@@ -266,6 +266,28 @@ explicit note when their separate reasoning explanation was not previously store
 - Native layout/frame tests and rendered previews do not measure desktop
   compositor latency under every GPU/load combination.
 
+## V9: persistence across sessions and legacy recovery — 2026-09-21
+
+- Verified the running v8 bridge after the user's full relaunch: new decisions,
+  acknowledgements and usage were already written to history.jsonl. Resumed
+  threads without new turns falsely triggered the legacy/relaunch warning.
+- History and statistics now derive from persisted decision IDs only. Resumed
+  tasks stay in Activity; accepted counts and model/effort breakdowns accumulate
+  across sessions. Live rows enrich existing historical decisions without
+  creating synthetic records. Removed the misleading restart/partial warning.
+- Recovered exactly 22 accepted sends from the previously verified user bridge
+  snapshot into history.recovered.jsonl. Native live history is untouched;
+  deterministic IDs make reruns idempotent (second run added zero). Missing
+  effort explanations, tokens and exact outcomes are not invented.
+- At validation, the rendered live monitor showed 24 decisions/accepted sends:
+  22 recovered and two native decisions after restart. The data paths resolve
+  from the installed router, not the chat's project or working directory.
+- 29 Python tests pass. Native review verifies persistence with no connected
+  task rows, accepted counts after reloading, recovery merge without duplication,
+  and no false restart warning for resumed tasks; all existing UI checks pass.
+- Only the monitor is replaced. The running recorder already supports persistence,
+  so this fix requires no further Codex restart. Personal journals stay Git-ignored.
+
 ## References and provenance
 
 This implementation is original. No upstream router source code was copied.

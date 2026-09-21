@@ -503,7 +503,7 @@ internal sealed partial class ModernRouterMonitor : Window
             bool enabled = ReadEnabled();
             pauseButton.Content = enabled ? "Ⅱ  Pausar selección" : "▶  Activar selección";
             var rows = new Dictionary<string, Dictionary<string, object>>();
-            int connected = 0, modern = 0, accepted = 0, nonAstra = 0;
+            int connected = 0, modern = 0;
             foreach (var file in Directory.GetFiles(StateFolder, "status-*.json").OrderBy(File.GetLastWriteTimeUtc))
             {
                 Dictionary<string, object> data;
@@ -525,8 +525,6 @@ internal sealed partial class ModernRouterMonitor : Window
                 {
                     modern++;
                     foreach (var pair in Dict(data["threads"])) rows[pair.Key] = Dict(pair.Value);
-                    var stats = data.ContainsKey("stats") ? Dict(data["stats"]) : new Dictionary<string, object>();
-                    accepted += Int(stats, "accepted"); nonAstra += Int(stats, "non_astra");
                 }
                 else if (data.ContainsKey("events"))
                 {
@@ -558,7 +556,7 @@ internal sealed partial class ModernRouterMonitor : Window
                 foreach (var pair in ordered.Skip(1)) taskList.Children.Add(TaskRow(pair.Key, pair.Value));
                 if (ordered.Count <= 1) taskList.Children.Add(EmptyRow("No hay otras tareas observables"));
             }
-            observedSessionAccepted = accepted; analyticsConnected = connected > 0;
+            analyticsConnected = connected > 0;
             RefreshAnalytics(ordered);
             UpdateTray();
         }

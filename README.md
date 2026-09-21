@@ -100,15 +100,18 @@ mensaje. **Activar selección** recupera el automático, sin reiniciar. Los mens
 que llegan durante una respuesta en curso no cambian el modelo de ese turno.
 
 Estadísticas consulta los datos cada dos segundos y muestra la hora de la última
-consulta. Separa **envíos aceptados en la sesión actual**, **decisiones con
-historial** y **tareas con datos parciales**. Una tarea puede contener muchos
-mensajes: contar tareas no equivale a contar decisiones.
+consulta. **Decisiones con historial** y **Envíos aceptados · acumulado** proceden
+de los registros persistentes, incluidos los de sesiones anteriores. Los gráficos
+de modelos y razonamiento usan esas mismas ejecuciones. Abrir una conversación
+antigua no cuenta como una nueva decisión.
 
-Si sigue activa una conexión anterior al registro persistente, se avisa de que
-los datos son parciales. El historial por ejecución empieza al cerrar Codex por
-completo y abrirlo desde **Codex automático**, cuando terminen los agentes.
+Los datos se guardan en `state/history.jsonl`, independientemente del proyecto
+al que pertenezca el chat. Se conservan entre reinicios y se aplica la política de
+retención elegida en Ajustes. Los registros antiguos recuperados están separados
+en `state/history.recovered.jsonl` y se identifican como datos con detalles limitados.
 Los tokens mostrados corresponden a la última llamada observada por registro,
-no al consumo total de todas las llamadas de cada tarea.
+no al consumo total de todas las llamadas de cada tarea. Los datos personales
+locales no se publican en GitHub.
 
 No se convierte el precio de la API ni el número bruto de tokens en cuota de
 suscripción. La calidad y el ahorro real requieren observar tareas representativas.

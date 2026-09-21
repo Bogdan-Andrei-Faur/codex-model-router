@@ -12,6 +12,7 @@ internal sealed class DecisionRecord
 {
     public string Id, Thread, Title, Model, Effort, ModelReason, EffortReason, Source, Status, Signal, Error;
     public double Time, StartedTime, FinishedTime;
+    public bool Accepted;
     public int InputTokens, OutputTokens, CachedTokens, ReasoningTokens;
 }
 
@@ -24,7 +25,7 @@ internal sealed partial class ModernRouterMonitor
     readonly List<UIElement> activityElements = new List<UIElement>();
     readonly List<DecisionRecord> decisions = new List<DecisionRecord>();
     string analyticsSignature, requestedHistoryThread;
-    int selectedMonitorTab, observedSessionAccepted;
+    int selectedMonitorTab;
     bool analyticsConnected;
     string selectedDecisionId;
     readonly TextBlock analyticsFreshness = Txt("", 11, Muted);
@@ -100,22 +101,30 @@ internal sealed partial class ModernRouterMonitor
         requestedHistoryThread = thread; SelectMonitorTab(1);
         var decision = decisions.FirstOrDefault(item => item.Thread == thread);
         if (decision != null) ShowDecision(decision);
+        else
+        {
+            selectedDecisionId = null; historyDetail.Children.Clear();
+            historyDetail.Children.Add(Txt("Sin ejecución registrada todavía", 15, Ink, FontWeights.SemiBold));
+            var note = Txt("La próxima ejecución de esta tarea aparecerá aquí. Abrir una conversación antigua no crea una decisión nueva.", 12, Muted);
+            note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 8, 0, 0); historyDetail.Children.Add(note);
+        }
     }
 
     void RefreshAnalytics(List<KeyValuePair<string, Dictionary<string, object>>> liveRows, string historyPath = null)
     {
         historyPath = historyPath ?? Path.Combine(StateFolder, "history.jsonl");
-        string signature = File.Exists(historyPath) ? File.GetLastWriteTimeUtc(historyPath).Ticks + ":" + new FileInfo(historyPath).Length : "none";
+        var historyPaths = new[] { historyPath, Path.ChangeExtension(historyPath, ".recovered.jsonl") };
+        string signature = System.String.Join("|", historyPaths.Select(path => File.Exists(path)
+            ? path + ":" + File.GetLastWriteTimeUtc(path).Ticks + ":" + new FileInfo(path).Length : path + ":none"));
         signature += ":" + System.String.Join("|", liveRows.Select(pair => pair.Key + ":" + Json.Serialize(pair.Value)));
         analyticsFreshness.Text = (analyticsConnected ? "Conectado · consultado " : "Sin conexión · consultado ") + DateTime.Now.ToString("HH:mm:ss") + " · cada 2 s";
-        signature += ":" + observedSessionAccepted + ":" + analyticsConnected;
+        signature += ":" + analyticsConnected;
         if (signature == analyticsSignature) return;
         decisions.Clear();
         var indexed = new Dictionary<string, DecisionRecord>();
-        if (File.Exists(historyPath))
+        foreach (string path in historyPaths.Where(File.Exists))
         {
-            var lines = File.ReadLines(historyPath).ToList();
-            foreach (string line in lines.Skip(Math.Max(0, lines.Count - 20000)))
+            foreach (string line in File.ReadLines(path))
             {
                 try
                 {
@@ -130,9 +139,10 @@ internal sealed partial class ModernRouterMonitor
         }
         foreach (var pair in liveRows)
         {
-            string id = String(pair.Value, "decision_id", "live-" + pair.Key);
+            string id = String(pair.Value, "decision_id");
             DecisionRecord item;
-            if (!indexed.TryGetValue(id, out item)) indexed[id] = item = new DecisionRecord { Id = id };
+            // Resumed conversations are live state, not new execution history.
+            if (id == "" || !indexed.TryGetValue(id, out item)) continue;
             item.Thread = pair.Key; item.Title = String(pair.Value, "name", pair.Key.Substring(0, Math.Min(8, pair.Key.Length)));
             item.Model = Model(Setting(pair.Value, "model", "Sin confirmar"));
             item.Effort = Effort(Setting(pair.Value, "effort", "")); item.Status = String(pair.Value, "status");
@@ -155,6 +165,7 @@ internal sealed partial class ModernRouterMonitor
         item.Time = Math.Max(item.Time, Number(data, "time"));
         string eventName = String(data, "event");
         if (eventName == "decision_created") item.StartedTime = Number(data, "time");
+        if (eventName == "decision_accepted" || eventName == "decision_recovered") item.Accepted = true;
         if (eventName == "decision_completed" || eventName == "decision_rejected" || eventName == "decision_error")
             item.FinishedTime = Number(data, "time");
         item.Thread = String(data, "thread", item.Thread); item.Title = String(data, "title", item.Title);
@@ -176,7 +187,7 @@ internal sealed partial class ModernRouterMonitor
         if (decisions.Count == 0)
         {
             historyDetail.Children.Clear(); historyDetail.Children.Add(Txt("Aún no hay decisiones registradas", 15, Ink, FontWeights.SemiBold));
-            var note = Txt("El historial empezará a conservarse al volver a abrir Codex desde su acceso automático.", 12, Muted);
+            var note = Txt("Las nuevas ejecuciones se guardan aquí y se conservan al cerrar Codex. Las conversaciones abiertas sin una nueva ejecución no cuentan como decisiones.", 12, Muted);
             note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 7, 0, 0); historyDetail.Children.Add(note); return;
         }
         historyList.Children.Add(Section("DECISIONES RECIENTES"));
@@ -238,6 +249,11 @@ internal sealed partial class ModernRouterMonitor
         historyDetail.Children.Add(tags);
         historyDetail.Children.Add(Txt(FriendlyStatus(decision.Status) + " · " + HistoryTime(decision.Time), 11,
             decision.Error == null ? Muted : Warning, FontWeights.Medium));
+        if (decision.Source == "recovered")
+        {
+            var recovered = Txt("Recuperada de registros anteriores · detalles limitados", 11, Muted);
+            recovered.TextWrapping = TextWrapping.Wrap; recovered.Margin = new Thickness(0, 5, 0, 0); historyDetail.Children.Add(recovered);
+        }
         AddExplanation(historyDetail, "POR QUÉ EL MODELO", decision.ModelReason);
         AddExplanation(historyDetail, "POR QUÉ EL RAZONAMIENTO", decision.EffortReason);
         int total = decision.InputTokens + decision.OutputTokens;
@@ -271,23 +287,25 @@ internal sealed partial class ModernRouterMonitor
     {
         statisticsContent.Children.Clear();
         statisticsContent.Children.Add(Txt("Resumen de decisiones", 17, Ink, FontWeights.SemiBold));
-        var recorded = decisions.Where(item => !item.Id.StartsWith("live-")).ToList();
-        int legacyTasks = decisions.Count - recorded.Count;
-        var note = Txt(legacyTasks > 0 ? "Datos parciales: la conexión actual conserva la última selección por tarea. Para guardar cada decisión, vuelve a abrir Codex desde su acceso automático cuando terminen tus agentes." :
-            "Historial local por ejecución. Los tokens observados no equivalen directamente a la cuota de la suscripción.", 12, legacyTasks > 0 ? Warning : Muted);
+        var note = Txt("Historial acumulado · se conserva entre sesiones", 12, Muted);
         note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 5, 0, 14); statisticsContent.Children.Add(note);
         statisticsContent.Children.Add(analyticsFreshness);
-        AddMetric("Envíos aceptados · sesión actual", observedSessionAccepted.ToString(), observedSessionAccepted > 0 ? 1 : 0, Accent);
-        AddMetric("Decisiones con historial", recorded.Count.ToString(), recorded.Count > 0 ? 1 : 0, Accent);
-        if (legacyTasks > 0) AddMetric("Tareas con datos parciales", legacyTasks.ToString(), 1, Warning);
-        int total = decisions.Count;
+        int total = decisions.Count, accepted = decisions.Count(item => item.Accepted);
+        AddMetric("Decisiones con historial", total.ToString(), total > 0 ? 1 : 0, Accent);
+        AddMetric("Envíos aceptados · acumulado", accepted.ToString(), total > 0 ? accepted * 1.0 / total : 0, Accent);
+        int recovered = decisions.Count(item => item.Source == "recovered");
+        if (recovered > 0)
+        {
+            var recoveryNote = Txt(recovered + " decisiones recuperadas de registros anteriores. Sus detalles son limitados.", 11, Muted);
+            recoveryNote.TextWrapping = TextWrapping.Wrap; recoveryNote.Margin = new Thickness(0, 3, 0, 8); statisticsContent.Children.Add(recoveryNote);
+        }
         int errors = decisions.Count(item => item.Error != null || item.Status == "error" || item.Status == "failed");
         int retries = decisions.Count(item => item.Signal == "retry");
-        AddMetric("Incidencias registradas", legacyTasks > 0 && recorded.Count == 0 && errors == 0 ? "Sin datos" : errors.ToString(), total == 0 ? 0 : errors * 1.0 / total, errors == 0 ? Good : Warning);
-        AddMetric("Reintentos registrados", legacyTasks > 0 && recorded.Count == 0 ? "Sin datos" : retries.ToString(), total == 0 ? 0 : retries * 1.0 / total, retries == 0 ? Good : Warning);
-        statisticsContent.Children.Add(AnalyticsHeading(legacyTasks > 0 ? "MODELOS · ÚLTIMO ESTADO POR TAREA Y REGISTROS" : "MODELOS"));
+        AddMetric("Incidencias registradas", errors.ToString(), total == 0 ? 0 : errors * 1.0 / total, errors == 0 ? Good : Warning);
+        AddMetric("Reintentos registrados", retries.ToString(), total == 0 ? 0 : retries * 1.0 / total, Good);
+        statisticsContent.Children.Add(AnalyticsHeading("MODELOS"));
         AddBreakdown(decisions.Where(item => item.Model != null).GroupBy(item => item.Model).ToDictionary(group => group.Key, group => group.Count()), true);
-        statisticsContent.Children.Add(AnalyticsHeading(legacyTasks > 0 ? "RAZONAMIENTO · DATOS PARCIALES" : "RAZONAMIENTO"));
+        statisticsContent.Children.Add(AnalyticsHeading("RAZONAMIENTO"));
         AddBreakdown(decisions.Where(item => !System.String.IsNullOrEmpty(item.Effort)).GroupBy(item => item.Effort).ToDictionary(group => group.Key, group => group.Count()), false);
         long input = decisions.Sum(item => (long)item.InputTokens), output = decisions.Sum(item => (long)item.OutputTokens), cached = decisions.Sum(item => (long)item.CachedTokens);
         if (input + output > 0)
@@ -406,7 +424,7 @@ internal sealed partial class ModernRouterMonitor
     static string FriendlyStatus(string value)
     {
         switch (value) { case "completed": case "idle": return "Completada"; case "inProgress": case "active": case "running": return "Trabajando";
-            case "pending": return "Pendiente"; case "error": case "failed": return "Error"; case "interrupted": return "Interrumpida";
+            case "finished": return "Finalizada"; case "pending": return "Pendiente"; case "error": case "failed": return "Error"; case "interrupted": return "Interrumpida";
             default: return Status(value ?? "unknown"); }
     }
 

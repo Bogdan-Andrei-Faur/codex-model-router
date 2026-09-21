@@ -15,9 +15,9 @@ try {
     $routerWriter.Write([UInt32]$routerPng.Length); $routerWriter.Write([UInt32]22)
     $routerWriter.Write($routerPng)
 } finally { $routerWriter.Dispose() }
-& $routerCompiler /nologo /target:winexe /optimize+ /r:System.Windows.Forms.dll /r:System.Web.Extensions.dll "/win32icon:$routerIcon" "/out:$routerOutput\codex-router-v8.exe" "$routerRoot\Launcher.cs"
+& $routerCompiler /nologo /target:winexe /optimize+ /r:System.Windows.Forms.dll /r:System.Web.Extensions.dll "/win32icon:$routerIcon" "/out:$routerOutput\codex-router-v9.exe" "$routerRoot\Launcher.cs"
 if ($LASTEXITCODE -ne 0) { throw 'Compilation failed' }
-& $routerCompiler /nologo /target:winexe /optimize+ /main:RouterMonitorProgram /r:System.Core.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Web.Extensions.dll "/r:$routerFramework\System.Xaml.dll" "/r:$routerFramework\WindowsBase.dll" "/r:$routerFramework\PresentationCore.dll" "/r:$routerFramework\PresentationFramework.dll" "/win32icon:$routerIcon" "/out:$routerOutput\codex-monitor-v8.exe" "$routerRoot\MonitorWpf.cs" "$routerRoot\MonitorAnalytics.cs" "$routerRoot\MonitorReviewTests.cs"
+& $routerCompiler /nologo /target:winexe /optimize+ /main:RouterMonitorProgram /r:System.Core.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Web.Extensions.dll "/r:$routerFramework\System.Xaml.dll" "/r:$routerFramework\WindowsBase.dll" "/r:$routerFramework\PresentationCore.dll" "/r:$routerFramework\PresentationFramework.dll" "/win32icon:$routerIcon" "/out:$routerOutput\codex-monitor-v9.exe" "$routerRoot\MonitorWpf.cs" "$routerRoot\MonitorAnalytics.cs" "$routerRoot\MonitorReviewTests.cs"
 if ($LASTEXITCODE -ne 0) { throw 'Monitor compilation failed' }
 if ($BuildOnly) { Write-Output 'Compilación preparada sin cambiar los accesos.'; return }
 $routerShell = New-Object -ComObject WScript.Shell
@@ -29,7 +29,7 @@ $routerLinks = @{
 }
 foreach ($routerName in $routerLinks.Keys) {
     $routerShortcut = $routerShell.CreateShortcut((Join-Path $routerRoot "$routerName.lnk"))
-    $routerShortcut.TargetPath = Join-Path $routerOutput 'codex-router-v8.exe'
+    $routerShortcut.TargetPath = Join-Path $routerOutput 'codex-router-v9.exe'
     $routerShortcut.Arguments = $routerLinks[$routerName]
     $routerShortcut.WorkingDirectory = $routerRoot
     $routerShortcut.IconLocation = "$routerIcon,0"
@@ -38,7 +38,7 @@ foreach ($routerName in $routerLinks.Keys) {
 $routerDesktop = [Environment]::GetFolderPath('Desktop')
 foreach ($routerEntry in @(@('Codex automático', '--open'), @('Estado de Codex automático', '--status'))) {
     $routerShortcut = $routerShell.CreateShortcut((Join-Path $routerDesktop ($routerEntry[0] + '.lnk')))
-    $routerShortcut.TargetPath = Join-Path $routerOutput 'codex-router-v8.exe'
+    $routerShortcut.TargetPath = Join-Path $routerOutput 'codex-router-v9.exe'
     $routerShortcut.Arguments = $routerEntry[1]
     $routerShortcut.WorkingDirectory = $routerRoot
     $routerShortcut.IconLocation = "$routerIcon,0"

@@ -103,11 +103,11 @@ internal sealed partial class ModernRouterMonitor
         var rows = new List<KeyValuePair<string, Dictionary<string, object>>>();
         try
         {
-            analyticsSignature = null; observedSessionAccepted = 2; analyticsConnected = true;
+            analyticsSignature = null; analyticsConnected = true;
             File.WriteAllText(path, "");
             rows.Add(new KeyValuePair<string, Dictionary<string, object>>("legacy", Fixture("Legacy task", "gpt-5.6-sol", "medium", "active")));
             RefreshAnalytics(rows, path); SelectMonitorTab(2); UpdateLayout();
-            Check(decisions.Count == 1 && ContainsText(statisticsContent, "Tareas con datos parciales"), "Legacy tasks reported as decisions");
+            Check(decisions.Count == 0 && !ContainsText(statisticsContent, "vuelve a abrir"), "Resumed tasks counted as decisions or triggered a false restart warning");
             rows.Clear();
             var created = new Dictionary<string, object> { { "decision_id", "one" }, { "event", "decision_created" },
                 { "thread", "same" }, { "model", "gpt-5.6-terra" }, { "effort", "medium" }, { "time", 100 } };
@@ -123,8 +123,19 @@ internal sealed partial class ModernRouterMonitor
             RefreshAnalytics(rows, path); Check(decisions.Count == 2 && decisions.First(d => d.Id == "two").InputTokens == 55, "Live usage failed to refresh without timestamp change");
             live["tokens"] = new Dictionary<string, object> { { "inputTokens", 61 } };
             RefreshAnalytics(rows, path); Check(decisions.First(d => d.Id == "two").InputTokens == 61, "Unchanged timestamp blocked live usage refresh");
+            File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "decision_accepted", time = 103 }) + Environment.NewLine);
+            rows.Clear(); analyticsSignature = null; decisions.Clear(); analyticsConnected = false;
+            RefreshAnalytics(rows, path);
+            Check(decisions.Count == 2 && decisions.Count(d => d.Accepted) == 1, "Persisted totals lost on reconnect without live rows");
+            string recoveredPath = Path.ChangeExtension(path, ".recovered.jsonl");
+            File.WriteAllText(recoveredPath, Json.Serialize(new { decision_id = "old", @event = "decision_recovered", source = "recovered",
+                model = "gpt-5.6-sol", effort = "high", time = 50 }) + Environment.NewLine);
+            RefreshAnalytics(rows, path);
+            Check(decisions.Count == 3 && decisions.Count(d => d.Accepted) == 2, "Recovered history not added to accumulated totals");
+            analyticsSignature = null; decisions.Clear(); RefreshAnalytics(rows, path);
+            Check(decisions.Count == 3 && decisions.Count(d => d.Accepted) == 2, "Second load duplicated or lost historical decisions");
         }
-        finally { File.Delete(path); analyticsSignature = null; }
+        finally { File.Delete(path); File.Delete(Path.ChangeExtension(path, ".recovered.jsonl")); analyticsSignature = null; }
     }
 
     public int RunReviewChecks()
@@ -235,7 +246,7 @@ internal sealed partial class ModernRouterMonitor
             results.Add("PASS: disconnected/empty view renders");
 
             CheckLiveStatistics();
-            results.Add("PASS: repeated decisions increment, usage refreshes without timestamps, legacy tasks stay explicitly partial");
+            results.Add("PASS: decisions and accepted totals persist without live tasks; recovered records merge without duplicates; resumed tasks trigger no false warning");
             SelectMonitorTab(2); UpdateLayout();
             SaveVisual(this, Path.Combine(StateFolder, "review-statistics-live.png"), 1);
             PaintAnalyticsFixtures();
