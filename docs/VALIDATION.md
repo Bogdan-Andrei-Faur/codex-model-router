@@ -288,6 +288,27 @@ explicit note when their separate reasoning explanation was not previously store
 - Only the monitor is replaced. The running recorder already supports persistence,
   so this fix requires no further Codex restart. Personal journals stay Git-ignored.
 
+## V11: native agent-first capsule — 2026-09-21
+
+- Added MonitorAgents.cs: circular task-category glyphs, existing model palette,
+  rotating arcs, stable active ordering and at most five visible avatars plus
+  an overflow action. No classifier/API call or routing change is involved.
+- Replaced the compact logo/featured-model block with active avatars and count.
+  Attached hover/focus/click details show the observed title, model, effort and
+  state without entering the expanded panel. A 220 ms leave delay permits
+  moving into the detail; Escape closes it.
+- Compact visual width is 326 DIP; the transparent native envelope stays fixed.
+  Width, height and peek motion retain a shared bottom-right anchor. Motion
+  honors Windows animation settings; hidden/expanded modes stop orbit clocks.
+- Native UI review verifies stable ordering across refreshed rows, task glyphs,
+  active orbit, hover details and edge stability, moving toward the detail,
+  reactivation during exit, model/effort refresh, 5+N overflow, idle cleanup and
+  stopping hidden animations. Existing persistence/navigation checks pass.
+- Rendered capsule, attached detail, overflow and idle fixtures were inspected.
+  Native compositor performance under every GPU/load and DPI combination is
+  not established by these local layout tests.
+- Only the monitor is replaced; currently running Codex tasks are unaffected.
+
 ## References and provenance
 
 This implementation is original. No upstream router source code was copied.

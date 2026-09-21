@@ -35,16 +35,13 @@ internal sealed partial class ModernRouterMonitor : Window
 
     readonly bool preview;
     readonly Border shell = new Border();
-    readonly Grid surface = new Grid { Margin = new Thickness(8), VerticalAlignment = VerticalAlignment.Bottom };
+    readonly Grid surface = new Grid { Margin = new Thickness(8), VerticalAlignment = VerticalAlignment.Bottom, HorizontalAlignment = HorizontalAlignment.Right };
     readonly Grid compactView = new Grid(), expandedView = new Grid();
     readonly StackPanel taskList = new StackPanel();
     readonly ScrollViewer activityScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
         HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, PanningMode = PanningMode.VerticalOnly };
-    readonly StackPanel compactTags = new StackPanel { Orientation = Orientation.Horizontal };
     readonly StackPanel mainTags = new StackPanel { Orientation = Orientation.Horizontal };
-    readonly Grid compactActivity = new Grid { Width = 18, Height = 18 };
     readonly Grid headerActivity = new Grid { Width = 18, Height = 18 };
-    readonly TextBlock compactTask = Txt("Esperando una tarea de Codex", 12, Muted);
     readonly TextBlock compactCount = Txt("0 activas", 12, Muted, FontWeights.Medium);
     readonly TextBlock connection = Txt("Esperando conexión", 12, Muted);
     readonly TextBlock mainTask = Txt("Sin tarea seleccionada", 17, Ink, FontWeights.SemiBold);
@@ -200,32 +197,7 @@ internal sealed partial class ModernRouterMonitor : Window
         return image;
     }
 
-    void BuildCompact()
-    {
-        compactView.Margin = new Thickness(13, 10, 10, 10);
-        compactView.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(39) });
-        compactView.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        compactView.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        compactView.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
-        var logo = Logo(34); Grid.SetColumn(logo, 0); compactView.Children.Add(logo);
-        var copy = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        copy.Children.Add(compactTags); compactTask.Margin = new Thickness(0, 5, 0, 0);
-        copy.Children.Add(compactTask); Grid.SetColumn(copy, 1); compactView.Children.Add(copy);
-        var compactActivityRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        compactActivityRow.Children.Add(compactActivity); compactActivityRow.Children.Add(compactCount);
-        var countBox = new Border { BorderBrush = Line, BorderThickness = new Thickness(1, 0, 0, 0),
-            Padding = new Thickness(8, 0, 0, 0), Margin = new Thickness(10, 8, 5, 8), Child = compactActivityRow };
-        Grid.SetColumn(countBox, 2); compactView.Children.Add(countBox);
-        var open = Btn("‹", delegate { SwitchMode(MonitorMode.Expanded, true); }, true);
-        open.Content = new System.Windows.Shapes.Path { Data = System.Windows.Media.Geometry.Parse("M 5,0 L 0,5 L 5,10"),
-            Stroke = Muted, StrokeThickness = 1.6, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
-            Width = 6, Height = 10, Stretch = Stretch.Uniform, VerticalAlignment = VerticalAlignment.Center };
-        open.ToolTip = "Desplegar panel lateral"; open.VerticalAlignment = VerticalAlignment.Center; open.HorizontalAlignment = HorizontalAlignment.Stretch;
-        Grid.SetColumn(open, 3); compactView.Children.Add(open);
-        compactView.MouseLeftButtonUp += delegate(object sender, MouseButtonEventArgs e)
-        { if (!e.Handled) SwitchMode(MonitorMode.Expanded, true); };
-        compactView.Background = TransparentBrush; compactView.Cursor = Cursors.Hand;
-    }
+    void BuildCompact() { BuildAgentCapsule(); }
 
     void BuildExpanded()
     {
@@ -415,10 +387,13 @@ internal sealed partial class ModernRouterMonitor : Window
 
     public void SwitchMode(MonitorMode target, bool animate)
     {
-        mode = target;
+        mode = target; peekCloseTimer.Stop(); peekAgentId = null; peekSignature = null;
+        agentPeek.Visibility = Visibility.Collapsed;
+        foreach (var visual in agentAvatars.Values) SetAgentOrbit(visual, false);
         if (target == MonitorMode.Hidden)
         {
             surface.BeginAnimation(FrameworkElement.HeightProperty, null);
+            surface.BeginAnimation(FrameworkElement.WidthProperty, null);
             Hide(); SaveUiState(); UpdateTray(); return;
         }
         compactView.Visibility = target == MonitorMode.Compact ? Visibility.Visible : Visibility.Collapsed;
@@ -429,17 +404,22 @@ internal sealed partial class ModernRouterMonitor : Window
         var envelope = TargetGeometry(MonitorMode.Expanded);
         var geometry = TargetGeometry(target);
         double from = surface.ActualHeight, to = Math.Max(1, geometry.Height - 16);
+        double fromWidth = surface.ActualWidth, toWidth = Math.Max(1, geometry.Width - 16);
         Width = envelope.Width; Height = envelope.Height; Left = envelope.Left; Top = envelope.Top;
         surface.BeginAnimation(FrameworkElement.HeightProperty, null);
         surface.Height = to;
+        surface.BeginAnimation(FrameworkElement.WidthProperty, null); surface.Width = toWidth;
         if (animate && IsVisible && SystemParameters.ClientAreaAnimation)
         {
             var motion = new DoubleAnimation(from, to, ModeTransitionDuration)
             { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }, FillBehavior = FillBehavior.Stop };
             surface.BeginAnimation(FrameworkElement.HeightProperty, motion, HandoffBehavior.SnapshotAndReplace);
+            surface.BeginAnimation(FrameworkElement.WidthProperty, new DoubleAnimation(fromWidth, toWidth, ModeTransitionDuration)
+            { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }, FillBehavior = FillBehavior.Stop });
         }
         Opacity = 1;
         if (!IsVisible) Show();
+        foreach (var visual in agentAvatars.Values) SetAgentOrbit(visual, target == MonitorMode.Compact);
         SaveUiState(); UpdateTray();
     }
 
@@ -457,7 +437,7 @@ internal sealed partial class ModernRouterMonitor : Window
     internal static Rect Geometry(MonitorMode target, Rect work)
     {
         const double margin = 10; // The surface has an additional 8 DIP shadow inset.
-        double width = Math.Min(432, Math.Max(1, work.Width - margin * 2));
+        double width = Math.Min(target == MonitorMode.Compact ? 342 : 432, Math.Max(1, work.Width - margin * 2));
         double height = Math.Min(target == MonitorMode.Compact ? 96 : 760, Math.Max(1, work.Height - margin * 2));
         return new Rect(work.Right - width - margin, work.Bottom - height - margin, width, height);
     }
@@ -556,6 +536,7 @@ internal sealed partial class ModernRouterMonitor : Window
                 foreach (var pair in ordered.Skip(1)) taskList.Children.Add(TaskRow(pair.Key, pair.Value));
                 if (ordered.Count <= 1) taskList.Children.Add(EmptyRow("No hay otras tareas observables"));
             }
+            RefreshAgentCapsule(ordered);
             analyticsConnected = connected > 0;
             RefreshAnalytics(ordered);
             UpdateTray();
@@ -568,10 +549,7 @@ internal sealed partial class ModernRouterMonitor : Window
         string name = String(row, "name", id.Substring(0, Math.Min(8, id.Length)));
         string model = Model(Setting(row, "model", "Sin confirmar"));
         string effort = Effort(Setting(row, "effort", ""));
-        FillTags(compactTags, model, effort); FillTags(mainTags, model, effort);
-        compactTask.Text = name + " · " + Status(String(row, "status"));
-        compactTask.ToolTip = compactTask.Text;
-        compactCount.Text = active + (active == 1 ? " activa" : " activas");
+        FillTags(mainTags, model, effort);
         mainTask.Text = name; mainTask.ToolTip = name;
         confirmation.Text = String(row, "status") == "pending" ? "Enviando · pendiente de confirmar" : String(row, "confirmation", "Sin confirmar");
         confirmation.Foreground = confirmation.Text == "Aceptado por Codex" ? Good : Muted;
@@ -581,8 +559,7 @@ internal sealed partial class ModernRouterMonitor : Window
 
     void ApplyEmpty()
     {
-        FillTags(compactTags, "Sin actividad", ""); FillTags(mainTags, "Sin confirmar", "");
-        compactTask.Text = "Esperando una tarea de Codex"; compactTask.ToolTip = compactTask.Text; compactCount.Text = "0 activas";
+        FillTags(mainTags, "Sin confirmar", "");
         mainTask.Text = "Sin tarea seleccionada"; mainTask.ToolTip = mainTask.Text;
         confirmation.Text = "Sin confirmación"; reason.Text = "Todavía no hay una decisión del selector.";
         effortReason.Text = "Todavía no hay una decisión de razonamiento.";
@@ -613,10 +590,9 @@ internal sealed partial class ModernRouterMonitor : Window
     {
         if (active == lastActiveCount && connected == lastConnected) return;
         lastActiveCount = active; lastConnected = connected;
-        compactActivity.Children.Clear(); headerActivity.Children.Clear();
-        compactActivity.Children.Add(ActivityIndicator(active > 0, connected ? Good : Warning));
+        headerActivity.Children.Clear();
         headerActivity.Children.Add(ActivityIndicator(active > 0, connected ? Good : Warning));
-        compactCount.Foreground = active > 0 ? Good : Muted;
+        compactCount.Foreground = Muted;
     }
 
     static Grid ActivityIndicator(bool active, Brush color)
@@ -767,6 +743,8 @@ internal sealed partial class ModernRouterMonitor : Window
     void OnClosing(object sender, System.ComponentModel.CancelEventArgs e)
     {
         if (!quitting && !preview) { e.Cancel = true; SwitchMode(MonitorMode.Hidden, true); return; }
+        peekCloseTimer.Stop();
+        foreach (var visual in agentAvatars.Values) SetAgentOrbit(visual, false);
         timer.Stop(); if (trayMenu != null) trayMenu.IsOpen = false; tray.Visible = false; tray.Dispose();
         Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= DisplayChanged;
         SystemParameters.StaticPropertyChanged -= WorkAreaChanged;

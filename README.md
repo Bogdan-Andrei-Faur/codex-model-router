@@ -132,3 +132,20 @@ suscripción. La calidad y el ahorro real requieren observar tareas representati
   privado [Bogdan-Andrei-Faur/codex-model-router](https://github.com/Bogdan-Andrei-Faur/codex-model-router).
 
 Pruebas y límites de validación: [VALIDATION.md](docs/VALIDATION.md).
+
+## Cápsula de agentes
+
+La cápsula muestra hasta cinco agentes activos y agrupa el resto en `+N`.
+Cada círculo usa el color de su modelo y un icono orientativo según el tipo de
+tarea (interfaces, correcciones, pruebas, auditorías, arquitectura, textos,
+investigación o tarea general). El icono no interviene en la elección del modelo.
+
+El aro gira mientras se observa actividad. Al pasar el ratón, pulsar o enfocar
+un agente con el teclado, se despliega su tarea, modelo, esfuerzo y estado desde
+la propia cápsula. El detalle permanece abierto al mover el ratón sobre él;
+Escape o salir de la cápsula lo cierra. La flecha y `+N` abren el panel lateral.
+
+Las entradas y salidas se animan sin reordenar los agentes que siguen activos.
+La base y el borde derecho permanecen fijos. Las animaciones respetan la opción
+de movimiento de Windows y los aros se detienen cuando la cápsula está oculta.
+No se infiere si un modelo está pensando: se muestra la actividad observada.

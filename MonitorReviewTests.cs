@@ -66,6 +66,11 @@ internal sealed partial class ModernRouterMonitor
     void PaintFixtures()
     {
         connection.Text = "4 tareas activas"; connection.Foreground = Good;
+        var avatarRows = new List<KeyValuePair<string, Dictionary<string, object>>> {
+            new KeyValuePair<string, Dictionary<string, object>>("ui", Fixture("Pulir la cápsula de agentes", "gpt-6-astra", "high", "active")),
+            new KeyValuePair<string, Dictionary<string, object>>("fix", Fixture("Corregir el formulario", "gpt-5.6-terra", "medium", "active")),
+            new KeyValuePair<string, Dictionary<string, object>>("test", Fixture("Comprobar el historial", "gpt-5.6-sol", "high", "active")) };
+        RefreshAgentCapsule(avatarRows, false);
         ApplyFocus("example", Fixture("Revisar el monitor de Codex", "gpt-6-astra", "xhigh", "active"), 4);
         taskList.Children.Clear(); taskList.Children.Add(Section("ACTIVIDAD"));
         var names = new[] { "Traducir un mensaje", "Ajustar un componente", "Revisar la arquitectura", "Auditar una interfaz", "Resolver un error complejo", "Investigación a fondo" };
@@ -136,6 +141,66 @@ internal sealed partial class ModernRouterMonitor
             Check(decisions.Count == 3 && decisions.Count(d => d.Accepted) == 2, "Second load duplicated or lost historical decisions");
         }
         finally { File.Delete(path); File.Delete(Path.ChangeExtension(path, ".recovered.jsonl")); analyticsSignature = null; }
+    }
+
+    static void RunUiFor(int milliseconds)
+    {
+        var frame = new DispatcherFrame();
+        var stop = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(milliseconds) };
+        stop.Tick += delegate { stop.Stop(); frame.Continue = false; };
+        stop.Start(); Dispatcher.PushFrame(frame);
+    }
+
+    void CheckAgentCapsule()
+    {
+        SwitchMode(MonitorMode.Compact, false); PaintFixtures(); UpdateLayout();
+        Check(agentAvatars.Count == 3 && activeAgentRows.Count == 3, "Active avatars missing");
+        Check(IdentifyAgent(activeAgentRows["ui"]).Name == "Interfaces" && IdentifyAgent(activeAgentRows["fix"]).Name == "Corrección", "Task icon catalog is not differentiated");
+        var original = agentAvatars["ui"];
+        var rows = activeAgentRows.Reverse().ToList();
+        RefreshAgentCapsule(rows, false);
+        Check(agentOrder.First() == "ui" && object.ReferenceEquals(original, agentAvatars["ui"]), "Refresh reordered or recreated active agents");
+        if (SystemParameters.ClientAreaAnimation) Check(original.Orbit.HasAnimatedProperties, "Working avatar lacks orbit");
+        double bottom = Top + shell.TransformToAncestor(this).Transform(new Point(0, shell.ActualHeight)).Y;
+        double drift = 0;
+        EventHandler sample = delegate { drift = Math.Max(drift, Math.Abs(Top + shell.TransformToAncestor(this).Transform(new Point(0, shell.ActualHeight)).Y - bottom)); };
+        CompositionTarget.Rendering += sample;
+        try
+        {
+            original.Button.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.MouseEnterEvent });
+            RunUiFor(500); UpdateLayout();
+            Check(mode == MonitorMode.Compact && peekAgentId == "ui" && surface.ActualHeight > 160, "Hover did not expand an attached detail");
+            Check(ContainsText(agentPeekContent, "Pulir") && ContainsText(agentPeekContent, "Astra") && ContainsText(agentPeekContent, "Alto"), "Peek lacks task/model/effort");
+            SaveVisual(this, Path.Combine(StateFolder, "review-agent-peek.png"), 1);
+            compactView.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.MouseLeaveEvent });
+            RunUiFor(100);
+            compactView.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.MouseEnterEvent });
+            RunUiFor(180); Check(peekAgentId == "ui", "Moving toward the detail closed it");
+            CloseAgentPeek(true); RunUiFor(500); UpdateLayout();
+            Check(Math.Abs(surface.ActualHeight - 80) < 1 && drift < 1.1, "Peek displaced bottom edge or failed to collapse");
+        }
+        finally { CompositionTarget.Rendering -= sample; }
+        rows = rows.Where(pair => pair.Key != "ui").ToList(); RefreshAgentCapsule(rows, true);
+        RunUiFor(80);
+        rows.Add(new KeyValuePair<string, Dictionary<string, object>>("ui", Fixture("Pulir la cápsula de agentes", "gpt-5.6-terra", "medium", "active")));
+        RefreshAgentCapsule(rows, true); RunUiFor(500);
+        Check(agentAvatars.Count == 3 && !agentAvatars["ui"].Leaving, "Reactivation during exit lost or duplicated avatar");
+        ShowAgentPeek("ui", false); UpdateLayout();
+        Check(ContainsText(agentPeekContent, "Terra") && ContainsText(agentPeekContent, "Medio"), "Changed model or effort was not reflected in peek");
+        CloseAgentPeek(false);
+        for (int i = 0; i < 5; i++) rows.Add(new KeyValuePair<string, Dictionary<string, object>>("extra-" + i, Fixture("Prueba adicional " + i, "gpt-5.6-sol", "high", "active")));
+        RefreshAgentCapsule(rows, false); UpdateLayout();
+        Check(agentAvatars.Count == 5 && moreAgents.Content.ToString() == "+3", "Overflow agents are not capped at five");
+        Check(agentStrip.ActualWidth < surface.ActualWidth - 50, "Avatar strip overflows capsule");
+        SaveVisual(this, Path.Combine(StateFolder, "review-agents-overflow.png"), 1);
+        moreAgents.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Check(mode == MonitorMode.Expanded, "Overflow action did not open the detailed panel");
+        Check(agentAvatars.Values.All(v => !v.Orbit.HasAnimatedProperties), "Hidden capsule keeps orbit clocks running");
+        SwitchMode(MonitorMode.Compact, false);
+        RefreshAgentCapsule(new List<KeyValuePair<string, Dictionary<string, object>>>(), true); RunUiFor(500); UpdateLayout();
+        Check(agentAvatars.Count == 0 && compactCount.Text == "Sin tareas activas", "Inactive agents were not removed");
+        SaveVisual(this, Path.Combine(StateFolder, "review-agents-idle.png"), 1);
+        PaintFixtures(); UpdateLayout();
     }
 
     public int RunReviewChecks()
@@ -216,11 +281,12 @@ internal sealed partial class ModernRouterMonitor
             SwitchMode(MonitorMode.Compact, false); PaintFixtures(); UpdateLayout();
             Check(compactView.Visibility == Visibility.Visible && expandedView.Visibility == Visibility.Collapsed, "Both views visible");
             Check(Math.Abs(surface.ActualHeight - 80) < 1, "Stale animation restored wrong geometry");
-            var arrow = compactView.Children.OfType<Button>().Single();
+            var arrow = expandAgents;
             var glyph = (FrameworkElement)arrow.Content;
             double arrowY = glyph.TransformToAncestor(compactView).Transform(new Point(0, glyph.ActualHeight / 2)).Y;
-            double countY = compactCount.TransformToAncestor(compactView).Transform(new Point(0, compactCount.ActualHeight / 2)).Y;
-            Check(Math.Abs(arrowY - countY) < 1, "Capsule arrow not aligned with active count");
+            Check(!double.IsNaN(arrowY), "Capsule arrow has invalid geometry");
+            CheckAgentCapsule();
+            results.Add("PASS: agent orbit, stable ordering, attached hover, exit/reactivation race, model changes, overflow and idle cleanup");
             SaveVisual(this, Path.Combine(StateFolder, "review-capsule.png"), 1);
             results.Add("PASS: rapid expand/hide/reveal/collapse keeps a single correctly sized surface");
             Check(trayCompact.IsChecked && !trayExpanded.IsChecked && !trayHidden.IsChecked, "Tray view selection missing");
