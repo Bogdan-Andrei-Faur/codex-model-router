@@ -238,9 +238,18 @@ internal sealed partial class ModernRouterMonitor
 
     static void AddExplanation(StackPanel panel, string label, string value)
     {
-        var heading = Label(label); heading.Margin = new Thickness(0, 12, 0, 4); panel.Children.Add(heading);
-        var text = Txt(System.String.IsNullOrEmpty(value) ? "No disponible en este registro." : value, 12, Muted);
-        text.TextWrapping = TextWrapping.Wrap; panel.Children.Add(text);
+        bool modelChoice = label == "POR QUÉ EL MODELO";
+        bool effortChoice = label == "POR QUÉ EL RAZONAMIENTO";
+        string title = modelChoice ? "Modelo elegido" : effortChoice ? "Razonamiento elegido" : label;
+        var titleText = Txt(title, 11, modelChoice ? Accent : effortChoice ? Good : Muted, FontWeights.SemiBold);
+        titleText.TextWrapping = TextWrapping.Wrap;
+        var text = Txt(System.String.IsNullOrEmpty(value) ? "No disponible en este registro." : value, 13, Ink, FontWeights.Medium);
+        text.TextWrapping = TextWrapping.Wrap; text.Margin = new Thickness(0, 5, 0, 0);
+        var stack = new StackPanel(); stack.Children.Add(titleText); stack.Children.Add(text);
+        var rail = modelChoice ? Accent : effortChoice ? Good : Line;
+        var card = new Border { Background = Panel2, BorderBrush = rail, BorderThickness = new Thickness(3, 0, 0, 0),
+            CornerRadius = new CornerRadius(9), Padding = new Thickness(10, 9, 11, 9), Margin = new Thickness(0, 10, 0, 0), Child = stack };
+        panel.Children.Add(card);
     }
 
     void RebuildStatistics()

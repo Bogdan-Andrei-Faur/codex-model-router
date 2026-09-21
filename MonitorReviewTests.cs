@@ -39,6 +39,15 @@ internal sealed partial class ModernRouterMonitor
         return ((TextBlock)((Border)panel.Children[index]).Child).Text;
     }
 
+    static bool ContainsText(DependencyObject node, string value)
+    {
+        var block = node as TextBlock;
+        if (block != null && (block.Text ?? "").Contains(value)) return true;
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
+            if (ContainsText(VisualTreeHelper.GetChild(node, i), value)) return true;
+        return false;
+    }
+
     static double Luminance(Color color)
     {
         var c = new[] { color.R / 255.0, color.G / 255.0, color.B / 255.0 }
@@ -50,7 +59,6 @@ internal sealed partial class ModernRouterMonitor
     {
         connection.Text = "4 tareas activas"; connection.Foreground = Good;
         ApplyFocus("example", Fixture("Revisar el monitor de Codex", "gpt-6-astra", "xhigh", "active"), 4);
-        summary.Text = "12/18 fuera de Astra";
         taskList.Children.Clear(); taskList.Children.Add(Section("ACTIVIDAD"));
         var names = new[] { "Traducir un mensaje", "Ajustar un componente", "Revisar la arquitectura", "Auditar una interfaz", "Resolver un error complejo", "Investigación a fondo" };
         var models = new[] { "gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-6-astra", "gpt-5.6-sol", "gpt-6-astra" };
@@ -82,8 +90,10 @@ internal sealed partial class ModernRouterMonitor
             Check(ModeTransitionDuration.TotalMilliseconds >= 350, "Mode transition is still too abrupt");
             double? previousX = null;
             int activityRowIndex = 0;
-            foreach (Grid row in taskList.Children.OfType<Grid>())
+            foreach (Border card in taskList.Children.OfType<Border>())
             {
+                var row = (Grid)card.Child;
+                Check(card.CornerRadius.TopLeft >= 10 && card.Padding.Left >= 8, "Activity hover card lacks rounded padding");
                 Check(Math.Abs(row.ColumnDefinitions[0].ActualWidth - 24) < .1, "Activity indicator lacks text spacing");
                 var indicator = row.Children.OfType<Grid>().First(candidate => Convert.ToString(candidate.Tag) == "activity-indicator");
                 Check(System.Windows.Automation.AutomationProperties.GetName(indicator) ==
@@ -152,7 +162,7 @@ internal sealed partial class ModernRouterMonitor
                 trayMenu.IsOpen = false;
             }
             results.Add("PASS: tray topmost action toggles the window; view and on/off indicators render correctly");
-            ApplyEmpty(); connection.Text = "Sin conexión"; connection.Foreground = Warning; summary.Text = "0/0 fuera de Astra";
+            ApplyEmpty(); connection.Text = "Sin conexión"; connection.Foreground = Warning;
             SwitchMode(MonitorMode.Expanded, false); taskList.Children.Clear();
             taskList.Children.Add(EmptyRow("No hay otras tareas observables"));
             SaveVisual(this, Path.Combine(StateFolder, "review-empty.png"), 1);
@@ -164,15 +174,15 @@ internal sealed partial class ModernRouterMonitor
             Check(historyPage.Visibility == Visibility.Visible && activityScroll.Visibility == Visibility.Collapsed,
                 "History tab is not exclusive");
             Check(historyList.Children.Count >= 5, "History list did not render decisions");
-            Check(historyDetail.Children.OfType<TextBlock>().Any(item => item.Text.Contains("Revisar el monitor")),
+            Check(ContainsText(historyDetail, "Revisar el monitor"),
                 "History details did not select a decision");
-            Check(historyDetail.Children.OfType<TextBlock>().Any(item => item.Text.Contains("interfaces")),
+            Check(ContainsText(historyDetail, "interfaces"),
                 "Model reason is absent from decision details");
-            Check(historyDetail.Children.OfType<TextBlock>().Any(item => item.Text.Contains("profunda")),
+            Check(ContainsText(historyDetail, "profunda"),
                 "Effort reason is absent from decision details");
             SaveVisual(this, Path.Combine(StateFolder, "review-history.png"), 1);
             OpenHistoryForThread("translation"); UpdateLayout();
-            Check(historyDetail.Children.OfType<TextBlock>().Any(item => item.Text.Contains("Traducir")),
+            Check(ContainsText(historyDetail, "Traducir"),
                 "Activity-to-history navigation did not select its thread");
             results.Add("PASS: Activity opens matching History; model and effort reasons remain available after completion");
 

@@ -240,7 +240,7 @@ were not restarted.
   four tabs in addition to the previous geometry, contrast, scrolling, pending,
   animation and tray checks.
 
-The history begins when Codex loads the v6 router on its next full launch. The v6
+The history begins when Codex loads the v7 router on its next full launch. The v7
 monitor can display current live rows immediately, including legacy rows with an
 explicit note when their separate reasoning explanation was not previously stored.
 

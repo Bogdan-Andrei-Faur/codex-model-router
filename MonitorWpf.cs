@@ -58,7 +58,9 @@ internal sealed partial class ModernRouterMonitor : Window
     ContextMenu trayMenu;
     MenuItem trayCompact, trayExpanded, trayHidden, trayPause, trayTopmost;
     MonitorMode mode = MonitorMode.Compact;
-    bool quitting, reasonOpen;
+    bool quitting, reasonOpen, morphing;
+    double morphRight, morphBottom, morphWidth, morphHeight;
+    int morphAnimations;
     string activitySignature;
     int lastActiveCount = -1;
     bool lastConnected;
@@ -130,6 +132,7 @@ internal sealed partial class ModernRouterMonitor : Window
         pauseButton = Btn("Ⅱ  Pausar selección", delegate { TogglePause(); }, false);
         BuildExpanded();
         Closing += OnClosing;
+        SizeChanged += OnSurfaceSizeChanged;
         if (!preview)
         {
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged += DisplayChanged;
@@ -217,7 +220,8 @@ internal sealed partial class ModernRouterMonitor : Window
             Padding = new Thickness(8, 0, 0, 0), Margin = new Thickness(10, 8, 5, 8), Child = compactActivityRow };
         Grid.SetColumn(countBox, 2); compactView.Children.Add(countBox);
         var open = Btn("‹", delegate { SwitchMode(MonitorMode.Expanded, true); }, true);
-        open.ToolTip = "Desplegar panel lateral"; Grid.SetColumn(open, 3); compactView.Children.Add(open);
+        open.ToolTip = "Desplegar panel lateral"; open.VerticalAlignment = VerticalAlignment.Center; open.HorizontalAlignment = HorizontalAlignment.Stretch;
+        Grid.SetColumn(open, 3); compactView.Children.Add(open);
         compactView.MouseLeftButtonUp += delegate(object sender, MouseButtonEventArgs e)
         { if (!e.Handled) SwitchMode(MonitorMode.Expanded, true); };
         compactView.Background = TransparentBrush; compactView.Cursor = Cursors.Hand;
@@ -285,11 +289,7 @@ internal sealed partial class ModernRouterMonitor : Window
         var footer = new Grid { Margin = new Thickness(10, 8, 10, 10) };
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         Grid.SetColumn(pauseButton, 0); footer.Children.Add(pauseButton);
-        summary.HorizontalAlignment = HorizontalAlignment.Right; summary.TextAlignment = TextAlignment.Right;
-        summary.Margin = new Thickness(8, 0, 5, 0); Grid.SetColumn(summary, 2); footer.Children.Add(summary);
-        summary.ToolTip = "Envíos aceptados con otro modelo respecto a tu referencia de Astra. No es un porcentaje de cuota ahorrada.";
         Grid.SetRow(footer, 5); expandedView.Children.Add(footer);
         SelectMonitorTab(0);
     }
@@ -418,6 +418,9 @@ internal sealed partial class ModernRouterMonitor : Window
         mode = target;
         if (target == MonitorMode.Hidden)
         {
+            morphing = false;
+            BeginAnimation(WidthProperty, null); BeginAnimation(HeightProperty, null);
+            BeginAnimation(LeftProperty, null); BeginAnimation(TopProperty, null);
             Hide(); SaveUiState(); UpdateTray(); return;
         }
         compactView.Visibility = target == MonitorMode.Compact ? Visibility.Visible : Visibility.Collapsed;
@@ -434,13 +437,11 @@ internal sealed partial class ModernRouterMonitor : Window
         }
         else if (animate)
         {
-            Animate(WidthProperty, ActualWidth, geometry.Width);
-            Animate(HeightProperty, ActualHeight, geometry.Height);
-            Animate(LeftProperty, Left, geometry.Left);
-            Animate(TopProperty, Top, geometry.Top);
+            StartAnchoredMorph(geometry);
         }
         else
         {
+            morphing = false;
             BeginAnimation(WidthProperty, null); BeginAnimation(HeightProperty, null);
             BeginAnimation(LeftProperty, null); BeginAnimation(TopProperty, null);
             Width = geometry.Width; Height = geometry.Height; Left = geometry.Left; Top = geometry.Top; Opacity = 1;
@@ -448,13 +449,41 @@ internal sealed partial class ModernRouterMonitor : Window
         SaveUiState(); UpdateTray();
     }
 
-    void Animate(DependencyProperty property, double from, double to)
+    // The bottom-right edge stays still: opening grows upward and closing folds downward.
+    void StartAnchoredMorph(Rect target)
     {
-        BeginAnimation(property, null);
-        SetValue(property, to);
+        BeginAnimation(WidthProperty, null); BeginAnimation(HeightProperty, null);
+        BeginAnimation(LeftProperty, null); BeginAnimation(TopProperty, null);
+        morphRight = target.Right; morphBottom = target.Bottom; morphWidth = target.Width; morphHeight = target.Height;
+        morphing = true; morphAnimations = 0;
+        StartMorphAnimation(WidthProperty, ActualWidth, target.Width);
+        StartMorphAnimation(HeightProperty, ActualHeight, target.Height);
+        if (morphAnimations == 0) FinishAnchoredMorph();
+    }
+
+    void StartMorphAnimation(DependencyProperty property, double from, double to)
+    {
+        if (Math.Abs(from - to) < .1) return;
+        morphAnimations++;
         var animation = new DoubleAnimation(from, to, ModeTransitionDuration)
         { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }, FillBehavior = FillBehavior.Stop };
+        animation.Completed += delegate { if (--morphAnimations == 0) FinishAnchoredMorph(); };
         BeginAnimation(property, animation, HandoffBehavior.SnapshotAndReplace);
+    }
+
+    void OnSurfaceSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (!morphing) return;
+        BeginAnimation(LeftProperty, null); BeginAnimation(TopProperty, null);
+        Left = morphRight - ActualWidth; Top = morphBottom - ActualHeight;
+    }
+
+    void FinishAnchoredMorph()
+    {
+        morphing = false;
+        BeginAnimation(WidthProperty, null); BeginAnimation(HeightProperty, null);
+        BeginAnimation(LeftProperty, null); BeginAnimation(TopProperty, null);
+        Width = morphWidth; Height = morphHeight; Left = morphRight - morphWidth; Top = morphBottom - morphHeight;
     }
 
     Rect TargetGeometry(MonitorMode target)
@@ -687,15 +716,16 @@ internal sealed partial class ModernRouterMonitor : Window
             }
         }
         var text = Txt(label, 12, Brush(foreground), FontWeights.SemiBold);
-        text.TextAlignment = TextAlignment.Center;
-        return new Border { Background = Brush(background), CornerRadius = new CornerRadius(6), Height = 24,
-            Padding = new Thickness(9, 0, 9, 0), Child = text, ToolTip = (model ? "Modelo: " : "Razonamiento: ") + label };
+        text.TextAlignment = TextAlignment.Center; text.VerticalAlignment = VerticalAlignment.Center;
+        text.LineHeight = 14; text.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+        return new Border { Background = Brush(background), CornerRadius = new CornerRadius(6), Height = 24, MinHeight = 24,
+            VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(9, 0, 9, 0), Child = text,
+            ToolTip = (model ? "Modelo: " : "Razonamiento: ") + label };
     }
 
     UIElement TaskRow(string id, Dictionary<string, object> row)
     {
-        var grid = new Grid { Margin = new Thickness(12, 8, 12, 8),
-            Background = TransparentBrush, Cursor = Cursors.Hand, ToolTip = "Consultar cómo se tomó esta decisión" };
+        var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
@@ -717,10 +747,13 @@ internal sealed partial class ModernRouterMonitor : Window
         }
         tags.ToolTip = String(row, "status") == "pending" ? "Selección pendiente de confirmar" : String(row, "confirmation", "Sin confirmar");
         Grid.SetColumn(tags, 2); grid.Children.Add(tags);
-        grid.MouseEnter += delegate { grid.Background = Panel2; };
-        grid.MouseLeave += delegate { grid.Background = TransparentBrush; };
-        grid.MouseLeftButtonUp += delegate { OpenHistoryForThread(id); };
-        return grid;
+        var card = new Border { Margin = new Thickness(12, 3, 12, 3), Padding = new Thickness(8, 7, 8, 7),
+            CornerRadius = new CornerRadius(10), Background = TransparentBrush, Cursor = Cursors.Hand,
+            ToolTip = "Consultar cómo se tomó esta decisión", Child = grid };
+        card.MouseEnter += delegate { card.Background = Panel2; };
+        card.MouseLeave += delegate { card.Background = TransparentBrush; };
+        card.MouseLeftButtonUp += delegate { OpenHistoryForThread(id); };
+        return card;
     }
 
     UIElement Section(string text)
