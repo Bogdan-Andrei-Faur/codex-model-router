@@ -78,7 +78,7 @@ internal static class Launcher
 
     static void OpenMonitor(bool hidden)
     {
-        Process.Start(new ProcessStartInfo(Path.Combine(Root, "dist", "codex-monitor-v5.exe"), hidden ? "--tray" : "")
+        Process.Start(new ProcessStartInfo(Path.Combine(Root, "dist", "codex-monitor-v6.exe"), hidden ? "--tray" : "")
             { UseShellExecute = false, CreateNoWindow = true });
     }
 

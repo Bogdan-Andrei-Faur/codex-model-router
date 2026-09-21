@@ -217,6 +217,33 @@ were not restarted.
   layout, contrast, scrolling, evidence and tray behaviors. Native read-only
   handshake/catalog/account smoke also passed and exited cleanly.
 
+## V6 decision history and analytics — 2026-09-21
+
+- An append-only local `state/history.jsonl` records privacy-safe decision
+  lifecycle events. Each decision has a random correlation id and separate model
+  and reasoning explanations. Accepted, completed, rejected, interrupted and
+  backend-error events retain status, duration and available token counters.
+- No prompt, response, attachment, tool argument, command, path, authentication
+  value or error message is persisted. Errors retain only a bounded type/code.
+  A sentinel test proves user content is absent from the history file.
+- Explicit model changes and follow-ups such as `sigue fallando` produce structured
+  override/retry signals. Completion alone is not treated as proof of quality.
+- Retention defaults to 90 days and can be changed locally to 30, 90, 180 days or
+  unlimited. Compaction retains at most the latest 20,000 events when the file
+  exceeds 5 MB. Runtime history and configuration remain Git-ignored.
+- The expanded monitor provides exclusive Activity, History, Statistics and
+  Settings tabs. Activity rows open their matching history details. History keeps
+  reasons available after completion; Statistics summarizes model/effort mix,
+  non-Astra choices, errors, retries, durations and observed tokens; Settings
+  controls routing, topmost state and retention.
+- 25 routing/protocol tests pass. Native monitor review renders and validates all
+  four tabs in addition to the previous geometry, contrast, scrolling, pending,
+  animation and tray checks.
+
+The history begins when Codex loads the v6 router on its next full launch. The v6
+monitor can display current live rows immediately, including legacy rows with an
+explicit note when their separate reasoning explanation was not previously stored.
+
 ## References and provenance
 
 This implementation is original. No upstream router source code was copied.

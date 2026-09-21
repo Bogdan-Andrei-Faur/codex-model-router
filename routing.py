@@ -77,6 +77,10 @@ def explicit_model(text, routes):
     return dict(routes[names[m.group(1)]]) if m else None
 
 def select_route(text, routes, previous=None, previous_effort=None, attachments=False):
+    route, reasons = select_route_details(text, routes, previous, previous_effort, attachments)
+    return route, reasons["model"]
+
+def select_route_details(text, routes, previous=None, previous_effort=None, attachments=False):
     decision = classify(text, previous, attachments, previous_effort)
     explicit = explicit_model(text, routes)
     route = explicit or {"model": routes[decision.tier]["model"], "effort": decision.effort}
@@ -90,7 +94,29 @@ def select_route(text, routes, previous=None, previous_effort=None, attachments=
     # Ultra also enables proactive delegation: only select it explicitly.
     if route["effort"] == "ultra" and not m and previous_effort != "ultra":
         route["effort"] = "max"
-    return route, "elección explícita" if explicit or m else decision.reason
+    if explicit:
+        model_reason = "modelo indicado explícitamente"
+    else:
+        model_reason = decision.reason
+    if m:
+        effort_reason = "nivel de razonamiento indicado explícitamente"
+    elif decision.reason.startswith("continuación"):
+        effort_reason = "continuación: conservar el nivel de razonamiento anterior"
+    elif decision.reason.startswith("el intento anterior"):
+        effort_reason = "mayor profundidad tras un intento que no resolvió la tarea"
+    else:
+        effort_reason = {
+            "low": "tarea delimitada: razonamiento ligero",
+            "medium": "análisis moderado para una tarea concreta",
+            "high": "trabajo complejo o revisión visual que requiere más profundidad",
+            "xhigh": "revisión profunda por amplitud, UX, auditoría o consecuencias",
+            "max": "máxima profundidad por riesgo o alcance excepcional",
+            "ultra": "delegación y profundidad Ultra solicitadas explícitamente",
+        }.get(route["effort"], "nivel configurado para esta categoría")
+    source = "explicit" if explicit or m else "automatic"
+    retry = has(r"\b(sigue fallando|no funciona|mismo error|still fails|still broken|did not work|no lo has solucionado)\b", normalize(text))
+    return route, {"model": model_reason, "effort": effort_reason, "source": source,
+                   "signal": "retry" if retry else None}
 
 def user_text(items):
     return "\n".join(x.get("text", "") for x in items if isinstance(x, dict) and x.get("type") == "text")

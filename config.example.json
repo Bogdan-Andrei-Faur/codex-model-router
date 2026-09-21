@@ -1,6 +1,7 @@
 {
   "enabled": true,
   "sync_picker": true,
+  "history_days": 90,
   "python": "C:\\Python314\\python.exe",
   "codex": "REPLACE_WITH_ORIGINAL_DESKTOP_CODEX_EXE",
   "desktop": "REPLACE_WITH_INSTALLED_CHATGPT_EXE",

@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from routing import DEFAULT_ROUTES, EFFORTS, classify, select_route
+from routing import DEFAULT_ROUTES, EFFORTS, classify, select_route, select_route_details
 from router import Router
 
 
@@ -61,6 +61,16 @@ class RoutingPolicyTests(unittest.TestCase):
         self.assertEqual(classify("Continúa", "critical", previous_effort="max").effort, "max")
         self.assertEqual(classify("Crea un formulario", "simple").tier, "normal")
         self.assertEqual(classify("Sigue fallando", "critical", previous_effort="xhigh").effort, "max")
+
+    def test_model_and_effort_explanations_are_separate(self):
+        route, reasons = select_route_details("Rediseña a fondo la UX del panel", DEFAULT_ROUTES)
+        self.assertEqual(route, {"model": "gpt-6-astra", "effort": "xhigh"})
+        self.assertIn("interfaces", reasons["model"])
+        self.assertIn("profunda", reasons["effort"])
+        route, reasons = select_route_details("Usa Sol con esfuerzo Ligero: revisa esto", DEFAULT_ROUTES)
+        self.assertEqual(reasons["source"], "explicit")
+        self.assertIn("modelo indicado", reasons["model"])
+        self.assertIn("nivel de razonamiento indicado", reasons["effort"])
 
 
 class ProtocolTests(unittest.TestCase):
@@ -192,7 +202,35 @@ class ProtocolTests(unittest.TestCase):
     def test_luna_ultra_falls_back_to_supported_max(self):
         result = json.loads(self.router.client_line(encode(self.request("Usa Luna con esfuerzo Ultra: traduce hola"))))
         self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-luna", "max"))
-        self.assertIn("Ultra no disponible", self.router.threads["t"]["reason"])
+        self.assertIn("Ultra no está disponible", self.router.threads["t"]["effort_reason"])
+
+    def test_persistent_history_tracks_decision_lifecycle_without_content(self):
+        self.router.client_line(encode(self.request("Traduce PRIVATE_HISTORY_SENTINEL al inglés")))
+        self.router.server_line(encode({"id": 7, "result": {"turn": {"id": "q"}}}))
+        self.router.threads["t"]["tokens"] = {"inputTokens": 20, "outputTokens": 2}
+        self.router.server_line(encode({"method": "turn/completed", "params": {
+            "threadId": "t", "turn": {"status": "completed"}}}))
+        records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
+        self.assertEqual([r["event"] for r in records],
+                         ["decision_created", "decision_accepted", "decision_completed"])
+        self.assertEqual(len({r["decision_id"] for r in records}), 1)
+        self.assertEqual(records[0]["source"], "automatic")
+        self.assertIn("model_reason", records[0])
+        self.assertIn("effort_reason", records[0])
+        self.assertEqual(records[-1]["inputTokens"], 20)
+        self.assertNotIn("PRIVATE_HISTORY_SENTINEL", (Path(self.tmp.name) / "state" / "history.jsonl").read_text())
+
+    def test_failed_followup_marks_previous_decision_as_retry_signal(self):
+        self.router.client_line(encode(self.request()))
+        self.router.server_line(encode({"id": 7, "result": {"turn": {"id": "q"}}}))
+        self.router.server_line(encode({"method": "turn/completed", "params": {
+            "threadId": "t", "turn": {"status": "completed"}}}))
+        first_id = self.router.current_decisions["t"]
+        request = self.request("Sigue fallando")
+        self.router.client_line(encode(request))
+        records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
+        signal = next(r for r in records if r["event"] == "decision_signal")
+        self.assertEqual((signal["decision_id"], signal["signal"]), (first_id, "retry"))
 
     def test_monitor_keeps_accepted_turn_separate_from_next_settings(self):
         self.router.client_line(encode(self.request()))

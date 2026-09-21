@@ -4,7 +4,7 @@ Elige modelo y razonamiento antes de cada nuevo mensaje enviado a Codex. Sigue
 usando la app y la suscripción actuales. La decisión usa reglas locales y no
 necesita otra llamada a una IA ni una clave de API.
 
-**Monitor versión 5.** La interfaz se puede actualizar sin cerrar Codex ni
+**Monitor versión 6.** La interfaz se puede actualizar sin cerrar Codex ni
 interrumpir sus tareas. Los accesos del escritorio apuntan a la versión actual.
 Los cambios del selector, cuando los haya, se cargan al volver a abrir Codex
 desde **Codex automático**. No hace falta cerrar sesión.
@@ -34,6 +34,26 @@ modelo, razonamiento y número de tareas activas. El panel añade las tareas en
 paralelo, su estado, la confirmación y el motivo. **Aceptado por Codex** significa
 que el motor aceptó la petición con esos ajustes; no es telemetría de cada
 inferencia interna. Si no conoce un dato, muestra «Sin confirmar».
+
+## Panel e historial
+
+El panel lateral tiene cuatro vistas:
+
+- **Actividad** muestra lo que está ocurriendo ahora. Al pulsar cualquier tarea
+  se abre su decisión más reciente en Historial.
+- **Historial** conserva decisiones activas y terminadas con dos explicaciones
+  independientes: por qué se eligió el modelo y por qué se eligió el razonamiento.
+  También muestra estado, fecha, duración, tokens observados e incidencias.
+- **Estadísticas** resume distribución por modelo y razonamiento, decisiones fuera
+  de Astra, errores, reintentos detectados, duración y tokens cuando están disponibles.
+- **Ajustes** permite pausar el selector, cambiar Mantener delante y conservar el
+  historial 30, 90, 180 días o indefinidamente.
+
+El historial persistente empieza a recoger decisiones cuando Codex se abre con
+esta versión del selector. Un mensaje posterior como «sigue fallando» se registra
+como señal automática de que la decisión anterior no resolvió la tarea. Un cambio
+explícito de modelo se registra como ajuste manual. Estas señales ayudan a corregir
+la política sin asumir que toda tarea terminada tuvo un resultado de calidad.
 
 El nombre del modelo junto al botón de enviar de Codex puede permanecer en la
 selección del editor. El selector comunica el cambio al motor, pero **no se ha
@@ -98,6 +118,7 @@ suscripción. La calidad y el ahorro real requieren observar tareas representati
   argumentos de herramientas, respuestas ni credenciales. `state/` se excluye de Git.
 - Las rutas de Codex están fijadas a la instalación comprobada. Una actualización
   de la app puede requerir ajustar el selector. Si falla, usa el acceso habitual.
-- Todo es personal, fuera de Grimaldi. No está publicado en GitHub.
+- Todo es personal, fuera de Grimaldi. El código está respaldado en el repositorio
+  privado [Bogdan-Andrei-Faur/codex-model-router](https://github.com/Bogdan-Andrei-Faur/codex-model-router).
 
 Pruebas y límites de validación: [VALIDATION.md](docs/VALIDATION.md).

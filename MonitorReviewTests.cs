@@ -157,6 +157,32 @@ internal sealed partial class ModernRouterMonitor
             taskList.Children.Add(EmptyRow("No hay otras tareas observables"));
             SaveVisual(this, Path.Combine(StateFolder, "review-empty.png"), 1);
             results.Add("PASS: disconnected/empty view renders");
+
+            PaintAnalyticsFixtures();
+            Check(monitorTabs.Count == 4, "Expected four monitor tabs");
+            SelectMonitorTab(1); UpdateLayout(); Dispatcher.Invoke(delegate { }, DispatcherPriority.Render);
+            Check(historyPage.Visibility == Visibility.Visible && activityScroll.Visibility == Visibility.Collapsed,
+                "History tab is not exclusive");
+            Check(historyList.Children.Count >= 5, "History list did not render decisions");
+            Check(historyDetail.Children.OfType<TextBlock>().Any(item => item.Text.Contains("Revisar el monitor")),
+                "History details did not select a decision");
+            Check(historyDetail.Children.OfType<TextBlock>().Any(item => item.Text.Contains("interfaces")),
+                "Model reason is absent from decision details");
+            Check(historyDetail.Children.OfType<TextBlock>().Any(item => item.Text.Contains("profunda")),
+                "Effort reason is absent from decision details");
+            SaveVisual(this, Path.Combine(StateFolder, "review-history.png"), 1);
+            OpenHistoryForThread("translation"); UpdateLayout();
+            Check(historyDetail.Children.OfType<TextBlock>().Any(item => item.Text.Contains("Traducir")),
+                "Activity-to-history navigation did not select its thread");
+            results.Add("PASS: Activity opens matching History; model and effort reasons remain available after completion");
+
+            SelectMonitorTab(2); UpdateLayout(); Dispatcher.Invoke(delegate { }, DispatcherPriority.Render);
+            Check(statisticsContent.Children.OfType<StackPanel>().Any(), "Statistics metrics are empty");
+            SaveVisual(this, Path.Combine(StateFolder, "review-statistics.png"), 1);
+            SelectMonitorTab(3); UpdateLayout(); Dispatcher.Invoke(delegate { }, DispatcherPriority.Render);
+            Check(settingsContent.Children.OfType<Button>().Count() >= 2, "Settings controls are missing");
+            SaveVisual(this, Path.Combine(StateFolder, "review-settings.png"), 1);
+            results.Add("PASS: Statistics and Settings tabs contain real metrics and working controls");
             File.WriteAllLines(report, results); quitting = true; Close(); return 0;
         }
         catch (Exception exception)

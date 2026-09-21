@@ -49,6 +49,7 @@ internal sealed partial class ModernRouterMonitor : Window
     readonly TextBlock mainTask = Txt("Sin tarea seleccionada", 17, Ink, FontWeights.SemiBold);
     readonly TextBlock confirmation = Txt("Sin confirmación", 12, Muted);
     readonly TextBlock reason = Txt("Todavía no hay una decisión del selector.", 13, Muted);
+    readonly TextBlock effortReason = Txt("Todavía no hay una decisión de razonamiento.", 13, Muted);
     readonly TextBlock summary = Txt("Referencia personal: Astra · Muy alto", 12, Muted);
     readonly Border reasonBox = new Border();
     readonly Button pauseButton;
@@ -226,6 +227,7 @@ internal sealed partial class ModernRouterMonitor : Window
     {
         expandedView.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         expandedView.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        expandedView.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         expandedView.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1) });
         expandedView.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         expandedView.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -247,27 +249,38 @@ internal sealed partial class ModernRouterMonitor : Window
         hide.ToolTip = "Ocultar monitor"; Grid.SetColumn(hide, 3); header.Children.Add(hide);
         Grid.SetRow(header, 0); expandedView.Children.Add(header);
 
+        var tabs = BuildTabBar(); Grid.SetRow(tabs, 1); expandedView.Children.Add(tabs);
+
         var main = new StackPanel { Margin = new Thickness(18, 7, 18, 17) };
         main.Children.Add(Label("TAREA DESTACADA"));
         mainTask.Margin = new Thickness(0, 9, 0, 11); main.Children.Add(mainTask);
         mainTask.ToolTip = mainTask.Text;
         main.Children.Add(mainTags);
         confirmation.Margin = new Thickness(0, 9, 0, 0); main.Children.Add(confirmation);
-        var why = Btn("¿Por qué este modelo?", delegate
+        var why = Btn("¿Por qué esta elección?", delegate
         {
             reasonOpen = !reasonOpen; reasonBox.Visibility = reasonOpen ? Visibility.Visible : Visibility.Collapsed;
         }, false);
         why.Foreground = Accent; why.HorizontalAlignment = HorizontalAlignment.Left; why.Margin = new Thickness(-10, 7, 0, 0);
         main.Children.Add(why);
-        reason.TextWrapping = TextWrapping.Wrap;
+        reason.TextWrapping = TextWrapping.Wrap; effortReason.TextWrapping = TextWrapping.Wrap;
         reasonBox.Margin = new Thickness(2, 4, 0, 0); reasonBox.Padding = new Thickness(10, 3, 0, 3);
         reasonBox.BorderBrush = Accent; reasonBox.BorderThickness = new Thickness(2, 0, 0, 0);
-        reasonBox.Child = reason; reasonBox.Visibility = Visibility.Collapsed; main.Children.Add(reasonBox);
-        Grid.SetRow(main, 1); expandedView.Children.Add(main);
+        var reasonStack = new StackPanel(); reasonStack.Children.Add(Label("POR QUÉ EL MODELO"));
+        reason.Margin = new Thickness(0, 4, 0, 10); reasonStack.Children.Add(reason);
+        reasonStack.Children.Add(Label("POR QUÉ EL RAZONAMIENTO"));
+        effortReason.Margin = new Thickness(0, 4, 0, 0); reasonStack.Children.Add(effortReason);
+        reasonBox.Child = reasonStack; reasonBox.Visibility = Visibility.Collapsed; main.Children.Add(reasonBox);
+        Grid.SetRow(main, 2); expandedView.Children.Add(main);
 
         var separator = new Border { Background = Line, Height = 1, Margin = new Thickness(18, 0, 18, 0) };
-        Grid.SetRow(separator, 2); expandedView.Children.Add(separator);
-        activityScroll.Content = taskList; Grid.SetRow(activityScroll, 3); expandedView.Children.Add(activityScroll);
+        Grid.SetRow(separator, 3); expandedView.Children.Add(separator);
+        activityScroll.Content = taskList; Grid.SetRow(activityScroll, 4); expandedView.Children.Add(activityScroll);
+        RegisterActivityElements(main, separator, activityScroll);
+        foreach (var page in new[] { historyPage, statisticsPage, settingsPage })
+        {
+            Grid.SetRow(page, 2); Grid.SetRowSpan(page, 3); expandedView.Children.Add(page);
+        }
 
         var footer = new Grid { Margin = new Thickness(10, 8, 10, 10) };
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -277,7 +290,8 @@ internal sealed partial class ModernRouterMonitor : Window
         summary.HorizontalAlignment = HorizontalAlignment.Right; summary.TextAlignment = TextAlignment.Right;
         summary.Margin = new Thickness(8, 0, 5, 0); Grid.SetColumn(summary, 2); footer.Children.Add(summary);
         summary.ToolTip = "Envíos aceptados con otro modelo respecto a tu referencia de Astra. No es un porcentaje de cuota ahorrada.";
-        Grid.SetRow(footer, 4); expandedView.Children.Add(footer);
+        Grid.SetRow(footer, 5); expandedView.Children.Add(footer);
+        SelectMonitorTab(0);
     }
 
     static TextBlock Label(string text)
@@ -559,6 +573,7 @@ internal sealed partial class ModernRouterMonitor : Window
                 if (ordered.Count <= 1) taskList.Children.Add(EmptyRow("No hay otras tareas observables"));
             }
             summary.Text = modern == 0 ? "Conexión anterior" : nonAstra + "/" + accepted + " fuera de Astra";
+            RefreshAnalytics(ordered);
             UpdateTray();
         }
         catch { connection.Text = "Esperando un estado válido"; connection.Foreground = Warning; }
@@ -577,6 +592,7 @@ internal sealed partial class ModernRouterMonitor : Window
         confirmation.Text = String(row, "status") == "pending" ? "Enviando · pendiente de confirmar" : String(row, "confirmation", "Sin confirmar");
         confirmation.Foreground = confirmation.Text == "Aceptado por Codex" ? Good : Muted;
         reason.Text = String(row, "reason", "Observado sin una decisión registrada del selector.");
+        effortReason.Text = String(row, "effort_reason", "El registro anterior no separaba el motivo del razonamiento.");
     }
 
     void ApplyEmpty()
@@ -585,6 +601,7 @@ internal sealed partial class ModernRouterMonitor : Window
         compactTask.Text = "Esperando una tarea de Codex"; compactTask.ToolTip = compactTask.Text; compactCount.Text = "0 activas";
         mainTask.Text = "Sin tarea seleccionada"; mainTask.ToolTip = mainTask.Text;
         confirmation.Text = "Sin confirmación"; reason.Text = "Todavía no hay una decisión del selector.";
+        effortReason.Text = "Todavía no hay una decisión de razonamiento.";
         confirmation.Foreground = Muted;
     }
 
@@ -677,7 +694,8 @@ internal sealed partial class ModernRouterMonitor : Window
 
     UIElement TaskRow(string id, Dictionary<string, object> row)
     {
-        var grid = new Grid { Margin = new Thickness(18, 8, 18, 8) };
+        var grid = new Grid { Margin = new Thickness(12, 8, 12, 8),
+            Background = TransparentBrush, Cursor = Cursors.Hand, ToolTip = "Consultar cómo se tomó esta decisión" };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
@@ -699,6 +717,9 @@ internal sealed partial class ModernRouterMonitor : Window
         }
         tags.ToolTip = String(row, "status") == "pending" ? "Selección pendiente de confirmar" : String(row, "confirmation", "Sin confirmar");
         Grid.SetColumn(tags, 2); grid.Children.Add(tags);
+        grid.MouseEnter += delegate { grid.Background = Panel2; };
+        grid.MouseLeave += delegate { grid.Background = TransparentBrush; };
+        grid.MouseLeftButtonUp += delegate { OpenHistoryForThread(id); };
         return grid;
     }
 
@@ -794,8 +815,8 @@ internal static class MonitorExtensions
 
 internal static class RouterMonitorProgram
 {
-    const string MutexName = "Local\\PersonalCodexRouterMonitorV5";
-    const string RevealName = "Local\\PersonalCodexRouterMonitorV5Reveal";
+    const string MutexName = "Local\\PersonalCodexRouterMonitorV6";
+    const string RevealName = "Local\\PersonalCodexRouterMonitorV6Reveal";
 
     [STAThread]
     static int Main(string[] args)

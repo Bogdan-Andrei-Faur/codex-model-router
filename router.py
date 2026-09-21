@@ -14,7 +14,7 @@ import threading
 import time
 import uuid
 
-from routing import DEFAULT_ROUTES, EFFORTS, select_route, has_attachments, user_text
+from routing import DEFAULT_ROUTES, EFFORTS, select_route_details, has_attachments, user_text
 
 ROOT = Path(__file__).resolve().parent
 
@@ -38,7 +38,62 @@ class Router:
         self.internal_requests = set()
         self.outbound = []
         self.accepted_routes = {}
+        self.current_decisions = {}
+        self.history_writes = 0
         self.stats = {"accepted": 0, "non_astra": 0}
+
+    def record_history(self, event, **fields):
+        """Append privacy-safe decision metadata; never prompts, outputs or tool data."""
+        allowed = {"decision_id", "thread", "title", "model", "effort", "previous_model",
+                   "model_reason", "effort_reason", "source", "status", "signal", "error_type", "error_code",
+                   "inputTokens", "outputTokens", "cachedInputTokens", "reasoningOutputTokens"}
+        record = {"schema": 1, "time": time.time(), "time_iso":
+                  time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event,
+                  "session": str(os.getpid())}
+        record.update({key: value for key, value in fields.items() if key in allowed and value is not None})
+        try:
+            self.state_dir.mkdir(parents=True, exist_ok=True)
+            history = self.state_dir / "history.jsonl"
+            with history.open("a", encoding="utf-8", newline="\n") as stream:
+                stream.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
+            self.history_writes += 1
+            if self.history_writes % 100 == 0 and history.stat().st_size > 5 * 1024 * 1024:
+                self.prune_history(history)
+        except OSError:
+            pass
+
+    def prune_history(self, history):
+        try:
+            days = int(read_config(self.config_path).get("history_days", 90))
+            cutoff = 0 if days <= 0 else time.time() - days * 86400
+            lines = history.read_text(encoding="utf-8").splitlines()
+            kept = []
+            for line in lines[-20000:]:
+                try:
+                    if float(json.loads(line).get("time", 0)) >= cutoff:
+                        kept.append(line)
+                except (ValueError, TypeError, json.JSONDecodeError):
+                    continue
+            temp = history.with_suffix(".tmp")
+            temp.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
+            os.replace(temp, history)
+        except (OSError, ValueError, KeyError):
+            pass
+
+    def new_decision(self, tid, model, effort, model_reason, effort_reason, source, previous_model=None, signal=None):
+        previous_decision = self.current_decisions.get(tid)
+        if previous_decision and signal == "retry":
+            self.record_history("decision_signal", decision_id=previous_decision, thread=tid, signal="retry")
+        elif previous_decision and source == "explicit" and previous_model != model:
+            self.record_history("decision_signal", decision_id=previous_decision, thread=tid, signal="manual_override")
+        decision_id = uuid.uuid4().hex
+        title = self.threads.get(tid, {}).get("name") or (tid[:8] if tid else "Sin título")
+        self.current_decisions[tid] = decision_id
+        self.record_history("decision_created", decision_id=decision_id, thread=tid, title=title,
+                            model=model, effort=effort, previous_model=previous_model,
+                            model_reason=model_reason, effort_reason=effort_reason, source=source,
+                            status="pending")
+        return decision_id
 
     def log(self, event):
         # The small diagnostic file never contains prompt text, input, auth, paths
@@ -103,12 +158,21 @@ class Router:
                         if "error" in message:
                             self.threads.setdefault(tid, {}).update(**(accepted or {}), status="error", confirmation="Rechazado")
                             self.log({"event": "turn_rejected", "thread": tid})
+                            if accepted:
+                                error = message.get("error") or {}
+                                self.record_history("decision_rejected", decision_id=accepted.get("decision_id"),
+                                                    thread=tid, status="error", error_type="turn_rejected",
+                                                    error_code=error.get("code"))
                         elif accepted:
                             self.threads.setdefault(tid, {}).update(**accepted, confirmation="Aceptado por Codex", status="inProgress", updated=time.time())
                             self.stats["accepted"] += 1
                             if accepted["model"] in {"gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"}:
                                 self.stats["non_astra"] += 1
                             self.log({"event": "turn_accepted", "thread": tid, **accepted})
+                            self.record_history("decision_accepted", decision_id=accepted.get("decision_id"),
+                                                thread=tid, title=self.threads.get(tid, {}).get("name"),
+                                                model=accepted.get("model"), effort=accepted.get("effort"),
+                                                status="inProgress")
                         if "error" not in message and sync:
                             # After acknowledgement, turn/start has already applied
                             # the user's mode and permissions. Ask the native server
@@ -127,10 +191,19 @@ class Router:
                     self.pending.discard(tid)
                     self.threads.setdefault(tid, {}).update(status=params.get("turn", {}).get("status", "completed"), updated=time.time())
                     self.log({"event": "turn_completed", "thread": tid})
+                    row = self.threads.get(tid, {})
+                    tokens = row.get("tokens") or {}
+                    self.record_history("decision_completed", decision_id=self.current_decisions.get(tid),
+                                        thread=tid, title=row.get("name"), status=row.get("status"), **tokens)
                 elif method == "thread/name/updated":
                     self.threads.setdefault(tid, {})["name"] = params.get("threadName", params.get("name", tid))
                 elif method == "thread/status/changed":
-                    self.threads.setdefault(tid, {}).update(status=params.get("status", {}).get("type", "unknown"), updated=time.time())
+                    status = params.get("status", {}).get("type", "unknown")
+                    self.threads.setdefault(tid, {}).update(status=status, updated=time.time())
+                    if status in ("error", "failed", "interrupted"):
+                        self.record_history("decision_error", decision_id=self.current_decisions.get(tid),
+                                            thread=tid, title=self.threads.get(tid, {}).get("name"),
+                                            status=status, error_type="thread_" + status)
                 elif method == "thread/started":
                     thread = params.get("thread", {})
                     if thread.get("id"):
@@ -149,6 +222,10 @@ class Router:
                             row.update(parent=item.get("senderThreadId"), updated=time.time())
                             if item.get("model") and row.get("confirmation") != "Aceptado por Codex":
                                 row.update(model=item["model"], effort=item.get("reasoningEffort"), confirmation="Solicitado por agente")
+                                if not row.get("decision_id"):
+                                    row["decision_id"] = self.new_decision(receiver, item["model"], item.get("reasoningEffort"),
+                                        "modelo solicitado por el agente coordinador",
+                                        "nivel solicitado por el agente coordinador", "agent")
                             agent = item.get("agentsStates", {}).get(receiver, {})
                             row["status"] = agent.get("status", "unknown") if isinstance(agent, dict) else "unknown"
                 elif method == "thread/tokenUsage/updated":
@@ -197,9 +274,10 @@ class Router:
                 if routed == raw and "id" in message:
                     self.observe_preserved(message)
                 return routed
-        except (ValueError, KeyError, TypeError, AttributeError, OSError):
+        except (ValueError, KeyError, TypeError, AttributeError, OSError) as error:
             with self.lock:
                 self.log({"event": "preserved", "reason": "router_error"})
+                self.record_history("router_error", error_type=type(error).__name__, status="error")
             return raw
 
     def observe_preserved(self, message):
@@ -210,7 +288,14 @@ class Router:
         model = settings.get("model") or params.get("model") or row.get("configured_model") or row.get("model")
         effort = settings.get("reasoning_effort") or params.get("effort") or row.get("configured_effort") or row.get("effort")
         if model:
-            self.accepted_routes[message["id"]] = {"model": model, "effort": effort, "reason": "configuración original; sin intervención del selector"}
+            tid = params.get("threadId")
+            model_reason = "configuración original; sin intervención del selector"
+            effort_reason = "nivel configurado manualmente en Codex"
+            decision_id = self.new_decision(tid, model, effort, model_reason, effort_reason, "preserved",
+                                            row.get("model"))
+            self.accepted_routes[message["id"]] = {"model": model, "effort": effort, "reason": model_reason,
+                "model_reason": model_reason, "effort_reason": effort_reason, "source": "preserved",
+                "decision_id": decision_id}
 
     def route_turn(self, message, raw):
         params = message["params"]
@@ -242,11 +327,11 @@ class Router:
             # A fresh thread's default Astra isn't evidence of a complex task.
             if not state.get("seen_turn"):
                 previous = None
-        route, reason = select_route(text, routes, previous, state.get("effort"), has_attachments(items))
+        route, reasons = select_route_details(text, routes, previous, state.get("effort"), has_attachments(items))
         model, effort = route["model"], route["effort"]
         if effort == "ultra" and model in self.catalog and effort not in self.catalog[model] and "max" in self.catalog[model]:
             effort = "max"
-            reason += "; Ultra no disponible para este modelo: Máx."
+            reasons["effort"] += "; Ultra no está disponible para este modelo, se utiliza Máx."
         if effort not in self.catalog.get(model, set()):
             self.log({"event": "preserved", "thread": tid, "reason": "catalog_unavailable"})
             return raw
@@ -257,14 +342,20 @@ class Router:
             changed["params"]["collaborationMode"]["settings"]["model"] = model
             changed["params"]["collaborationMode"]["settings"]["reasoning_effort"] = effort
         tier = next(t for t, r in routes.items() if r["model"] == model)
+        decision_id = self.new_decision(tid, model, effort, reasons["model"], reasons["effort"], reasons["source"],
+                                        current, reasons.get("signal"))
+        decision = {"model": model, "effort": effort, "reason": reasons["model"],
+                    "model_reason": reasons["model"], "effort_reason": reasons["effort"],
+                    "source": reasons["source"], "decision_id": decision_id}
         self.threads.setdefault(tid, {}).update(tier=tier, seen_turn=True, requested_model=model,
-                                              requested_effort=effort, status="pending", reason=reason, updated=time.time())
+                                              requested_effort=effort, status="pending", updated=time.time(), **decision)
         if "id" in message:
-            self.accepted_routes[message["id"]] = {"model": model, "effort": effort, "reason": reason}
+            self.accepted_routes[message["id"]] = decision
         if config.get("sync_picker", True) and "id" in message:
             self.sync_after_ack[message["id"]] = {"threadId": tid, "model": model, "effort": effort}
         self.log({"event": "routed", "thread": tid, "from": current, "model": model,
-                  "effort": effort, "reason": reason})
+                  "effort": effort, "reason": reasons["model"], "effort_reason": reasons["effort"],
+                  "decision_id": decision_id})
         return (json.dumps(changed, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
 
 
@@ -368,6 +459,9 @@ def main():
             proc.wait(timeout=5)
         stderr_worker.join(timeout=1)
         router.log({"event": "bridge_stopped", "exit_code": proc.returncode})
+        if proc.returncode:
+            router.record_history("bridge_error", status="error", error_type="backend_exit",
+                                  error_code=proc.returncode)
     return proc.returncode
 
 
