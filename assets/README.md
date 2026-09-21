@@ -12,3 +12,9 @@ oficial de recursos de marca verificado. No se reivindica autoría de la imagen.
 
 `build.ps1` empaqueta el PNG sin alterarlo en `codex.ico`, para los ejecutables y
 accesos de Windows. No modifica los recursos de la aplicación instalada.
+
+`codex-ui-1024.png` es la imagen original de 1024 x 1024 del mismo listado,
+descargada sin los parametros de reduccion el 2026-09-21:
+https://ph-files.imgix.net/64f50b38-7e9e-47ca-b2e9-2939ff10431a.png
+El monitor usa esta version con escalado de alta calidad. El ICO conserva la
+version de 256 x 256 para compatibilidad con el formato de iconos de Windows.

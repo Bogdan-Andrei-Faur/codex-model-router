@@ -192,8 +192,10 @@ internal sealed partial class ModernRouterMonitor : Window
     Image Logo(double size)
     {
         var image = new Image { Width = size, Height = size, Stretch = Stretch.Uniform };
-        var path = Path.Combine(Root, "assets", "codex-official.png");
+        var path = Path.Combine(Root, "assets", "codex-ui-1024.png");
+        if (!File.Exists(path)) path = Path.Combine(Root, "assets", "codex-official.png");
         if (File.Exists(path)) image.Source = new BitmapImage(new Uri(path));
+        RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
         return image;
     }
 
@@ -229,9 +231,16 @@ internal sealed partial class ModernRouterMonitor : Window
 
         var main = new StackPanel { Margin = new Thickness(18, 7, 18, 17) };
         main.Children.Add(Label("TAREA DESTACADA"));
-        mainTask.Margin = new Thickness(0, 9, 0, 11); main.Children.Add(mainTask);
+        var featuredRow = new Grid { Margin = new Thickness(0, 9, 0, 0) };
+        featuredRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(56) });
+        featuredRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        featuredAgentHost.HorizontalAlignment = HorizontalAlignment.Left; featuredAgentHost.VerticalAlignment = VerticalAlignment.Center;
+        featuredRow.Children.Add(featuredAgentHost);
+        var featuredCopy = new StackPanel();
+        mainTask.Margin = new Thickness(0, 0, 0, 8); featuredCopy.Children.Add(mainTask);
         mainTask.ToolTip = mainTask.Text;
-        main.Children.Add(mainTags);
+        featuredCopy.Children.Add(mainTags); Grid.SetColumn(featuredCopy, 1); featuredRow.Children.Add(featuredCopy);
+        main.Children.Add(featuredRow);
         confirmation.Margin = new Thickness(0, 9, 0, 0); main.Children.Add(confirmation);
         var why = Btn("¿Por qué esta elección?", delegate
         {
@@ -437,7 +446,7 @@ internal sealed partial class ModernRouterMonitor : Window
     internal static Rect Geometry(MonitorMode target, Rect work)
     {
         const double margin = 10; // The surface has an additional 8 DIP shadow inset.
-        double width = Math.Min(target == MonitorMode.Compact ? 342 : 432, Math.Max(1, work.Width - margin * 2));
+        double width = Math.Min(target == MonitorMode.Compact ? 382 : 432, Math.Max(1, work.Width - margin * 2));
         double height = Math.Min(target == MonitorMode.Compact ? 96 : 760, Math.Max(1, work.Height - margin * 2));
         return new Rect(work.Right - width - margin, work.Bottom - height - margin, width, height);
     }
@@ -550,6 +559,7 @@ internal sealed partial class ModernRouterMonitor : Window
         string model = Model(Setting(row, "model", "Sin confirmar"));
         string effort = Effort(Setting(row, "effort", ""));
         FillTags(mainTags, model, effort);
+        UpdateFeaturedAgent(id, row);
         mainTask.Text = name; mainTask.ToolTip = name;
         confirmation.Text = String(row, "status") == "pending" ? "Enviando · pendiente de confirmar" : String(row, "confirmation", "Sin confirmar");
         confirmation.Foreground = confirmation.Text == "Aceptado por Codex" ? Good : Muted;
@@ -560,6 +570,7 @@ internal sealed partial class ModernRouterMonitor : Window
     void ApplyEmpty()
     {
         FillTags(mainTags, "Sin confirmar", "");
+        featuredAgentHost.Child = null; featuredAvatar = null;
         mainTask.Text = "Sin tarea seleccionada"; mainTask.ToolTip = mainTask.Text;
         confirmation.Text = "Sin confirmación"; reason.Text = "Todavía no hay una decisión del selector.";
         effortReason.Text = "Todavía no hay una decisión de razonamiento.";
@@ -657,13 +668,12 @@ internal sealed partial class ModernRouterMonitor : Window
     UIElement TaskRow(string id, Dictionary<string, object> row)
     {
         var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(56) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
-        string rowStatus = String(row, "status");
-        var dot = ActivityIndicator(Active(rowStatus), rowStatus == "waiting" ? Warning : Active(rowStatus) ? Good : Muted);
-        dot.Tag = "activity-indicator";
-        Grid.SetColumn(dot, 0); grid.Children.Add(dot);
+        var agent = MakeAgentAvatar(id, row, true);
+        agent.Slot.HorizontalAlignment = HorizontalAlignment.Left;
+        Grid.SetColumn(agent.Slot, 0); grid.Children.Add(agent.Slot);
         string name = String(row, "name", id.Substring(0, Math.Min(8, id.Length)));
         var copy = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 14, 0) };
         var title = Txt(name, 13, Ink, FontWeights.SemiBold); title.ToolTip = name; copy.Children.Add(title);

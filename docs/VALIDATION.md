@@ -322,6 +322,21 @@ explicit note when their separate reasoning explanation was not previously store
   Existing anchor, hover, reactivation, overflow and persistence checks pass.
 - Inspected rendered capsule, attached detail, History and tray-menu previews.
 
+## V13: shared avatars and reasoning indicators — 2026-09-21
+
+- Activity rows and the highlighted task use the capsule's avatar component,
+  task glyphs and model palette. Active orbits share a time-based phase across
+  refreshed rows; idle agents retain their identity without a rotating sweep.
+- Restored the Codex logo on the left, centered agents and right-hand expand
+  action with separator. Compact visual width is now 366 DIP. The logo uses
+  the original 1024-square listing image at 40 DIP with high-quality scaling;
+  source provenance is documented in assets/README.md.
+- The lower-right dot uses the existing reasoning tag palette independently
+  of activity; unknown reasoning is neutral. Native review checks all six levels
+  and unknown, including effort-only changes without a model/status change.
+- Existing native review covers fixed anchors, overflow, Activity navigation,
+  hover, animation lifecycle, persistent statistics and history.
+
 ## References and provenance
 
 This implementation is original. No upstream router source code was copied.

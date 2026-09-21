@@ -18,7 +18,7 @@ internal sealed partial class ModernRouterMonitor
         public Border Slot;
         public Button Button;
         public RotateTransform Orbit;
-        public bool Leaving;
+        public bool Leaving, ActivityView;
     }
 
     sealed class AgentIdentity
@@ -37,6 +37,9 @@ internal sealed partial class ModernRouterMonitor
     readonly DispatcherTimer peekCloseTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(220) };
     readonly TextBlock agentsIdle = Txt("Todo en calma", 13, Muted);
     Button moreAgents, expandAgents;
+    readonly Border featuredAgentHost = new Border();
+    AgentAvatar featuredAvatar;
+    static readonly DateTime AgentOrbitEpoch = DateTime.UtcNow;
     string peekAgentId, peekSignature;
 
     void BuildAgentCapsule()
@@ -46,7 +49,8 @@ internal sealed partial class ModernRouterMonitor
         agentPeek.Content = agentPeekContent;
         agentPeek.Margin = new Thickness(18, 14, 18, 0);
         Grid.SetRow(agentPeek, 0); compactView.Children.Add(agentPeek);
-        var bar = new Grid { Margin = new Thickness(14, 8, 10, 8) };
+        var bar = new Grid { Margin = new Thickness(12, 8, 12, 8) };
+        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
         var crew = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
@@ -54,7 +58,10 @@ internal sealed partial class ModernRouterMonitor
         compactCount.FontSize = 11; compactCount.Foreground = Muted;
         compactCount.HorizontalAlignment = HorizontalAlignment.Center;
         compactCount.Margin = new Thickness(0, 2, 0, 0); crew.Children.Add(compactCount);
-        bar.Children.Add(crew);
+        var codexLogo = Logo(40);
+        codexLogo.ToolTip = "Codex automático";
+        Grid.SetColumn(codexLogo, 0); bar.Children.Add(codexLogo);
+        Grid.SetColumn(crew, 1); bar.Children.Add(crew);
         expandAgents = Btn("", delegate { SwitchMode(MonitorMode.Expanded, true); }, true);
         expandAgents.MinWidth = 28; expandAgents.VerticalAlignment = VerticalAlignment.Center;
         expandAgents.Content = new System.Windows.Shapes.Path { Data = System.Windows.Media.Geometry.Parse("M5,0 L0,5 L5,10"),
@@ -64,7 +71,7 @@ internal sealed partial class ModernRouterMonitor
         System.Windows.Automation.AutomationProperties.SetName(expandAgents, "Desplegar panel lateral");
         var expandDivider = new Border { BorderBrush = Line, BorderThickness = new Thickness(1, 0, 0, 0),
             Padding = new Thickness(6, 0, 0, 0), Height = 38, VerticalAlignment = VerticalAlignment.Center, Child = expandAgents };
-        Grid.SetColumn(expandDivider, 1); bar.Children.Add(expandDivider);
+        Grid.SetColumn(expandDivider, 2); bar.Children.Add(expandDivider);
         Grid.SetRow(bar, 1); compactView.Children.Add(bar);
         moreAgents = Btn("", delegate { SwitchMode(MonitorMode.Expanded, true); }, false);
         moreAgents.MinWidth = 0; moreAgents.Width = 34; moreAgents.Padding = new Thickness(0);
@@ -124,16 +131,24 @@ internal sealed partial class ModernRouterMonitor
         return template;
     }
 
-    AgentAvatar MakeAgentAvatar(string id, Dictionary<string, object> row)
+    AgentAvatar MakeAgentAvatar(string id, Dictionary<string, object> row, bool activityView = false)
     {
-        var visual = new AgentAvatar { Id = id, Row = row };
+        var visual = new AgentAvatar { Id = id, Row = row, ActivityView = activityView };
         visual.Button = new Button { Width = 44, Height = 44, Padding = new Thickness(0),
             BorderThickness = new Thickness(0), Template = AvatarTemplate(), Cursor = Cursors.Hand };
         visual.Slot = new Border { Width = 44, Height = 44, Child = visual.Button, Background = TransparentBrush,
             RenderTransform = new TranslateTransform(), VerticalAlignment = VerticalAlignment.Center };
-        visual.Button.MouseEnter += delegate { ShowAgentPeek(id, true); };
-        visual.Button.GotKeyboardFocus += delegate { ShowAgentPeek(id, true); };
-        visual.Button.Click += delegate { ShowAgentPeek(id, true); };
+        visual.Slot.Tag = visual;
+        if (activityView)
+            visual.Button.Click += delegate { OpenHistoryForThread(id); };
+        else
+        {
+            visual.Button.MouseEnter += delegate { ShowAgentPeek(id, true); };
+            visual.Button.GotKeyboardFocus += delegate { ShowAgentPeek(id, true); };
+            visual.Button.Click += delegate { ShowAgentPeek(id, true); };
+        }
+        visual.Slot.IsVisibleChanged += delegate { SetAgentOrbit(visual, visual.Slot.IsVisible); };
+        visual.Slot.Unloaded += delegate { SetAgentOrbit(visual, false); };
         UpdateAgentAvatar(visual, row);
         return visual;
     }
@@ -142,8 +157,10 @@ internal sealed partial class ModernRouterMonitor
     {
         visual.Row = row;
         string model = Model(Setting(row, "model", "Sin confirmar"));
+        string effort = Effort(Setting(row, "effort", ""));
         var identity = IdentifyAgent(row);
-        string signature = model + ":" + identity.Name;
+        bool working = Active(String(row, "status"));
+        string signature = model + ":" + effort + ":" + identity.Name + ":" + String(row, "status");
         System.Windows.Automation.AutomationProperties.SetName(visual.Button,
             String(row, "name", visual.Id) + " · " + model + " · " + Effort(Setting(row, "effort", "")) + " · " + Status(String(row, "status")));
         if (signature == visual.Signature) return;
@@ -170,27 +187,31 @@ internal sealed partial class ModernRouterMonitor
         orbitBrush.GradientStops.Add(new GradientStop(tint, 1));
         // Rotate a fixed square around an explicit center. A partial path's own
         // bounding box is not its circle's center and makes the orbit wobble.
-        var orbitLayer = new Grid { Tag = "orbit-sweep", Width = 44, Height = 44, IsHitTestVisible = false };
+        var orbitLayer = new Grid { Tag = "orbit-sweep", Width = 44, Height = 44, IsHitTestVisible = false, Visibility = working ? Visibility.Visible : Visibility.Collapsed };
         orbitLayer.Children.Add(new System.Windows.Shapes.Path {
             Data = System.Windows.Media.Geometry.Parse("M22,2 A20,20 0 0 1 42,22"),
             Stroke = orbitBrush, StrokeThickness = 1.6, StrokeStartLineCap = PenLineCap.Round,
             StrokeEndLineCap = PenLineCap.Round, Width = 44, Height = 44 });
         visual.Orbit = new RotateTransform(0, 22, 22); orbitLayer.RenderTransform = visual.Orbit; art.Children.Add(orbitLayer);
-        art.Children.Add(new Border { Width = 7, Height = 7, CornerRadius = new CornerRadius(4), Background = color,
+        art.Children.Add(new Border { Tag = "agent-effort", Width = 8, Height = 8, CornerRadius = new CornerRadius(4),
+            Background = effort == "" ? Muted : BadgeColor(effort, false),
             BorderBrush = Panel, BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 5, 5), IsHitTestVisible = false });
         visual.Button.Content = art;
-        SetAgentOrbit(visual, mode == MonitorMode.Compact && IsVisible);
+        SetAgentOrbit(visual, visual.ActivityView ? visual.Slot.IsVisible : mode == MonitorMode.Compact && IsVisible);
     }
 
     static void SetAgentOrbit(AgentAvatar visual, bool active)
     {
         if (visual.Orbit == null) return;
-        if (active && !visual.Leaving && SystemParameters.ClientAreaAnimation)
+        if (active && Active(String(visual.Row, "status")) && !visual.Leaving && SystemParameters.ClientAreaAnimation)
         {
             if (!visual.Orbit.HasAnimatedProperties)
+            {
+                double phase = ((DateTime.UtcNow - AgentOrbitEpoch).TotalSeconds % 3.2) / 3.2 * 360;
                 visual.Orbit.BeginAnimation(RotateTransform.AngleProperty,
-                    new DoubleAnimation(0, 360, TimeSpan.FromSeconds(3.2)) { RepeatBehavior = RepeatBehavior.Forever });
+                    new DoubleAnimation(phase, phase + 360, TimeSpan.FromSeconds(3.2)) { RepeatBehavior = RepeatBehavior.Forever });
+            }
         }
         else visual.Orbit.BeginAnimation(RotateTransform.AngleProperty, null);
     }
@@ -201,7 +222,7 @@ internal sealed partial class ModernRouterMonitor
         foreach (var pair in rows.Where(pair => Active(String(pair.Value, "status")))) activeAgentRows[pair.Key] = pair.Value;
         agentOrder.RemoveAll(id => !activeAgentRows.ContainsKey(id));
         foreach (string id in activeAgentRows.Keys) if (!agentOrder.Contains(id)) agentOrder.Add(id);
-        int limit = Math.Max(1, Math.Min(5, (int)((TargetGeometry(MonitorMode.Compact).Width - 16 - 2 - 24 - 40 - 34) / 44)));
+        int limit = Math.Max(1, Math.Min(5, (int)((TargetGeometry(MonitorMode.Compact).Width - 16 - 2 - 24 - 40 - 40 - 34) / 44)));
         var visibleIds = new HashSet<string>(agentOrder.Take(limit));
         agentStrip.Children.Remove(moreAgents); agentStrip.Children.Remove(agentsIdle);
         foreach (var visual in agentAvatars.Values.ToList())
@@ -268,6 +289,16 @@ internal sealed partial class ModernRouterMonitor
     {
         SetAgentOrbit(visual, false);
         agentStrip.Children.Remove(visual.Slot); agentAvatars.Remove(visual.Id);
+    }
+
+    void UpdateFeaturedAgent(string id, Dictionary<string, object> row)
+    {
+        if (featuredAvatar == null || featuredAvatar.Id != id)
+        {
+            featuredAvatar = MakeAgentAvatar(id, row, true);
+            featuredAgentHost.Child = featuredAvatar.Slot;
+        }
+        else UpdateAgentAvatar(featuredAvatar, row);
     }
 
     void ShowAgentPeek(string id, bool animate)

@@ -149,3 +149,9 @@ Las entradas y salidas se animan sin reordenar los agentes que siguen activos.
 La base y el borde derecho permanecen fijos. Las animaciones respetan la opción
 de movimiento de Windows y los aros se detienen cuando la cápsula está oculta.
 No se infiere si un modelo está pensando: se muestra la actividad observada.
+
+El icono de Codex queda a la izquierda, los agentes en el centro y la flecha a
+la derecha. Actividad y su tarea destacada utilizan los mismos avatares.
+El círculo identifica el modelo; el punto inferior derecho identifica el nivel
+de razonamiento con el color de su etiqueta. Sin un nivel confirmado, el punto
+es neutro. El aro gira únicamente mientras se observa actividad.

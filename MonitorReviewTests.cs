@@ -179,6 +179,16 @@ internal sealed partial class ModernRouterMonitor
             }
         }
         SetAgentOrbit(original, true);
+        // Reasoning can change without changing model, task or working state.
+        foreach (string level in new[] { "low", "medium", "high", "xhigh", "max", "ultra", "" })
+        {
+            var changed = new Dictionary<string, object>(original.Row); changed["effort"] = level;
+            UpdateAgentAvatar(original, changed);
+            var dot = ((Grid)original.Button.Content).Children.OfType<Border>().First(child => Convert.ToString(child.Tag) == "agent-effort");
+            Brush expected = level == "" ? Muted : BadgeColor(Effort(level), false);
+            Check(((SolidColorBrush)dot.Background).Color == ((SolidColorBrush)expected).Color, "Reasoning dot did not refresh for " + level);
+        }
+        UpdateAgentAvatar(original, activeAgentRows["ui"]);
         var rows = activeAgentRows.Reverse().ToList();
         RefreshAgentCapsule(rows, false);
         Check(agentOrder.First() == "ui" && object.ReferenceEquals(original, agentAvatars["ui"]), "Refresh reordered or recreated active agents");
@@ -252,12 +262,12 @@ internal sealed partial class ModernRouterMonitor
             {
                 var row = (Grid)card.Child;
                 Check(card.CornerRadius.TopLeft >= 10 && card.Padding.Left >= 8, "Activity hover card lacks rounded padding");
-                Check(Math.Abs(row.ColumnDefinitions[0].ActualWidth - 24) < .1, "Activity indicator lacks text spacing");
-                var indicator = row.Children.OfType<Grid>().First(candidate => Convert.ToString(candidate.Tag) == "activity-indicator");
-                Check(System.Windows.Automation.AutomationProperties.GetName(indicator) ==
-                    (activityRowIndex < 3 ? "Agente trabajando" : "Agente inactivo"), "Activity state indicator mismatch");
-                if (activityRowIndex < 3 && SystemParameters.ClientAreaAnimation)
-                    Check(((Border)indicator.Children[0]).HasAnimatedProperties, "Working agent has no pulse animation");
+                Check(Math.Abs(row.ColumnDefinitions[0].ActualWidth - 56) < .1, "Activity avatar lacks text spacing");
+                var avatar = (AgentAvatar)row.Children.OfType<Border>().First(child => child.Tag is AgentAvatar).Tag;
+                Check(avatar.ActivityView, "Activity row is not using the shared agent avatar");
+                Check(System.Windows.Automation.AutomationProperties.GetName(avatar.Button).Contains(activityRowIndex < 3 ? "Trabajando" : "En espera"), "Activity state indicator mismatch");
+                if (SystemParameters.ClientAreaAnimation)
+                    Check(avatar.Orbit.HasAnimatedProperties == (activityRowIndex < 3), "Activity orbit does not match working state");
                 activityRowIndex++;
                 var tags = row.Children.OfType<StackPanel>().Last();
                 double x = tags.TransformToAncestor(taskList).Transform(new Point()).X;
@@ -275,7 +285,7 @@ internal sealed partial class ModernRouterMonitor
                 }
             }
             results.Add("PASS: featured badges share 24 DIP height; all six efforts fit and contrast >= 4.5:1");
-            results.Add("PASS: working agents pulse; idle indicators remain static; 24 DIP indicator column separates text");
+            results.Add("PASS: Activity uses shared model/task avatars; active agents orbit and idle agents stay still with text spacing");
             CheckAnimatedAnchor(MonitorMode.Compact); CheckAnimatedAnchor(MonitorMode.Expanded);
             results.Add("PASS: render-frame sampling keeps native window and lower surface edge fixed during both 420 ms transitions");
             foreach (double scale in new[] { 1.0, 1.25, 1.5, 2.0 })
