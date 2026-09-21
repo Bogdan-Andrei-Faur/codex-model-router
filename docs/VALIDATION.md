@@ -337,6 +337,19 @@ explicit note when their separate reasoning explanation was not previously store
 - Existing native review covers fixed anchors, overflow, Activity navigation,
   hover, animation lifecycle, persistent statistics and history.
 
+## V14: durable agent identity classification — 2026-09-21
+
+- The router classifies an agent at message submission using title, message,
+  attachment presence and the routing explanation. It records only the category
+  and confidence, never the message, attachment content, tool data or output.
+- Categories cover interfaces, corrections, tests, audits, architecture, text,
+  research, configuration, automation and a neutral fallback. A specific title
+  outweighs a short follow-up; ambiguous continuations retain the prior category.
+- Safe identity metadata reloads from the local decision journal after a restart.
+  Child agents inherit their coordinator's category until they receive their own
+  routed instruction. Native review checks every stored category reaches a
+  distinct catalog identity; Python tests verify privacy and restart behavior.
+
 ## References and provenance
 
 This implementation is original. No upstream router source code was copied.

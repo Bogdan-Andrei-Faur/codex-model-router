@@ -124,7 +124,9 @@ suscripción. La calidad y el ahorro real requieren observar tareas representati
 - Conserva adjuntos, instrucciones, herramientas y permisos. Si no puede decidir
   con un catálogo válido, deja pasar la petición original. No reintenta trabajos.
 - Los registros locales contienen identificadores, **títulos de tareas**, modelos,
-  razonamiento, motivos, estados y contadores. No copian mensajes, adjuntos,
+  razonamiento, motivos, estados, una categoría visual y contadores. El mensaje
+  solo se analiza localmente al enviarlo para obtener esa categoría; no se guarda.
+  No copian mensajes, adjuntos,
   argumentos de herramientas, respuestas ni credenciales. `state/` se excluye de Git.
 - Las rutas de Codex están fijadas a la instalación comprobada. Una actualización
   de la app puede requerir ajustar el selector. Si falla, usa el acceso habitual.
@@ -138,7 +140,14 @@ Pruebas y límites de validación: [VALIDATION.md](docs/VALIDATION.md).
 La cápsula muestra hasta cinco agentes activos y agrupa el resto en `+N`.
 Cada círculo usa el color de su modelo y un icono orientativo según el tipo de
 tarea (interfaces, correcciones, pruebas, auditorías, arquitectura, textos,
-investigación o tarea general). El icono no interviene en la elección del modelo.
+investigación, configuración, automatización o tarea general). El icono no
+interviene en la elección del modelo.
+
+La categoría se decide al enviar la tarea, combinando título, mensaje, adjuntos
+y el motivo de selección. Solo se guarda la categoría y una indicación de
+confianza; nunca el mensaje. Los seguimientos breves conservan la categoría de
+la tarea, incluso al reiniciar Codex, y los agentes secundarios la heredan hasta
+que reciben una instrucción propia.
 
 El aro gira mientras se observa actividad. Al pasar el ratón, pulsar o enfocar
 un agente con el teclado, se despliega su tarea, modelo, esfuerzo y estado desde

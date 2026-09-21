@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from routing import DEFAULT_ROUTES, EFFORTS, classify, select_route, select_route_details
+from routing import DEFAULT_ROUTES, EFFORTS, classify, classify_agent_identity, select_route, select_route_details
 from router import Router
 
 
@@ -71,6 +71,19 @@ class RoutingPolicyTests(unittest.TestCase):
         self.assertEqual(reasons["source"], "explicit")
         self.assertIn("modelo indicado", reasons["model"])
         self.assertIn("nivel de razonamiento indicado", reasons["effort"])
+
+    def test_agent_identity_uses_title_message_and_safe_fallbacks(self):
+        cases = [
+            ("", "Rediseña la UX de la cápsula", False, None, "interface", "alta"),
+            ("Auditar permisos", "Sí, continúa", False, "interface", "audit", "alta"),
+            ("", "Escribe pruebas E2E y valida el formulario", False, None, "tests", "alta"),
+            ("", "", True, None, "interface", "baja"),
+            ("", "Sí, hazlo", False, "architecture", "architecture", "heredada"),
+            ("", "Sí, hazlo", False, None, "general", "baja"),
+        ]
+        for title, message, attachments, previous, category, confidence in cases:
+            with self.subTest(title=title, message=message):
+                self.assertEqual(classify_agent_identity(message, title, attachments, previous=previous), (category, confidence))
 
 
 class ProtocolTests(unittest.TestCase):
@@ -217,6 +230,8 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(records[0]["source"], "automatic")
         self.assertIn("model_reason", records[0])
         self.assertIn("effort_reason", records[0])
+        self.assertEqual(records[0]["agent_category"], "text")
+        self.assertEqual(records[0]["agent_confidence"], "media")
         self.assertEqual(records[-1]["inputTokens"], 20)
         self.assertNotIn("PRIVATE_HISTORY_SENTINEL", (Path(self.tmp.name) / "state" / "history.jsonl").read_text())
 
@@ -266,6 +281,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(self.router.drain_outbound(), [])
 
     def test_agent_telemetry_does_not_copy_prompt_or_output(self):
+        self.router.threads["t"].update(agent_category="architecture", agent_confidence="alta")
         self.router.server_line(encode({"method": "item/started", "params": {"threadId": "t", "item": {
             "type": "collabAgentToolCall", "senderThreadId": "t", "receiverThreadIds": ["child"],
             "model": "gpt-5.6-sol", "reasoningEffort": "high", "prompt": "SECRET_PROMPT",
@@ -273,8 +289,19 @@ class ProtocolTests(unittest.TestCase):
         self.router.log({"event": "snapshot"})
         child = self.router.threads["child"]
         self.assertEqual((child["model"], child["parent"], child["confirmation"]), ("gpt-5.6-sol", "t", "Solicitado por agente"))
+        self.assertEqual((child["agent_category"], child["agent_confidence"]), ("architecture", "heredada"))
         logged = next((Path(self.tmp.name) / "state").glob("*.json")).read_text()
         self.assertNotIn("SECRET_", logged)
+
+    def test_agent_category_survives_router_restart_without_replaying_content(self):
+        self.router.client_line(encode(self.request("Investiga la arquitectura distribuida del servicio")))
+        restarted = Router(self.path, Path(self.tmp.name) / "state")
+        restarted.catalog = {x["model"]: set(EFFORTS) for x in DEFAULT_ROUTES.values()}
+        restarted.client_line(encode({"id": 8, "method": "thread/resume", "params": {"threadId": "t"}}))
+        restarted.server_line(encode({"id": 8, "result": {"thread": {"id": "t", "name": "General"},
+            "modelProvider": "openai", "model": "gpt-6-astra"}}))
+        restarted.client_line(encode(self.request("Sí, continúa")))
+        self.assertEqual(restarted.threads["t"]["agent_category"], "architecture")
 
 
 if __name__ == "__main__":

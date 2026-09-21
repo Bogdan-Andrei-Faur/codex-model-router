@@ -8,6 +8,7 @@ import unicodedata
 TIERS = ("simple", "normal", "complex", "critical")
 EFFORTS = ("low", "medium", "high", "xhigh", "max", "ultra")
 EFFORT_LABELS = dict(zip(EFFORTS, ("Ligero", "Medio", "Alto", "Muy alto", "Máx.", "Ultra")))
+AGENT_CATEGORIES = ("interface", "correction", "tests", "audit", "architecture", "text", "research", "configuration", "automation", "general")
 DEFAULT_ROUTES = {
     "simple": {"model": "gpt-5.6-luna", "effort": "low"},
     "normal": {"model": "gpt-5.6-terra", "effort": "medium"},
@@ -26,6 +27,40 @@ def normalize(text):
 
 def has(pattern, text):
     return bool(re.search(pattern, text))
+
+
+def classify_agent_identity(text, title="", attachments=False, model_reason="", previous=None):
+    """Return privacy-safe agent identity metadata without retaining user content.
+
+    A title is a stronger signal than the current message. The message is only
+    inspected at routing time; the returned category/confidence contain no text.
+    """
+    title = normalize(title)
+    message = normalize(text)
+    reason = normalize(model_reason)
+    patterns = (
+        ("audit", r"\b(auditor\w*|audit\w*|seguridad|security|vulnerabil\w*|accesibilidad|accessibility|compliance)\b"),
+        ("interface", r"\b(ui\s*/?\s*ux|ux|ui|interfaz|interfaces|frontend|front.end|figma|disen\w*|redisen\w*|maquet\w*|layout|responsive|tipografia|animacion\w*|visual)\b"),
+        ("tests", r"\b(prueba\w*|test\w*|e2e|validar|verificar|comprobar|coverage)\b"),
+        ("correction", r"\b(correg\w*|arregl\w*|error|fallo|bug|fix\w*|regresion|regression)\b"),
+        ("architecture", r"\b(arquitectura|architecture|migraci\w*|migration|refactor\w*|concurrencia|deadlock|distribuid\w*)\b"),
+        ("research", r"\b(investig\w*|research|diagnostic\w*|causa raiz|root cause|analiz\w*|rendimiento|performance|compar\w*|optimiza\w*)\b"),
+        ("configuration", r"\b(configur\w*|instal\w*|deploy\w*|desplieg\w*|dependenc\w*|entorno|environment|docker|npm|pip|ci/cd)\b"),
+        ("automation", r"\b(automat\w*|programa\w*|script\w*|workflow|cron|orquest\w*)\b"),
+        ("text", r"\b(traduc\w*|translat\w*|texto\w*|document\w*|resum\w*|redact\w*|ortografia|typo|reformula\w*)\b"),
+    )
+    scores = {}
+    for category, pattern in patterns:
+        # A specific title should win over a generic follow-up such as “sí”.
+        scores[category] = 3 * len(re.findall(pattern, title)) + 2 * len(re.findall(pattern, message)) + len(re.findall(pattern, reason))
+    category, score = max(scores.items(), key=lambda item: item[1])
+    if score:
+        return category, "alta" if score >= 3 else "media"
+    if attachments:
+        return "interface", "baja"
+    if previous in AGENT_CATEGORIES and previous != "general":
+        return previous, "heredada"
+    return "general", "baja"
 
 def classify(text, previous=None, attachments=False, previous_effort=None):
     t = normalize(text).strip()

@@ -88,10 +88,30 @@ internal sealed partial class ModernRouterMonitor
     // Task category is an indicative local classification. It never affects routing.
     static AgentIdentity IdentifyAgent(Dictionary<string, object> row)
     {
+        var routed = IdentityFromCategory(String(row, "agent_category"));
+        if (routed != null) return routed;
         string name = String(row, "name").ToLowerInvariant();
         var found = MatchAgentIdentity(name);
         return found ?? MatchAgentIdentity(String(row, "model_reason", String(row, "reason")).ToLowerInvariant())
             ?? new AgentIdentity("Tarea", "M12,2 A10,10 0 1 1 11.99,2 M12,7 L12,17 M7,12 L17,12");
+    }
+
+    static AgentIdentity IdentityFromCategory(string category)
+    {
+        switch (category)
+        {
+            case "audit": return new AgentIdentity("Auditoría", "M9,2 L15,2 L15,4 L20,4 L20,12 M12,22 L4,22 L4,4 L9,4 Z M8,8 L12,8 M8,12 L10,12 M16,12 A4,4 0 1 1 15.99,12 M19,19 L23,23");
+            case "tests": return new AgentIdentity("Pruebas", "M8,2 L16,2 M10,2 L10,9 L4,19 Q3,22 6,22 L18,22 Q21,22 20,19 L14,9 L14,2 M7,15 L17,15 M9,18 L10,18 M14,19 L15,19");
+            case "architecture": return new AgentIdentity("Arquitectura", "M9,2 L15,2 L15,8 L9,8 Z M2,16 L8,16 L8,22 L2,22 Z M16,16 L22,16 L22,22 L16,22 Z M12,8 L12,12 M5,16 L5,12 L19,12 L19,16");
+            case "correction": return new AgentIdentity("Corrección", "M8,7 L16,7 L17,11 L17,16 A5,5 0 0 1 7,16 L7,11 Z M9,7 L9,4 L15,4 L15,7 M9,4 L7,2 M15,4 L17,2 M3,10 L7,12 M17,12 L21,10 M3,16 L7,16 M17,16 L21,16 M5,22 L8,19 M16,19 L19,22 M12,8 L12,20");
+            case "text": return new AgentIdentity("Textos", "M4,3 L20,3 M12,3 L12,21 M8,21 L16,21 M4,3 L4,7 M20,3 L20,7");
+            case "interface": return new AgentIdentity("Interfaces", "M3,3 L21,3 L21,21 L3,21 Z M3,8 L21,8 M8,8 L8,21 M5,5.5 L6,5.5 M9,5.5 L10,5.5");
+            case "research": return new AgentIdentity("Investigación", "M10,2 A8,8 0 1 1 9.99,2 M16,16 L23,23 M6,10 L14,10 M10,6 L10,14");
+            case "configuration": return new AgentIdentity("Configuración", "M12,3 L14,6 L18,6 L19,10 L22,12 L19,14 L18,18 L14,18 L12,21 L10,18 L6,18 L5,14 L2,12 L5,10 L6,6 L10,6 Z M12,9 A3,3 0 1 1 11.99,9");
+            case "automation": return new AgentIdentity("Automatización", "M5,5 L10,5 L12,8 L14,5 L19,5 L19,10 L22,12 L19,14 L19,19 L14,19 L12,16 L10,19 L5,19 L5,14 L2,12 L5,10 Z M9,12 L15,12 M12,9 L12,15");
+            case "general": return new AgentIdentity("Tarea", "M12,2 A10,10 0 1 1 11.99,2 M12,7 L12,17 M7,12 L17,12");
+            default: return null;
+        }
     }
 
     static AgentIdentity MatchAgentIdentity(string text)
@@ -306,14 +326,17 @@ internal sealed partial class ModernRouterMonitor
         if (mode != MonitorMode.Compact || !activeAgentRows.ContainsKey(id)) return;
         peekCloseTimer.Stop();
         var row = activeAgentRows[id];
-        string signature = id + ":" + Json.Serialize(row.Where(pair => new[] { "name", "model", "effort", "requested_model", "requested_effort", "status", "reason" }.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value));
+        string signature = id + ":" + Json.Serialize(row.Where(pair => new[] { "name", "model", "effort", "requested_model", "requested_effort", "status", "reason", "agent_category", "agent_confidence" }.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value));
         if (peekAgentId == id && signature == peekSignature) return;
         peekAgentId = id; peekSignature = signature;
         agentPeekContent.Children.Clear();
         string model = Model(Setting(row, "model", "Sin confirmar"));
         var identity = IdentifyAgent(row);
         var category = Txt(identity.Name, 11, BadgeColor(model, true), FontWeights.SemiBold);
-        category.ToolTip = "Tipo orientativo según el título y la descripción de la tarea"; agentPeekContent.Children.Add(category);
+        string confidence = String(row, "agent_confidence");
+        category.ToolTip = confidence == "" ? "Tipo orientativo según el título y la descripción de la tarea" :
+            "Tipo determinado al iniciar la tarea · confianza " + confidence;
+        agentPeekContent.Children.Add(category);
         var name = Txt(String(row, "name", id), 15, Ink, FontWeights.SemiBold);
         name.TextWrapping = TextWrapping.Wrap; name.Margin = new Thickness(0, 6, 0, 10); agentPeekContent.Children.Add(name);
         var tags = new StackPanel { Orientation = Orientation.Horizontal };

@@ -156,6 +156,14 @@ internal sealed partial class ModernRouterMonitor
         SwitchMode(MonitorMode.Compact, false); PaintFixtures(); UpdateLayout();
         Check(agentAvatars.Count == 3 && activeAgentRows.Count == 3, "Active avatars missing");
         Check(IdentifyAgent(activeAgentRows["ui"]).Name == "Interfaces" && IdentifyAgent(activeAgentRows["fix"]).Name == "Corrección", "Task icon catalog is not differentiated");
+        var catalog = new Dictionary<string, string> { { "interface", "Interfaces" }, { "correction", "Corrección" },
+            { "tests", "Pruebas" }, { "audit", "Auditoría" }, { "architecture", "Arquitectura" }, { "text", "Textos" },
+            { "research", "Investigación" }, { "configuration", "Configuración" }, { "automation", "Automatización" }, { "general", "Tarea" } };
+        foreach (var entry in catalog)
+        {
+            var row = Fixture("Título genérico", "gpt-5.6-terra", "medium", "active"); row["agent_category"] = entry.Key;
+            Check(IdentifyAgent(row).Name == entry.Value, "Stored agent category did not select " + entry.Value);
+        }
         var original = agentAvatars["ui"];
         // Check the rendered arc against the face center at every rotation quadrant.
         // This catches a moving/off-center orbit even when its source arc is circular.

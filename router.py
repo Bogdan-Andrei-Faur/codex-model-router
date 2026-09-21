@@ -14,7 +14,7 @@ import threading
 import time
 import uuid
 
-from routing import DEFAULT_ROUTES, EFFORTS, select_route_details, has_attachments, user_text
+from routing import DEFAULT_ROUTES, EFFORTS, classify_agent_identity, select_route_details, has_attachments, user_text
 
 ROOT = Path(__file__).resolve().parent
 
@@ -39,13 +39,31 @@ class Router:
         self.outbound = []
         self.accepted_routes = {}
         self.current_decisions = {}
+        self.thread_categories = self.load_thread_categories()
         self.history_writes = 0
         self.stats = {"accepted": 0, "non_astra": 0}
+
+    def load_thread_categories(self):
+        """Recover only safe identity metadata, never prompt content, after restart."""
+        categories = {}
+        try:
+            history = self.state_dir / "history.jsonl"
+            if not history.exists():
+                return categories
+            for line in history.read_text(encoding="utf-8").splitlines()[-20000:]:
+                record = json.loads(line)
+                thread, category = record.get("thread"), record.get("agent_category")
+                if thread and category:
+                    categories[thread] = {"agent_category": category,
+                                          "agent_confidence": record.get("agent_confidence", "heredada")}
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            pass
+        return categories
 
     def record_history(self, event, **fields):
         """Append privacy-safe decision metadata; never prompts, outputs or tool data."""
         allowed = {"decision_id", "thread", "title", "model", "effort", "previous_model",
-                   "model_reason", "effort_reason", "source", "status", "signal", "error_type", "error_code",
+                   "model_reason", "effort_reason", "agent_category", "agent_confidence", "source", "status", "signal", "error_type", "error_code",
                    "inputTokens", "outputTokens", "cachedInputTokens", "reasoningOutputTokens"}
         record = {"schema": 1, "time": time.time(), "time_iso":
                   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event,
@@ -80,7 +98,8 @@ class Router:
         except (OSError, ValueError, KeyError):
             pass
 
-    def new_decision(self, tid, model, effort, model_reason, effort_reason, source, previous_model=None, signal=None):
+    def new_decision(self, tid, model, effort, model_reason, effort_reason, source, previous_model=None, signal=None,
+                     agent_category=None, agent_confidence=None):
         previous_decision = self.current_decisions.get(tid)
         if previous_decision and signal == "retry":
             self.record_history("decision_signal", decision_id=previous_decision, thread=tid, signal="retry")
@@ -89,11 +108,14 @@ class Router:
         decision_id = uuid.uuid4().hex
         title = self.threads.get(tid, {}).get("name") or (tid[:8] if tid else "Sin título")
         self.current_decisions[tid] = decision_id
+        if agent_category:
+            self.thread_categories[tid] = {"agent_category": agent_category,
+                                           "agent_confidence": agent_confidence or "baja"}
         self.threads.setdefault(tid, {}).pop("tokens", None)
         self.record_history("decision_created", decision_id=decision_id, thread=tid, title=title,
                             model=model, effort=effort, previous_model=previous_model,
                             model_reason=model_reason, effort_reason=effort_reason, source=source,
-                            status="pending")
+                            agent_category=agent_category, agent_confidence=agent_confidence, status="pending")
         return decision_id
 
     def log(self, event):
@@ -139,7 +161,7 @@ class Router:
                         thread = result.get("thread") or {}
                         tid = thread.get("id")
                         if tid:
-                            old = self.threads.get(tid, {})
+                            old = {**self.thread_categories.get(tid, {}), **self.threads.get(tid, {})}
                             self.threads[tid] = {**old,
                                 "provider": result.get("modelProvider", thread.get("modelProvider", old.get("provider"))),
                                 "model": old.get("model") if old.get("confirmation") == "Aceptado por Codex" else result.get("model", thread.get("model", old.get("model"))),
@@ -220,13 +242,18 @@ class Router:
                     if item.get("type") == "collabAgentToolCall":
                         for receiver in item.get("receiverThreadIds", []):
                             row = self.threads.setdefault(receiver, {})
+                            parent = self.threads.get(item.get("senderThreadId"), {})
                             row.update(parent=item.get("senderThreadId"), updated=time.time())
+                            if not row.get("agent_category") and parent.get("agent_category"):
+                                row.update(agent_category=parent["agent_category"], agent_confidence="heredada")
                             if item.get("model") and row.get("confirmation") != "Aceptado por Codex":
                                 row.update(model=item["model"], effort=item.get("reasoningEffort"), confirmation="Solicitado por agente")
                                 if not row.get("decision_id"):
                                     row["decision_id"] = self.new_decision(receiver, item["model"], item.get("reasoningEffort"),
                                         "modelo solicitado por el agente coordinador",
-                                        "nivel solicitado por el agente coordinador", "agent")
+                                        "nivel solicitado por el agente coordinador", "agent",
+                                        agent_category=row.get("agent_category", "general"),
+                                        agent_confidence=row.get("agent_confidence", "baja"))
                             agent = item.get("agentsStates", {}).get(receiver, {})
                             row["status"] = agent.get("status", "unknown") if isinstance(agent, dict) else "unknown"
                 elif method == "thread/tokenUsage/updated":
@@ -293,13 +320,16 @@ class Router:
         effort = settings.get("reasoning_effort") or params.get("effort") or row.get("configured_effort") or row.get("effort")
         if model:
             tid = params.get("threadId")
+            items = params.get("input") if isinstance(params.get("input"), list) else []
+            category, confidence = classify_agent_identity(user_text(items), row.get("name", ""), has_attachments(items),
+                                                           previous=row.get("agent_category"))
             model_reason = "configuración original; sin intervención del selector"
             effort_reason = "nivel configurado manualmente en Codex"
             decision_id = self.new_decision(tid, model, effort, model_reason, effort_reason, "preserved",
-                                            row.get("model"))
+                                            row.get("model"), agent_category=category, agent_confidence=confidence)
             self.accepted_routes[message["id"]] = {"model": model, "effort": effort, "reason": model_reason,
                 "model_reason": model_reason, "effort_reason": effort_reason, "source": "preserved",
-                "decision_id": decision_id}
+                "agent_category": category, "agent_confidence": confidence, "decision_id": decision_id}
 
     def route_turn(self, message, raw):
         params = message["params"]
@@ -332,6 +362,8 @@ class Router:
             if not state.get("seen_turn"):
                 previous = None
         route, reasons = select_route_details(text, routes, previous, state.get("effort"), has_attachments(items))
+        category, confidence = classify_agent_identity(text, state.get("name", ""), has_attachments(items),
+                                                       reasons["model"], state.get("agent_category"))
         model, effort = route["model"], route["effort"]
         if effort == "ultra" and model in self.catalog and effort not in self.catalog[model] and "max" in self.catalog[model]:
             effort = "max"
@@ -347,10 +379,11 @@ class Router:
             changed["params"]["collaborationMode"]["settings"]["reasoning_effort"] = effort
         tier = next(t for t, r in routes.items() if r["model"] == model)
         decision_id = self.new_decision(tid, model, effort, reasons["model"], reasons["effort"], reasons["source"],
-                                        current, reasons.get("signal"))
+                                        current, reasons.get("signal"), category, confidence)
         decision = {"model": model, "effort": effort, "reason": reasons["model"],
                     "model_reason": reasons["model"], "effort_reason": reasons["effort"],
-                    "source": reasons["source"], "decision_id": decision_id}
+                    "source": reasons["source"], "agent_category": category,
+                    "agent_confidence": confidence, "decision_id": decision_id}
         self.threads.setdefault(tid, {}).update(tier=tier, seen_turn=True, requested_model=model,
                                               requested_effort=effort, status="pending", updated=time.time(), **decision)
         if "id" in message:
