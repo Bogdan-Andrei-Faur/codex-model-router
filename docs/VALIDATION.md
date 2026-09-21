@@ -309,6 +309,19 @@ explicit note when their separate reasoning explanation was not previously store
   not established by these local layout tests.
 - Only the monitor is replaced; currently running Codex tasks are unaffected.
 
+## V12: outer circular orbit and rounded components — 2026-09-21
+
+- Fixed the orbit's rotation center: the former partial path bounding box was
+  not concentric with the avatar. A fixed 44-DIP layer rotates explicitly around
+  (22,22), with a radius-20 arc outside the radius-16 face and a faint full track.
+- Restored the vertical separator before the capsule expand action. Rounded
+  model/effort tags, buttons/tabs, Activity/History cards, explanation cards and
+  the tray menu; preserved tag heights and existing information.
+- Native review samples points on the rendered arc over twelve rotation angles
+  to verify constant radius relative to the face and positive external clearance.
+  Existing anchor, hover, reactivation, overflow and persistence checks pass.
+- Inspected rendered capsule, attached detail, History and tray-menu previews.
+
 ## References and provenance
 
 This implementation is original. No upstream router source code was copied.

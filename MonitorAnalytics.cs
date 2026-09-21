@@ -222,7 +222,7 @@ internal sealed partial class ModernRouterMonitor
     static ControlTemplate RowButtonTemplate()
     {
         var border = new FrameworkElementFactory(typeof(Border));
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(10));
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(16));
         border.SetBinding(Border.BackgroundProperty, new System.Windows.Data.Binding("Background") { RelativeSource =
             new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent) });
         border.SetBinding(Border.PaddingProperty, new System.Windows.Data.Binding("Padding") { RelativeSource =
@@ -277,7 +277,7 @@ internal sealed partial class ModernRouterMonitor
         var stack = new StackPanel(); stack.Children.Add(titleText); stack.Children.Add(text);
         var rail = modelChoice ? Accent : effortChoice ? Good : Line;
         var card = new Border { Background = Panel2, BorderBrush = rail, BorderThickness = new Thickness(3, 0, 0, 0),
-            CornerRadius = new CornerRadius(9), Padding = new Thickness(10, 9, 11, 9), Margin = new Thickness(0, 10, 0, 0), Child = stack };
+            CornerRadius = new CornerRadius(16), Padding = new Thickness(10, 9, 11, 9), Margin = new Thickness(0, 10, 0, 0), Child = stack };
         panel.Children.Add(card);
     }
 

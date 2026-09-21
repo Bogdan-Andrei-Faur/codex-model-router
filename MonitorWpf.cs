@@ -110,7 +110,7 @@ internal sealed partial class ModernRouterMonitor : Window
         shell.Background = Panel;
         shell.BorderBrush = Line;
         shell.BorderThickness = new Thickness(1);
-        shell.CornerRadius = new CornerRadius(22);
+        shell.CornerRadius = new CornerRadius(26);
         // Keep the shadow outside the content render tree so it cannot rasterize text.
         RenderOptions.SetClearTypeHint(shell, ClearTypeHint.Enabled);
         var content = new Grid();
@@ -158,7 +158,7 @@ internal sealed partial class ModernRouterMonitor : Window
     static ControlTemplate ButtonTemplate()
     {
         var border = new FrameworkElementFactory(typeof(Border));
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(17));
         border.SetBinding(Border.BackgroundProperty, new System.Windows.Data.Binding("Background") { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent) });
         border.SetBinding(Border.BorderBrushProperty, new System.Windows.Data.Binding("BorderBrush") { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent) });
         border.SetBinding(Border.BorderThicknessProperty, new System.Windows.Data.Binding("BorderThickness") { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent) });
@@ -282,7 +282,7 @@ internal sealed partial class ModernRouterMonitor : Window
         var border = new FrameworkElementFactory(typeof(Border));
         border.SetValue(Border.BackgroundProperty, Panel); border.SetValue(Border.BorderBrushProperty, Line);
         border.SetValue(Border.BorderThicknessProperty, new Thickness(1));
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(14));
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(20));
         border.SetValue(Border.PaddingProperty, new Thickness(7));
         var items = new FrameworkElementFactory(typeof(StackPanel));
         items.SetValue(StackPanel.IsItemsHostProperty, true); border.AppendChild(items);
@@ -331,7 +331,7 @@ internal sealed partial class ModernRouterMonitor : Window
     static ControlTemplate MenuTemplate()
     {
         var border = new FrameworkElementFactory(typeof(Border));
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(17));
         border.SetBinding(Border.BackgroundProperty, new System.Windows.Data.Binding("Background") {
             RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent) });
         var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
@@ -398,7 +398,7 @@ internal sealed partial class ModernRouterMonitor : Window
         }
         compactView.Visibility = target == MonitorMode.Compact ? Visibility.Visible : Visibility.Collapsed;
         expandedView.Visibility = target == MonitorMode.Expanded ? Visibility.Visible : Visibility.Collapsed;
-        shell.CornerRadius = new CornerRadius(target == MonitorMode.Compact ? 21 : 22);
+        shell.CornerRadius = new CornerRadius(26);
         // Keep the transparent native window fixed. Only the bottom-aligned surface grows;
         // resizing and moving an HWND on separate frames causes lower-edge judder.
         var envelope = TargetGeometry(MonitorMode.Expanded);
@@ -649,7 +649,7 @@ internal sealed partial class ModernRouterMonitor : Window
         var text = Txt(label, 12, Brush(foreground), FontWeights.SemiBold);
         text.TextAlignment = TextAlignment.Center; text.VerticalAlignment = VerticalAlignment.Center;
         text.LineHeight = 14; text.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
-        return new Border { Background = Brush(background), CornerRadius = new CornerRadius(6), Height = 24, MinHeight = 24,
+        return new Border { Background = Brush(background), CornerRadius = new CornerRadius(12), Height = 24, MinHeight = 24,
             VerticalAlignment = VerticalAlignment.Center, Padding = new Thickness(9, 0, 9, 0), Child = text,
             ToolTip = (model ? "Modelo: " : "Razonamiento: ") + label };
     }
@@ -679,7 +679,7 @@ internal sealed partial class ModernRouterMonitor : Window
         tags.ToolTip = String(row, "status") == "pending" ? "Selección pendiente de confirmar" : String(row, "confirmation", "Sin confirmar");
         Grid.SetColumn(tags, 2); grid.Children.Add(tags);
         var card = new Border { Margin = new Thickness(12, 3, 12, 3), Padding = new Thickness(8, 7, 8, 7),
-            CornerRadius = new CornerRadius(10), Background = TransparentBrush, Cursor = Cursors.Hand,
+            CornerRadius = new CornerRadius(16), Background = TransparentBrush, Cursor = Cursors.Hand,
             ToolTip = "Consultar cómo se tomó esta decisión", Child = grid };
         card.MouseEnter += delegate { card.Background = Panel2; };
         card.MouseLeave += delegate { card.Background = TransparentBrush; };

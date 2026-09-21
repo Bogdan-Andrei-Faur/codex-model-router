@@ -157,6 +157,28 @@ internal sealed partial class ModernRouterMonitor
         Check(agentAvatars.Count == 3 && activeAgentRows.Count == 3, "Active avatars missing");
         Check(IdentifyAgent(activeAgentRows["ui"]).Name == "Interfaces" && IdentifyAgent(activeAgentRows["fix"]).Name == "Corrección", "Task icon catalog is not differentiated");
         var original = agentAvatars["ui"];
+        // Check the rendered arc against the face center at every rotation quadrant.
+        // This catches a moving/off-center orbit even when its source arc is circular.
+        SetAgentOrbit(original, false); UpdateLayout();
+        var art = (Grid)original.Button.Content;
+        var face = art.Children.OfType<Border>().First(child => Convert.ToString(child.Tag) == "agent-face");
+        var sweep = art.Children.OfType<Grid>().First(child => Convert.ToString(child.Tag) == "orbit-sweep");
+        var arc = (System.Windows.Shapes.Path)sweep.Children[0];
+        Point faceCenter = face.TransformToAncestor(art).Transform(new Point(face.ActualWidth / 2, face.ActualHeight / 2));
+        var drawn = arc.RenderedGeometry.GetFlattenedPathGeometry();
+        for (int angle = 0; angle < 360; angle += 30)
+        {
+            original.Orbit.Angle = angle;
+            for (int part = 0; part <= 8; part++)
+            {
+                Point point, tangent; drawn.GetPointAtFractionLength(part / 8.0, out point, out tangent);
+                point = arc.TransformToAncestor(art).Transform(point);
+                double radius = (point - faceCenter).Length;
+                Check(Math.Abs(radius - 20) < .35 && radius > face.ActualWidth / 2 + 3,
+                    "Rendered orbit is not circular and outside the face: radius=" + radius);
+            }
+        }
+        SetAgentOrbit(original, true);
         var rows = activeAgentRows.Reverse().ToList();
         RefreshAgentCapsule(rows, false);
         Check(agentOrder.First() == "ui" && object.ReferenceEquals(original, agentAvatars["ui"]), "Refresh reordered or recreated active agents");

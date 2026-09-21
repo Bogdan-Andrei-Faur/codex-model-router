@@ -48,7 +48,7 @@ internal sealed partial class ModernRouterMonitor
         Grid.SetRow(agentPeek, 0); compactView.Children.Add(agentPeek);
         var bar = new Grid { Margin = new Thickness(14, 8, 10, 8) };
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) });
+        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
         var crew = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         agentStrip.Height = 44; crew.Children.Add(agentStrip);
         compactCount.FontSize = 11; compactCount.Foreground = Muted;
@@ -62,7 +62,9 @@ internal sealed partial class ModernRouterMonitor
             Width = 6, Height = 10, Stretch = Stretch.Uniform };
         expandAgents.ToolTip = "Desplegar panel lateral";
         System.Windows.Automation.AutomationProperties.SetName(expandAgents, "Desplegar panel lateral");
-        Grid.SetColumn(expandAgents, 1); bar.Children.Add(expandAgents);
+        var expandDivider = new Border { BorderBrush = Line, BorderThickness = new Thickness(1, 0, 0, 0),
+            Padding = new Thickness(6, 0, 0, 0), Height = 38, VerticalAlignment = VerticalAlignment.Center, Child = expandAgents };
+        Grid.SetColumn(expandDivider, 1); bar.Children.Add(expandDivider);
         Grid.SetRow(bar, 1); compactView.Children.Add(bar);
         moreAgents = Btn("", delegate { SwitchMode(MonitorMode.Expanded, true); }, false);
         moreAgents.MinWidth = 0; moreAgents.Width = 34; moreAgents.Padding = new Thickness(0);
@@ -125,7 +127,7 @@ internal sealed partial class ModernRouterMonitor
     AgentAvatar MakeAgentAvatar(string id, Dictionary<string, object> row)
     {
         var visual = new AgentAvatar { Id = id, Row = row };
-        visual.Button = new Button { Width = 40, Height = 40, Padding = new Thickness(0),
+        visual.Button = new Button { Width = 44, Height = 44, Padding = new Thickness(0),
             BorderThickness = new Thickness(0), Template = AvatarTemplate(), Cursor = Cursors.Hand };
         visual.Slot = new Border { Width = 44, Height = 44, Child = visual.Button, Background = TransparentBrush,
             RenderTransform = new TranslateTransform(), VerticalAlignment = VerticalAlignment.Center };
@@ -148,8 +150,14 @@ internal sealed partial class ModernRouterMonitor
         visual.Signature = signature;
         if (visual.Orbit != null) visual.Orbit.BeginAnimation(RotateTransform.AngleProperty, null);
         Brush color = BadgeColor(model, true);
-        visual.Button.Background = ((Border)Badge(model, true)).Background;
-        var art = new Grid { Width = 40, Height = 40 };
+        visual.Button.Background = TransparentBrush;
+        var art = new Grid { Width = 44, Height = 44 };
+        art.Children.Add(new Border { Tag = "agent-face", Width = 32, Height = 32, CornerRadius = new CornerRadius(16),
+            Background = Badge(model, true).Background, HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center });
+        art.Children.Add(new System.Windows.Shapes.Path { Tag = "orbit-track",
+            Data = new EllipseGeometry(new Point(22, 22), 20, 20), Stroke = color, StrokeThickness = 1,
+            Opacity = .22, Width = 44, Height = 44, IsHitTestVisible = false });
         var glyph = new System.Windows.Shapes.Path { Data = System.Windows.Media.Geometry.Parse(identity.Path), Stroke = color,
             StrokeThickness = 1.5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
             StrokeLineJoin = PenLineJoin.Round, Width = 19, Height = 19, Stretch = Stretch.Uniform,
@@ -160,13 +168,17 @@ internal sealed partial class ModernRouterMonitor
         orbitBrush.StartPoint = new Point(0, 0); orbitBrush.EndPoint = new Point(1, 1);
         orbitBrush.GradientStops.Add(new GradientStop(Color.FromArgb(0, tint.R, tint.G, tint.B), 0));
         orbitBrush.GradientStops.Add(new GradientStop(tint, 1));
-        var ring = new System.Windows.Shapes.Path { Data = System.Windows.Media.Geometry.Parse("M20,0 A20,20 0 1 1 0,20"),
-            Stroke = orbitBrush, StrokeThickness = 1.4, IsHitTestVisible = false, RenderTransformOrigin = new Point(.5, .5),
-            Width = 42, Height = 42, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        visual.Orbit = new RotateTransform(); ring.RenderTransform = visual.Orbit; art.Children.Add(ring);
+        // Rotate a fixed square around an explicit center. A partial path's own
+        // bounding box is not its circle's center and makes the orbit wobble.
+        var orbitLayer = new Grid { Tag = "orbit-sweep", Width = 44, Height = 44, IsHitTestVisible = false };
+        orbitLayer.Children.Add(new System.Windows.Shapes.Path {
+            Data = System.Windows.Media.Geometry.Parse("M22,2 A20,20 0 0 1 42,22"),
+            Stroke = orbitBrush, StrokeThickness = 1.6, StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round, Width = 44, Height = 44 });
+        visual.Orbit = new RotateTransform(0, 22, 22); orbitLayer.RenderTransform = visual.Orbit; art.Children.Add(orbitLayer);
         art.Children.Add(new Border { Width = 7, Height = 7, CornerRadius = new CornerRadius(4), Background = color,
             BorderBrush = Panel, BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Right,
-            VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 1, 1), IsHitTestVisible = false });
+            VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 5, 5), IsHitTestVisible = false });
         visual.Button.Content = art;
         SetAgentOrbit(visual, mode == MonitorMode.Compact && IsVisible);
     }
@@ -189,7 +201,7 @@ internal sealed partial class ModernRouterMonitor
         foreach (var pair in rows.Where(pair => Active(String(pair.Value, "status")))) activeAgentRows[pair.Key] = pair.Value;
         agentOrder.RemoveAll(id => !activeAgentRows.ContainsKey(id));
         foreach (string id in activeAgentRows.Keys) if (!agentOrder.Contains(id)) agentOrder.Add(id);
-        int limit = Math.Max(1, Math.Min(5, (int)((TargetGeometry(MonitorMode.Compact).Width - 16 - 2 - 24 - 32 - 34) / 44)));
+        int limit = Math.Max(1, Math.Min(5, (int)((TargetGeometry(MonitorMode.Compact).Width - 16 - 2 - 24 - 40 - 34) / 44)));
         var visibleIds = new HashSet<string>(agentOrder.Take(limit));
         agentStrip.Children.Remove(moreAgents); agentStrip.Children.Remove(agentsIdle);
         foreach (var visual in agentAvatars.Values.ToList())
