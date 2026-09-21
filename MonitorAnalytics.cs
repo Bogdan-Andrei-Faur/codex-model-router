@@ -259,8 +259,6 @@ internal sealed partial class ModernRouterMonitor
         int total = decision.InputTokens + decision.OutputTokens;
         if (total > 0) AddExplanation(historyDetail, "USO OBSERVADO",
             decision.InputTokens + " entrada · " + decision.OutputTokens + " salida · " + decision.CachedTokens + " en caché");
-        if (decision.StartedTime > 0 && decision.FinishedTime >= decision.StartedTime)
-            AddExplanation(historyDetail, "DURACIÓN OBSERVADA", FormatDuration(decision.FinishedTime - decision.StartedTime));
         if (decision.Signal != null) AddExplanation(historyDetail, "SEÑAL DE RESULTADO",
             decision.Signal == "retry" ? "La siguiente petición indicó que el resultado no había resuelto la tarea." :
             "La siguiente petición cambió el modelo explícitamente.");
@@ -293,12 +291,6 @@ internal sealed partial class ModernRouterMonitor
         int total = decisions.Count, accepted = decisions.Count(item => item.Accepted);
         AddMetric("Decisiones con historial", total.ToString(), total > 0 ? 1 : 0, Accent);
         AddMetric("Envíos aceptados · acumulado", accepted.ToString(), total > 0 ? accepted * 1.0 / total : 0, Accent);
-        int recovered = decisions.Count(item => item.Source == "recovered");
-        if (recovered > 0)
-        {
-            var recoveryNote = Txt(recovered + " decisiones recuperadas de registros anteriores. Sus detalles son limitados.", 11, Muted);
-            recoveryNote.TextWrapping = TextWrapping.Wrap; recoveryNote.Margin = new Thickness(0, 3, 0, 8); statisticsContent.Children.Add(recoveryNote);
-        }
         int errors = decisions.Count(item => item.Error != null || item.Status == "error" || item.Status == "failed");
         int retries = decisions.Count(item => item.Signal == "retry");
         AddMetric("Incidencias registradas", errors.ToString(), total == 0 ? 0 : errors * 1.0 / total, errors == 0 ? Good : Warning);
