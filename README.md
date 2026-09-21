@@ -99,10 +99,17 @@ criterios y sus límites.
 mensaje. **Activar selección** recupera el automático, sin reiniciar. Los mensajes
 que llegan durante una respuesta en curso no cambian el modelo de ese turno.
 
-La referencia personal es **Astra/Muy alto en casi todos los mensajes**. El panel
-cuenta cuántos envíos aceptados usaron otros modelos desde que se abrió la
-conexión. Ese contador muestra cambios respecto a tu hábito anterior; no calcula
-un porcentaje de cuota ahorrada. También puede reducir razonamiento en Astra.
+Estadísticas consulta los datos cada dos segundos y muestra la hora de la última
+consulta. Separa **envíos aceptados en la sesión actual**, **decisiones con
+historial** y **tareas con datos parciales**. Una tarea puede contener muchos
+mensajes: contar tareas no equivale a contar decisiones.
+
+Si sigue activa una conexión anterior al registro persistente, se avisa de que
+los datos son parciales. El historial por ejecución empieza al cerrar Codex por
+completo y abrirlo desde **Codex automático**, cuando terminen los agentes.
+Los tokens mostrados corresponden a la última llamada observada por registro,
+no al consumo total de todas las llamadas de cada tarea.
+
 No se convierte el precio de la API ni el número bruto de tokens en cuota de
 suscripción. La calidad y el ahorro real requieren observar tareas representativas.
 

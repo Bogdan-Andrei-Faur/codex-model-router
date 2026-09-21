@@ -35,6 +35,7 @@ internal sealed partial class ModernRouterMonitor : Window
 
     readonly bool preview;
     readonly Border shell = new Border();
+    readonly Grid surface = new Grid { Margin = new Thickness(8), VerticalAlignment = VerticalAlignment.Bottom };
     readonly Grid compactView = new Grid(), expandedView = new Grid();
     readonly StackPanel taskList = new StackPanel();
     readonly ScrollViewer activityScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -50,7 +51,6 @@ internal sealed partial class ModernRouterMonitor : Window
     readonly TextBlock confirmation = Txt("Sin confirmación", 12, Muted);
     readonly TextBlock reason = Txt("Todavía no hay una decisión del selector.", 13, Muted);
     readonly TextBlock effortReason = Txt("Todavía no hay una decisión de razonamiento.", 13, Muted);
-    readonly TextBlock summary = Txt("Referencia personal: Astra · Muy alto", 12, Muted);
     readonly Border reasonBox = new Border();
     readonly Button pauseButton;
     readonly DispatcherTimer timer = new DispatcherTimer();
@@ -58,9 +58,7 @@ internal sealed partial class ModernRouterMonitor : Window
     ContextMenu trayMenu;
     MenuItem trayCompact, trayExpanded, trayHidden, trayPause, trayTopmost;
     MonitorMode mode = MonitorMode.Compact;
-    bool quitting, reasonOpen, morphing;
-    double morphRight, morphBottom, morphWidth, morphHeight;
-    int morphAnimations;
+    bool quitting, reasonOpen;
     string activitySignature;
     int lastActiveCount = -1;
     bool lastConnected;
@@ -122,7 +120,7 @@ internal sealed partial class ModernRouterMonitor : Window
         content.Children.Add(compactView);
         content.Children.Add(expandedView);
         shell.Child = content;
-        var surface = new Grid { Margin = new Thickness(8) };
+        shell.ClipToBounds = true;
         surface.Children.Add(new Border { Background = Panel, CornerRadius = shell.CornerRadius,
             Effect = new DropShadowEffect { Color = Colors.Black, Opacity = .34, BlurRadius = 15, ShadowDepth = 2 } });
         surface.Children.Add(shell);
@@ -132,7 +130,6 @@ internal sealed partial class ModernRouterMonitor : Window
         pauseButton = Btn("Ⅱ  Pausar selección", delegate { TogglePause(); }, false);
         BuildExpanded();
         Closing += OnClosing;
-        SizeChanged += OnSurfaceSizeChanged;
         if (!preview)
         {
             Microsoft.Win32.SystemEvents.DisplaySettingsChanged += DisplayChanged;
@@ -220,6 +217,9 @@ internal sealed partial class ModernRouterMonitor : Window
             Padding = new Thickness(8, 0, 0, 0), Margin = new Thickness(10, 8, 5, 8), Child = compactActivityRow };
         Grid.SetColumn(countBox, 2); compactView.Children.Add(countBox);
         var open = Btn("‹", delegate { SwitchMode(MonitorMode.Expanded, true); }, true);
+        open.Content = new System.Windows.Shapes.Path { Data = System.Windows.Media.Geometry.Parse("M 5,0 L 0,5 L 5,10"),
+            Stroke = Muted, StrokeThickness = 1.6, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+            Width = 6, Height = 10, Stretch = Stretch.Uniform, VerticalAlignment = VerticalAlignment.Center };
         open.ToolTip = "Desplegar panel lateral"; open.VerticalAlignment = VerticalAlignment.Center; open.HorizontalAlignment = HorizontalAlignment.Stretch;
         Grid.SetColumn(open, 3); compactView.Children.Add(open);
         compactView.MouseLeftButtonUp += delegate(object sender, MouseButtonEventArgs e)
@@ -418,72 +418,29 @@ internal sealed partial class ModernRouterMonitor : Window
         mode = target;
         if (target == MonitorMode.Hidden)
         {
-            morphing = false;
-            BeginAnimation(WidthProperty, null); BeginAnimation(HeightProperty, null);
-            BeginAnimation(LeftProperty, null); BeginAnimation(TopProperty, null);
+            surface.BeginAnimation(FrameworkElement.HeightProperty, null);
             Hide(); SaveUiState(); UpdateTray(); return;
         }
         compactView.Visibility = target == MonitorMode.Compact ? Visibility.Visible : Visibility.Collapsed;
         expandedView.Visibility = target == MonitorMode.Expanded ? Visibility.Visible : Visibility.Collapsed;
         shell.CornerRadius = new CornerRadius(target == MonitorMode.Compact ? 21 : 22);
+        // Keep the transparent native window fixed. Only the bottom-aligned surface grows;
+        // resizing and moving an HWND on separate frames causes lower-edge judder.
+        var envelope = TargetGeometry(MonitorMode.Expanded);
         var geometry = TargetGeometry(target);
-        animate = animate && SystemParameters.ClientAreaAnimation;
-        if (!IsVisible)
+        double from = surface.ActualHeight, to = Math.Max(1, geometry.Height - 16);
+        Width = envelope.Width; Height = envelope.Height; Left = envelope.Left; Top = envelope.Top;
+        surface.BeginAnimation(FrameworkElement.HeightProperty, null);
+        surface.Height = to;
+        if (animate && IsVisible && SystemParameters.ClientAreaAnimation)
         {
-            BeginAnimation(WidthProperty, null); BeginAnimation(HeightProperty, null);
-            BeginAnimation(LeftProperty, null); BeginAnimation(TopProperty, null); BeginAnimation(OpacityProperty, null);
-            Width = geometry.Width; Height = geometry.Height; Left = geometry.Left; Top = geometry.Top;
-            Opacity = 1; Show();
+            var motion = new DoubleAnimation(from, to, ModeTransitionDuration)
+            { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }, FillBehavior = FillBehavior.Stop };
+            surface.BeginAnimation(FrameworkElement.HeightProperty, motion, HandoffBehavior.SnapshotAndReplace);
         }
-        else if (animate)
-        {
-            StartAnchoredMorph(geometry);
-        }
-        else
-        {
-            morphing = false;
-            BeginAnimation(WidthProperty, null); BeginAnimation(HeightProperty, null);
-            BeginAnimation(LeftProperty, null); BeginAnimation(TopProperty, null);
-            Width = geometry.Width; Height = geometry.Height; Left = geometry.Left; Top = geometry.Top; Opacity = 1;
-        }
+        Opacity = 1;
+        if (!IsVisible) Show();
         SaveUiState(); UpdateTray();
-    }
-
-    // The bottom-right edge stays still: opening grows upward and closing folds downward.
-    void StartAnchoredMorph(Rect target)
-    {
-        BeginAnimation(WidthProperty, null); BeginAnimation(HeightProperty, null);
-        BeginAnimation(LeftProperty, null); BeginAnimation(TopProperty, null);
-        morphRight = target.Right; morphBottom = target.Bottom; morphWidth = target.Width; morphHeight = target.Height;
-        morphing = true; morphAnimations = 0;
-        StartMorphAnimation(WidthProperty, ActualWidth, target.Width);
-        StartMorphAnimation(HeightProperty, ActualHeight, target.Height);
-        if (morphAnimations == 0) FinishAnchoredMorph();
-    }
-
-    void StartMorphAnimation(DependencyProperty property, double from, double to)
-    {
-        if (Math.Abs(from - to) < .1) return;
-        morphAnimations++;
-        var animation = new DoubleAnimation(from, to, ModeTransitionDuration)
-        { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }, FillBehavior = FillBehavior.Stop };
-        animation.Completed += delegate { if (--morphAnimations == 0) FinishAnchoredMorph(); };
-        BeginAnimation(property, animation, HandoffBehavior.SnapshotAndReplace);
-    }
-
-    void OnSurfaceSizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        if (!morphing) return;
-        BeginAnimation(LeftProperty, null); BeginAnimation(TopProperty, null);
-        Left = morphRight - ActualWidth; Top = morphBottom - ActualHeight;
-    }
-
-    void FinishAnchoredMorph()
-    {
-        morphing = false;
-        BeginAnimation(WidthProperty, null); BeginAnimation(HeightProperty, null);
-        BeginAnimation(LeftProperty, null); BeginAnimation(TopProperty, null);
-        Width = morphWidth; Height = morphHeight; Left = morphRight - morphWidth; Top = morphBottom - morphHeight;
     }
 
     Rect TargetGeometry(MonitorMode target)
@@ -601,7 +558,7 @@ internal sealed partial class ModernRouterMonitor : Window
                 foreach (var pair in ordered.Skip(1)) taskList.Children.Add(TaskRow(pair.Key, pair.Value));
                 if (ordered.Count <= 1) taskList.Children.Add(EmptyRow("No hay otras tareas observables"));
             }
-            summary.Text = modern == 0 ? "Conexión anterior" : nonAstra + "/" + accepted + " fuera de Astra";
+            observedSessionAccepted = accepted; analyticsConnected = connected > 0;
             RefreshAnalytics(ordered);
             UpdateTray();
         }
@@ -830,12 +787,10 @@ internal sealed partial class ModernRouterMonitor : Window
         {
             SwitchMode(item.Mode, false); UpdateLayout();
             Dispatcher.Invoke(delegate { }, DispatcherPriority.Render);
-            int width = Math.Max(1, (int)Math.Ceiling(ActualWidth)), height = Math.Max(1, (int)Math.Ceiling(ActualHeight));
-            var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-            bitmap.Render(this);
-            var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
-            using (var stream = File.Create(Path.Combine(StateFolder, item.Name))) encoder.Save(stream);
+            SaveVisual(this, Path.Combine(StateFolder, item.Name), 1);
         }
+        SelectMonitorTab(2); UpdateLayout();
+        SaveVisual(this, Path.Combine(StateFolder, "wpf-statistics.png"), 1);
         quitting = true; Close();
     }
 }

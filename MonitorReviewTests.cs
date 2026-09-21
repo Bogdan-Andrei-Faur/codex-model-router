@@ -20,10 +20,18 @@ internal sealed partial class ModernRouterMonitor
     static void SaveVisual(FrameworkElement element, string path, double scale)
     {
         element.UpdateLayout();
+        var monitor = element as ModernRouterMonitor;
         var bitmap = new RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth * scale),
             (int)Math.Ceiling(element.ActualHeight * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
         bitmap.Render(element);
-        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        BitmapSource output = bitmap;
+        if (monitor != null)
+        {
+            var offset = monitor.surface.TransformToAncestor(monitor).Transform(new Point());
+            output = new CroppedBitmap(bitmap, new Int32Rect((int)Math.Round(offset.X * scale), (int)Math.Round(offset.Y * scale),
+                (int)Math.Floor(monitor.surface.ActualWidth * scale), (int)Math.Floor(monitor.surface.ActualHeight * scale)));
+        }
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(output));
         using (var stream = File.Create(path)) encoder.Save(stream);
     }
 
@@ -65,6 +73,58 @@ internal sealed partial class ModernRouterMonitor
         var efforts = new[] { "low", "medium", "high", "xhigh", "max", "ultra" };
         for (int i = 0; i < names.Length; i++) taskList.Children.Add(TaskRow("example-" + i,
             Fixture(names[i], models[i], efforts[i], i < 3 ? "active" : "idle")));
+    }
+
+    void CheckAnimatedAnchor(MonitorMode target)
+    {
+        double bottom = shell.TransformToAncestor(this).Transform(new Point(0, shell.ActualHeight)).Y + Top;
+        double windowTop = Top, windowHeight = ActualHeight;
+        int frames = 0; double maxDrift = 0;
+        var loop = new DispatcherFrame();
+        EventHandler handler = delegate
+        {
+            frames++;
+            var current = shell.TransformToAncestor(this).Transform(new Point(0, shell.ActualHeight)).Y + Top;
+            maxDrift = Math.Max(maxDrift, Math.Abs(current - bottom));
+            maxDrift = Math.Max(maxDrift, Math.Abs(Top - windowTop));
+            maxDrift = Math.Max(maxDrift, Math.Abs(ActualHeight - windowHeight));
+        };
+        var stop = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(650) };
+        stop.Tick += delegate { loop.Continue = false; stop.Stop(); };
+        CompositionTarget.Rendering += handler;
+        try { SwitchMode(target, true); stop.Start(); Dispatcher.PushFrame(loop); }
+        finally { CompositionTarget.Rendering -= handler; stop.Stop(); }
+        Check(frames >= 2 && maxDrift < 1.1, "Animated bottom edge drift: " + maxDrift + "; frames: " + frames);
+    }
+
+    void CheckLiveStatistics()
+    {
+        string path = Path.GetTempFileName();
+        var rows = new List<KeyValuePair<string, Dictionary<string, object>>>();
+        try
+        {
+            analyticsSignature = null; observedSessionAccepted = 2; analyticsConnected = true;
+            File.WriteAllText(path, "");
+            rows.Add(new KeyValuePair<string, Dictionary<string, object>>("legacy", Fixture("Legacy task", "gpt-5.6-sol", "medium", "active")));
+            RefreshAnalytics(rows, path); SelectMonitorTab(2); UpdateLayout();
+            Check(decisions.Count == 1 && ContainsText(statisticsContent, "Tareas con datos parciales"), "Legacy tasks reported as decisions");
+            rows.Clear();
+            var created = new Dictionary<string, object> { { "decision_id", "one" }, { "event", "decision_created" },
+                { "thread", "same" }, { "model", "gpt-5.6-terra" }, { "effort", "medium" }, { "time", 100 } };
+            File.AppendAllText(path, Json.Serialize(created) + Environment.NewLine);
+            RefreshAnalytics(rows, path); Check(decisions.Count == 1, "First decision missing");
+            created["decision_id"] = "two"; created["time"] = 101;
+            File.AppendAllText(path, Json.Serialize(created) + Environment.NewLine);
+            RefreshAnalytics(rows, path); Check(decisions.Count == 2, "Repeated task did not increase decision count");
+            File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "decision_usage", inputTokens = 40, time = 102 }) + Environment.NewLine);
+            RefreshAnalytics(rows, path); Check(decisions.Count == 2 && decisions.First(d => d.Id == "two").InputTokens == 40, "Usage duplicated a decision or failed to refresh");
+            var live = Fixture("Live task", "gpt-5.6-terra", "medium", "active"); live["decision_id"] = "two";
+            live["tokens"] = new Dictionary<string, object> { { "inputTokens", 55 } }; rows.Add(new KeyValuePair<string, Dictionary<string, object>>("same", live));
+            RefreshAnalytics(rows, path); Check(decisions.Count == 2 && decisions.First(d => d.Id == "two").InputTokens == 55, "Live usage failed to refresh without timestamp change");
+            live["tokens"] = new Dictionary<string, object> { { "inputTokens", 61 } };
+            RefreshAnalytics(rows, path); Check(decisions.First(d => d.Id == "two").InputTokens == 61, "Unchanged timestamp blocked live usage refresh");
+        }
+        finally { File.Delete(path); analyticsSignature = null; }
     }
 
     public int RunReviewChecks()
@@ -118,7 +178,8 @@ internal sealed partial class ModernRouterMonitor
             }
             results.Add("PASS: featured badges share 24 DIP height; all six efforts fit and contrast >= 4.5:1");
             results.Add("PASS: working agents pulse; idle indicators remain static; 24 DIP indicator column separates text");
-            results.Add("PASS: compact/expanded transition lasts 420 ms with ease-in-out motion");
+            CheckAnimatedAnchor(MonitorMode.Compact); CheckAnimatedAnchor(MonitorMode.Expanded);
+            results.Add("PASS: render-frame sampling keeps native window and lower surface edge fixed during both 420 ms transitions");
             foreach (double scale in new[] { 1.0, 1.25, 1.5, 2.0 })
                 SaveVisual(this, Path.Combine(StateFolder, "review-panel-" + (int)(scale * 100) + ".png"), scale);
 
@@ -143,7 +204,12 @@ internal sealed partial class ModernRouterMonitor
             SwitchMode(MonitorMode.Expanded, true);
             SwitchMode(MonitorMode.Compact, false); PaintFixtures(); UpdateLayout();
             Check(compactView.Visibility == Visibility.Visible && expandedView.Visibility == Visibility.Collapsed, "Both views visible");
-            Check(Math.Abs(ActualHeight - 96) < 1, "Stale animation restored wrong geometry");
+            Check(Math.Abs(surface.ActualHeight - 80) < 1, "Stale animation restored wrong geometry");
+            var arrow = compactView.Children.OfType<Button>().Single();
+            var glyph = (FrameworkElement)arrow.Content;
+            double arrowY = glyph.TransformToAncestor(compactView).Transform(new Point(0, glyph.ActualHeight / 2)).Y;
+            double countY = compactCount.TransformToAncestor(compactView).Transform(new Point(0, compactCount.ActualHeight / 2)).Y;
+            Check(Math.Abs(arrowY - countY) < 1, "Capsule arrow not aligned with active count");
             SaveVisual(this, Path.Combine(StateFolder, "review-capsule.png"), 1);
             results.Add("PASS: rapid expand/hide/reveal/collapse keeps a single correctly sized surface");
             Check(trayCompact.IsChecked && !trayExpanded.IsChecked && !trayHidden.IsChecked, "Tray view selection missing");
@@ -168,6 +234,10 @@ internal sealed partial class ModernRouterMonitor
             SaveVisual(this, Path.Combine(StateFolder, "review-empty.png"), 1);
             results.Add("PASS: disconnected/empty view renders");
 
+            CheckLiveStatistics();
+            results.Add("PASS: repeated decisions increment, usage refreshes without timestamps, legacy tasks stay explicitly partial");
+            SelectMonitorTab(2); UpdateLayout();
+            SaveVisual(this, Path.Combine(StateFolder, "review-statistics-live.png"), 1);
             PaintAnalyticsFixtures();
             Check(monitorTabs.Count == 4, "Expected four monitor tabs");
             SelectMonitorTab(1); UpdateLayout(); Dispatcher.Invoke(delegate { }, DispatcherPriority.Render);
@@ -180,7 +250,11 @@ internal sealed partial class ModernRouterMonitor
                 "Model reason is absent from decision details");
             Check(ContainsText(historyDetail, "profunda"),
                 "Effort reason is absent from decision details");
+            var historyHover = historyList.Children.OfType<Button>().First();
+            historyHover.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.MouseEnterEvent });
+            Check(historyHover.Background == Panel2, "History hover is not visible");
             SaveVisual(this, Path.Combine(StateFolder, "review-history.png"), 1);
+            historyHover.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0) { RoutedEvent = UIElement.MouseLeaveEvent });
             OpenHistoryForThread("translation"); UpdateLayout();
             Check(ContainsText(historyDetail, "Traducir"),
                 "Activity-to-history navigation did not select its thread");

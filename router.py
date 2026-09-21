@@ -89,6 +89,7 @@ class Router:
         decision_id = uuid.uuid4().hex
         title = self.threads.get(tid, {}).get("name") or (tid[:8] if tid else "Sin título")
         self.current_decisions[tid] = decision_id
+        self.threads.setdefault(tid, {}).pop("tokens", None)
         self.record_history("decision_created", decision_id=decision_id, thread=tid, title=title,
                             model=model, effort=effort, previous_model=previous_model,
                             model_reason=model_reason, effort_reason=effort_reason, source=source,
@@ -230,7 +231,10 @@ class Router:
                             row["status"] = agent.get("status", "unknown") if isinstance(agent, dict) else "unknown"
                 elif method == "thread/tokenUsage/updated":
                     usage = params.get("tokenUsage", {}).get("last", {})
-                    self.threads.setdefault(tid, {})["tokens"] = {k: usage[k] for k in ("inputTokens", "outputTokens", "cachedInputTokens", "reasoningOutputTokens") if k in usage}
+                    tokens = {k: usage[k] for k in ("inputTokens", "outputTokens", "cachedInputTokens", "reasoningOutputTokens") if k in usage}
+                    self.threads.setdefault(tid, {}).update(tokens=tokens, updated=time.time())
+                    if self.current_decisions.get(tid):
+                        self.record_history("decision_usage", decision_id=self.current_decisions[tid], thread=tid, **tokens)
                 elif method == "thread/settings/updated":
                     settings = params.get("threadSettings") or {}
                     state = self.threads.setdefault(tid, {})

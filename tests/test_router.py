@@ -220,6 +220,18 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(records[-1]["inputTokens"], 20)
         self.assertNotIn("PRIVATE_HISTORY_SENTINEL", (Path(self.tmp.name) / "state" / "history.jsonl").read_text())
 
+    def test_usage_is_persisted_live_and_new_decision_clears_previous_usage(self):
+        self.router.client_line(encode(self.request()))
+        self.router.server_line(encode({"method": "thread/tokenUsage/updated", "params": {
+            "threadId": "t", "tokenUsage": {"last": {"inputTokens": 40, "outputTokens": 4}}}}))
+        records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
+        self.assertEqual(records[-1]["event"], "decision_usage")
+        self.assertEqual(records[-1]["inputTokens"], 40)
+        first_id = self.router.current_decisions["t"]
+        self.router.new_decision("t", "gpt-5.6-terra", "medium", "reason", "effort", "automatic")
+        self.assertNotEqual(first_id, self.router.current_decisions["t"])
+        self.assertNotIn("tokens", self.router.threads["t"])
+
     def test_failed_followup_marks_previous_decision_as_retry_signal(self):
         self.router.client_line(encode(self.request()))
         self.router.server_line(encode({"id": 7, "result": {"turn": {"id": "q"}}}))

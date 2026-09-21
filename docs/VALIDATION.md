@@ -244,6 +244,28 @@ The history begins when Codex loads the v7 router on its next full launch. The v
 monitor can display current live rows immediately, including legacy rows with an
 explicit note when their separate reasoning explanation was not previously stored.
 
+## V8: anchored animation and honest live statistics — 2026-09-21
+
+- Confirmed the live legacy bridge had 14 task snapshots but 22 accepted sends,
+  no decision IDs and no history.jsonl. The previous "Decisiones observadas"
+  label incorrectly counted tasks. The monitor now separates session sends,
+  persisted decisions and partial task snapshots, with explicit coverage and
+  two-second polling time. Legacy bridges require a full Codex relaunch to load
+  the new recorder; no live agent or Codex process was restarted.
+- Analytics invalidation includes token changes and session counters. Usage is
+  persisted while work continues, not only on completion; new decisions clear
+  stale tokens. Tokens are labeled as the last observed call, not turn totals.
+- History hover has the same rounded padding as Activity. The capsule chevron
+  is a vector centered on the same vertical axis as the active count.
+- The native transparent window stays at a fixed envelope. Its bottom-aligned
+  visual surface animates upward/downward; no native position/size animation.
+- 26 Python tests pass. Native review samples render frames in both directions
+  and verifies lower-edge/native-window drift below 1.1 DIP; it also checks
+  repeated decisions on one task, live usage without timestamp changes, legacy
+  coverage, history hover, arrow alignment and the existing navigation checks.
+- Native layout/frame tests and rendered previews do not measure desktop
+  compositor latency under every GPU/load combination.
+
 ## References and provenance
 
 This implementation is original. No upstream router source code was copied.
