@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "sync_picker": true,
+  "python": "C:\\Python314\\python.exe",
+  "codex": "REPLACE_WITH_ORIGINAL_DESKTOP_CODEX_EXE",
+  "desktop": "REPLACE_WITH_INSTALLED_CHATGPT_EXE",
+  "routes": {
+    "simple": {"model": "gpt-5.6-luna", "effort": "low"},
+    "normal": {"model": "gpt-5.6-terra", "effort": "medium"},
+    "complex": {"model": "gpt-5.6-sol", "effort": "high"},
+    "critical": {"model": "gpt-6-astra", "effort": "xhigh"}
+  }
+}

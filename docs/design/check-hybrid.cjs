@@ -1,0 +1,43 @@
+// Interaction and responsive QA for the in-conversation hybrid monitor mockup.
+const { chromium } = require('playwright');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+const fs = require('node:fs');
+
+(async () => {
+  const preview = path.resolve(__dirname, '../../state/design/hybrid-preview.html');
+  const output = path.resolve(__dirname, '../../state/design');
+  fs.mkdirSync(output, { recursive: true });
+  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  const page = await browser.newPage({ viewport: { width: 1180, height: 900 } });
+  const errors = [];
+  page.on('pageerror', error => errors.push(String(error)));
+  await page.goto(pathToFileURL(preview).href);
+  const frame = page.frameLocator('iframe');
+  await frame.locator('#cm-status').waitFor();
+  if (!await frame.locator('#cm-capsule').isVisible() || await frame.locator('#cm-side').isVisible()) throw new Error('Initial compact state failed');
+  await page.screenshot({ path: path.join(output, 'hybrid-compact.png'), fullPage: true });
+  await frame.locator('#cm-tray-button').click();
+  await frame.locator('#cm-view-expanded').click();
+  if (!await frame.locator('#cm-side').isVisible() || await frame.locator('#cm-capsule').isVisible()) throw new Error('Expanded state is not exclusive');
+  await frame.locator('#cm-side-close').click();
+  if (!await frame.locator('#cm-capsule').isVisible() || await frame.locator('#cm-side').isVisible()) throw new Error('Collapse to compact failed');
+  await frame.locator('#cm-tray-button').click();
+  await frame.locator('#cm-view-hidden').click();
+  if (await frame.locator('#cm-side').isVisible() || await frame.locator('#cm-capsule').isVisible()) throw new Error('Hidden state failed');
+  await frame.locator('#cm-tray-button').click();
+  await frame.locator('#cm-view-compact').click();
+  await frame.locator('#cm-cap-open').click();
+  if (!await frame.locator('#cm-side').isVisible() || await frame.locator('#cm-capsule').isVisible()) throw new Error('Capsule did not morph to panel');
+  await frame.locator('#cm-why').click();
+  if (!await frame.locator('#cm-reason').isVisible()) throw new Error('Reason did not expand');
+  await frame.locator('#cm-pause').click();
+  if (!((await frame.locator('#cm-status').textContent()) || '').includes('pausada')) throw new Error('Pause state failed');
+  await page.screenshot({ path: path.join(output, 'hybrid.png'), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 920 });
+  const overflow = await frame.locator('#codex-monitor-hybrid').evaluate(root => root.scrollWidth > root.clientWidth);
+  await page.screenshot({ path: path.join(output, 'hybrid-narrow.png'), fullPage: true });
+  if (overflow || errors.length) throw new Error(JSON.stringify({ overflow, errors }));
+  console.log('Exclusive hidden, compact and expanded states, tray, reasoning, pause and narrow layout: OK');
+  await browser.close();
+})().catch(error => { console.error(error); process.exit(1); });

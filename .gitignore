@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+dist/
+state/
+config.local.json
+*.lnk
