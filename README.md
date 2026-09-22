@@ -1,10 +1,10 @@
 # Codex automático — selector personal
 
 Elige modelo y razonamiento antes de cada nuevo mensaje enviado a Codex. Sigue
-usando la app y la suscripción actuales. La decisión usa reglas locales y no
-necesita otra llamada a una IA ni una clave de API.
+usando la app y la suscripción actuales. Puede decidir mediante reglas locales,
+Jev o un clasificador de Ollama Cloud.
 
-**Monitor versión 6.** La interfaz se puede actualizar sin cerrar Codex ni
+**Monitor versión 15.** La interfaz se puede actualizar sin cerrar Codex ni
 interrumpir sus tareas. Los accesos del escritorio apuntan a la versión actual.
 Los cambios del selector, cuando los haya, se cargan al volver a abrir Codex
 desde **Codex automático**. No hace falta cerrar sesión.
@@ -44,10 +44,11 @@ El panel lateral tiene cuatro vistas:
 - **Historial** conserva decisiones activas y terminadas con dos explicaciones
   independientes: por qué se eligió el modelo y por qué se eligió el razonamiento.
   También muestra estado, fecha, duración, tokens observados e incidencias.
-- **Estadísticas** resume distribución por modelo y razonamiento, decisiones fuera
-  de Astra, errores, reintentos detectados, duración y tokens cuando están disponibles.
+- **Estadísticas** resume distribución por modelo, razonamiento y motor de
+  enrutamiento, además de errores, reintentos detectados, duración y tokens cuando están disponibles.
 - **Ajustes** permite pausar el selector, cambiar Mantener delante y conservar el
-  historial 30, 90, 180 días o indefinidamente.
+  historial 30, 90, 180 días o indefinidamente. También permite elegir el motor,
+  activar comparaciones en paralelo, configurar Jev y seleccionar Ollama Cloud.
 
 El historial persistente empieza a recoger decisiones cuando Codex se abre con
 esta versión del selector. Un mensaje posterior como «sigue fallando» se registra
@@ -92,6 +93,31 @@ Una pregunta sobre qué significa Ultra no lo activa por sí sola.
 
 La guía [MODEL_POLICY.md](docs/MODEL_POLICY.md) documenta las fuentes, los
 criterios y sus límites.
+
+## Motores de enrutamiento
+
+**Reglas locales** es el modo inicial: decide sin enviar el mensaje a ningún
+proveedor adicional. **Jev** usa el clasificador estructurado de TypeSafe y
+requiere una clave que se introduce desde Ajustes; la clave se cifra con la
+protección de Windows para este usuario y se guarda dentro de `state/`, fuera de
+Git. **Ollama Cloud** usa por defecto `glm-5.3-flash:cloud` a través de la sesión
+iniciada de Ollama; también puede elegirse DeepSeek Flash.
+
+En todos los casos siguen mandando las instrucciones explícitas, el catálogo de
+Codex y los límites para auditorías, UI/UX y adjuntos. Si Jev u Ollama no están
+configurados, no responden a tiempo o devuelven un formato no válido, se aplica
+la política local sin interrumpir el mensaje.
+
+**Comparación en paralelo** deja que Jev u Ollama propongan una combinación para
+la misma petición, pero solo el motor activo cambia Codex. El historial registra
+motor, modelo interno, estado, tiempo y propuesta, sin guardar el mensaje. Así
+las comparaciones se hacen sobre las mismas tareas, no sobre semanas distintas.
+
+Jev recibe el texto y metadatos de adjuntos: presencia, cantidad y tipo. Ollama
+también parte de esos metadatos. En Ajustes existe una opción independiente para
+permitir que Ollama reciba una imagen real, pero permanece desactivada por
+defecto. Solo se reenvían imágenes que Codex ya incluya como datos adjuntos; el
+selector nunca lee rutas locales de archivos para enviarlas a Ollama.
 
 ## Control y consumo
 

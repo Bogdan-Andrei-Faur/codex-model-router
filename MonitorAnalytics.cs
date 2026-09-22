@@ -3,6 +3,8 @@ using System.IO;
 using System.Linq;
 using System.Collections.Generic;
 using System.Web.Script.Serialization;
+using System.Security.Cryptography;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -11,6 +13,8 @@ using System.Windows.Media;
 internal sealed class DecisionRecord
 {
     public string Id, Thread, Title, Model, Effort, ModelReason, EffortReason, Source, Status, Signal, Error;
+    public string RoutingEngine, EngineModel, EngineStatus;
+    public double EngineConfidence, EngineLatencyMs;
     public double Time, StartedTime, FinishedTime;
     public bool Accepted;
     public int InputTokens, OutputTokens, CachedTokens, ReasoningTokens;
@@ -175,6 +179,11 @@ internal sealed partial class ModernRouterMonitor
         item.Source = String(data, "source", item.Source); item.Status = String(data, "status", item.Status);
         item.Signal = String(data, "signal", item.Signal);
         item.Error = String(data, "error_type", item.Error);
+        item.RoutingEngine = String(data, "routing_engine", item.RoutingEngine);
+        item.EngineModel = String(data, "engine_model", item.EngineModel);
+        item.EngineStatus = String(data, "engine_status", item.EngineStatus);
+        if (data.ContainsKey("engine_confidence")) item.EngineConfidence = Number(data, "engine_confidence");
+        if (data.ContainsKey("engine_latency_ms")) item.EngineLatencyMs = Number(data, "engine_latency_ms");
         if (data.ContainsKey("inputTokens")) item.InputTokens = Int(data, "inputTokens");
         if (data.ContainsKey("outputTokens")) item.OutputTokens = Int(data, "outputTokens");
         if (data.ContainsKey("cachedInputTokens")) item.CachedTokens = Int(data, "cachedInputTokens");
@@ -256,6 +265,14 @@ internal sealed partial class ModernRouterMonitor
         }
         AddExplanation(historyDetail, "POR QUÉ EL MODELO", decision.ModelReason);
         AddExplanation(historyDetail, "POR QUÉ EL RAZONAMIENTO", decision.EffortReason);
+        if (!System.String.IsNullOrEmpty(decision.RoutingEngine))
+        {
+            string engine = FriendlyEngine(decision.RoutingEngine);
+            string detail = decision.EngineStatus == "ok" ? engine + " decidió en " + Math.Round(decision.EngineLatencyMs) + " ms" :
+                engine + " · " + FriendlyEngineStatus(decision.EngineStatus);
+            if (decision.EngineConfidence > 0) detail += " · confianza " + Math.Round(decision.EngineConfidence * 100) + "%";
+            AddExplanation(historyDetail, "MOTOR DE ENRUTAMIENTO", detail);
+        }
         int total = decision.InputTokens + decision.OutputTokens;
         if (total > 0) AddExplanation(historyDetail, "USO OBSERVADO",
             decision.InputTokens + " entrada · " + decision.OutputTokens + " salida · " + decision.CachedTokens + " en caché");
@@ -299,6 +316,8 @@ internal sealed partial class ModernRouterMonitor
         AddBreakdown(decisions.Where(item => item.Model != null).GroupBy(item => item.Model).ToDictionary(group => group.Key, group => group.Count()), true);
         statisticsContent.Children.Add(AnalyticsHeading("RAZONAMIENTO"));
         AddBreakdown(decisions.Where(item => !System.String.IsNullOrEmpty(item.Effort)).GroupBy(item => item.Effort).ToDictionary(group => group.Key, group => group.Count()), false);
+        statisticsContent.Children.Add(AnalyticsHeading("MOTOR DE ENRUTAMIENTO"));
+        AddBreakdown(decisions.Where(item => !System.String.IsNullOrEmpty(item.RoutingEngine)).GroupBy(item => FriendlyEngine(item.RoutingEngine)).ToDictionary(group => group.Key, group => group.Count()), false);
         long input = decisions.Sum(item => (long)item.InputTokens), output = decisions.Sum(item => (long)item.OutputTokens), cached = decisions.Sum(item => (long)item.CachedTokens);
         if (input + output > 0)
         {
@@ -343,7 +362,7 @@ internal sealed partial class ModernRouterMonitor
     void RefreshSettings()
     {
         settingsContent.Children.Clear(); settingsContent.Children.Add(Txt("Ajustes", 17, Ink, FontWeights.SemiBold));
-        AddSettingsNote("Controla el selector y cuánto tiempo se conserva su historial local.");
+        AddSettingsNote("Controla el selector, el motor que decide y cuánto tiempo se conserva su historial local.");
         settingsContent.Children.Add(SettingsAction(ReadEnabled() ? "Ⅱ  Pausar selección automática" : "▶  Activar selección automática",
             ReadEnabled() ? "Codex automático decide en cada nuevo mensaje." : "Se respeta la selección manual de Codex.", delegate { TogglePause(); RefreshSettings(); }));
         settingsContent.Children.Add(SettingsAction(Topmost ? "Desactivar Mantener delante" : "Activar Mantener delante",
@@ -360,11 +379,91 @@ internal sealed partial class ModernRouterMonitor
             choices.Children.Add(button);
         }
         settingsContent.Children.Add(choices);
+        BuildRoutingEngineSettings();
         settingsContent.Children.Add(AnalyticsHeading("POLÍTICA ACTUAL"));
         AddPolicy("Luna", "Tareas delimitadas", "Ligero"); AddPolicy("Terra", "Cambios concretos", "Medio");
         AddPolicy("Sol", "Ingeniería compleja", "Alto"); AddPolicy("Astra", "UX, auditorías y gran alcance", "Muy alto");
         settingsContent.Children.Add(AnalyticsHeading("PRIVACIDAD"));
-        AddSettingsNote("El historial guarda fecha, tarea, modelo, razonamiento, motivos, estado, incidencias y contadores de tokens. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales.");
+        AddSettingsNote("El historial guarda fecha, tarea, modelo, razonamiento, motores, tiempos, motivos, estado, incidencias y contadores de tokens. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales.");
+    }
+
+    void BuildRoutingEngineSettings()
+    {
+        settingsContent.Children.Add(AnalyticsHeading("MOTOR DE ENRUTAMIENTO"));
+        string current = ReadConfigString("routing_engine", "rules");
+        var engines = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var option in new[] { new[] { "rules", "Reglas" }, new[] { "jev", "Jev" }, new[] { "ollama", "Ollama" } })
+        {
+            string key = option[0], label = option[1];
+            var button = Btn(label, delegate { WriteConfigValue("routing_engine", key); RefreshSettings(); }, false);
+            button.MinWidth = 0; button.Margin = new Thickness(0, 0, 5, 0);
+            button.Background = current == key ? Panel2 : TransparentBrush; button.Foreground = current == key ? Accent : Muted;
+            engines.Children.Add(button);
+        }
+        settingsContent.Children.Add(engines);
+        AddSettingsNote(current == "jev" ? "Jev decide con una respuesta estructurada; las reglas mantienen los límites de seguridad y compatibilidad." :
+            current == "ollama" ? "Ollama Cloud clasifica con GLM Flash; una respuesta inválida o sin conexión vuelve a las reglas locales." :
+            "Las reglas locales deciden al instante sin enviar el mensaje a otro servicio.");
+
+        settingsContent.Children.Add(AnalyticsHeading("COMPARACIÓN EN PARALELO"));
+        var comparisons = ReadConfigStrings("comparison_engines");
+        var compare = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var option in new[] { new[] { "jev", "Jev" }, new[] { "ollama", "Ollama" } })
+        {
+            string key = option[0], label = option[1]; bool enabled = comparisons.Contains(key);
+            var button = Btn((enabled ? "✓  " : "") + label, delegate { ToggleComparison(key); RefreshSettings(); }, false);
+            button.MinWidth = 0; button.Margin = new Thickness(0, 0, 5, 0);
+            button.Background = enabled ? Panel2 : TransparentBrush; button.Foreground = enabled ? Good : Muted;
+            compare.Children.Add(button);
+        }
+        settingsContent.Children.Add(compare);
+        AddSettingsNote("Los motores marcados opinan sobre la misma petición sin afectar a Codex. Sus decisiones se comparan sin guardar el mensaje.");
+
+        settingsContent.Children.Add(AnalyticsHeading("JEV"));
+        bool keyReady = File.Exists(Path.Combine(StateFolder, "jev.secret")) || !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable("PERSONAL_CODEX_JEV_API_KEY"));
+        settingsContent.Children.Add(SettingsAction(keyReady ? "●  Clave de Jev configurada" : "○  Añadir clave de Jev",
+            keyReady ? "La clave se guarda protegida para este usuario de Windows. Puedes reemplazarla aquí." : "Pega una clave de TypeSafe. No se guarda en el repositorio ni en el historial.", PromptJevKey));
+
+        settingsContent.Children.Add(AnalyticsHeading("OLLAMA CLOUD"));
+        string ollama = ReadNestedConfigString("ollama", "model", "glm-5.3-flash:cloud");
+        var models = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var option in new[] { new[] { "glm-5.3-flash:cloud", "GLM Flash" }, new[] { "deepseek-v4.1-flash:cloud", "DeepSeek Flash" } })
+        {
+            string model = option[0], label = option[1];
+            var button = Btn(label, delegate { WriteNestedConfigValue("ollama", "model", model); RefreshSettings(); }, false);
+            button.MinWidth = 0; button.Margin = new Thickness(0, 0, 5, 0);
+            button.Background = ollama == model ? Panel2 : TransparentBrush; button.Foreground = ollama == model ? Accent : Muted;
+            models.Children.Add(button);
+        }
+        settingsContent.Children.Add(models);
+        bool images = ReadNestedConfigBool("ollama", "send_attachment_content", false);
+        settingsContent.Children.Add(SettingsAction(images ? "✓  Permitir imágenes para Ollama" : "○  Mantener adjuntos como metadatos",
+            images ? "Ollama podrá recibir imágenes que Codex exponga como datos adjuntos. Jev seguirá viendo solo metadatos." : "Ollama recibe que hay adjuntos, cuántos y de qué tipo; no recibe su contenido.",
+            delegate { WriteNestedConfigValue("ollama", "send_attachment_content", !images); RefreshSettings(); }));
+    }
+
+    void PromptJevKey()
+    {
+        var dialog = new Window { Title = "Clave de Jev", Width = 380, Height = 185, ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = this, Background = Panel, Foreground = Ink };
+        var panel = new StackPanel { Margin = new Thickness(18) };
+        panel.Children.Add(Txt("Pega la clave de TypeSafe", 15, Ink, FontWeights.SemiBold));
+        var note = Txt("Se cifra con la protección de Windows para este usuario. No se añade a Git.", 11, Muted);
+        note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 6, 0, 10); panel.Children.Add(note);
+        var input = new PasswordBox { Height = 30, Background = Panel2, Foreground = Ink, BorderBrush = Line, Padding = new Thickness(8, 4, 8, 4) };
+        panel.Children.Add(input);
+        var save = Btn("Guardar clave", delegate {
+            if (input.Password.Trim().Length == 0) return;
+            try
+            {
+                Directory.CreateDirectory(StateFolder);
+                byte[] cipher = ProtectedData.Protect(Encoding.UTF8.GetBytes(input.Password.Trim()), null, DataProtectionScope.CurrentUser);
+                File.WriteAllBytes(Path.Combine(StateFolder, "jev.secret"), cipher); dialog.DialogResult = true;
+            }
+            catch { connection.Text = "No se pudo guardar la clave de Jev"; connection.Foreground = Warning; }
+        }, false);
+        save.Margin = new Thickness(0, 12, 0, 0); panel.Children.Add(save); dialog.Content = panel;
+        dialog.Loaded += delegate { input.Focus(); }; dialog.ShowDialog();
     }
 
     UIElement SettingsAction(string title, string description, Action action)
@@ -401,6 +500,47 @@ internal sealed partial class ModernRouterMonitor
         catch { return 90; }
     }
 
+    string ReadConfigString(string key, string fallback)
+    {
+        try
+        {
+            var data = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(Path.Combine(Root, "config.local.json")));
+            return data.ContainsKey(key) ? Convert.ToString(data[key]) : fallback;
+        }
+        catch { return fallback; }
+    }
+
+    List<string> ReadConfigStrings(string key)
+    {
+        try
+        {
+            var data = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(Path.Combine(Root, "config.local.json")));
+            if (!data.ContainsKey(key)) return new List<string>();
+            return ((System.Collections.IEnumerable)data[key]).Cast<object>().Select(Convert.ToString).Where(item => item != null).ToList();
+        }
+        catch { return new List<string>(); }
+    }
+
+    string ReadNestedConfigString(string parent, string key, string fallback)
+    {
+        try
+        {
+            var data = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(Path.Combine(Root, "config.local.json")));
+            var nested = Dict(data[parent]); return nested.ContainsKey(key) ? Convert.ToString(nested[key]) : fallback;
+        }
+        catch { return fallback; }
+    }
+
+    bool ReadNestedConfigBool(string parent, string key, bool fallback)
+    {
+        try
+        {
+            var data = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(Path.Combine(Root, "config.local.json")));
+            return Convert.ToBoolean(Dict(data[parent])[key]);
+        }
+        catch { return fallback; }
+    }
+
     void WriteConfigValue(string key, object value)
     {
         try
@@ -411,6 +551,39 @@ internal sealed partial class ModernRouterMonitor
             File.Replace(temp, path, null);
         }
         catch { connection.Text = "No se pudo guardar el ajuste"; connection.Foreground = Warning; }
+    }
+
+    void WriteNestedConfigValue(string parent, string key, object value)
+    {
+        try
+        {
+            string path = Path.Combine(Root, "config.local.json");
+            var data = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(path));
+            Dictionary<string, object> nested;
+            if (data.ContainsKey(parent)) nested = Dict(data[parent]); else data[parent] = nested = new Dictionary<string, object>();
+            nested[key] = value;
+            string temp = path + ".monitor.tmp"; File.WriteAllText(temp, Json.Serialize(data), new UTF8Encoding(false));
+            File.Replace(temp, path, null);
+        }
+        catch { connection.Text = "No se pudo guardar el ajuste"; connection.Foreground = Warning; }
+    }
+
+    void ToggleComparison(string engine)
+    {
+        var values = ReadConfigStrings("comparison_engines");
+        if (values.Contains(engine)) values.Remove(engine); else values.Add(engine);
+        WriteConfigValue("comparison_engines", values.Distinct().ToArray());
+    }
+
+    static string FriendlyEngine(string engine)
+    {
+        switch (engine) { case "jev": return "Jev"; case "ollama": return "Ollama Cloud"; default: return "Reglas locales"; }
+    }
+
+    static string FriendlyEngineStatus(string status)
+    {
+        switch (status) { case "not_configured": return "sin configurar"; case "unavailable": return "sin conexión";
+            case "invalid": return "respuesta no válida"; case "guardrail": return "limitado por la política local"; default: return status ?? "sin datos"; }
     }
 
     static string FriendlyStatus(string value)

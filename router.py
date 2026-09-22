@@ -15,6 +15,7 @@ import time
 import uuid
 
 from routing import DEFAULT_ROUTES, EFFORTS, classify_agent_identity, select_route_details, has_attachments, user_text
+from decision_engines import ENGINES, ENGINE_JEV, ENGINE_OLLAMA, ENGINE_RULES, attachment_summary, build_state, candidate_routes, inline_images, run_jev, run_ollama
 
 ROOT = Path(__file__).resolve().parent
 
@@ -64,8 +65,9 @@ class Router:
         """Append privacy-safe decision metadata; never prompts, outputs or tool data."""
         allowed = {"decision_id", "thread", "title", "model", "effort", "previous_model",
                    "model_reason", "effort_reason", "agent_category", "agent_confidence", "source", "status", "signal", "error_type", "error_code",
-                   "inputTokens", "outputTokens", "cachedInputTokens", "reasoningOutputTokens"}
-        record = {"schema": 1, "time": time.time(), "time_iso":
+                   "inputTokens", "outputTokens", "cachedInputTokens", "reasoningOutputTokens", "routing_engine", "engine_model",
+                   "engine_status", "engine_confidence", "engine_latency_ms", "proposed_model", "proposed_effort"}
+        record = {"schema": 2, "time": time.time(), "time_iso":
                   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event,
                   "session": str(os.getpid())}
         record.update({key: value for key, value in fields.items() if key in allowed and value is not None})
@@ -362,6 +364,40 @@ class Router:
             if not state.get("seen_turn"):
                 previous = None
         route, reasons = select_route_details(text, routes, previous, state.get("effort"), has_attachments(items))
+        baseline_route, baseline_reasons = dict(route), dict(reasons)
+        engine_name = config.get("routing_engine", ENGINE_RULES)
+        if engine_name not in ENGINES:
+            engine_name = ENGINE_RULES
+        candidates = candidate_routes(routes, self.catalog)
+        external_allowed = (reasons.get("source") == "automatic" and not reasons["model"].startswith("continuación")
+                            and bool(candidates))
+        state_for_engine = build_state(text, attachment_summary(items), current, state.get("effort"), reasons.get("signal") == "retry")
+        ollama_images = inline_images(items) if ((config.get("ollama") or {}).get("send_attachment_content", False)) else []
+        engine_result = {"engine": ENGINE_RULES, "status": "ok", "latency_ms": 0,
+                         "route": {"model": route["model"], "effort": route["effort"]}, "engine_model": "local-policy"}
+        if external_allowed and engine_name == ENGINE_JEV:
+            engine_result = run_jev(config, self.state_dir, state_for_engine, candidates)
+        elif external_allowed and engine_name == ENGINE_OLLAMA:
+            engine_result = run_ollama(config, state_for_engine, candidates, ollama_images)
+        if engine_result.get("status") == "ok" and engine_result.get("route"):
+            proposed = engine_result["route"]
+            # Hard local policy remains a floor for visual work, attachments, audits and risk.
+            strict = baseline_reasons["model"].startswith(("auditoría", "diseño de interfaces", "interpretación de adjuntos"))
+            tiers = ("simple", "normal", "complex", "critical")
+            chosen_tier = proposed.get("tier") or next((tier for tier, item in routes.items() if item["model"] == proposed["model"]), "simple")
+            baseline_tier = next((tier for tier, item in routes.items() if item["model"] == baseline_route["model"]), "simple")
+            if not strict or tiers.index(chosen_tier) >= tiers.index(baseline_tier):
+                route = {"model": proposed["model"], "effort": proposed["effort"]}
+                label = "Jev" if engine_name == ENGINE_JEV else "Ollama"
+                reasons["model"] = "%s eligió %s para esta petición" % (label, proposed.get("label", route["model"]))
+                reasons["effort"] = "%s propuso este nivel de razonamiento para la complejidad observada" % label
+            else:
+                engine_result["status"] = "guardrail"
+        elif engine_name != ENGINE_RULES and external_allowed:
+            label = "Jev" if engine_name == ENGINE_JEV else "Ollama"
+            reasons["model"] = "%s no estuvo disponible; se aplicó la política local" % label
+            reasons["effort"] = "nivel de respaldo de la política local"
+        effective_engine = engine_result.get("engine", ENGINE_RULES)
         category, confidence = classify_agent_identity(text, state.get("name", ""), has_attachments(items),
                                                        reasons["model"], state.get("agent_category"))
         model, effort = route["model"], route["effort"]
@@ -380,10 +416,15 @@ class Router:
         tier = next(t for t, r in routes.items() if r["model"] == model)
         decision_id = self.new_decision(tid, model, effort, reasons["model"], reasons["effort"], reasons["source"],
                                         current, reasons.get("signal"), category, confidence)
+        self.record_engine_comparisons(config, decision_id, tid, candidates, state_for_engine, ollama_images, engine_name,
+                                       engine_result, baseline_route, external_allowed)
         decision = {"model": model, "effort": effort, "reason": reasons["model"],
                     "model_reason": reasons["model"], "effort_reason": reasons["effort"],
                     "source": reasons["source"], "agent_category": category,
-                    "agent_confidence": confidence, "decision_id": decision_id}
+                    "agent_confidence": confidence, "decision_id": decision_id,
+                    "routing_engine": effective_engine, "engine_model": engine_result.get("engine_model"),
+                    "engine_status": engine_result.get("status"), "engine_confidence": engine_result.get("confidence"),
+                    "engine_latency_ms": engine_result.get("latency_ms")}
         self.threads.setdefault(tid, {}).update(tier=tier, seen_turn=True, requested_model=model,
                                               requested_effort=effort, status="pending", updated=time.time(), **decision)
         if "id" in message:
@@ -392,8 +433,27 @@ class Router:
             self.sync_after_ack[message["id"]] = {"threadId": tid, "model": model, "effort": effort}
         self.log({"event": "routed", "thread": tid, "from": current, "model": model,
                   "effort": effort, "reason": reasons["model"], "effort_reason": reasons["effort"],
-                  "decision_id": decision_id})
+                  "decision_id": decision_id, "routing_engine": effective_engine, "engine_status": engine_result.get("status")})
         return (json.dumps(changed, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
+
+    def record_engine_comparisons(self, config, decision_id, tid, candidates, state, ollama_images, active_engine, active_result, baseline_route, allowed):
+        """Record comparable, content-free engine choices. Shadow engines never affect Codex."""
+        results = [active_result]
+        shadows = config.get("comparison_engines") or []
+        if allowed:
+            for name in shadows:
+                if name not in ENGINES or name in (active_engine, ENGINE_RULES):
+                    continue
+                if name == ENGINE_JEV:
+                    results.append(run_jev(config, self.state_dir, state, candidates))
+                elif name == ENGINE_OLLAMA:
+                    results.append(run_ollama(config, state, candidates, ollama_images))
+        for result in results:
+            proposed = result.get("route") or baseline_route
+            self.record_history("engine_comparison", decision_id=decision_id, thread=tid, routing_engine=result.get("engine", ENGINE_RULES),
+                                engine_model=result.get("engine_model"), engine_status=result.get("status"),
+                                engine_confidence=result.get("confidence"), engine_latency_ms=result.get("latency_ms"),
+                                proposed_model=proposed.get("model"), proposed_effort=proposed.get("effort"))
 
 
 def copy_bytes(source, target):

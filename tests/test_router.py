@@ -4,9 +4,11 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from routing import DEFAULT_ROUTES, EFFORTS, classify, classify_agent_identity, select_route, select_route_details
+from decision_engines import inline_images
 from router import Router
 
 
@@ -15,6 +17,12 @@ def encode(value):
 
 
 class RoutingPolicyTests(unittest.TestCase):
+    def test_only_inline_image_data_is_eligible_for_opt_in_ollama_vision(self):
+        items = [{"type": "localImage", "path": r"C:\\private\\capture.png"},
+                 {"type": "image", "url": "data:image/png;base64,c2FmZQ=="},
+                 {"type": "image", "url": "https://example.com/image.png"}]
+        self.assertEqual(inline_images(items), ["c2FmZQ=="])
+
     def test_spanish_and_english_workloads(self):
         cases = [
             ("Traduce al ingles: Nos vemos mañana.", "simple"),
@@ -121,6 +129,26 @@ class ProtocolTests(unittest.TestCase):
             model="gpt-6-astra", reasoning_effort="high")
         self.assertEqual(json.loads(self.router.client_line(encode(original))), expected)
 
+    @patch("router.run_jev")
+    def test_jev_engine_can_select_a_valid_pair_and_keeps_telemetry_content_free(self, fake_jev):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
+        fake_jev.return_value = {"engine": "jev", "status": "ok", "latency_ms": 25, "confidence": .91,
+                                 "engine_model": "jev-test", "route": {"model": "gpt-5.6-terra", "effort": "medium", "tier": "normal", "label": "Terra · medium"}}
+        result = json.loads(self.router.client_line(encode(self.request("PRIVATE_JEV_SENTINEL implementa un cambio concreto"))))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-terra", "medium"))
+        records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
+        self.assertEqual(records[-1]["routing_engine"], "jev")
+        self.assertNotIn("PRIVATE_JEV_SENTINEL", (Path(self.tmp.name) / "state" / "history.jsonl").read_text())
+
+    @patch("router.run_ollama")
+    def test_ollama_failure_falls_back_to_rules(self, fake_ollama):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "ollama"}))
+        fake_ollama.return_value = {"engine": "ollama", "status": "unavailable", "latency_ms": 10,
+                                    "engine_model": "glm-5.3-flash:cloud"}
+        result = json.loads(self.router.client_line(encode(self.request("Traduce hola al inglés"))))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-luna", "low"))
+        self.assertIn("no estuvo disponible", self.router.threads["t"]["model_reason"])
+
     def test_non_turn_messages_are_byte_identical(self):
         for data in [b'  {"id":9, "method":"turn/interrupt", "params":{"threadId":"t","turnId":"q"}} \n',
                      b'{"id":7,"result":{"decision":"approved"}}\n', b'not json\n', b'[1,2]\n']:
@@ -225,13 +253,15 @@ class ProtocolTests(unittest.TestCase):
             "threadId": "t", "turn": {"status": "completed"}}}))
         records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
         self.assertEqual([r["event"] for r in records],
-                         ["decision_created", "decision_accepted", "decision_completed"])
+                         ["decision_created", "engine_comparison", "decision_accepted", "decision_completed"])
         self.assertEqual(len({r["decision_id"] for r in records}), 1)
         self.assertEqual(records[0]["source"], "automatic")
         self.assertIn("model_reason", records[0])
         self.assertIn("effort_reason", records[0])
         self.assertEqual(records[0]["agent_category"], "text")
         self.assertEqual(records[0]["agent_confidence"], "media")
+        self.assertEqual(records[1]["routing_engine"], "rules")
+        self.assertEqual(records[1]["proposed_model"], "gpt-5.6-luna")
         self.assertEqual(records[-1]["inputTokens"], 20)
         self.assertNotIn("PRIVATE_HISTORY_SENTINEL", (Path(self.tmp.name) / "state" / "history.jsonl").read_text())
 

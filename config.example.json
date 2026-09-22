@@ -2,6 +2,19 @@
   "enabled": true,
   "sync_picker": true,
   "history_days": 90,
+  "routing_engine": "rules",
+  "comparison_engines": [],
+  "jev": {
+    "model": "jev-latest",
+    "endpoint": "https://api.typesafe.ai/v1/systemone",
+    "timeout_seconds": 4
+  },
+  "ollama": {
+    "model": "glm-5.3-flash:cloud",
+    "endpoint": "http://127.0.0.1:11434/api/chat",
+    "timeout_seconds": 6,
+    "send_attachment_content": false
+  },
   "python": "C:\\Python314\\python.exe",
   "codex": "REPLACE_WITH_ORIGINAL_DESKTOP_CODEX_EXE",
   "desktop": "REPLACE_WITH_INSTALLED_CHATGPT_EXE",
