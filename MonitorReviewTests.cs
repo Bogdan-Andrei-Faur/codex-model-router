@@ -139,6 +139,18 @@ internal sealed partial class ModernRouterMonitor
             Check(decisions.Count == 3 && decisions.Count(d => d.Accepted) == 2, "Recovered history not added to accumulated totals");
             analyticsSignature = null; decisions.Clear(); RefreshAnalytics(rows, path);
             Check(decisions.Count == 3 && decisions.Count(d => d.Accepted) == 2, "Second load duplicated or lost historical decisions");
+            File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "decision_quality", quality = "adequate", time = 200 }) + Environment.NewLine);
+            RefreshAnalytics(rows, path);
+            Check(decisions.First(d => d.Id == "two").Quality == "adequate", "Quality rating not loaded");
+            File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "decision_quality", quality = "", time = 201 }) + Environment.NewLine);
+            analyticsSignature = null; decisions.Clear(); RefreshAnalytics(rows, path);
+            Check(decisions.First(d => d.Id == "two").Quality == "" && decisions.First(d => d.Id == "two").Time == 103,
+                "Cleared rating did not survive reload or changed execution time");
+            File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "engine_comparison", routing_engine = "provider", engine_active = true, time = 104 }) + Environment.NewLine);
+            File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "engine_comparison", routing_engine = "rules", engine_active = false, time = 104 }) + Environment.NewLine);
+            RefreshAnalytics(rows, path);
+            Check(decisions.First(d => d.Id == "two").RoutingEngine == "provider" && decisions.First(d => d.Id == "two").Comparisons.Count == 2,
+                "Shadow engine overwrote deciding engine in statistics");
         }
         finally { File.Delete(path); File.Delete(Path.ChangeExtension(path, ".recovered.jsonl")); analyticsSignature = null; }
     }
@@ -149,6 +161,47 @@ internal sealed partial class ModernRouterMonitor
         var stop = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(milliseconds) };
         stop.Tick += delegate { stop.Stop(); frame.Continue = false; };
         stop.Start(); Dispatcher.PushFrame(frame);
+    }
+
+    static IEnumerable<T> Descendants<T>(DependencyObject node) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++)
+        {
+            var child = VisualTreeHelper.GetChild(node, i);
+            if (child is T) yield return (T)child;
+            foreach (var descendant in Descendants<T>(child)) yield return descendant;
+        }
+    }
+
+    void CheckSettingsInteraction()
+    {
+        foreach (string engine in new[] { "rules", "jev", "provider" })
+        {
+            settingsContent.Children.Clear(); BuildRoutingEngineSettings(engine); UpdateLayout();
+            Check(ContainsText(settingsContent, "MODELO PARA CLASIFICAR") == (engine == "provider"), "Provider configuration visible under wrong engine");
+            Check(settingsContent.Children.OfType<TextBlock>().Any(text => text.Text == "JEV") == (engine == "jev"), "Jev configuration visible under wrong engine");
+            var comparisons = settingsContent.Children.OfType<WrapPanel>().ElementAt(1).Children.OfType<Button>().ToList();
+            Check(comparisons.Count == 3 && comparisons.Count(button => !button.IsEnabled) == 1, "Missing Rules comparison or active engine duplicated");
+            foreach (var button in settingsContent.Children.OfType<WrapPanel>().SelectMany(panel => panel.Children.OfType<Button>()))
+                Check(button.BorderThickness.Left == 1 && button.Background != TransparentBrush, "Unselected option has no visible outline");
+            if (engine != "rules")
+            {
+                var key = settingsContent.Children.OfType<StackPanel>().First();
+                var open = (Button)key.Children[0];
+                int windows = Application.Current.Windows.Count;
+                open.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); UpdateLayout();
+                var password = Descendants<PasswordBox>(key).Single();
+                Check(password.IsVisible && windows == Application.Current.Windows.Count, "Key editor opened another window or stayed hidden");
+                var scroll = (ScrollViewer)settingsPage.Children[0]; scroll.ScrollToEnd(); UpdateLayout();
+                SaveVisual(this, Path.Combine(StateFolder, "review-settings-" + engine + "-inline.png"), 1);
+                password.Password = "test-only-not-saved";
+                var cancel = Descendants<Button>(key).First(button => Convert.ToString(button.Content) == "Cancelar");
+                cancel.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); UpdateLayout();
+                Check(password.Password == "" && !password.IsVisible, "Cancel retained the secret or editor");
+            }
+            SaveVisual(this, Path.Combine(StateFolder, "review-settings-" + engine + ".png"), 1);
+        }
+        RefreshSettings();
     }
 
     void CheckAgentCapsule()
@@ -383,6 +436,8 @@ internal sealed partial class ModernRouterMonitor
             SelectMonitorTab(3); UpdateLayout(); Dispatcher.Invoke(delegate { }, DispatcherPriority.Render);
             Check(settingsContent.Children.OfType<Button>().Count() >= 2, "Settings controls are missing");
             SaveVisual(this, Path.Combine(StateFolder, "review-settings.png"), 1);
+            CheckSettingsInteraction();
+            results.Add("PASS: outlined selectors, Rules comparison, engine-specific settings, inline keys with cancel, persistent rating removal and active-engine attribution");
             results.Add("PASS: Statistics and Settings tabs contain real metrics and working controls");
             File.WriteAllLines(report, results); quitting = true; Close(); return 0;
         }

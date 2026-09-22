@@ -149,6 +149,33 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-luna", "low"))
         self.assertIn("no estuvo disponible", self.router.threads["t"]["model_reason"])
 
+    @patch("router.run_provider")
+    def test_rules_comparison_records_baseline_without_changing_provider_choice(self, provider):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES,
+            "routing_engine": "provider", "comparison_engines": ["rules", "rules", "provider"]}))
+        provider.return_value = {"engine": "provider", "status": "ok", "route": {
+            "model": "gpt-5.6-terra", "effort": "medium", "tier": "normal"}}
+        result = json.loads(self.router.client_line(encode(self.request("Traduce hola al inglés"))))
+        self.assertEqual(result["params"]["model"], "gpt-5.6-terra")
+        records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
+        comparisons = [item for item in records if item["event"] == "engine_comparison"]
+        self.assertEqual([(item["routing_engine"], item["engine_active"]) for item in comparisons],
+                         [("provider", True), ("rules", False)])
+        self.assertEqual(comparisons[1]["proposed_model"], "gpt-5.6-luna")
+        provider.assert_called_once()
+
+    @patch("router.run_provider")
+    def test_comparison_aliases_do_not_duplicate_calls_or_replace_local_reasons(self, provider):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES,
+            "routing_engine": "rules", "comparison_engines": ["rules", "ollama", "provider"]}))
+        provider.return_value = {"engine": "provider", "status": "ok", "route": {
+            "model": "gpt-5.6-terra", "effort": "medium", "tier": "normal"}}
+        result = json.loads(self.router.client_line(encode(self.request("Traduce hola al inglés"))))
+        self.assertEqual(result["params"]["model"], "gpt-5.6-luna")
+        self.assertNotIn("Proveedor", self.router.threads["t"]["model_reason"])
+        self.assertEqual(self.router.threads["t"]["routing_engine"], "rules")
+        provider.assert_called_once()
+
     def test_non_turn_messages_are_byte_identical(self):
         for data in [b'  {"id":9, "method":"turn/interrupt", "params":{"threadId":"t","turnId":"q"}} \n',
                      b'{"id":7,"result":{"decision":"approved"}}\n', b'not json\n', b'[1,2]\n']:

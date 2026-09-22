@@ -66,7 +66,7 @@ class Router:
         allowed = {"decision_id", "thread", "title", "model", "effort", "previous_model",
                    "model_reason", "effort_reason", "agent_category", "agent_confidence", "source", "status", "signal", "error_type", "error_code",
                    "inputTokens", "outputTokens", "cachedInputTokens", "reasoningOutputTokens", "routing_engine", "engine_model",
-                   "engine_status", "engine_confidence", "engine_latency_ms", "proposed_model", "proposed_effort"}
+                   "engine_status", "engine_confidence", "engine_latency_ms", "proposed_model", "proposed_effort", "engine_active"}
         record = {"schema": 2, "time": time.time(), "time_iso":
                   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event,
                   "session": str(os.getpid())}
@@ -384,7 +384,7 @@ class Router:
             engine_result = run_jev(config, self.state_dir, state_for_engine, candidates)
         elif external_allowed and engine_name == ENGINE_PROVIDER:
             engine_result = run_provider(config, self.state_dir, state_for_engine, candidates, provider_images)
-        if engine_result.get("status") == "ok" and engine_result.get("route"):
+        if engine_result.get("engine") != ENGINE_RULES and engine_result.get("status") == "ok" and engine_result.get("route"):
             proposed = engine_result["route"]
             # Hard local policy remains a floor for visual work, attachments, audits and risk.
             strict = baseline_reasons["model"].startswith(("auditoría", "diseño de interfaces", "interpretación de adjuntos"))
@@ -445,20 +445,25 @@ class Router:
         """Record comparable, content-free engine choices. Shadow engines never affect Codex."""
         results = [active_result]
         shadows = config.get("comparison_engines") or []
+        seen = {active_result.get("engine", ENGINE_RULES), active_engine}
         if allowed:
             for name in shadows:
                 if name == ENGINE_OLLAMA:
                     name = ENGINE_PROVIDER
-                if name not in ENGINES or name in (active_engine, ENGINE_RULES):
+                if name not in ENGINES or name in seen:
                     continue
-                if name == ENGINE_JEV:
+                seen.add(name)
+                if name == ENGINE_RULES:
+                    results.append({"engine": ENGINE_RULES, "status": "ok", "latency_ms": 0,
+                                    "route": baseline_route, "engine_model": "local-policy"})
+                elif name == ENGINE_JEV:
                     results.append(run_jev(config, self.state_dir, state, candidates))
                 elif name == ENGINE_PROVIDER:
                     results.append(run_provider(config, self.state_dir, state, candidates, provider_images))
-        for result in results:
+        for index, result in enumerate(results):
             proposed = result.get("route") or baseline_route
             self.record_history("engine_comparison", decision_id=decision_id, thread=tid, routing_engine=result.get("engine", ENGINE_RULES),
-                                engine_model=result.get("engine_model"), engine_status=result.get("status"),
+                                engine_active=index == 0, engine_model=result.get("engine_model"), engine_status=result.get("status"),
                                 engine_confidence=result.get("confidence"), engine_latency_ms=result.get("latency_ms"),
                                 proposed_model=proposed.get("model"), proposed_effort=proposed.get("effort"))
 

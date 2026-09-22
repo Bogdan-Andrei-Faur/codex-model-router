@@ -195,6 +195,9 @@ internal sealed partial class ModernRouterMonitor
                 Effort = Effort(String(data, "proposed_effort")), Status = String(data, "engine_status"),
                 EngineModel = String(data, "engine_model"), Confidence = Number(data, "engine_confidence"),
                 LatencyMs = Number(data, "engine_latency_ms") };
+            // Older logs put the deciding engine first; new ones identify it explicitly.
+            bool active = data.ContainsKey("engine_active") ? Convert.ToBoolean(data["engine_active"]) : System.String.IsNullOrEmpty(item.RoutingEngine);
+            if (!active) return;
         }
         item.RoutingEngine = String(data, "routing_engine", item.RoutingEngine);
         item.EngineModel = String(data, "engine_model", item.EngineModel);
@@ -286,7 +289,7 @@ internal sealed partial class ModernRouterMonitor
         if (decision.Comparisons.Count > 0)
         {
             string observed = System.String.Join("\n", decision.Comparisons.Values.OrderBy(item => item.Engine).Select(item =>
-                FriendlyEngine(item.Engine) + " → " + item.Model + (item.Effort == "" ? "" : " · " + item.Effort) +
+                FriendlyEngine(item.Engine) + (item.Engine == decision.RoutingEngine ? " · activo" : " · comparación") + " → " + item.Model + (item.Effort == "" ? "" : " · " + item.Effort) +
                 " · " + (item.Status == "ok" ? Math.Round(item.LatencyMs) + " ms" : FriendlyEngineStatus(item.Status)) +
                 (item.Confidence > 0 ? " · " + Math.Round(item.Confidence * 100) + "%" : "")));
             AddExplanation(historyDetail, "MOTORES OBSERVADOS", observed);
@@ -312,19 +315,22 @@ internal sealed partial class ModernRouterMonitor
     {
         var title = Txt("VALORA ESTA ELECCIÓN", 11, Muted, FontWeights.SemiBold);
         title.Margin = new Thickness(0, 12, 0, 7); historyDetail.Children.Add(title);
-        var choices = new StackPanel { Orientation = Orientation.Horizontal };
+        var choices = new WrapPanel();
         foreach (var option in new[] { new[] { "insufficient", "Insuficiente" }, new[] { "adequate", "Adecuada" }, new[] { "excessive", "Excesiva" } })
         {
             string quality = option[0], label = option[1]; bool selected = decision.Quality == quality;
-            var button = Btn((selected ? "✓  " : "") + label, delegate { WriteDecisionQuality(decision, quality); }, false);
-            button.MinWidth = 0; button.Margin = new Thickness(0, 0, 5, 0);
-            button.Background = selected ? Panel2 : TransparentBrush;
-            button.Foreground = selected ? (quality == "adequate" ? Good : quality == "insufficient" ? Warning : Accent) : Muted;
+            var button = ChoiceButton(label, selected, delegate { WriteDecisionQuality(decision, selected ? "" : quality); });
             choices.Children.Add(button);
         }
         historyDetail.Children.Add(choices);
+        if (!System.String.IsNullOrEmpty(decision.Quality))
+        {
+            var clear = Btn("Quitar valoración", delegate { WriteDecisionQuality(decision, ""); }, false);
+            clear.HorizontalAlignment = HorizontalAlignment.Left; clear.Foreground = Muted;
+            historyDetail.Children.Add(clear);
+        }
         var note = Txt(System.String.IsNullOrEmpty(decision.Quality) ? "Tu valoración mejora las estadísticas sin guardar el mensaje ni la respuesta." :
-            "Valoración guardada: " + FriendlyQuality(decision.Quality) + ". Puedes cambiarla.", 11, Muted);
+            "Valoración guardada: " + FriendlyQuality(decision.Quality) + ". Puedes cambiarla o quitarla.", 11, Muted);
         note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 6, 0, 0); historyDetail.Children.Add(note);
     }
 
@@ -434,14 +440,12 @@ internal sealed partial class ModernRouterMonitor
         settingsContent.Children.Add(SettingsAction(Topmost ? "Desactivar Mantener delante" : "Activar Mantener delante",
             Topmost ? "El monitor permanece sobre otras ventanas." : "El monitor puede quedar detrás de otras ventanas.", delegate { Topmost = !Topmost; SaveUiState(); UpdateTray(); RefreshSettings(); }));
         settingsContent.Children.Add(AnalyticsHeading("CONSERVAR HISTORIAL"));
-        var choices = new StackPanel { Orientation = Orientation.Horizontal };
+        var choices = new WrapPanel();
         int current = ReadHistoryDays();
         foreach (var option in new[] { 30, 90, 180, 0 })
         {
             int captured = option; string label = option == 0 ? "Siempre" : option + " días";
-            var button = Btn(label, delegate { WriteConfigValue("history_days", captured); RefreshSettings(); }, false);
-            button.MinWidth = 0; button.Margin = new Thickness(0, 0, 5, 0);
-            button.Background = current == option ? Panel2 : TransparentBrush; button.Foreground = current == option ? Accent : Muted;
+            var button = ChoiceButton(label, current == option, delegate { WriteConfigValue("history_days", captured); RefreshSettings(); });
             choices.Children.Add(button);
         }
         settingsContent.Children.Add(choices);
@@ -453,18 +457,16 @@ internal sealed partial class ModernRouterMonitor
         AddSettingsNote("El historial guarda fecha, tarea, modelo, razonamiento, motores, tiempos, motivos, estado, incidencias y contadores de tokens. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales.");
     }
 
-    void BuildRoutingEngineSettings()
+    void BuildRoutingEngineSettings(string selectedEngine = null)
     {
         settingsContent.Children.Add(AnalyticsHeading("MOTOR DE ENRUTAMIENTO"));
-        string current = ReadConfigString("routing_engine", "rules");
+        string current = selectedEngine ?? ReadConfigString("routing_engine", "rules");
         if (current == "ollama") current = "provider";
-        var engines = new StackPanel { Orientation = Orientation.Horizontal };
+        var engines = new WrapPanel();
         foreach (var option in new[] { new[] { "rules", "Reglas" }, new[] { "jev", "Jev" }, new[] { "provider", "Proveedor" } })
         {
             string key = option[0], label = option[1];
-            var button = Btn(label, delegate { WriteConfigValue("routing_engine", key); RefreshSettings(); }, false);
-            button.MinWidth = 0; button.Margin = new Thickness(0, 0, 5, 0);
-            button.Background = current == key ? Panel2 : TransparentBrush; button.Foreground = current == key ? Accent : Muted;
+            var button = ChoiceButton(label, current == key, delegate { WriteConfigValue("routing_engine", key); RefreshSettings(); });
             engines.Children.Add(button);
         }
         settingsContent.Children.Add(engines);
@@ -473,50 +475,52 @@ internal sealed partial class ModernRouterMonitor
             "Las reglas locales deciden al instante sin enviar el mensaje a otro servicio.");
 
         settingsContent.Children.Add(AnalyticsHeading("COMPARACIÓN EN PARALELO"));
-        var comparisons = ReadConfigStrings("comparison_engines");
-        var compare = new StackPanel { Orientation = Orientation.Horizontal };
-        foreach (var option in new[] { new[] { "jev", "Jev" }, new[] { "provider", "Proveedor" } })
+        var comparisons = ReadConfigStrings("comparison_engines").Select(value => value == "ollama" ? "provider" : value).ToList();
+        var compare = new WrapPanel();
+        foreach (var option in new[] { new[] { "rules", "Reglas" }, new[] { "jev", "Jev" }, new[] { "provider", "Proveedor" } })
         {
-            string key = option[0], label = option[1]; bool enabled = comparisons.Contains(key);
-            var button = Btn((enabled ? "✓  " : "") + label, delegate { ToggleComparison(key); RefreshSettings(); }, false);
-            button.MinWidth = 0; button.Margin = new Thickness(0, 0, 5, 0);
-            button.Background = enabled ? Panel2 : TransparentBrush; button.Foreground = enabled ? Good : Muted;
+            string key = option[0], label = option[1]; bool active = current == key;
+            var button = ChoiceButton(label, active || comparisons.Contains(key), delegate { ToggleComparison(key); RefreshSettings(); }, true);
+            button.IsEnabled = !active;
+            button.ToolTip = active ? "Motor activo: su decisión ya se registra" : "Incluir o quitar de la comparación";
             compare.Children.Add(button);
         }
         settingsContent.Children.Add(compare);
-        AddSettingsNote("Los motores marcados opinan sobre la misma petición sin afectar a Codex. Sus decisiones se comparan sin guardar el mensaje.");
+        AddSettingsNote("El motor activo ya se registra. Marca otros para comparar sus propuestas. Para configurar uno, selecciónalo arriba.");
 
+        if (current == "jev") BuildJevSettings();
+        if (current == "provider") BuildProviderSettings();
+    }
+
+    void BuildJevSettings()
+    {
         settingsContent.Children.Add(AnalyticsHeading("JEV"));
-        bool keyReady = File.Exists(Path.Combine(StateFolder, "jev.secret")) || !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable("PERSONAL_CODEX_JEV_API_KEY"));
-        settingsContent.Children.Add(SettingsAction(keyReady ? "●  Clave de Jev configurada" : "○  Añadir clave de Jev",
-            keyReady ? "La clave se guarda protegida para este usuario de Windows. Puedes reemplazarla aquí." : "Pega una clave de TypeSafe. No se guarda en el repositorio ni en el historial.", PromptJevKey));
+        bool keyReady = File.Exists(Path.Combine(StateFolder, "jev.secret")) || !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable("PERSONAL_CODEX_JEV_API_KEY")) || !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable("TYPESAFE_API_KEY"));
+        settingsContent.Children.Add(InlineKeySettings("jev", "TypeSafe", keyReady));
+    }
 
+    void BuildProviderSettings()
+    {
         settingsContent.Children.Add(AnalyticsHeading("PROVEEDOR"));
         string provider = ReadNestedConfigString("provider", "id", "ollama");
-        var providers = new StackPanel { Orientation = Orientation.Horizontal };
-        var ollamaProvider = Btn("Ollama", delegate { WriteNestedConfigValue("provider", "id", "ollama"); RefreshSettings(); }, false);
-        ollamaProvider.MinWidth = 0; ollamaProvider.Margin = new Thickness(0, 0, 5, 0);
-        ollamaProvider.Background = provider == "ollama" ? Panel2 : TransparentBrush; ollamaProvider.Foreground = provider == "ollama" ? Accent : Muted;
+        var providers = new WrapPanel();
+        var ollamaProvider = ChoiceButton("Ollama", provider == "ollama", delegate { WriteNestedConfigValue("provider", "id", "ollama"); RefreshSettings(); });
         providers.Children.Add(ollamaProvider);
-        var futureProvider = Btn("Próximamente", delegate { }, false); futureProvider.IsEnabled = false; futureProvider.MinWidth = 0; providers.Children.Add(futureProvider);
         settingsContent.Children.Add(providers);
         AddSettingsNote("Ollama es el primer conector. Esta sección permitirá añadir otros proveedores sin cambiar el motor de enrutamiento.");
         bool providerKey = File.Exists(Path.Combine(StateFolder, "ollama.secret")) || !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable("OLLAMA_API_KEY"));
         string connection = ReadNestedConfigString("provider", "connection", "local");
-        settingsContent.Children.Add(SettingsAction(connection == "api_key" && providerKey ? "●  Ollama conectado con clave API" : "○  Conectar Ollama con clave API",
-            connection == "api_key" && providerKey ? "La clave se guarda protegida para este usuario de Windows." : "Conexión directa a Ollama Cloud. Puedes crear y pegar una clave desde tu cuenta de Ollama.",
-            delegate { PromptProviderKey("ollama", "Ollama"); }));
+        settingsContent.Children.Add(InlineKeySettings("ollama", "Ollama", providerKey));
         settingsContent.Children.Add(SettingsAction(connection == "local" ? "✓  Usando la sesión local de Ollama" : "Usar sesión de Ollama instalada",
             connection == "local" ? "El selector usa la aplicación de Ollama instalada y su sesión iniciada." : "Útil si ya has iniciado sesión en la aplicación de Ollama; no requiere pegar una clave.",
             delegate { WriteNestedConfigValue("provider", "connection", "local"); RefreshSettings(); }));
+        settingsContent.Children.Add(AnalyticsHeading("MODELO PARA CLASIFICAR"));
         string ollama = ReadNestedConfigString("provider", "model", "glm-5.3-flash:cloud");
-        var models = new StackPanel { Orientation = Orientation.Horizontal };
+        var models = new WrapPanel();
         foreach (var option in new[] { new[] { "glm-5.3-flash:cloud", "GLM Flash" }, new[] { "deepseek-v4.1-flash:cloud", "DeepSeek Flash" } })
         {
             string model = option[0], label = option[1];
-            var button = Btn(label, delegate { WriteNestedConfigValue("provider", "model", model); RefreshSettings(); }, false);
-            button.MinWidth = 0; button.Margin = new Thickness(0, 0, 5, 0);
-            button.Background = ollama == model ? Panel2 : TransparentBrush; button.Foreground = ollama == model ? Accent : Muted;
+            var button = ChoiceButton(label, ollama == model, delegate { WriteNestedConfigValue("provider", "model", model); RefreshSettings(); });
             models.Children.Add(button);
         }
         settingsContent.Children.Add(models);
@@ -526,53 +530,70 @@ internal sealed partial class ModernRouterMonitor
             delegate { WriteNestedConfigValue("provider", "send_attachment_content", !images); RefreshSettings(); }));
     }
 
-    void PromptJevKey()
+    static Button ChoiceButton(string label, bool selected, RoutedEventHandler click, bool multiple = false)
     {
-        var dialog = new Window { Title = "Clave de Jev", Width = 380, Height = 185, ResizeMode = ResizeMode.NoResize,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = this, Background = Panel, Foreground = Ink };
-        var panel = new StackPanel { Margin = new Thickness(18) };
-        panel.Children.Add(Txt("Pega la clave de TypeSafe", 15, Ink, FontWeights.SemiBold));
-        var note = Txt("Se cifra con la protección de Windows para este usuario. No se añade a Git.", 11, Muted);
-        note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 6, 0, 10); panel.Children.Add(note);
-        var input = new PasswordBox { Height = 30, Background = Panel2, Foreground = Ink, BorderBrush = Line, Padding = new Thickness(8, 4, 8, 4) };
-        panel.Children.Add(input);
-        var save = Btn("Guardar clave", delegate {
-            if (input.Password.Trim().Length == 0) return;
-            try
-            {
-                Directory.CreateDirectory(StateFolder);
-                byte[] cipher = ProtectedData.Protect(Encoding.UTF8.GetBytes(input.Password.Trim()), null, DataProtectionScope.CurrentUser);
-                File.WriteAllBytes(Path.Combine(StateFolder, "jev.secret"), cipher); dialog.DialogResult = true;
-            }
-            catch { connection.Text = "No se pudo guardar la clave de Jev"; connection.Foreground = Warning; }
-        }, false);
-        save.Margin = new Thickness(0, 12, 0, 0); panel.Children.Add(save); dialog.Content = panel;
-        dialog.Loaded += delegate { input.Focus(); }; dialog.ShowDialog();
+        var button = Btn((multiple ? (selected ? "✓  " : "+  ") : (selected ? "●  " : "○  ")) + label, click, false);
+        button.MinWidth = 0; button.Margin = new Thickness(0, 0, 6, 6);
+        button.Padding = new Thickness(9, 4, 9, 4);
+        button.Background = selected ? Brush("#373343") : Brush("#292A31");
+        button.Foreground = selected ? Accent : Ink;
+        button.BorderBrush = selected ? Accent : Brush("#51525D");
+        button.BorderThickness = new Thickness(1);
+        System.Windows.Automation.AutomationProperties.SetName(button, label);
+        System.Windows.Automation.AutomationProperties.SetHelpText(button, selected ? "Seleccionado" : "Sin seleccionar");
+        return button;
     }
 
-    void PromptProviderKey(string provider, string name)
+    UIElement InlineKeySettings(string secretId, string name, bool keyReady)
     {
-        var dialog = new Window { Title = "Conectar " + name, Width = 400, Height = 195, ResizeMode = ResizeMode.NoResize,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = this, Background = Panel, Foreground = Ink };
-        var panel = new StackPanel { Margin = new Thickness(18) };
-        panel.Children.Add(Txt("Pega la clave API de " + name, 15, Ink, FontWeights.SemiBold));
-        var note = Txt("Se cifra con la protección de Windows para este usuario. No se añade a Git ni al historial.", 11, Muted);
-        note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 6, 0, 10); panel.Children.Add(note);
-        var input = new PasswordBox { Height = 30, Background = Panel2, Foreground = Ink, BorderBrush = Line, Padding = new Thickness(8, 4, 8, 4) };
-        panel.Children.Add(input);
-        var save = Btn("Conectar", delegate {
-            if (input.Password.Trim().Length == 0) return;
+        var stack = new StackPanel();
+        var editor = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 10, 0, 0) };
+        bool apiSelected = secretId == "ollama" && ReadNestedConfigString("provider", "connection", "local") == "api_key";
+        string title = keyReady ? (apiSelected ? "✓  Clave API de " : "Clave guardada de ") + name : "Añadir clave de " + name;
+        var toggle = SettingsAction(title, keyReady ? "Pulsa para reemplazar la clave guardada." : "Introduce tu clave aquí mismo, dentro del panel.", delegate {
+            editor.Visibility = editor.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+        });
+        stack.Children.Add(toggle);
+        var note = Txt("Clave API · se guarda cifrada para tu usuario de Windows", 11, Muted);
+        note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 0, 0, 8); editor.Children.Add(note);
+        var input = new PasswordBox { Height = 34, Background = TransparentBrush, Foreground = Ink,
+            BorderThickness = new Thickness(0), Padding = new Thickness(10, 7, 10, 7), FontSize = 13 };
+        System.Windows.Automation.AutomationProperties.SetName(input, "Clave API de " + name);
+        var field = new Border { Background = Panel, CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), BorderBrush = Line, Child = input };
+        input.GotKeyboardFocus += delegate { field.BorderBrush = Accent; };
+        input.LostKeyboardFocus += delegate { field.BorderBrush = Line; };
+        editor.Children.Add(field);
+        var feedback = Txt("", 11, Warning); feedback.TextWrapping = TextWrapping.Wrap;
+        var actions = new WrapPanel { Margin = new Thickness(0, 10, 0, 0) };
+        var save = ChoiceButton("Guardar clave", false, delegate {
+            if (input.Password.Trim().Length == 0) { feedback.Text = "Introduce una clave antes de guardar."; return; }
             try
             {
                 Directory.CreateDirectory(StateFolder);
                 byte[] cipher = ProtectedData.Protect(Encoding.UTF8.GetBytes(input.Password.Trim()), null, DataProtectionScope.CurrentUser);
-                File.WriteAllBytes(Path.Combine(StateFolder, provider + ".secret"), cipher);
-                WriteNestedConfigValue("provider", "id", provider); WriteNestedConfigValue("provider", "connection", "api_key"); dialog.DialogResult = true;
+                File.WriteAllBytes(Path.Combine(StateFolder, secretId + ".secret"), cipher);
+                if (secretId == "ollama")
+                {
+                    WriteNestedConfigValue("provider", "id", "ollama");
+                    WriteNestedConfigValue("provider", "connection", "api_key");
+                }
+                input.Clear(); RefreshSettings();
             }
-            catch { connection.Text = "No se pudo conectar " + name; connection.Foreground = Warning; }
-        }, false);
-        save.Margin = new Thickness(0, 12, 0, 0); panel.Children.Add(save); dialog.Content = panel;
-        dialog.Loaded += delegate { input.Focus(); }; dialog.ShowDialog(); RefreshSettings();
+            catch { feedback.Text = "No se pudo guardar la clave. Inténtalo de nuevo."; }
+        });
+        // This is an action, not a selectable value.
+        save.Content = "Guardar clave";
+        actions.Children.Add(save);
+        actions.Children.Add(Btn("Cancelar", delegate { input.Clear(); feedback.Text = ""; editor.Visibility = Visibility.Collapsed; }, false));
+        editor.Children.Add(actions); editor.Children.Add(feedback);
+        editor.IsVisibleChanged += delegate {
+            if (editor.IsVisible) input.Focus(); else input.Clear();
+        };
+        stack.Children.Add(editor);
+        if (secretId == "ollama" && keyReady && !apiSelected)
+            stack.Children.Add(SettingsAction("Usar la clave guardada", "Cambiar a la conexión directa con Ollama Cloud.",
+                delegate { WriteNestedConfigValue("provider", "connection", "api_key"); RefreshSettings(); }));
+        return stack;
     }
 
     UIElement SettingsAction(string title, string description, Action action)

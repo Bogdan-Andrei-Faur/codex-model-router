@@ -45,11 +45,15 @@ El panel lateral tiene cuatro vistas:
   independientes: por qué se eligió el modelo y por qué se eligió el razonamiento.
   También muestra estado, fecha, duración, tokens observados e incidencias. Desde
   cada decisión puedes marcarla como **Insuficiente**, **Adecuada** o **Excesiva**.
+  Vuelve a pulsar la opción marcada o usa **Quitar valoración** para dejarla sin valorar.
 - **Estadísticas** resume distribución por modelo, razonamiento y motor de
   enrutamiento, valoraciones, errores, reintentos detectados, duración y tokens cuando están disponibles.
 - **Ajustes** permite pausar el selector, cambiar Mantener delante y conservar el
   historial 30, 90, 180 días o indefinidamente. También permite elegir el motor,
   activar comparaciones en paralelo, configurar Jev y seleccionar Ollama Cloud.
+  Los selectores mantienen un contorno visible en todas sus opciones. La configuración
+  de Jev o Proveedor aparece solo al elegir ese motor; las claves se editan dentro
+  del panel con **Guardar clave** y **Cancelar**, sin abrir otra ventana.
 
 El historial persistente empieza a recoger decisiones cuando Codex se abre con
 esta versión del selector. Un mensaje posterior como «sigue fallando» se registra
@@ -117,11 +121,15 @@ Codex y los límites para auditorías, UI/UX y adjuntos. Si Jev o el proveedor n
 configurados, no responden a tiempo o devuelven un formato no válido, se aplica
 la política local sin interrumpir el mensaje.
 
-**Comparación en paralelo** deja que Jev o el proveedor propongan una combinación para
+**Comparación en paralelo** permite incluir Reglas, Jev y Proveedor. El motor activo
+ya se registra y aparece marcado; las demás opciones se pueden añadir o quitar.
+Las reglas aportan su propuesta local sin una llamada externa. Los demás motores proponen una combinación para
 la misma petición, pero solo el motor activo cambia Codex. El historial registra
 motor, modelo interno, estado, tiempo y propuesta, sin guardar el mensaje. Así
 las comparaciones se hacen sobre las mismas tareas, no sobre semanas distintas.
-Cada ejecución muestra sus **Motores observados** en Historial.
+Cada ejecución muestra sus **Motores observados** en Historial, distinguiendo el
+motor activo de las comparaciones. Las propuestas secundarias no cambian la
+atribución del motor en Estadísticas.
 
 Jev recibe el texto y metadatos de adjuntos: presencia, cantidad y tipo. El proveedor
 también parte de esos metadatos. En Ajustes existe una opción independiente para
