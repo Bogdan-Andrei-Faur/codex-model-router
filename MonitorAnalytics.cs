@@ -23,8 +23,10 @@ internal sealed class DecisionRecord
 
 internal sealed class EngineComparison
 {
-    public string Engine, Model, Effort, Status, EngineModel;
+    public string Engine, Model, Effort, Status, EngineModel, Failure;
     public double Confidence, LatencyMs;
+    public int InputTokens, OutputTokens, CachedTokens;
+    public bool Active;
 }
 
 internal sealed partial class ModernRouterMonitor
@@ -194,10 +196,15 @@ internal sealed partial class ModernRouterMonitor
             item.Comparisons[engine] = new EngineComparison { Engine = engine, Model = Model(String(data, "proposed_model")),
                 Effort = Effort(String(data, "proposed_effort")), Status = String(data, "engine_status"),
                 EngineModel = String(data, "engine_model"), Confidence = Number(data, "engine_confidence"),
-                LatencyMs = Number(data, "engine_latency_ms") };
-            // Older logs put the deciding engine first; new ones identify it explicitly.
-            bool active = data.ContainsKey("engine_active") ? Convert.ToBoolean(data["engine_active"]) : System.String.IsNullOrEmpty(item.RoutingEngine);
-            if (!active) return;
+                LatencyMs = Number(data, "engine_latency_ms"), Failure = String(data, "engine_failure"),
+                InputTokens = Int(data, "engine_input_tokens"), OutputTokens = Int(data, "engine_output_tokens"),
+                CachedTokens = Int(data, "engine_cached_tokens"),
+                Active = data.ContainsKey("engine_active") ? Convert.ToBoolean(data["engine_active"]) : System.String.IsNullOrEmpty(item.RoutingEngine) };
+            // Old history had no decision_routed event. Preserve its best-known
+            // applied engine while treating malformed/guardrailed choices as local.
+            if (!data.ContainsKey("engine_active"))
+                item.RoutingEngine = String(data, "engine_status") == "ok" ? engine : "rules";
+            return;
         }
         item.RoutingEngine = String(data, "routing_engine", item.RoutingEngine);
         item.EngineModel = String(data, "engine_model", item.EngineModel);
@@ -289,8 +296,9 @@ internal sealed partial class ModernRouterMonitor
         if (decision.Comparisons.Count > 0)
         {
             string observed = System.String.Join("\n", decision.Comparisons.Values.OrderBy(item => item.Engine).Select(item =>
-                FriendlyEngine(item.Engine) + (item.Engine == decision.RoutingEngine ? " · activo" : " · comparación") + " → " + item.Model + (item.Effort == "" ? "" : " · " + item.Effort) +
+                FriendlyEngine(item.Engine) + (item.Active ? (item.Engine == decision.RoutingEngine ? " · aplicado" : " · intento") : " · comparación") + " → " + item.Model + (item.Effort == "" ? "" : " · " + item.Effort) +
                 " · " + (item.Status == "ok" ? Math.Round(item.LatencyMs) + " ms" : FriendlyEngineStatus(item.Status)) +
+                (System.String.IsNullOrEmpty(item.Failure) ? "" : " · " + FriendlyEngineFailure(item.Failure)) +
                 (item.Confidence > 0 ? " · " + Math.Round(item.Confidence * 100) + "%" : "")));
             AddExplanation(historyDetail, "MOTORES OBSERVADOS", observed);
         }
@@ -386,6 +394,8 @@ internal sealed partial class ModernRouterMonitor
         AddBreakdown(decisions.Where(item => !System.String.IsNullOrEmpty(item.Effort)).GroupBy(item => item.Effort).ToDictionary(group => group.Key, group => group.Count()), false);
         statisticsContent.Children.Add(AnalyticsHeading("MOTOR DE ENRUTAMIENTO"));
         AddBreakdown(decisions.Where(item => !System.String.IsNullOrEmpty(item.RoutingEngine)).GroupBy(item => FriendlyEngine(item.RoutingEngine)).ToDictionary(group => group.Key, group => group.Count()), false);
+        AddEngineTelemetry();
+        AddEngineQuality();
         int rated = decisions.Count(item => !System.String.IsNullOrEmpty(item.Quality));
         statisticsContent.Children.Add(AnalyticsHeading("VALORACIÓN DE LA ELECCIÓN"));
         AddMetric("Decisiones valoradas", rated + " / " + total, total == 0 ? 0 : rated * 1.0 / total, Accent);
@@ -455,6 +465,60 @@ internal sealed partial class ModernRouterMonitor
         AddPolicy("Sol", "Ingeniería compleja", "Alto"); AddPolicy("Astra", "UX, auditorías y gran alcance", "Muy alto");
         settingsContent.Children.Add(AnalyticsHeading("PRIVACIDAD"));
         AddSettingsNote("El historial guarda fecha, tarea, modelo, razonamiento, motores, tiempos, motivos, estado, incidencias y contadores de tokens. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales.");
+    }
+
+    static bool ValidEngineResponse(EngineComparison item)
+    {
+        return item.Status == "ok" || item.Status == "guardrail";
+    }
+
+    void AddEngineTelemetry()
+    {
+        var attempts = decisions.SelectMany(item => item.Comparisons.Values).ToList();
+        statisticsContent.Children.Add(AnalyticsHeading("FIABILIDAD DE LOS MOTORES"));
+        if (attempts.Count == 0) { statisticsContent.Children.Add(Txt("Sin clasificaciones externas registradas todavía", 12, Muted)); return; }
+        foreach (var group in attempts.GroupBy(item => FriendlyEngine(item.Engine)).OrderBy(group => group.Key))
+        {
+            var rows = group.ToList(); int valid = rows.Count(ValidEngineResponse);
+            AddMetric(group.Key + " · respuestas válidas", valid + " / " + rows.Count,
+                valid * 1.0 / rows.Count, valid == rows.Count ? Good : Warning);
+            int fallback = rows.Count(item => item.Active && item.Status != "ok");
+            if (fallback > 0) AddMetric(group.Key + " · respaldo local", fallback.ToString(), fallback * 1.0 / rows.Count, Warning);
+            var timed = rows.Where(item => item.LatencyMs > 0).ToList();
+            if (timed.Count > 0) AddMetric(group.Key + " · demora media", Math.Round(timed.Average(item => item.LatencyMs)) + " ms",
+                Math.Min(1, timed.Average(item => item.LatencyMs) / 6000), Accent);
+            long input = rows.Sum(item => (long)item.InputTokens), output = rows.Sum(item => (long)item.OutputTokens);
+            if (input + output > 0) AddMetric(group.Key + " · tokens de clasificación", (input + output).ToString("N0"), 1, Muted);
+            var failures = rows.Where(item => !System.String.IsNullOrEmpty(item.Failure)).GroupBy(item => FriendlyEngineFailure(item.Failure))
+                .OrderByDescending(item => item.Count()).FirstOrDefault();
+            if (failures != null) AddMetric(group.Key + " · principal incidencia", failures.Key + " · " + failures.Count(),
+                failures.Count() * 1.0 / rows.Count, Warning);
+            var confidence = rows.Where(item => item.Confidence > 0).ToList();
+            if (confidence.Count > 0) AddMetric(group.Key + " · confianza media", Math.Round(confidence.Average(item => item.Confidence) * 100) + "%",
+                confidence.Average(item => item.Confidence), Good);
+        }
+        var shadows = decisions.SelectMany(decision => decision.Comparisons.Values.Where(item => !item.Active && item.Status == "ok")
+            .Select(item => new { Decision = decision, Comparison = item })).ToList();
+        if (shadows.Count > 0)
+        {
+            int agreement = shadows.Count(item => item.Decision.Model == item.Comparison.Model && item.Decision.Effort == item.Comparison.Effort);
+            statisticsContent.Children.Add(AnalyticsHeading("COINCIDENCIA DE COMPARACIONES"));
+            AddMetric("Propuestas que coinciden con la selección aplicada", agreement + " / " + shadows.Count,
+                agreement * 1.0 / shadows.Count, Accent);
+        }
+    }
+
+    void AddEngineQuality()
+    {
+        var rated = decisions.Where(item => !System.String.IsNullOrEmpty(item.Quality)).ToList();
+        statisticsContent.Children.Add(AnalyticsHeading("VALORACIÓN POR MOTOR APLICADO"));
+        if (rated.Count == 0) { statisticsContent.Children.Add(Txt("Valora decisiones para comparar la calidad aplicada", 12, Muted)); return; }
+        foreach (var group in rated.GroupBy(item => FriendlyEngine(item.RoutingEngine ?? "rules")).OrderBy(group => group.Key))
+        {
+            var rows = group.ToList(); int adequate = rows.Count(item => item.Quality == "adequate");
+            AddMetric(group.Key + " · adecuadas", adequate + " / " + rows.Count,
+                adequate * 1.0 / rows.Count, adequate * 2 >= rows.Count ? Good : Warning);
+        }
     }
 
     void BuildRoutingEngineSettings(string selectedEngine = null)
@@ -715,6 +779,14 @@ internal sealed partial class ModernRouterMonitor
     {
         switch (status) { case "not_configured": return "sin configurar"; case "unavailable": return "sin conexión";
             case "invalid": return "respuesta no válida"; case "guardrail": return "limitado por la política local"; default: return status ?? "sin datos"; }
+    }
+
+    static string FriendlyEngineFailure(string failure)
+    {
+        switch (failure) { case "invalid_response": return "formato de respuesta"; case "timeout": return "tiempo agotado";
+            case "network": return "red local"; case "authentication": return "credenciales"; case "rate_limited": return "límite de uso";
+            case "missing_api_key": return "falta clave API"; case "unsupported_provider": return "proveedor no disponible";
+            default: return failure ?? "incidencia desconocida"; }
     }
 
     static string FriendlyQuality(string quality)

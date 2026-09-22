@@ -1,7 +1,8 @@
+import socket
 import unittest
 from unittest.mock import patch
 
-from decision_engines import parse_provider_choice, run_provider
+from decision_engines import engine_failure, engine_usage, parse_provider_choice, run_provider
 
 
 class ProviderResponseTests(unittest.TestCase):
@@ -32,10 +33,16 @@ class ProviderResponseTests(unittest.TestCase):
 
     @patch("decision_engines._post_json")
     def test_provider_reads_json_selection_and_does_not_return_response_content(self, post):
-        post.return_value = {"message": {"content": '{"route":"critical_high"}'}}
+        post.return_value = {"message": {"content": '{"route":"critical_high"}'}, "prompt_eval_count": 12, "eval_count": 3}
         result = run_provider({}, "", {"task": "PRIVATE_SENTINEL"}, self.candidates)
         self.assertEqual(result["route"]["model"], "gpt-6-astra")
+        self.assertEqual((result["engine_input_tokens"], result["engine_output_tokens"]), (12, 3))
         self.assertNotIn("PRIVATE_SENTINEL", str(result))
         messages = post.call_args.args[1]["messages"]
         self.assertNotIn("PRIVATE_SENTINEL", messages[0]["content"])
         self.assertIn("Revisión visual", messages[0]["content"])
+
+    def test_safe_usage_and_failure_classes_do_not_contain_provider_content(self):
+        self.assertEqual(engine_usage({"usage": {"input_tokens": 8, "output_tokens": 2, "cached_input_tokens": 1}}),
+                         {"engine_input_tokens": 8, "engine_output_tokens": 2, "engine_cached_tokens": 1})
+        self.assertEqual(engine_failure(socket.timeout("PRIVATE_SENTINEL")), "timeout")

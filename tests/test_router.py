@@ -148,6 +148,10 @@ class ProtocolTests(unittest.TestCase):
         result = json.loads(self.router.client_line(encode(self.request("Traduce hola al inglés"))))
         self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-luna", "low"))
         self.assertIn("no estuvo disponible", self.router.threads["t"]["model_reason"])
+        self.assertEqual(self.router.threads["t"]["routing_engine"], "rules")
+        records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
+        self.assertEqual(records[-1]["event"], "decision_routed")
+        self.assertEqual((records[-1]["routing_engine"], records[-1]["engine_applied"]), ("rules", False))
 
     @patch("router.run_provider")
     def test_invalid_provider_choice_is_not_presented_as_a_connection_failure(self, provider):
@@ -290,7 +294,7 @@ class ProtocolTests(unittest.TestCase):
             "threadId": "t", "turn": {"status": "completed"}}}))
         records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
         self.assertEqual([r["event"] for r in records],
-                         ["decision_created", "engine_comparison", "decision_accepted", "decision_completed"])
+                         ["decision_created", "engine_comparison", "decision_routed", "decision_accepted", "decision_completed"])
         self.assertEqual(len({r["decision_id"] for r in records}), 1)
         self.assertEqual(records[0]["source"], "automatic")
         self.assertIn("model_reason", records[0])
@@ -299,6 +303,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(records[0]["agent_confidence"], "media")
         self.assertEqual(records[1]["routing_engine"], "rules")
         self.assertEqual(records[1]["proposed_model"], "gpt-5.6-luna")
+        self.assertEqual((records[2]["routing_engine"], records[2]["engine_applied"]), ("rules", False))
         self.assertEqual(records[-1]["inputTokens"], 20)
         self.assertNotIn("PRIVATE_HISTORY_SENTINEL", (Path(self.tmp.name) / "state" / "history.jsonl").read_text())
 

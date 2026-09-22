@@ -148,9 +148,12 @@ internal sealed partial class ModernRouterMonitor
                 "Cleared rating did not survive reload or changed execution time");
             File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "engine_comparison", routing_engine = "provider", engine_active = true, time = 104 }) + Environment.NewLine);
             File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "engine_comparison", routing_engine = "rules", engine_active = false, time = 104 }) + Environment.NewLine);
+            File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "decision_routed", routing_engine = "provider", engine_applied = true, time = 104 }) + Environment.NewLine);
             RefreshAnalytics(rows, path);
             Check(decisions.First(d => d.Id == "two").RoutingEngine == "provider" && decisions.First(d => d.Id == "two").Comparisons.Count == 2,
                 "Shadow engine overwrote deciding engine in statistics");
+            Check(ContainsText(statisticsContent, "FIABILIDAD DE LOS MOTORES") && ContainsText(statisticsContent, "respuestas válidas"),
+                "Engine reliability telemetry is absent from statistics");
         }
         finally { File.Delete(path); File.Delete(Path.ChangeExtension(path, ".recovered.jsonl")); analyticsSignature = null; }
     }

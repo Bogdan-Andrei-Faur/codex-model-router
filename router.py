@@ -66,7 +66,8 @@ class Router:
         allowed = {"decision_id", "thread", "title", "model", "effort", "previous_model",
                    "model_reason", "effort_reason", "agent_category", "agent_confidence", "source", "status", "signal", "error_type", "error_code",
                    "inputTokens", "outputTokens", "cachedInputTokens", "reasoningOutputTokens", "routing_engine", "engine_model",
-                   "engine_status", "engine_confidence", "engine_latency_ms", "proposed_model", "proposed_effort", "engine_active"}
+                   "engine_status", "engine_confidence", "engine_latency_ms", "engine_failure", "engine_input_tokens",
+                   "engine_output_tokens", "engine_cached_tokens", "proposed_model", "proposed_effort", "engine_active", "engine_applied"}
         record = {"schema": 2, "time": time.time(), "time_iso":
                   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event,
                   "session": str(os.getpid())}
@@ -384,6 +385,7 @@ class Router:
             engine_result = run_jev(config, self.state_dir, state_for_engine, candidates)
         elif external_allowed and engine_name == ENGINE_PROVIDER:
             engine_result = run_provider(config, self.state_dir, state_for_engine, candidates, provider_images)
+        engine_applied = False
         if engine_result.get("engine") != ENGINE_RULES and engine_result.get("status") == "ok" and engine_result.get("route"):
             proposed = engine_result["route"]
             # Hard local policy remains a floor for visual work, attachments, audits and risk.
@@ -393,6 +395,7 @@ class Router:
             baseline_tier = next((tier for tier, item in routes.items() if item["model"] == baseline_route["model"]), "simple")
             if not strict or tiers.index(chosen_tier) >= tiers.index(baseline_tier):
                 route = {"model": proposed["model"], "effort": proposed["effort"]}
+                engine_applied = True
                 label = "Jev" if engine_name == ENGINE_JEV else "Proveedor"
                 reasons["model"] = "%s eligió %s para esta petición" % (label, proposed.get("label", route["model"]))
                 reasons["effort"] = "%s propuso este nivel de razonamiento para la complejidad observada" % label
@@ -404,7 +407,9 @@ class Router:
                        "not_configured": "no está configurado"}.get(engine_result.get("status"), "no estuvo disponible")
             reasons["model"] = "%s %s; se aplicó la política local: %s" % (label, failure, baseline_reasons["model"])
             reasons["effort"] = "respaldo local: " + baseline_reasons["effort"]
-        effective_engine = engine_result.get("engine", ENGINE_RULES)
+        # The configured engine may have been attempted, but local policy owns
+        # the final selection after a malformed response, failure or guardrail.
+        effective_engine = engine_result.get("engine", ENGINE_RULES) if engine_applied else ENGINE_RULES
         category, confidence = classify_agent_identity(text, state.get("name", ""), has_attachments(items),
                                                        reasons["model"], state.get("agent_category"))
         model, effort = route["model"], route["effort"]
@@ -425,13 +430,15 @@ class Router:
                                         current, reasons.get("signal"), category, confidence)
         self.record_engine_comparisons(config, decision_id, tid, candidates, state_for_engine, provider_images, engine_name,
                                        engine_result, baseline_route, external_allowed)
+        self.record_history("decision_routed", decision_id=decision_id, thread=tid, model=model, effort=effort,
+                            routing_engine=effective_engine, engine_applied=engine_applied)
         decision = {"model": model, "effort": effort, "reason": reasons["model"],
                     "model_reason": reasons["model"], "effort_reason": reasons["effort"],
                     "source": reasons["source"], "agent_category": category,
                     "agent_confidence": confidence, "decision_id": decision_id,
                     "routing_engine": effective_engine, "engine_model": engine_result.get("engine_model"),
                     "engine_status": engine_result.get("status"), "engine_confidence": engine_result.get("confidence"),
-                    "engine_latency_ms": engine_result.get("latency_ms")}
+                    "engine_latency_ms": engine_result.get("latency_ms"), "engine_applied": engine_applied}
         self.threads.setdefault(tid, {}).update(tier=tier, seen_turn=True, requested_model=model,
                                               requested_effort=effort, status="pending", updated=time.time(), **decision)
         if "id" in message:
@@ -467,6 +474,8 @@ class Router:
             self.record_history("engine_comparison", decision_id=decision_id, thread=tid, routing_engine=result.get("engine", ENGINE_RULES),
                                 engine_active=index == 0, engine_model=result.get("engine_model"), engine_status=result.get("status"),
                                 engine_confidence=result.get("confidence"), engine_latency_ms=result.get("latency_ms"),
+                                engine_failure=result.get("engine_failure"), engine_input_tokens=result.get("engine_input_tokens"),
+                                engine_output_tokens=result.get("engine_output_tokens"), engine_cached_tokens=result.get("engine_cached_tokens"),
                                 proposed_model=proposed.get("model"), proposed_effort=proposed.get("effort"))
 
 

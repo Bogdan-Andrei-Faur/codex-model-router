@@ -48,6 +48,8 @@ El panel lateral tiene cuatro vistas:
   Vuelve a pulsar la opción marcada o usa **Quitar valoración** para dejarla sin valorar.
 - **Estadísticas** resume distribución por modelo, razonamiento y motor de
   enrutamiento, valoraciones, errores, reintentos detectados, duración y tokens cuando están disponibles.
+  Añade fiabilidad de cada motor, demoras, tokens consumidos para clasificar,
+  incidencias agrupadas, coincidencia entre propuestas y calidad por motor aplicado.
 - **Ajustes** permite pausar el selector, cambiar Mantener delante y conservar el
   historial 30, 90, 180 días o indefinidamente. También permite elegir el motor,
   activar comparaciones en paralelo, configurar Jev y seleccionar Ollama Cloud.
@@ -134,6 +136,13 @@ las comparaciones se hacen sobre las mismas tareas, no sobre semanas distintas.
 Cada ejecución muestra sus **Motores observados** en Historial, distinguiendo el
 motor activo de las comparaciones. Las propuestas secundarias no cambian la
 atribución del motor en Estadísticas.
+
+La telemetría del motor guarda solo el nombre, modelo, estado, tipo de incidencia,
+demora, contadores agregados de tokens, propuesta y si esa propuesta se aplicó.
+No guarda el texto de la respuesta del clasificador, el mensaje original, adjuntos
+ni credenciales. Si un motor falla, devuelve un formato inválido o una regla local
+limita su propuesta, la decisión aplicada se atribuye a **Reglas locales** y el
+intento queda visible por separado.
 
 Jev recibe el texto y metadatos de adjuntos: presencia, cantidad y tipo. El proveedor
 también parte de esos metadatos. En Ajustes existe una opción independiente para

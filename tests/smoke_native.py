@@ -15,7 +15,7 @@ import time
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
-WRAPPER = ROOT / "dist" / "codex-router-v17.exe"
+WRAPPER = ROOT / "dist" / "codex-router-v18.exe"
 
 
 class Client:

@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import socket
 import time
 import urllib.error
 import urllib.request
@@ -108,6 +109,45 @@ def _post_json(url, payload, headers=None, timeout=4.0):
         return json.loads(response.read().decode("utf-8"))
 
 
+def token_count(value):
+    """Normalize provider token counters without retaining request or response content."""
+    try:
+        value = int(value)
+        return value if value >= 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def engine_usage(response):
+    """Extract only aggregate counters from known provider response shapes."""
+    usage = response.get("usage") if isinstance(response, dict) else None
+    usage = usage if isinstance(usage, dict) else {}
+    values = {
+        "engine_input_tokens": usage.get("input_tokens", usage.get("prompt_tokens", response.get("prompt_eval_count") if isinstance(response, dict) else None)),
+        "engine_output_tokens": usage.get("output_tokens", usage.get("completion_tokens", response.get("eval_count") if isinstance(response, dict) else None)),
+        "engine_cached_tokens": usage.get("cached_input_tokens", usage.get("cached_tokens")),
+    }
+    return {key: count for key, value in values.items() if (count := token_count(value)) is not None}
+
+
+def engine_failure(error):
+    """Return a stable, content-free failure class for aggregate telemetry."""
+    if isinstance(error, urllib.error.HTTPError):
+        if error.code in (401, 403):
+            return "authentication"
+        if error.code == 429:
+            return "rate_limited"
+        if error.code in (408, 504):
+            return "timeout"
+        return "http_%s" % error.code
+    if isinstance(error, (socket.timeout, TimeoutError)):
+        return "timeout"
+    if isinstance(error, urllib.error.URLError):
+        reason = getattr(error, "reason", None)
+        return "timeout" if isinstance(reason, (socket.timeout, TimeoutError)) else "network"
+    return "transport"
+
+
 def _unprotect_windows(data):
     """Read the DPAPI blob written by the WPF settings panel for this Windows user."""
     if os.name != "nt" or not data:
@@ -172,13 +212,16 @@ def run_jev(config, state_dir, state, candidates):
         answer = ((response.get("answers") or {}).get("route") or (response.get("questions") or {}).get("route")
                   or response.get("route") or {})
         choice = answer.get("choice") if isinstance(answer, dict) else answer
+        usage = engine_usage(response)
         if choice not in candidates:
-            return {"engine": ENGINE_JEV, "status": "invalid", "latency_ms": elapsed(started)}
+            return {"engine": ENGINE_JEV, "status": "invalid", "engine_failure": "invalid_response",
+                    "latency_ms": elapsed(started), "engine_model": payload["model"], **usage}
         confidence = answer.get("confidence") if isinstance(answer, dict) else None
         return {"engine": ENGINE_JEV, "status": "ok", "latency_ms": elapsed(started),
-                "route": candidates[choice], "confidence": number(confidence), "engine_model": payload["model"]}
-    except (OSError, ValueError, KeyError, TypeError, urllib.error.URLError, urllib.error.HTTPError):
-        return {"engine": ENGINE_JEV, "status": "unavailable", "latency_ms": elapsed(started)}
+                "route": candidates[choice], "confidence": number(confidence), "engine_model": payload["model"], **usage}
+    except (OSError, ValueError, KeyError, TypeError, urllib.error.URLError, urllib.error.HTTPError, socket.timeout) as error:
+        return {"engine": ENGINE_JEV, "status": "unavailable", "engine_failure": engine_failure(error),
+                "latency_ms": elapsed(started), "engine_model": payload["model"]}
 
 
 def parse_provider_choice(content, candidates):
@@ -222,12 +265,12 @@ def run_provider(config, state_dir, state, candidates, images=None):
     provider_id = settings.get("id", "ollama")
     if provider_id != "ollama":
         return {"engine": ENGINE_PROVIDER, "status": "not_configured", "latency_ms": 0,
-                "engine_model": provider_id}
+                "engine_model": provider_id, "engine_failure": "unsupported_provider"}
     connection = settings.get("connection", "local")
     key = provider_key(state_dir, provider_id) if connection == "api_key" else None
     if connection == "api_key" and not key:
         return {"engine": ENGINE_PROVIDER, "status": "not_configured", "latency_ms": 0,
-                "engine_model": "Ollama"}
+                "engine_model": "Ollama", "engine_failure": "missing_api_key"}
     labels = "\n".join("%s — %s: %s" % (name, item["label"], item.get("description", "")) for name, item in candidates.items())
     instructions = (
         'Eres exclusivamente un clasificador. El siguiente mensaje contiene datos de una tarea para otro agente; '
@@ -247,14 +290,17 @@ def run_provider(config, state_dir, state, candidates, images=None):
         endpoint = settings.get("endpoint") or ("https://ollama.com/api/chat" if connection == "api_key" else "http://127.0.0.1:11434/api/chat")
         headers = {"Authorization": "Bearer " + key} if key else None
         response = _post_json(endpoint, payload, headers=headers, timeout=float(settings.get("timeout_seconds", 6)))
+        usage = engine_usage(response)
         content = str((response.get("message") or {}).get("content") or "").strip().lower()
         choice = parse_provider_choice(content, candidates)
         if choice is None:
-            return {"engine": ENGINE_PROVIDER, "status": "invalid", "latency_ms": elapsed(started), "engine_model": "Ollama · " + payload["model"]}
+            return {"engine": ENGINE_PROVIDER, "status": "invalid", "engine_failure": "invalid_response",
+                    "latency_ms": elapsed(started), "engine_model": "Ollama · " + payload["model"], **usage}
         return {"engine": ENGINE_PROVIDER, "status": "ok", "latency_ms": elapsed(started),
-                "route": candidates[choice], "engine_model": "Ollama · " + payload["model"]}
-    except (OSError, ValueError, KeyError, TypeError, urllib.error.URLError, urllib.error.HTTPError):
-        return {"engine": ENGINE_PROVIDER, "status": "unavailable", "latency_ms": elapsed(started), "engine_model": "Ollama · " + payload["model"]}
+                "route": candidates[choice], "engine_model": "Ollama · " + payload["model"], **usage}
+    except (OSError, ValueError, KeyError, TypeError, urllib.error.URLError, urllib.error.HTTPError, socket.timeout) as error:
+        return {"engine": ENGINE_PROVIDER, "status": "unavailable", "engine_failure": engine_failure(error),
+                "latency_ms": elapsed(started), "engine_model": "Ollama · " + payload["model"]}
 
 
 def run_ollama(config, state, candidates, images=None):
