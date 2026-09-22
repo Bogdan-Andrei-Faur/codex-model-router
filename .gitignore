@@ -4,3 +4,4 @@ dist/
 state/
 config.local.json
 *.lnk
+.DS_Store

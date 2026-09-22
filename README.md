@@ -4,6 +4,22 @@ Elige modelo y razonamiento antes de cada nuevo mensaje enviado a Codex. Sigue
 usando la app y la suscripción actuales. Puede decidir mediante reglas locales,
 Jev o un clasificador de Ollama Cloud.
 
+## macOS
+
+El puente de Python funciona en Windows y macOS. En Mac hay un lanzador y un
+monitor nativo AppKit propios. Instrucciones, alcance y límites:
+[Preparar y usar en macOS](docs/MACOS.md).
+
+```sh
+python3 macos.py doctor
+python3 macos.py setup
+```
+
+Después de terminar tus tareas y cerrar Codex por completo, abre
+`dist/Codex automático.app`. No muevas esta app fuera de `dist`: el acceso usa
+esta copia del proyecto. Puedes crear un alias. El uso descrito a continuación
+corresponde al monitor de Windows.
+
 **Monitor versión 15.** La interfaz se puede actualizar sin cerrar Codex ni
 interrumpir sus tareas. Los accesos del escritorio apuntan a la versión actual.
 Los cambios del selector, cuando los haya, se cargan al volver a abrir Codex
@@ -107,10 +123,12 @@ criterios y sus límites.
 
 **Reglas locales** es el modo inicial: decide sin enviar el mensaje a ningún
 proveedor adicional. **Jev** usa el clasificador estructurado de TypeSafe y
-requiere una clave que se introduce desde Ajustes; la clave se cifra con la
-protección de Windows para este usuario y se guarda dentro de `state/`, fuera de
-Git. **Proveedor** es el motor preparado para servicios externos: Ollama es el
-primer conector y otros podrán añadirse desde la misma sección.
+permite elegir entre TypeSafe directo y Vercel AI Gateway. En Vercel utiliza el
+modelo virtual `vmc/jev`; la conexión directa conserva `jev-latest`. Requiere una
+clave introducida desde Ajustes. En Windows se cifra con DPAPI dentro de
+`state/`; en macOS se guarda en el llavero. **Proveedor** es el motor preparado
+para servicios externos: Ollama es el primer conector y otros podrán añadirse
+desde la misma sección.
 
 Para Ollama puedes usar la sesión ya iniciada en su aplicación local o conectar
 directamente con una clave API. La clave se cifra con la protección de Windows,

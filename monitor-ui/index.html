@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Codex automático</title><link rel="stylesheet" href="monitor.css"></head>
+<body class="compact"><main id="surface" aria-label="Monitor de Codex">
+<section id="compact"><div id="peek" hidden></div><div class="capsule-bar"><img class="logo" src="codex.png" alt="Codex automático"><div class="crew"><div id="agents"></div><div id="count">Sin tareas activas</div></div><div class="divider"><button id="expand" class="icon" aria-label="Desplegar panel lateral"><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M8 4 2 10 8 16"/></svg></button></div></div></section>
+<section id="expanded" hidden><header><img class="logo" src="codex.png" alt=""><div class="header-copy"><h1>Codex automático</h1><div id="connection"><i class="pulse"></i><span>Esperando conexión</span></div></div><button id="collapse" class="icon" aria-label="Volver a vista compacta"><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M4 4 10 10 4 16"/></svg></button><button id="hide" class="icon" aria-label="Ocultar monitor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7 17 17M17 7 7 17"/></svg></button></header>
+<nav aria-label="Vistas"><button data-tab="activity" class="selected">Actividad</button><button data-tab="history">Historial</button><button data-tab="statistics">Estadísticas</button><button data-tab="settings">Ajustes</button></nav>
+<div id="pages"><section id="activity" class="page"></section><section id="history" class="page" hidden></section><section id="statistics" class="page" hidden></section><section id="settings" class="page" hidden></section></div>
+<footer><button id="pause">Ⅱ &nbsp; Pausar selección</button><span id="feedback" role="status"></span></footer></section>
+</main><script src="core.js"></script><script src="monitor.js"></script></body></html>

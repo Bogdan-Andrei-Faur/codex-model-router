@@ -12,17 +12,19 @@ import subprocess
 import sys
 import threading
 import time
-import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
-WRAPPER = ROOT / "dist" / "codex-router-v18.exe"
+sys.path.insert(0, str(ROOT))
+from platform_support import creation_flags
+WRAPPER = ROOT / "dist" / ("codex-router-v18.exe" if os.name == "nt" else "codex-router")
 
 
 class Client:
     def __init__(self, command=None):
-        self.p = subprocess.Popen(command or [str(WRAPPER), "app-server"],
+        self.started_at = time.time()
+        self.p = subprocess.Popen(command or [str(WRAPPER), "-c", "model_reasoning_effort=\"high\"", "app-server", "--analytics-default-enabled"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            creationflags=subprocess.CREATE_NO_WINDOW)
+            creationflags=creation_flags())
         self.messages = queue.Queue()
         self.sequence = 0
         self.notifications = []
@@ -112,7 +114,7 @@ def main():
     parser.add_argument("--live", action="store_true")
     args = parser.parse_args()
     version = subprocess.run([str(WRAPPER), "--version"],
-        capture_output=True, timeout=15, creationflags=subprocess.CREATE_NO_WINDOW)
+        capture_output=True, timeout=15, creationflags=creation_flags())
     assert version.returncode == 0 and b"codex-cli" in version.stdout
     report = {"version": version.stdout.decode().strip(), "live": args.live}
     client = Client()
@@ -121,6 +123,11 @@ def main():
                                   "capabilities": {"experimentalApi": True}})
         client.send({"method": "initialized", "params": {}})
         models = client.call("model/list", {})
+        if os.name != "nt":
+            snapshot = json.loads((ROOT / "state" / ("status-%s.json" % client.p.pid)).read_text(encoding="utf-8"))
+            assert snapshot.get("heartbeat", 0) >= client.started_at - 1, "Bridge snapshot is stale"
+            assert any(event.get("event") == "bridge_started" for event in snapshot.get("events", [])), "Desktop-style invocation bypassed the bridge"
+            print("Desktop-style global -c arguments use the routing bridge: OK", flush=True)
         report["models"] = [m["model"] for m in models["data"] if m["model"].startswith("gpt-")]
         (ROOT / "state" / "catalog.json").write_text(json.dumps({"checked": time.time(), "models": {
             m["model"]: [e["reasoningEffort"] for e in m.get("supportedReasoningEfforts", [])]
@@ -131,6 +138,7 @@ def main():
         assert report["account_type"] == "chatgpt", "This test requires the existing ChatGPT subscription"
         print("Native handshake, model catalog and ChatGPT account: OK", flush=True)
         if args.live:
+            import tomllib  # Only the optional live test requires Python 3.11+.
             overrides = {"features.shell_tool": False, "features.web_search": False,
                          "features.code_mode": False, "features.code_mode_host": False}
             # Read only server names; no credentials/values enter logs or reports.

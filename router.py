@@ -1,4 +1,4 @@
-"""Transparent JSONL bridge to the installed Codex app-server on Windows.
+"""Transparent JSONL bridge to the installed Codex app-server on Windows/macOS.
 
 Only model/effort in eligible turn/start requests are changed. All other bytes
 and server output are forwarded. No credential loading, network gateway, prompt
@@ -7,6 +7,7 @@ replay, transcript editing, or additional model requests are involved.
 import copy
 import json
 import os
+import signal
 from pathlib import Path
 import subprocess
 import sys
@@ -17,6 +18,7 @@ import uuid
 from routing import DEFAULT_ROUTES, EFFORTS, classify_agent_identity, select_route_details, has_attachments, user_text
 from decision_engines import ENGINES, ENGINE_JEV, ENGINE_OLLAMA, ENGINE_PROVIDER, ENGINE_RULES, attachment_summary, build_state, candidate_routes, inline_images, run_jev, run_provider
 from thread_inventory import ThreadInventory
+from platform_support import backend_path, creation_flags, uses_stdio, stop_backend, input_lines
 
 ROOT = Path(__file__).resolve().parent
 
@@ -524,34 +526,36 @@ def main():
     config_path = Path(os.environ.get("PERSONAL_CODEX_ROUTER_CONFIG", ROOT / "config.local.json"))
     try:
         config = read_config(config_path)
-        binary = Path(config["codex"]).resolve(strict=True)
-        if binary.name.lower() != "codex.exe":
-            raise ValueError("Unexpected backend filename")
-    except (ValueError, KeyError, OSError):
+        binary = backend_path(config)
+    except (ValueError, KeyError, TypeError, OSError):
         # Don't expose config or credential-bearing arguments in diagnostics.
         print("Personal router: backend configuration is unavailable.", file=sys.stderr)
         return 1
     args = sys.argv[1:]
     # Other CLI commands, including version/schema, remain the original program.
-    is_server = "app-server" in args and not any(
-        x in args for x in ("daemon", "proxy", "generate-ts", "generate-json-schema"))
+    is_server = uses_stdio(args)
     env = dict(os.environ)
     env.pop("PERSONAL_CODEX_ROUTER_CONFIG", None)
+    env.pop("CODEX_CLI_PATH", None)
     # Desktop removes this identity when it sees a custom executable. Our child
     # is still its original installed engine, so preserve that original identity.
     family = config.get("windows_sandbox_package_family")
-    if family:
+    if family and os.name == "nt":
         env["CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY"] = family
-    flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+    flags = creation_flags()
     if not is_server:
         return subprocess.call([str(binary), *args], env=env, creationflags=flags,
                                stdin=sys.stdin.buffer, stdout=sys.stdout.buffer, stderr=sys.stderr.buffer)
-    if any(x.startswith(("ws://", "unix://")) for x in args):
-        return subprocess.call([str(binary), *args], env=env, creationflags=flags,
-                               stdin=sys.stdin.buffer, stdout=sys.stdout.buffer, stderr=sys.stderr.buffer)
     proc = subprocess.Popen([str(binary), *args], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, env=env, creationflags=flags)
-    router = Router(config_path)
+                            stderr=subprocess.PIPE, env=env, creationflags=flags,
+                            start_new_session=os.name != "nt")
+    if os.name != "nt":
+        def interrupted(signum, frame):
+            stop_backend(proc)
+            raise SystemExit(128 + signum)
+        signal.signal(signal.SIGTERM, interrupted)
+        signal.signal(signal.SIGINT, interrupted)
+    router = Router(config_path, os.environ.get("PERSONAL_CODEX_ROUTER_STATE"))
     router.log({"event": "bridge_started", "backend_pid": proc.pid})
     heartbeat_stop = threading.Event()
     write_lock = threading.Lock()
@@ -580,9 +584,9 @@ def main():
 
     def input_worker():
         try:
-            for line in sys.stdin.buffer:
+            for line in input_lines(sys.stdin.buffer, heartbeat_stop):
                 write_native(router.client_line(line))
-        except (BrokenPipeError, OSError):
+        except (ValueError, BrokenPipeError, OSError):
             pass
         finally:
             try:
@@ -591,7 +595,8 @@ def main():
             except OSError:
                 pass
 
-    threading.Thread(target=input_worker, daemon=True).start()
+    input_thread = threading.Thread(target=input_worker, daemon=True)
+    input_thread.start()
     stderr_worker = threading.Thread(target=copy_bytes, args=(proc.stderr, sys.stderr.buffer), daemon=True)
     stderr_worker.start()
     try:
@@ -607,14 +612,14 @@ def main():
                     pass
     except (BrokenPipeError, OSError):
         if proc.poll() is None:
-            proc.terminate()
+            stop_backend(proc)
     finally:
         heartbeat_stop.set()
+        input_thread.join(timeout=1)
         try:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            proc.terminate()
-            proc.wait(timeout=5)
+            stop_backend(proc)
         stderr_worker.join(timeout=1)
         router.log({"event": "bridge_stopped", "exit_code": proc.returncode})
         if proc.returncode:

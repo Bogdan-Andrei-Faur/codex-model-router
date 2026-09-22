@@ -1,5 +1,121 @@
 # Validation and integration notes
 
+## macOS visual fidelity follow-up — 2026-09-22
+
+The owner identified visual omissions after functional acceptance. Compared
+`MonitorWpf.cs`, `MonitorAnalytics.cs` and `MonitorAgents.cs` against all four
+Mac pages, capsule and avatar detail. Functional acceptance alone had not
+established complete visual parity.
+
+| Area | Restored on macOS |
+| --- | --- |
+| Explanation cards | Original 3-point left rail: lilac `#C7BBFF` for model, green `#93D2AD` for effort; matching headings, `Panel2` background, 13-point medium-weight ink text, original padding and 16-point corners. Other explanation cards use a neutral rail. |
+| Expand/collapse | Matching SVG chevrons mirrored horizontally, with identical dimensions, stroke and rounded caps. The compact action retains its original icon. |
+| Badges and header | 12-point badge text, original padding, model/effort tooltips and 40/36/36-point header control columns. |
+| History | Compact title/date with badges on the right, 16-point detail title, original detail height, rating heading and separate clear action; telemetry grouped in explanation cards. |
+| Statistics | Effort-specific bar colors, neutral engine colors, original vertical density and rated-decision count. |
+| Avatars | Transparent-to-model-color orbit gradient, original 8-point effort dot with 1-point outline, 34-point overflow control and 420 ms width/fade/slide transitions. |
+| Avatar detail | Colored category above title, original spacing and bottom divider, height measured from its contents. |
+| Settings and shell | Original policy-row sizing and text size, original shell shadow opacity; existing palette, rounded controls, scrollbars and anchored shell preserved. |
+
+Verified JavaScript syntax, all seven existing monitor-core test groups, native
+build and actual AppKit/WebKit screenshots in an isolated eight-task preview:
+capsule/overflow, avatar detail, activity, history cards/list, statistics,
+settings policy rows and clicking the corrected collapse button. The original
+Windows runtime was not available for a fresh screenshot comparison; font
+rasterization and the native menu remain platform-specific. No routing code
+or provider choices changed in this follow-up.
+
+## macOS visual/functional port and real launch correction — 2026-09-22
+
+- The owner's actual Desktop launch used `-c value app-server` and the first Mac
+  detector silently passed through to the native engine. It now consumes known
+  global options before finding the subcommand, without matching a user prompt
+  containing `app-server`. Alternative transports remain untouched.
+- Native smoke now uses the actual global-option arrangement and requires a
+  fresh `bridge_started` snapshot for its own bridge PID. Handshake/catalog/account
+  success alone is no longer enough. This strengthened smoke passed, as did
+  the read-only background inventory test with global `-c` arguments.
+- Replaced the basic AppKit text panel with a borderless native AppKit/WebKit
+  monitor using local bundle assets only. Surface dimensions, 26-point corners,
+  model/effort palettes, 44-point avatars, category glyphs, 5+N overflow and
+  420 ms transitions derive from the current Windows implementation. Native
+  window envelope is fixed; transparent unused space passes clicks through.
+- Implemented capsule peek, stable surviving-agent order, all four views,
+  persisted/removable ratings, recovered-history merge, applied-engine metrics,
+  comparisons and provider settings. Task/telemetry strings use DOM text nodes.
+  UI preferences persist separately from routing configuration. Metadata I/O is
+  off the main queue and unchanged data is not resent to the web surface.
+- Added Keychain storage for explicitly entered classifier keys and a scoped,
+  timeout-bounded Python reader. No real credentials were entered, migrated or
+  read for validation. Keychain lookup tests use mocks; first-use OS authorization
+  and real external classifier calls remain untested.
+- `python3 -m unittest discover -s tests -q`: 57 passing tests.
+  `node --test tests/test_monitor_core.cjs`: 7 passing groups covering history
+  replay, clearing ratings without changing chronology, pending settings/live
+  usage, applied versus comparison engines, stable agents, category identities
+  and badge contrast.
+- Native compilation targeting macOS 12+ on Apple Silicon passed. Inspected
+  actual native capsule/panel screenshots with eight isolated synthetic agents.
+  Verified five avatars plus `+3`, opened an agent's attached detail, opened the
+  panel via `+3`, and checked the shared anchor, palette, activity rows and
+  scrolling overflow visually. The fixture is explicitly labelled as simulated.
+- After unlocking the Mac, verified Activity → History navigation, adequate
+  rating write and removal with journal readback, and rating/statistics survival
+  across a native monitor restart. Retention and topmost preferences also
+  survived restart. Verified pause/resume, conditional provider controls,
+  restored fixture settings, and Escape returning to the compact capsule.
+  All mutations used an isolated synthetic preview; no real provider was called.
+  Returned the installed monitor to the real workspace afterward.
+- Reduced-motion CSS is implemented but the OS preference was not changed
+  during validation. Code tests and these interactions do not prove compositor
+  smoothness on every display. Do not claim pixel-for-pixel Windows equality:
+  macOS uses its system font, menu bar and system menu.
+- Final real integration passed after a full launch through Codex automático.
+  The observed process chain was ChatGPT PID 62125 → router PID 62549 → native
+  engine PID 62559, with the actual global `-c value app-server` arguments.
+  This user turn produced `bridge_started`, `routed`, `native_settings` and
+  `turn_accepted` events for the same decision, followed by usage telemetry.
+  The native monitor simultaneously showed the real task as Sol / Medio,
+  working and accepted by Codex. This validates activation for the installed
+  Apple Silicon Desktop build without making an artificial test inference.
+
+The following section describes the earlier baseline, not the final monitor.
+
+## macOS port — 2026-09-22
+
+- Built the native AppKit monitor on Apple Silicon with Swift, targeting macOS
+  12+. The installer found `/Applications/ChatGPT.app/Contents/Resources/codex`.
+  Intel hardware and older macOS releases were not exercised.
+- All 55 Python unit tests pass with the system Python 3.9.6. New regressions
+  cover POSIX executable discovery, paths/arguments with spaces and quotes,
+  stdio transport selection, atomic configuration updates, refusing to relaunch
+  an open Desktop, unchanged protocol bytes and backend cleanup on SIGTERM.
+- The SIGTERM regression initially exposed Python aborting during interpreter
+  shutdown while a daemon held buffered stdin. POSIX input now uses interruptible
+  descriptor reads, and the worker is joined during shutdown. The test passes.
+- `python3 tests/smoke_native.py` passed native version, initialize handshake,
+  model catalog, ChatGPT account-type check and clean shutdown. The installed
+  catalog includes the four configured routes and their configured effort levels.
+- `python3 tests/smoke_inventory.py` passed background pagination, task-title
+  synchronization, retained conversation and isolation of private replies.
+  Neither native check requested inference or changed conversations.
+- Inspected the actual monitor window through the native accessibility tree and
+  a window screenshot: labels and controls are legible. Clicked pause, verified
+  the paused settings, resumed, and verified History/Statistics empty states.
+  Configuration was restored to enabled local rules. AppKit bitmap exports do
+  not accurately capture all composited control materials on this macOS release;
+  the actual window screenshot was used for visual acceptance.
+- Generated local launcher and monitor bundles in ignored `dist/`. The existing
+  Desktop was left running. Loading the bridge through the launcher and observing
+  a real accepted user turn remain pending until the owner closes current work.
+- This is a functional Mac baseline, not WPF feature parity: animated capsule,
+  review ratings, recovered Windows history and advanced provider settings are
+  not implemented in the Mac monitor. DPAPI secrets are not migrated.
+
+See [macOS setup and limitations](MACOS.md). Historical Windows evidence follows;
+the Windows UI build was not rerun on this Mac.
+
 Date: 2026-09-21. Personal project; no Grimaldi implementation or Moontech task.
 
 ## Integration evidence

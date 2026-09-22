@@ -7,7 +7,7 @@ from smoke_native import Client, ROOT
 
 
 def main():
-    client = Client([sys.executable, str(ROOT / "router.py"), "app-server"])
+    client = Client([sys.executable, str(ROOT / "router.py"), "-c", 'model_reasoning_effort="high"', "app-server"])
     try:
         client.call("initialize", {"clientInfo": {"name": "router_inventory_smoke", "version": "1.0"}})
         # Reproduce Desktop integrations where the follow-up acknowledgement is

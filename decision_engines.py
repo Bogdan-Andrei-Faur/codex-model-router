@@ -8,10 +8,13 @@ import base64
 import ctypes
 from ctypes import wintypes
 import json
+import hashlib
 import os
 from pathlib import Path
 import re
 import socket
+import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -23,6 +26,8 @@ ENGINE_PROVIDER = "provider"
 # Kept only to interpret historical local configuration from the first release.
 ENGINE_OLLAMA = "ollama"
 ENGINES = (ENGINE_RULES, ENGINE_JEV, ENGINE_PROVIDER, ENGINE_OLLAMA)
+_KEYCHAIN_TIMEOUT_SECONDS = 45
+_KEYCHAIN_CACHE = {}
 
 
 def attachment_summary(items):
@@ -123,8 +128,8 @@ def engine_usage(response):
     usage = response.get("usage") if isinstance(response, dict) else None
     usage = usage if isinstance(usage, dict) else {}
     values = {
-        "engine_input_tokens": usage.get("input_tokens", usage.get("prompt_tokens", response.get("prompt_eval_count") if isinstance(response, dict) else None)),
-        "engine_output_tokens": usage.get("output_tokens", usage.get("completion_tokens", response.get("eval_count") if isinstance(response, dict) else None)),
+        "engine_input_tokens": usage.get("input_tokens", usage.get("inputTokens", usage.get("prompt_tokens", response.get("prompt_eval_count") if isinstance(response, dict) else None))),
+        "engine_output_tokens": usage.get("output_tokens", usage.get("outputTokens", usage.get("completion_tokens", response.get("eval_count") if isinstance(response, dict) else None))),
         "engine_cached_tokens": usage.get("cached_input_tokens", usage.get("cached_tokens")),
     }
     return {key: count for key, value in values.items() if (count := token_count(value)) is not None}
@@ -133,8 +138,10 @@ def engine_usage(response):
 def engine_failure(error):
     """Return a stable, content-free failure class for aggregate telemetry."""
     if isinstance(error, urllib.error.HTTPError):
-        if error.code in (401, 403):
+        if error.code == 401:
             return "authentication"
+        if error.code == 403:
+            return "forbidden"
         if error.code == 429:
             return "rate_limited"
         if error.code in (408, 504):
@@ -169,11 +176,44 @@ def _unprotect_windows(data):
         kernel32.LocalFree(target.pbData)
 
 
-def jev_key(state_dir):
+def _keychain_key(state_dir, provider):
+    """Read and cache an authorized classifier key; never log its value."""
+    if sys.platform != "darwin" or provider not in ("jev", "ollama"):
+        return None
+    state = Path(state_dir).resolve()
+    root = str(state.parent)
+    service = "local.codex-model-router." + hashlib.sha256(root.encode("utf-8")).hexdigest()
+    try:
+        revisions = json.loads((state / "keychain-revision.json").read_text(encoding="utf-8"))
+        revision = revisions.get(provider) if isinstance(revisions, dict) else None
+    except (OSError, UnicodeError, ValueError):
+        revision = None
+    cache_key = (service, provider)
+    cached = _KEYCHAIN_CACHE.get(cache_key)
+    if cached and cached[0] == revision:
+        return cached[1]
+    try:
+        result = subprocess.run(["/usr/bin/security", "find-generic-password", "-s", service,
+                                 "-a", provider, "-w"], capture_output=True,
+                                timeout=_KEYCHAIN_TIMEOUT_SECONDS)
+        value = result.stdout.decode("utf-8").strip() if result.returncode == 0 else ""
+        if value:
+            _KEYCHAIN_CACHE[cache_key] = (revision, value)
+            return value
+        return None
+    except (OSError, UnicodeError, subprocess.TimeoutExpired):
+        return None
+
+
+def jev_key(state_dir, connection="typesafe"):
     """Environment variables are useful for development; production key stays DPAPI-protected."""
-    value = os.environ.get("PERSONAL_CODEX_JEV_API_KEY") or os.environ.get("TYPESAFE_API_KEY")
+    value = os.environ.get("PERSONAL_CODEX_JEV_API_KEY")
+    if not value:
+        value = os.environ.get("AI_GATEWAY_API_KEY") if connection == "vercel" else os.environ.get("TYPESAFE_API_KEY")
     if value:
         return value.strip()
+    if sys.platform == "darwin":
+        return _keychain_key(state_dir, "jev")
     try:
         return _unprotect_windows((Path(state_dir) / "jev.secret").read_bytes())
     except OSError:
@@ -186,6 +226,8 @@ def provider_key(state_dir, provider_id):
         value = os.environ.get("OLLAMA_API_KEY")
         if value:
             return value.strip()
+    if sys.platform == "darwin":
+        return _keychain_key(state_dir, provider_id)
     try:
         return _unprotect_windows((Path(state_dir) / (provider_id + ".secret")).read_bytes())
     except OSError:
@@ -194,20 +236,30 @@ def provider_key(state_dir, provider_id):
 
 def run_jev(config, state_dir, state, candidates):
     started = time.perf_counter()
-    key = jev_key(state_dir)
+    settings = config.get("jev") or {}
+    connection = settings.get("connection", "typesafe")
+    if connection == "vercel":
+        default_endpoint = "https://ai-gateway.vercel.sh/v1/evaluate"
+        default_model = "vmc/jev"
+    elif connection == "typesafe":
+        default_endpoint = "https://api.typesafe.ai/v1/systemone"
+        default_model = "jev-latest"
+    else:
+        return {"engine": ENGINE_JEV, "status": "not_configured", "latency_ms": 0,
+                "engine_failure": "unsupported_connection"}
+    key = jev_key(state_dir, connection)
     if not key:
         return {"engine": ENGINE_JEV, "status": "not_configured", "latency_ms": 0}
-    settings = config.get("jev") or {}
     criteria = {name: "%s: %s" % (item["label"], item["description"]) for name, item in candidates.items()}
     payload = {
-        "model": settings.get("model", "jev-latest"),
+        "model": settings.get("model") or default_model,
         "state": state,
         "questions": {"route": {"type": "choice", "instructions":
             "Elige la combinación de modelo Codex y razonamiento más pequeña que mantenga buena calidad. "
             "Si hay adjuntos o una tarea visual, no infravalores la capacidad necesaria.", "criteria": criteria}},
     }
     try:
-        response = _post_json(settings.get("endpoint", "https://api.typesafe.ai/v1/systemone"), payload,
+        response = _post_json(settings.get("endpoint") or default_endpoint, payload,
                               {"Authorization": "Bearer " + key}, float(settings.get("timeout_seconds", 4)))
         answer = ((response.get("answers") or {}).get("route") or (response.get("questions") or {}).get("route")
                   or response.get("route") or {})
