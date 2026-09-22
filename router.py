@@ -16,6 +16,7 @@ import uuid
 
 from routing import DEFAULT_ROUTES, EFFORTS, classify_agent_identity, select_route_details, has_attachments, user_text
 from decision_engines import ENGINES, ENGINE_JEV, ENGINE_OLLAMA, ENGINE_PROVIDER, ENGINE_RULES, attachment_summary, build_state, candidate_routes, inline_images, run_jev, run_provider
+from thread_inventory import ThreadInventory
 
 ROOT = Path(__file__).resolve().parent
 
@@ -43,6 +44,7 @@ class Router:
         self.thread_categories = self.load_thread_categories()
         self.history_writes = 0
         self.stats = {"accepted": 0, "non_astra": 0}
+        self.inventory = ThreadInventory()
 
     def load_thread_categories(self):
         """Recover only safe identity metadata, never prompt content, after restart."""
@@ -132,7 +134,8 @@ class Router:
             target = self.state_dir / ("status-%s.json" % os.getpid())
             temp = target.with_suffix(".tmp")
             temp.write_text(json.dumps({"version": 2, "pid": os.getpid(), "events": self.events,
-                                       "heartbeat": time.time(), "threads": self.threads,
+                                       "heartbeat": time.time(), "threads": self.inventory.visible(self.threads),
+                                       "inventory_synced_at": self.inventory.synced_at,
                                        "catalog": {m: sorted(e) for m, e in self.catalog.items()},
                                        "stats": self.stats},
                                        ensure_ascii=False, indent=2), encoding="utf-8")
@@ -146,6 +149,15 @@ class Router:
             if not isinstance(message, dict):
                 return
             with self.lock:
+                owned, next_page = self.inventory.consume(message)
+                if owned:
+                    if next_page:
+                        self.outbound.append(next_page)
+                    else:
+                        for tid, name in self.inventory.names.items():
+                            if tid in self.threads:
+                                self.threads[tid]["name"] = name
+                    return False
                 if "method" not in message and message.get("id") in self.internal_requests:
                     self.internal_requests.discard(message["id"])
                     if "error" in message:
@@ -170,6 +182,7 @@ class Router:
                                 "model": old.get("model") if old.get("confirmation") == "Aceptado por Codex" else result.get("model", thread.get("model", old.get("model"))),
                                 "name": thread.get("name") or thread.get("agentNickname") or old.get("name") or tid[:8],
                                 "parent": thread.get("parentThreadId"),
+                                "ephemeral": thread.get("ephemeral", False),
                                 "effort": old.get("effort") if old.get("confirmation") == "Aceptado por Codex" else result.get("reasoningEffort") or thread.get("reasoningEffort") or old.get("effort"),
                                 "status": thread.get("status", {}).get("type", "unknown"),
                                 "confirmation": old.get("confirmation", "Configurado; sin envío observado"),
@@ -208,6 +221,7 @@ class Router:
                             self.outbound.append({"id": rid, "method": "thread/settings/update", "params": sync})
                 method = message.get("method")
                 params = message.get("params") or {}
+                self.inventory.notification(method, params)
                 tid = params.get("threadId")
                 if method == "turn/started":
                     self.active.add(tid)
@@ -234,7 +248,8 @@ class Router:
                     thread = params.get("thread", {})
                     if thread.get("id"):
                         row = self.threads.setdefault(thread["id"], {})
-                        row.update(name=thread.get("name") or thread.get("agentNickname") or thread["id"][:8],
+                        row.update(name=thread.get("name") or thread.get("agentNickname") or row.get("name") or thread["id"][:8],
+                                   ephemeral=thread.get("ephemeral", False),
                                    parent=thread.get("parentThreadId"), updated=time.time())
                         if thread.get("model"):
                             row.setdefault("model", thread["model"])
@@ -294,6 +309,8 @@ class Router:
             if not isinstance(params, dict):
                 return raw
             with self.lock:
+                if method == "initialized":
+                    self.inventory.ready = True
                 if "id" in message and method in (
                         "model/list", "thread/start", "thread/resume", "thread/read", "turn/start"):
                     self.requests[message["id"]] = (method, params)
@@ -525,20 +542,29 @@ def main():
     router = Router(config_path)
     router.log({"event": "bridge_started", "backend_pid": proc.pid})
     heartbeat_stop = threading.Event()
-    def heartbeat_worker():
-        while not heartbeat_stop.wait(2):
-            with router.lock:
-                # Keep liveness fresh without growing the event history.
-                previous_events = list(router.events)
-                router.log({"event": "heartbeat"})
-                router.events = previous_events
-    threading.Thread(target=heartbeat_worker, daemon=True).start()
     write_lock = threading.Lock()
 
     def write_native(data):
         with write_lock:
             proc.stdin.write(data)
             proc.stdin.flush()
+
+    def heartbeat_worker():
+        while not heartbeat_stop.wait(2):
+            with router.lock:
+                request = router.inventory.poll(router.threads)
+                if request:
+                    router.outbound.append(request)
+                # Keep liveness fresh without growing the event history.
+                previous_events = list(router.events)
+                router.log({"event": "heartbeat"})
+                router.events = previous_events
+            for command in router.drain_outbound():
+                try:
+                    write_native((json.dumps(command) + "\n").encode())
+                except (ValueError, BrokenPipeError, OSError):
+                    return
+    threading.Thread(target=heartbeat_worker, daemon=True).start()
 
     def input_worker():
         try:

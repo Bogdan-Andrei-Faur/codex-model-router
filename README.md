@@ -177,6 +177,11 @@ suscripción. La calidad y el ahorro real requieren observar tareas representati
 
 - Observa las tareas y los agentes cuyos eventos pasan por esta conexión local.
   No promete ver todos los agentes internos, otros equipos o ejecuciones autónomas.
+- Actividad y la cápsula contrastan las tareas observadas con el catálogo local
+  de Codex cada 15 segundos: actualizan los títulos y ocultan las conversaciones
+  archivadas o eliminadas. No añaden todas las conversaciones antiguas al monitor.
+  Las consultas son de metadatos, sin llamadas a modelos. Una consulta fallida o
+  incompleta conserva la última lista válida. El historial de decisiones se mantiene.
 - No cambia conversaciones de Ollama u otros proveedores ni modelos desconocidos.
 - Conserva adjuntos, instrucciones, herramientas y permisos. Si no puede decidir
   con un catálogo válido, deja pasar la petición original. No reintenta trabajos.

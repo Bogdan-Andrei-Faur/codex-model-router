@@ -350,6 +350,29 @@ explicit note when their separate reasoning explanation was not previously store
   routed instruction. Native review checks every stored category reaches a
   distinct catalog identity; Python tests verify privacy and restart behavior.
 
+## Activity catalog reconciliation — 2026-09-22
+
+- Activity and capsule snapshots reconcile observed threads with a complete,
+  paginated, non-archived `thread/list` catalog every approximately 15 seconds.
+  The catalog uses state metadata only; previews and transcript content are not
+  retained. Renames, archive/delete notifications, and unarchive are handled.
+- A partial page, timeout, malformed response, or API error never replaces the
+  last successful catalog. Late responses cannot undo lifecycle notifications.
+  Newly observed tasks and working ephemeral agents survive an in-flight scan.
+- Filtering changes monitor snapshots only. Routing context and persistent
+  decision journals remain intact. It does not populate Activity with all old
+  stored conversations or promise visibility of unobserved tasks/other hosts.
+- `python -m unittest discover -s tests -v`: 49 passing tests, including seven
+  reconciliation regressions for pagination/failure, lifecycle changes, privacy,
+  ephemeral agents, and unchanged history.
+- `python tests/smoke_inventory.py`: passed against the installed app-server;
+  automatic polling, title synchronization, existing-task retention, and private
+  reply isolation were checked without inference or conversation mutations.
+- `python tests/smoke_native.py`: native handshake, model catalog, ChatGPT
+  account and clean shutdown passed. No UI binaries changed; the Python bridge
+  update loads on the next full launch through Codex automático. The currently
+  running desktop connection was not restarted as part of validation.
+
 ## References and provenance
 
 This implementation is original. No upstream router source code was copied.

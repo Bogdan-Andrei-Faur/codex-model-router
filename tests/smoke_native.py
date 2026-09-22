@@ -19,8 +19,8 @@ WRAPPER = ROOT / "dist" / "codex-router-v18.exe"
 
 
 class Client:
-    def __init__(self):
-        self.p = subprocess.Popen([str(WRAPPER), "app-server"],
+    def __init__(self, command=None):
+        self.p = subprocess.Popen(command or [str(WRAPPER), "app-server"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             creationflags=subprocess.CREATE_NO_WINDOW)
         self.messages = queue.Queue()
