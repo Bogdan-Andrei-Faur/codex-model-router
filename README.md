@@ -182,6 +182,10 @@ suscripción. La calidad y el ahorro real requieren observar tareas representati
   archivadas o eliminadas. No añaden todas las conversaciones antiguas al monitor.
   Las consultas son de metadatos, sin llamadas a modelos. Una consulta fallida o
   incompleta conserva la última lista válida. El historial de decisiones se mantiene.
+- Los hilos efímeros internos que Codex usa para operaciones auxiliares, como la
+  generación automática de títulos, no aparecen como conversaciones ni pasan por
+  el enrutador. Conservan la configuración nativa de Codex. Los agentes secundarios
+  con una tarea principal identificada sí se muestran mientras están trabajando.
 - No cambia conversaciones de Ollama u otros proveedores ni modelos desconocidos.
 - Conserva adjuntos, instrucciones, herramientas y permisos. Si no puede decidir
   con un catálogo válido, deja pasar la petición original. No reintenta trabajos.

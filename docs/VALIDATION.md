@@ -373,6 +373,29 @@ explicit note when their separate reasoning explanation was not previously store
   update loads on the next full launch through Codex automático. The currently
   running desktop connection was not restarted as part of validation.
 
+### Desktop lifecycle and ephemeral-thread correction
+
+- A real Desktop run exposed two different records beside a new persisted task:
+  an ephemeral title helper that completed and an ephemeral root with no turn.
+  Neither represented a user conversation. The persisted root retained its real
+  title and routing decision.
+- Catalog reconciliation now becomes ready after the successful `initialize`
+  response. It still accepts the later `initialized` notification, but no longer
+  depends on observing it. This matches the authoritative server handshake and
+  fixes live snapshots that remained permanently unsynchronized.
+- Ephemeral roots without a parent are excluded from monitor snapshots and their
+  `turn/start` bytes are preserved unchanged. They create no routing decision and
+  keep Codex's native model/effort. Ephemeral collaboration agents remain visible
+  only while working and once linked to a parent task.
+- `python -m unittest discover -s tests -v`: 50 passing tests. The added protocol
+  regression proves an internal ephemeral root is neither rerouted nor persisted
+  as a decision. Inventory regressions cover hidden roots and visible active children.
+- `python tests/smoke_inventory.py`: passed against the installed app-server with
+  the `initialized` acknowledgement deliberately unobserved. Background catalog
+  synchronization still completed and private responses remained isolated.
+- `python tests/smoke_native.py`: native handshake, model catalog, ChatGPT account
+  and clean shutdown passed. No inference request was made by either smoke test.
+
 ## References and provenance
 
 This implementation is original. No upstream router source code was copied.

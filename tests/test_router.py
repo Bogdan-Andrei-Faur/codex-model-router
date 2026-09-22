@@ -200,6 +200,17 @@ class ProtocolTests(unittest.TestCase):
         raw = encode(self.request())
         self.assertEqual(self.router.client_line(raw), raw)
 
+    def test_internal_ephemeral_root_keeps_native_settings_and_creates_no_decision(self):
+        self.router.threads["helper"] = {"provider": "openai", "model": "gpt-5.6-luna",
+                                          "effort": "low", "ephemeral": True, "parent": None}
+        request = self.request("Generate a concise UI title", threadId="helper")
+        raw = encode(request)
+        self.assertEqual(self.router.client_line(raw), raw)
+        self.assertNotIn("helper", self.router.pending)
+        self.assertNotIn("helper", self.router.current_decisions)
+        self.assertFalse((Path(self.tmp.name) / "state" / "history.jsonl").exists())
+        self.assertEqual(self.router.threads["helper"]["model"], "gpt-5.6-luna")
+
     def test_pending_turn_does_not_reroute_a_second_message(self):
         self.router.client_line(encode(self.request()))
         raw = encode(self.request("Nueva tarea: investiga una migración"))

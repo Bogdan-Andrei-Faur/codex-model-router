@@ -168,7 +168,12 @@ class Router:
                 if request:
                     method, params = request
                     result = message.get("result") or {}
-                    if method == "model/list" and "error" not in message:
+                    if method == "initialize" and "error" not in message:
+                        # Some Desktop builds do not expose the follow-up
+                        # `initialized` notification through this bridge. The
+                        # successful handshake response is authoritative.
+                        self.inventory.ready = True
+                    elif method == "model/list" and "error" not in message:
                         for model in result.get("data", []):
                             self.catalog[model["model"]] = {
                                 e["reasoningEffort"] for e in model.get("supportedReasoningEfforts", [])}
@@ -312,11 +317,18 @@ class Router:
                 if method == "initialized":
                     self.inventory.ready = True
                 if "id" in message and method in (
-                        "model/list", "thread/start", "thread/resume", "thread/read", "turn/start"):
+                        "initialize", "model/list", "thread/start", "thread/resume", "thread/read", "turn/start"):
                     self.requests[message["id"]] = (method, params)
                 if method != "turn/start":
                     return raw
                 tid = params.get("threadId")
+                state = self.threads.get(tid, {})
+                if state.get("ephemeral") and not state.get("parent"):
+                    # Internal in-memory roots (for example automatic title
+                    # helpers) are not user tasks and must keep Codex's native
+                    # cheap configuration. Do not create decision telemetry.
+                    self.log({"event": "preserved", "reason": "internal_ephemeral", "thread": tid})
+                    return raw
                 if tid in self.active or tid in self.pending:
                     self.log({"event": "preserved", "reason": "active_turn", "thread": tid})
                     return raw

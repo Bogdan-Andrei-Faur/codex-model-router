@@ -10,7 +10,9 @@ def main():
     client = Client([sys.executable, str(ROOT / "router.py"), "app-server"])
     try:
         client.call("initialize", {"clientInfo": {"name": "router_inventory_smoke", "version": "1.0"}})
-        client.send({"method": "initialized", "params": {}})
+        # Reproduce Desktop integrations where the follow-up acknowledgement is
+        # not observable by the bridge. A successful initialize response must
+        # still activate catalog reconciliation.
         page = client.call("thread/list", {"limit": 1, "archived": False, "useStateDbOnly": True})
         thread = next(iter(page["data"]), None)
         if thread:

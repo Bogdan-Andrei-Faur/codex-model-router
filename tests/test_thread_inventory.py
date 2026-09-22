@@ -67,13 +67,14 @@ class ThreadInventoryTests(unittest.TestCase):
 
     def test_new_and_working_ephemeral_agents_are_not_hidden_mid_scan(self):
         self.rows["child"] = {"parent": "kept", "status": "inProgress"}
-        self.rows["ephemeral"] = {"ephemeral": True, "status": "active"}
+        self.rows["internal"] = {"ephemeral": True, "status": "active"}
+        self.rows["ephemeral_child"] = {"ephemeral": True, "parent": "kept", "status": "active"}
         req = self.inventory.poll(self.rows, now=0)
         self.rows["new"] = {"name": "Just created"}
         self.reply(req, [{"id": "kept"}])
-        self.assertEqual(set(self.inventory.visible(self.rows)), {"kept", "child", "ephemeral", "new"})
+        self.assertEqual(set(self.inventory.visible(self.rows)), {"kept", "child", "ephemeral_child", "new"})
         self.rows["child"]["status"] = "completed"
-        self.rows["ephemeral"]["status"] = "idle"
+        self.rows["ephemeral_child"]["status"] = "idle"
         self.assertEqual(set(self.inventory.visible(self.rows)), {"kept", "new"})
         req = self.inventory.poll(self.rows, now=16)
         self.inventory.consume({"id": req["id"], "error": {"code": -1}})
@@ -97,8 +98,11 @@ class ThreadInventoryTests(unittest.TestCase):
             router.threads = self.rows
             router.record_history("decision_created", thread="deleted", title="Historic title")
             history = (Path(folder) / "history.jsonl").read_bytes()
-            initialized = b'{"method":"initialized"}\n'
-            self.assertEqual(router.client_line(initialized), initialized)
+            initialize = b'{"id":1,"method":"initialize","params":{"clientInfo":{"name":"test","version":"1"}}}\n'
+            self.assertEqual(router.client_line(initialize), initialize)
+            self.assertFalse(router.inventory.ready)
+            self.assertTrue(router.server_line('{"id":1,"result":{"userAgent":"test"}}'))
+            self.assertTrue(router.inventory.ready)
             req = router.inventory.poll(router.threads, now=0)
             self.assertFalse(router.server_line(json.dumps({"id": req["id"], "result": {
                 "data": [{"id": "kept", "name": "Current"}], "nextCursor": None}})))

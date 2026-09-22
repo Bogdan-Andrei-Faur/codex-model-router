@@ -99,9 +99,16 @@ class ThreadInventory:
         for tid, row in threads.items():
             if tid in self.hidden or row.get("parent") in self.hidden:
                 continue
+            working = row.get("status") in ("active", "inProgress", "running", "pending")
+            if row.get("ephemeral"):
+                # Codex also creates in-memory root forks for internal work such
+                # as title generation. They are not user conversations. Real
+                # collaboration agents acquire a parent and remain visible only
+                # while they are actually working.
+                if not row.get("parent") or not working:
+                    continue
             if self.catalog is not None and tid not in self.catalog and tid in self.catalog_observed:
                 # Ephemeral agents have no persistent catalog entry while working.
-                working = row.get("status") in ("active", "inProgress", "running", "pending")
                 if not (working and (row.get("ephemeral") or row.get("parent") in self.catalog)):
                     continue
             rows[tid] = {**row}
