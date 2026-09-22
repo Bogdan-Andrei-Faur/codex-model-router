@@ -120,6 +120,10 @@ En todos los casos siguen mandando las instrucciones explícitas, el catálogo d
 Codex y los límites para auditorías, UI/UX y adjuntos. Si Jev o el proveedor no están
 configurados, no responden a tiempo o devuelven un formato no válido, se aplica
 la política local sin interrumpir el mensaje.
+El clasificador devuelve una única selección JSON. Si un modelo mezcla razonamiento
+con la respuesta final mediante `</think>`, se valida solo la respuesta posterior;
+no se deduce una elección de las alternativas mencionadas durante el razonamiento.
+Una selección inválida se identifica como tal, sin confundirla con falta de conexión.
 
 **Comparación en paralelo** permite incluir Reglas, Jev y Proveedor. El motor activo
 ya se registra y aparece marcado; las demás opciones se pueden añadir o quitar.

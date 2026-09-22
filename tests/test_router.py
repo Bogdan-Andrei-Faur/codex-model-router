@@ -150,6 +150,16 @@ class ProtocolTests(unittest.TestCase):
         self.assertIn("no estuvo disponible", self.router.threads["t"]["model_reason"])
 
     @patch("router.run_provider")
+    def test_invalid_provider_choice_is_not_presented_as_a_connection_failure(self, provider):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "provider"}))
+        provider.return_value = {"engine": "provider", "status": "invalid", "latency_ms": 2200}
+        result = json.loads(self.router.client_line(encode(self.request("Traduce hola al inglés"))))
+        self.assertEqual(result["params"]["model"], "gpt-5.6-luna")
+        self.assertIn("respondió sin una elección única válida", self.router.threads["t"]["model_reason"])
+        self.assertNotIn("no estuvo disponible", self.router.threads["t"]["model_reason"])
+        self.assertIn("respaldo local:", self.router.threads["t"]["effort_reason"])
+
+    @patch("router.run_provider")
     def test_rules_comparison_records_baseline_without_changing_provider_choice(self, provider):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES,
             "routing_engine": "provider", "comparison_engines": ["rules", "rules", "provider"]}))

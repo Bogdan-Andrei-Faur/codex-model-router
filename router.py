@@ -400,8 +400,10 @@ class Router:
                 engine_result["status"] = "guardrail"
         elif engine_name != ENGINE_RULES and external_allowed:
             label = "Jev" if engine_name == ENGINE_JEV else "Proveedor"
-            reasons["model"] = "%s no estuvo disponible; se aplicó la política local" % label
-            reasons["effort"] = "nivel de respaldo de la política local"
+            failure = {"invalid": "respondió sin una elección única válida",
+                       "not_configured": "no está configurado"}.get(engine_result.get("status"), "no estuvo disponible")
+            reasons["model"] = "%s %s; se aplicó la política local: %s" % (label, failure, baseline_reasons["model"])
+            reasons["effort"] = "respaldo local: " + baseline_reasons["effort"]
         effective_engine = engine_result.get("engine", ENGINE_RULES)
         category, confidence = classify_agent_identity(text, state.get("name", ""), has_attachments(items),
                                                        reasons["model"], state.get("agent_category"))
