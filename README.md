@@ -112,6 +112,7 @@ la política local sin interrumpir el mensaje.
 la misma petición, pero solo el motor activo cambia Codex. El historial registra
 motor, modelo interno, estado, tiempo y propuesta, sin guardar el mensaje. Así
 las comparaciones se hacen sobre las mismas tareas, no sobre semanas distintas.
+Cada ejecución muestra sus **Motores observados** en Historial.
 
 Jev recibe el texto y metadatos de adjuntos: presencia, cantidad y tipo. Ollama
 también parte de esos metadatos. En Ajustes existe una opción independiente para

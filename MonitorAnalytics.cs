@@ -18,6 +18,13 @@ internal sealed class DecisionRecord
     public double Time, StartedTime, FinishedTime;
     public bool Accepted;
     public int InputTokens, OutputTokens, CachedTokens, ReasoningTokens;
+    public readonly Dictionary<string, EngineComparison> Comparisons = new Dictionary<string, EngineComparison>();
+}
+
+internal sealed class EngineComparison
+{
+    public string Engine, Model, Effort, Status, EngineModel;
+    public double Confidence, LatencyMs;
 }
 
 internal sealed partial class ModernRouterMonitor
@@ -179,6 +186,14 @@ internal sealed partial class ModernRouterMonitor
         item.Source = String(data, "source", item.Source); item.Status = String(data, "status", item.Status);
         item.Signal = String(data, "signal", item.Signal);
         item.Error = String(data, "error_type", item.Error);
+        if (eventName == "engine_comparison")
+        {
+            string engine = String(data, "routing_engine", "rules");
+            item.Comparisons[engine] = new EngineComparison { Engine = engine, Model = Model(String(data, "proposed_model")),
+                Effort = Effort(String(data, "proposed_effort")), Status = String(data, "engine_status"),
+                EngineModel = String(data, "engine_model"), Confidence = Number(data, "engine_confidence"),
+                LatencyMs = Number(data, "engine_latency_ms") };
+        }
         item.RoutingEngine = String(data, "routing_engine", item.RoutingEngine);
         item.EngineModel = String(data, "engine_model", item.EngineModel);
         item.EngineStatus = String(data, "engine_status", item.EngineStatus);
@@ -265,7 +280,15 @@ internal sealed partial class ModernRouterMonitor
         }
         AddExplanation(historyDetail, "POR QUÉ EL MODELO", decision.ModelReason);
         AddExplanation(historyDetail, "POR QUÉ EL RAZONAMIENTO", decision.EffortReason);
-        if (!System.String.IsNullOrEmpty(decision.RoutingEngine))
+        if (decision.Comparisons.Count > 0)
+        {
+            string observed = System.String.Join("\n", decision.Comparisons.Values.OrderBy(item => item.Engine).Select(item =>
+                FriendlyEngine(item.Engine) + " → " + item.Model + (item.Effort == "" ? "" : " · " + item.Effort) +
+                " · " + (item.Status == "ok" ? Math.Round(item.LatencyMs) + " ms" : FriendlyEngineStatus(item.Status)) +
+                (item.Confidence > 0 ? " · " + Math.Round(item.Confidence * 100) + "%" : "")));
+            AddExplanation(historyDetail, "MOTORES OBSERVADOS", observed);
+        }
+        else if (!System.String.IsNullOrEmpty(decision.RoutingEngine))
         {
             string engine = FriendlyEngine(decision.RoutingEngine);
             string detail = decision.EngineStatus == "ok" ? engine + " decidió en " + Math.Round(decision.EngineLatencyMs) + " ms" :
