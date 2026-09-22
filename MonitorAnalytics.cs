@@ -12,7 +12,7 @@ using System.Windows.Media;
 
 internal sealed class DecisionRecord
 {
-    public string Id, Thread, Title, Model, Effort, ModelReason, EffortReason, Source, Status, Signal, Error;
+    public string Id, Thread, Title, Model, Effort, ModelReason, EffortReason, Source, Status, Signal, Error, Quality;
     public string RoutingEngine, EngineModel, EngineStatus;
     public double EngineConfidence, EngineLatencyMs;
     public double Time, StartedTime, FinishedTime;
@@ -173,8 +173,9 @@ internal sealed partial class ModernRouterMonitor
 
     static void ApplyHistoryEvent(DecisionRecord item, Dictionary<string, object> data)
     {
-        item.Time = Math.Max(item.Time, Number(data, "time"));
         string eventName = String(data, "event");
+        // A later user rating must not make an old execution look newly run.
+        if (eventName != "decision_quality") item.Time = Math.Max(item.Time, Number(data, "time"));
         if (eventName == "decision_created") item.StartedTime = Number(data, "time");
         if (eventName == "decision_accepted" || eventName == "decision_recovered") item.Accepted = true;
         if (eventName == "decision_completed" || eventName == "decision_rejected" || eventName == "decision_error")
@@ -186,6 +187,7 @@ internal sealed partial class ModernRouterMonitor
         item.Source = String(data, "source", item.Source); item.Status = String(data, "status", item.Status);
         item.Signal = String(data, "signal", item.Signal);
         item.Error = String(data, "error_type", item.Error);
+        item.Quality = String(data, "quality", item.Quality);
         if (eventName == "engine_comparison")
         {
             string engine = String(data, "routing_engine", "rules");
@@ -280,6 +282,7 @@ internal sealed partial class ModernRouterMonitor
         }
         AddExplanation(historyDetail, "POR QUÉ EL MODELO", decision.ModelReason);
         AddExplanation(historyDetail, "POR QUÉ EL RAZONAMIENTO", decision.EffortReason);
+        AddQualityControls(decision);
         if (decision.Comparisons.Count > 0)
         {
             string observed = System.String.Join("\n", decision.Comparisons.Values.OrderBy(item => item.Engine).Select(item =>
@@ -303,6 +306,42 @@ internal sealed partial class ModernRouterMonitor
             decision.Signal == "retry" ? "La siguiente petición indicó que el resultado no había resuelto la tarea." :
             "La siguiente petición cambió el modelo explícitamente.");
         if (decision.Error != null) AddExplanation(historyDetail, "INCIDENCIA", decision.Error);
+    }
+
+    void AddQualityControls(DecisionRecord decision)
+    {
+        var title = Txt("VALORA ESTA ELECCIÓN", 11, Muted, FontWeights.SemiBold);
+        title.Margin = new Thickness(0, 12, 0, 7); historyDetail.Children.Add(title);
+        var choices = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var option in new[] { new[] { "insufficient", "Insuficiente" }, new[] { "adequate", "Adecuada" }, new[] { "excessive", "Excesiva" } })
+        {
+            string quality = option[0], label = option[1]; bool selected = decision.Quality == quality;
+            var button = Btn((selected ? "✓  " : "") + label, delegate { WriteDecisionQuality(decision, quality); }, false);
+            button.MinWidth = 0; button.Margin = new Thickness(0, 0, 5, 0);
+            button.Background = selected ? Panel2 : TransparentBrush;
+            button.Foreground = selected ? (quality == "adequate" ? Good : quality == "insufficient" ? Warning : Accent) : Muted;
+            choices.Children.Add(button);
+        }
+        historyDetail.Children.Add(choices);
+        var note = Txt(System.String.IsNullOrEmpty(decision.Quality) ? "Tu valoración mejora las estadísticas sin guardar el mensaje ni la respuesta." :
+            "Valoración guardada: " + FriendlyQuality(decision.Quality) + ". Puedes cambiarla.", 11, Muted);
+        note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 6, 0, 0); historyDetail.Children.Add(note);
+    }
+
+    void WriteDecisionQuality(DecisionRecord decision, string quality)
+    {
+        try
+        {
+            Directory.CreateDirectory(StateFolder);
+            var entry = new Dictionary<string, object> {
+                { "schema", 2 }, { "time", DateTimeOffset.UtcNow.ToUnixTimeSeconds() }, { "time_iso", DateTime.UtcNow.ToString("o") },
+                { "event", "decision_quality" }, { "decision_id", decision.Id }, { "thread", decision.Thread ?? "" }, { "quality", quality }
+            };
+            using (var stream = new FileStream(Path.Combine(StateFolder, "history.jsonl"), FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+            using (var writer = new StreamWriter(stream, new UTF8Encoding(false))) writer.WriteLine(Json.Serialize(entry));
+            decision.Quality = quality; analyticsSignature = null; RefreshData();
+        }
+        catch { connection.Text = "No se pudo guardar la valoración"; connection.Foreground = Warning; }
     }
 
     static void AddExplanation(StackPanel panel, string label, string value)
@@ -341,6 +380,10 @@ internal sealed partial class ModernRouterMonitor
         AddBreakdown(decisions.Where(item => !System.String.IsNullOrEmpty(item.Effort)).GroupBy(item => item.Effort).ToDictionary(group => group.Key, group => group.Count()), false);
         statisticsContent.Children.Add(AnalyticsHeading("MOTOR DE ENRUTAMIENTO"));
         AddBreakdown(decisions.Where(item => !System.String.IsNullOrEmpty(item.RoutingEngine)).GroupBy(item => FriendlyEngine(item.RoutingEngine)).ToDictionary(group => group.Key, group => group.Count()), false);
+        int rated = decisions.Count(item => !System.String.IsNullOrEmpty(item.Quality));
+        statisticsContent.Children.Add(AnalyticsHeading("VALORACIÓN DE LA ELECCIÓN"));
+        AddMetric("Decisiones valoradas", rated + " / " + total, total == 0 ? 0 : rated * 1.0 / total, Accent);
+        AddBreakdown(decisions.Where(item => !System.String.IsNullOrEmpty(item.Quality)).GroupBy(item => FriendlyQuality(item.Quality)).ToDictionary(group => group.Key, group => group.Count()), false);
         long input = decisions.Sum(item => (long)item.InputTokens), output = decisions.Sum(item => (long)item.OutputTokens), cached = decisions.Sum(item => (long)item.CachedTokens);
         if (input + output > 0)
         {
@@ -609,6 +652,11 @@ internal sealed partial class ModernRouterMonitor
             case "invalid": return "respuesta no válida"; case "guardrail": return "limitado por la política local"; default: return status ?? "sin datos"; }
     }
 
+    static string FriendlyQuality(string quality)
+    {
+        switch (quality) { case "insufficient": return "Insuficiente"; case "adequate": return "Adecuada"; case "excessive": return "Excesiva"; default: return quality ?? "Sin valorar"; }
+    }
+
     static string FriendlyStatus(string value)
     {
         switch (value) { case "completed": case "idle": return "Completada"; case "inProgress": case "active": case "running": return "Trabajando";
@@ -638,10 +686,10 @@ internal sealed partial class ModernRouterMonitor
             Model = "Astra", Effort = "Muy alto", ModelReason = "diseño de interfaces, UX o evaluación visual",
             EffortReason = "revisión profunda por amplitud, UX, auditoría o consecuencias", Source = "automatic",
             Status = "completed", Time = now, StartedTime = now - 190, FinishedTime = now,
-            InputTokens = 28400, OutputTokens = 2100, CachedTokens = 23700 });
+            InputTokens = 28400, OutputTokens = 2100, CachedTokens = 23700, Quality = "adequate" });
         decisions.Add(new DecisionRecord { Id = "fixture-2", Thread = "translation", Title = "Traducir un mensaje",
             Model = "Luna", Effort = "Ligero", ModelReason = "consulta o transformación delimitada",
-            EffortReason = "tarea delimitada: razonamiento ligero", Source = "automatic", Status = "completed", Time = now - 260 });
+            EffortReason = "tarea delimitada: razonamiento ligero", Source = "automatic", Status = "completed", Time = now - 260, Quality = "excessive" });
         decisions.Add(new DecisionRecord { Id = "fixture-3", Thread = "feature", Title = "Ajustar un componente",
             Model = "Terra", Effort = "Medio", ModelReason = "cambio concreto y comprobable",
             EffortReason = "análisis moderado para una tarea concreta", Source = "automatic", Status = "inProgress", Time = now - 520 });

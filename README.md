@@ -43,9 +43,10 @@ El panel lateral tiene cuatro vistas:
   se abre su decisión más reciente en Historial.
 - **Historial** conserva decisiones activas y terminadas con dos explicaciones
   independientes: por qué se eligió el modelo y por qué se eligió el razonamiento.
-  También muestra estado, fecha, duración, tokens observados e incidencias.
+  También muestra estado, fecha, duración, tokens observados e incidencias. Desde
+  cada decisión puedes marcarla como **Insuficiente**, **Adecuada** o **Excesiva**.
 - **Estadísticas** resume distribución por modelo, razonamiento y motor de
-  enrutamiento, además de errores, reintentos detectados, duración y tokens cuando están disponibles.
+  enrutamiento, valoraciones, errores, reintentos detectados, duración y tokens cuando están disponibles.
 - **Ajustes** permite pausar el selector, cambiar Mantener delante y conservar el
   historial 30, 90, 180 días o indefinidamente. También permite elegir el motor,
   activar comparaciones en paralelo, configurar Jev y seleccionar Ollama Cloud.
@@ -55,6 +56,8 @@ esta versión del selector. Un mensaje posterior como «sigue fallando» se regi
 como señal automática de que la decisión anterior no resolvió la tarea. Un cambio
 explícito de modelo se registra como ajuste manual. Estas señales ayudan a corregir
 la política sin asumir que toda tarea terminada tuvo un resultado de calidad.
+La valoración manual se guarda localmente ligada solo al identificador de decisión
+y a la etiqueta elegida; no conserva el mensaje ni la respuesta.
 
 El nombre del modelo junto al botón de enviar de Codex puede permanecer en la
 selección del editor. El selector comunica el cambio al motor, pero **no se ha
