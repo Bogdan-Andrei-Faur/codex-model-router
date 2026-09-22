@@ -140,11 +140,11 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(records[-1]["routing_engine"], "jev")
         self.assertNotIn("PRIVATE_JEV_SENTINEL", (Path(self.tmp.name) / "state" / "history.jsonl").read_text())
 
-    @patch("router.run_ollama")
-    def test_ollama_failure_falls_back_to_rules(self, fake_ollama):
-        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "ollama"}))
-        fake_ollama.return_value = {"engine": "ollama", "status": "unavailable", "latency_ms": 10,
-                                    "engine_model": "glm-5.3-flash:cloud"}
+    @patch("router.run_provider")
+    def test_provider_failure_falls_back_to_rules(self, fake_provider):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "provider"}))
+        fake_provider.return_value = {"engine": "provider", "status": "unavailable", "latency_ms": 10,
+                                      "engine_model": "Ollama · glm-5.3-flash:cloud"}
         result = json.loads(self.router.client_line(encode(self.request("Traduce hola al inglés"))))
         self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-luna", "low"))
         self.assertIn("no estuvo disponible", self.router.threads["t"]["model_reason"])

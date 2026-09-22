@@ -18,8 +18,10 @@ import urllib.request
 
 ENGINE_RULES = "rules"
 ENGINE_JEV = "jev"
+ENGINE_PROVIDER = "provider"
+# Kept only to interpret historical local configuration from the first release.
 ENGINE_OLLAMA = "ollama"
-ENGINES = (ENGINE_RULES, ENGINE_JEV, ENGINE_OLLAMA)
+ENGINES = (ENGINE_RULES, ENGINE_JEV, ENGINE_PROVIDER, ENGINE_OLLAMA)
 
 
 def attachment_summary(items):
@@ -138,6 +140,18 @@ def jev_key(state_dir):
         return None
 
 
+def provider_key(state_dir, provider_id):
+    """Provider keys use Windows DPAPI and never enter configuration or telemetry."""
+    if provider_id == "ollama":
+        value = os.environ.get("OLLAMA_API_KEY")
+        if value:
+            return value.strip()
+    try:
+        return _unprotect_windows((Path(state_dir) / (provider_id + ".secret")).read_bytes())
+    except OSError:
+        return None
+
+
 def run_jev(config, state_dir, state, candidates):
     started = time.perf_counter()
     key = jev_key(state_dir)
@@ -167,9 +181,20 @@ def run_jev(config, state_dir, state, candidates):
         return {"engine": ENGINE_JEV, "status": "unavailable", "latency_ms": elapsed(started)}
 
 
-def run_ollama(config, state, candidates, images=None):
+def run_provider(config, state_dir, state, candidates, images=None):
     started = time.perf_counter()
-    settings = config.get("ollama") or {}
+    # Old installations used an `ollama` block. Read it once as a safe migration
+    # path, while all new configuration lives under `provider`.
+    settings = config.get("provider") or config.get("ollama") or {}
+    provider_id = settings.get("id", "ollama")
+    if provider_id != "ollama":
+        return {"engine": ENGINE_PROVIDER, "status": "not_configured", "latency_ms": 0,
+                "engine_model": provider_id}
+    connection = settings.get("connection", "local")
+    key = provider_key(state_dir, provider_id) if connection == "api_key" else None
+    if connection == "api_key" and not key:
+        return {"engine": ENGINE_PROVIDER, "status": "not_configured", "latency_ms": 0,
+                "engine_model": "Ollama"}
     labels = "\n".join("%s — %s" % (name, item["label"]) for name, item in candidates.items())
     prompt = ("Clasifica esta petición para elegir Codex. Responde únicamente con una de estas claves, sin explicación:\n" +
               labels + "\n\nEstado:\n" + json.dumps(state, ensure_ascii=False, separators=(",", ":")))
@@ -180,15 +205,22 @@ def run_ollama(config, state, candidates, images=None):
                "messages": [{"role": "system", "content": "Eres un clasificador de rutas. Sigue exactamente el formato solicitado."},
                             user], "options": {"temperature": 0}}
     try:
-        response = _post_json(settings.get("endpoint", "http://127.0.0.1:11434/api/chat"), payload, timeout=float(settings.get("timeout_seconds", 6)))
+        endpoint = settings.get("endpoint") or ("https://ollama.com/api/chat" if connection == "api_key" else "http://127.0.0.1:11434/api/chat")
+        headers = {"Authorization": "Bearer " + key} if key else None
+        response = _post_json(endpoint, payload, headers=headers, timeout=float(settings.get("timeout_seconds", 6)))
         content = str((response.get("message") or {}).get("content") or "").strip().lower()
         found = [key for key in candidates if re.search(r"\b" + re.escape(key.lower()) + r"\b", content)]
         if len(found) != 1:
-            return {"engine": ENGINE_OLLAMA, "status": "invalid", "latency_ms": elapsed(started), "engine_model": payload["model"]}
-        return {"engine": ENGINE_OLLAMA, "status": "ok", "latency_ms": elapsed(started),
-                "route": candidates[found[0]], "engine_model": payload["model"]}
+            return {"engine": ENGINE_PROVIDER, "status": "invalid", "latency_ms": elapsed(started), "engine_model": "Ollama · " + payload["model"]}
+        return {"engine": ENGINE_PROVIDER, "status": "ok", "latency_ms": elapsed(started),
+                "route": candidates[found[0]], "engine_model": "Ollama · " + payload["model"]}
     except (OSError, ValueError, KeyError, TypeError, urllib.error.URLError, urllib.error.HTTPError):
-        return {"engine": ENGINE_OLLAMA, "status": "unavailable", "latency_ms": elapsed(started), "engine_model": payload["model"]}
+        return {"engine": ENGINE_PROVIDER, "status": "unavailable", "latency_ms": elapsed(started), "engine_model": "Ollama · " + payload["model"]}
+
+
+def run_ollama(config, state, candidates, images=None):
+    """Compatibility entry point for integrations using the pre-provider API."""
+    return run_provider(config, "", state, candidates, images)
 
 
 def elapsed(started):

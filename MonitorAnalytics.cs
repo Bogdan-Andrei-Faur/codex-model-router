@@ -457,8 +457,9 @@ internal sealed partial class ModernRouterMonitor
     {
         settingsContent.Children.Add(AnalyticsHeading("MOTOR DE ENRUTAMIENTO"));
         string current = ReadConfigString("routing_engine", "rules");
+        if (current == "ollama") current = "provider";
         var engines = new StackPanel { Orientation = Orientation.Horizontal };
-        foreach (var option in new[] { new[] { "rules", "Reglas" }, new[] { "jev", "Jev" }, new[] { "ollama", "Ollama" } })
+        foreach (var option in new[] { new[] { "rules", "Reglas" }, new[] { "jev", "Jev" }, new[] { "provider", "Proveedor" } })
         {
             string key = option[0], label = option[1];
             var button = Btn(label, delegate { WriteConfigValue("routing_engine", key); RefreshSettings(); }, false);
@@ -468,13 +469,13 @@ internal sealed partial class ModernRouterMonitor
         }
         settingsContent.Children.Add(engines);
         AddSettingsNote(current == "jev" ? "Jev decide con una respuesta estructurada; las reglas mantienen los límites de seguridad y compatibilidad." :
-            current == "ollama" ? "Ollama Cloud clasifica con GLM Flash; una respuesta inválida o sin conexión vuelve a las reglas locales." :
+            current == "provider" ? "El proveedor conectado clasifica la petición; una respuesta inválida o sin conexión vuelve a las reglas locales." :
             "Las reglas locales deciden al instante sin enviar el mensaje a otro servicio.");
 
         settingsContent.Children.Add(AnalyticsHeading("COMPARACIÓN EN PARALELO"));
         var comparisons = ReadConfigStrings("comparison_engines");
         var compare = new StackPanel { Orientation = Orientation.Horizontal };
-        foreach (var option in new[] { new[] { "jev", "Jev" }, new[] { "ollama", "Ollama" } })
+        foreach (var option in new[] { new[] { "jev", "Jev" }, new[] { "provider", "Proveedor" } })
         {
             string key = option[0], label = option[1]; bool enabled = comparisons.Contains(key);
             var button = Btn((enabled ? "✓  " : "") + label, delegate { ToggleComparison(key); RefreshSettings(); }, false);
@@ -490,22 +491,39 @@ internal sealed partial class ModernRouterMonitor
         settingsContent.Children.Add(SettingsAction(keyReady ? "●  Clave de Jev configurada" : "○  Añadir clave de Jev",
             keyReady ? "La clave se guarda protegida para este usuario de Windows. Puedes reemplazarla aquí." : "Pega una clave de TypeSafe. No se guarda en el repositorio ni en el historial.", PromptJevKey));
 
-        settingsContent.Children.Add(AnalyticsHeading("OLLAMA CLOUD"));
-        string ollama = ReadNestedConfigString("ollama", "model", "glm-5.3-flash:cloud");
+        settingsContent.Children.Add(AnalyticsHeading("PROVEEDOR"));
+        string provider = ReadNestedConfigString("provider", "id", "ollama");
+        var providers = new StackPanel { Orientation = Orientation.Horizontal };
+        var ollamaProvider = Btn("Ollama", delegate { WriteNestedConfigValue("provider", "id", "ollama"); RefreshSettings(); }, false);
+        ollamaProvider.MinWidth = 0; ollamaProvider.Margin = new Thickness(0, 0, 5, 0);
+        ollamaProvider.Background = provider == "ollama" ? Panel2 : TransparentBrush; ollamaProvider.Foreground = provider == "ollama" ? Accent : Muted;
+        providers.Children.Add(ollamaProvider);
+        var futureProvider = Btn("Próximamente", delegate { }, false); futureProvider.IsEnabled = false; futureProvider.MinWidth = 0; providers.Children.Add(futureProvider);
+        settingsContent.Children.Add(providers);
+        AddSettingsNote("Ollama es el primer conector. Esta sección permitirá añadir otros proveedores sin cambiar el motor de enrutamiento.");
+        bool providerKey = File.Exists(Path.Combine(StateFolder, "ollama.secret")) || !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable("OLLAMA_API_KEY"));
+        string connection = ReadNestedConfigString("provider", "connection", "local");
+        settingsContent.Children.Add(SettingsAction(connection == "api_key" && providerKey ? "●  Ollama conectado con clave API" : "○  Conectar Ollama con clave API",
+            connection == "api_key" && providerKey ? "La clave se guarda protegida para este usuario de Windows." : "Conexión directa a Ollama Cloud. Puedes crear y pegar una clave desde tu cuenta de Ollama.",
+            delegate { PromptProviderKey("ollama", "Ollama"); }));
+        settingsContent.Children.Add(SettingsAction(connection == "local" ? "✓  Usando la sesión local de Ollama" : "Usar sesión de Ollama instalada",
+            connection == "local" ? "El selector usa la aplicación de Ollama instalada y su sesión iniciada." : "Útil si ya has iniciado sesión en la aplicación de Ollama; no requiere pegar una clave.",
+            delegate { WriteNestedConfigValue("provider", "connection", "local"); RefreshSettings(); }));
+        string ollama = ReadNestedConfigString("provider", "model", "glm-5.3-flash:cloud");
         var models = new StackPanel { Orientation = Orientation.Horizontal };
         foreach (var option in new[] { new[] { "glm-5.3-flash:cloud", "GLM Flash" }, new[] { "deepseek-v4.1-flash:cloud", "DeepSeek Flash" } })
         {
             string model = option[0], label = option[1];
-            var button = Btn(label, delegate { WriteNestedConfigValue("ollama", "model", model); RefreshSettings(); }, false);
+            var button = Btn(label, delegate { WriteNestedConfigValue("provider", "model", model); RefreshSettings(); }, false);
             button.MinWidth = 0; button.Margin = new Thickness(0, 0, 5, 0);
             button.Background = ollama == model ? Panel2 : TransparentBrush; button.Foreground = ollama == model ? Accent : Muted;
             models.Children.Add(button);
         }
         settingsContent.Children.Add(models);
-        bool images = ReadNestedConfigBool("ollama", "send_attachment_content", false);
+        bool images = ReadNestedConfigBool("provider", "send_attachment_content", false);
         settingsContent.Children.Add(SettingsAction(images ? "✓  Permitir imágenes para Ollama" : "○  Mantener adjuntos como metadatos",
             images ? "Ollama podrá recibir imágenes que Codex exponga como datos adjuntos. Jev seguirá viendo solo metadatos." : "Ollama recibe que hay adjuntos, cuántos y de qué tipo; no recibe su contenido.",
-            delegate { WriteNestedConfigValue("ollama", "send_attachment_content", !images); RefreshSettings(); }));
+            delegate { WriteNestedConfigValue("provider", "send_attachment_content", !images); RefreshSettings(); }));
     }
 
     void PromptJevKey()
@@ -530,6 +548,31 @@ internal sealed partial class ModernRouterMonitor
         }, false);
         save.Margin = new Thickness(0, 12, 0, 0); panel.Children.Add(save); dialog.Content = panel;
         dialog.Loaded += delegate { input.Focus(); }; dialog.ShowDialog();
+    }
+
+    void PromptProviderKey(string provider, string name)
+    {
+        var dialog = new Window { Title = "Conectar " + name, Width = 400, Height = 195, ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = this, Background = Panel, Foreground = Ink };
+        var panel = new StackPanel { Margin = new Thickness(18) };
+        panel.Children.Add(Txt("Pega la clave API de " + name, 15, Ink, FontWeights.SemiBold));
+        var note = Txt("Se cifra con la protección de Windows para este usuario. No se añade a Git ni al historial.", 11, Muted);
+        note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 6, 0, 10); panel.Children.Add(note);
+        var input = new PasswordBox { Height = 30, Background = Panel2, Foreground = Ink, BorderBrush = Line, Padding = new Thickness(8, 4, 8, 4) };
+        panel.Children.Add(input);
+        var save = Btn("Conectar", delegate {
+            if (input.Password.Trim().Length == 0) return;
+            try
+            {
+                Directory.CreateDirectory(StateFolder);
+                byte[] cipher = ProtectedData.Protect(Encoding.UTF8.GetBytes(input.Password.Trim()), null, DataProtectionScope.CurrentUser);
+                File.WriteAllBytes(Path.Combine(StateFolder, provider + ".secret"), cipher);
+                WriteNestedConfigValue("provider", "id", provider); WriteNestedConfigValue("provider", "connection", "api_key"); dialog.DialogResult = true;
+            }
+            catch { connection.Text = "No se pudo conectar " + name; connection.Foreground = Warning; }
+        }, false);
+        save.Margin = new Thickness(0, 12, 0, 0); panel.Children.Add(save); dialog.Content = panel;
+        dialog.Loaded += delegate { input.Focus(); }; dialog.ShowDialog(); RefreshSettings();
     }
 
     UIElement SettingsAction(string title, string description, Action action)
@@ -637,13 +680,14 @@ internal sealed partial class ModernRouterMonitor
     void ToggleComparison(string engine)
     {
         var values = ReadConfigStrings("comparison_engines");
+        values = values.Select(value => value == "ollama" ? "provider" : value).Distinct().ToList();
         if (values.Contains(engine)) values.Remove(engine); else values.Add(engine);
         WriteConfigValue("comparison_engines", values.Distinct().ToArray());
     }
 
     static string FriendlyEngine(string engine)
     {
-        switch (engine) { case "jev": return "Jev"; case "ollama": return "Ollama Cloud"; default: return "Reglas locales"; }
+        switch (engine) { case "jev": return "Jev"; case "provider": case "ollama": return "Proveedor · Ollama"; default: return "Reglas locales"; }
     }
 
     static string FriendlyEngineStatus(string status)

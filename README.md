@@ -103,21 +103,27 @@ criterios y sus límites.
 proveedor adicional. **Jev** usa el clasificador estructurado de TypeSafe y
 requiere una clave que se introduce desde Ajustes; la clave se cifra con la
 protección de Windows para este usuario y se guarda dentro de `state/`, fuera de
-Git. **Ollama Cloud** usa por defecto `glm-5.3-flash:cloud` a través de la sesión
-iniciada de Ollama; también puede elegirse DeepSeek Flash.
+Git. **Proveedor** es el motor preparado para servicios externos: Ollama es el
+primer conector y otros podrán añadirse desde la misma sección.
+
+Para Ollama puedes usar la sesión ya iniciada en su aplicación local o conectar
+directamente con una clave API. La clave se cifra con la protección de Windows,
+no aparece en la configuración ni en el historial, y la conexión directa usa la
+API oficial de Ollama Cloud. El modelo inicial es `glm-5.3-flash:cloud`; también
+puede elegirse DeepSeek Flash.
 
 En todos los casos siguen mandando las instrucciones explícitas, el catálogo de
-Codex y los límites para auditorías, UI/UX y adjuntos. Si Jev u Ollama no están
+Codex y los límites para auditorías, UI/UX y adjuntos. Si Jev o el proveedor no están
 configurados, no responden a tiempo o devuelven un formato no válido, se aplica
 la política local sin interrumpir el mensaje.
 
-**Comparación en paralelo** deja que Jev u Ollama propongan una combinación para
+**Comparación en paralelo** deja que Jev o el proveedor propongan una combinación para
 la misma petición, pero solo el motor activo cambia Codex. El historial registra
 motor, modelo interno, estado, tiempo y propuesta, sin guardar el mensaje. Así
 las comparaciones se hacen sobre las mismas tareas, no sobre semanas distintas.
 Cada ejecución muestra sus **Motores observados** en Historial.
 
-Jev recibe el texto y metadatos de adjuntos: presencia, cantidad y tipo. Ollama
+Jev recibe el texto y metadatos de adjuntos: presencia, cantidad y tipo. El proveedor
 también parte de esos metadatos. En Ajustes existe una opción independiente para
 permitir que Ollama reciba una imagen real, pero permanece desactivada por
 defecto. Solo se reenvían imágenes que Codex ya incluya como datos adjuntos; el

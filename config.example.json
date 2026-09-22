@@ -9,9 +9,10 @@
     "endpoint": "https://api.typesafe.ai/v1/systemone",
     "timeout_seconds": 4
   },
-  "ollama": {
+  "provider": {
+    "id": "ollama",
+    "connection": "local",
     "model": "glm-5.3-flash:cloud",
-    "endpoint": "http://127.0.0.1:11434/api/chat",
     "timeout_seconds": 6,
     "send_attachment_content": false
   },

@@ -15,7 +15,7 @@ import time
 import uuid
 
 from routing import DEFAULT_ROUTES, EFFORTS, classify_agent_identity, select_route_details, has_attachments, user_text
-from decision_engines import ENGINES, ENGINE_JEV, ENGINE_OLLAMA, ENGINE_RULES, attachment_summary, build_state, candidate_routes, inline_images, run_jev, run_ollama
+from decision_engines import ENGINES, ENGINE_JEV, ENGINE_OLLAMA, ENGINE_PROVIDER, ENGINE_RULES, attachment_summary, build_state, candidate_routes, inline_images, run_jev, run_provider
 
 ROOT = Path(__file__).resolve().parent
 
@@ -366,19 +366,24 @@ class Router:
         route, reasons = select_route_details(text, routes, previous, state.get("effort"), has_attachments(items))
         baseline_route, baseline_reasons = dict(route), dict(reasons)
         engine_name = config.get("routing_engine", ENGINE_RULES)
+        # v15 called the first external connector "ollama". Keep existing users
+        # working but record all new decisions under the product-level Provider.
+        if engine_name == ENGINE_OLLAMA:
+            engine_name = ENGINE_PROVIDER
         if engine_name not in ENGINES:
             engine_name = ENGINE_RULES
         candidates = candidate_routes(routes, self.catalog)
         external_allowed = (reasons.get("source") == "automatic" and not reasons["model"].startswith("continuación")
                             and bool(candidates))
         state_for_engine = build_state(text, attachment_summary(items), current, state.get("effort"), reasons.get("signal") == "retry")
-        ollama_images = inline_images(items) if ((config.get("ollama") or {}).get("send_attachment_content", False)) else []
+        provider_settings = config.get("provider") or config.get("ollama") or {}
+        provider_images = inline_images(items) if provider_settings.get("send_attachment_content", False) else []
         engine_result = {"engine": ENGINE_RULES, "status": "ok", "latency_ms": 0,
                          "route": {"model": route["model"], "effort": route["effort"]}, "engine_model": "local-policy"}
         if external_allowed and engine_name == ENGINE_JEV:
             engine_result = run_jev(config, self.state_dir, state_for_engine, candidates)
-        elif external_allowed and engine_name == ENGINE_OLLAMA:
-            engine_result = run_ollama(config, state_for_engine, candidates, ollama_images)
+        elif external_allowed and engine_name == ENGINE_PROVIDER:
+            engine_result = run_provider(config, self.state_dir, state_for_engine, candidates, provider_images)
         if engine_result.get("status") == "ok" and engine_result.get("route"):
             proposed = engine_result["route"]
             # Hard local policy remains a floor for visual work, attachments, audits and risk.
@@ -388,13 +393,13 @@ class Router:
             baseline_tier = next((tier for tier, item in routes.items() if item["model"] == baseline_route["model"]), "simple")
             if not strict or tiers.index(chosen_tier) >= tiers.index(baseline_tier):
                 route = {"model": proposed["model"], "effort": proposed["effort"]}
-                label = "Jev" if engine_name == ENGINE_JEV else "Ollama"
+                label = "Jev" if engine_name == ENGINE_JEV else "Proveedor"
                 reasons["model"] = "%s eligió %s para esta petición" % (label, proposed.get("label", route["model"]))
                 reasons["effort"] = "%s propuso este nivel de razonamiento para la complejidad observada" % label
             else:
                 engine_result["status"] = "guardrail"
         elif engine_name != ENGINE_RULES and external_allowed:
-            label = "Jev" if engine_name == ENGINE_JEV else "Ollama"
+            label = "Jev" if engine_name == ENGINE_JEV else "Proveedor"
             reasons["model"] = "%s no estuvo disponible; se aplicó la política local" % label
             reasons["effort"] = "nivel de respaldo de la política local"
         effective_engine = engine_result.get("engine", ENGINE_RULES)
@@ -416,7 +421,7 @@ class Router:
         tier = next(t for t, r in routes.items() if r["model"] == model)
         decision_id = self.new_decision(tid, model, effort, reasons["model"], reasons["effort"], reasons["source"],
                                         current, reasons.get("signal"), category, confidence)
-        self.record_engine_comparisons(config, decision_id, tid, candidates, state_for_engine, ollama_images, engine_name,
+        self.record_engine_comparisons(config, decision_id, tid, candidates, state_for_engine, provider_images, engine_name,
                                        engine_result, baseline_route, external_allowed)
         decision = {"model": model, "effort": effort, "reason": reasons["model"],
                     "model_reason": reasons["model"], "effort_reason": reasons["effort"],
@@ -436,18 +441,20 @@ class Router:
                   "decision_id": decision_id, "routing_engine": effective_engine, "engine_status": engine_result.get("status")})
         return (json.dumps(changed, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
 
-    def record_engine_comparisons(self, config, decision_id, tid, candidates, state, ollama_images, active_engine, active_result, baseline_route, allowed):
+    def record_engine_comparisons(self, config, decision_id, tid, candidates, state, provider_images, active_engine, active_result, baseline_route, allowed):
         """Record comparable, content-free engine choices. Shadow engines never affect Codex."""
         results = [active_result]
         shadows = config.get("comparison_engines") or []
         if allowed:
             for name in shadows:
+                if name == ENGINE_OLLAMA:
+                    name = ENGINE_PROVIDER
                 if name not in ENGINES or name in (active_engine, ENGINE_RULES):
                     continue
                 if name == ENGINE_JEV:
                     results.append(run_jev(config, self.state_dir, state, candidates))
-                elif name == ENGINE_OLLAMA:
-                    results.append(run_ollama(config, state, candidates, ollama_images))
+                elif name == ENGINE_PROVIDER:
+                    results.append(run_provider(config, self.state_dir, state, candidates, provider_images))
         for result in results:
             proposed = result.get("route") or baseline_route
             self.record_history("engine_comparison", decision_id=decision_id, thread=tid, routing_engine=result.get("engine", ENGINE_RULES),
