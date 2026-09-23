@@ -229,6 +229,8 @@ suscripción. La calidad y el ahorro real requieren observar tareas representati
 
 Pruebas y límites de validación: [VALIDATION.md](docs/VALIDATION.md).
 
+Para retomar el trabajo desde otro agente, consulta la [guía de continuidad del proyecto](docs/KNOWLEDGE-CONTINUITY.md), que separa la evidencia Windows de la validación nativa pendiente en macOS.
+
 ## Cápsula de agentes
 
 La cápsula muestra hasta cinco agentes activos y agrupa el resto en `+N`.
