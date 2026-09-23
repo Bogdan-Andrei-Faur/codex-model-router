@@ -4,6 +4,39 @@ let state = {threads:{},history:[],config:{enabled:true},ui:{mode:'Compact',topm
 let currentTab = 'activity', order = [], selectedDecision = null, selectedThread = null, peekId = null, peekTimer, reasonOpen = false;
 let dataSignature = '', history = [], avatars = new Map(), orbitSequence = 0;
 const native = message => window.webkit?.messageHandlers?.monitor?.postMessage(message);
+const heightGrip = $('height-grip');
+let heightDrag = null;
+function panelHeight(value) {
+  const height = Math.min(Math.max(1,innerHeight-16),Math.max(544,value));
+  $('surface').style.setProperty('--panel-height',height+'px');
+  return height;
+}
+heightGrip.addEventListener('pointerdown',event=>{
+  if(event.button!==0)return;
+  heightDrag={y:event.screenY,height:$('surface').getBoundingClientRect().height};
+  heightGrip.setPointerCapture(event.pointerId);document.body.classList.add('resizing');
+  native({action:'resizeStart'});event.preventDefault();
+});
+heightGrip.addEventListener('pointermove',event=>{
+  if(heightDrag)panelHeight(heightDrag.height+heightDrag.y-event.screenY);
+});
+function finishHeightDrag() {
+  if(!heightDrag)return;
+  const height=$('surface').getBoundingClientRect().height+16;
+  heightDrag=null;document.body.classList.remove('resizing');
+  native({action:'resizeEnd',height});
+}
+heightGrip.addEventListener('pointerup',finishHeightDrag);
+heightGrip.addEventListener('pointercancel',finishHeightDrag);
+heightGrip.addEventListener('lostpointercapture',finishHeightDrag);
+heightGrip.addEventListener('dblclick',()=>{native({action:'resizeReset'});});
+heightGrip.addEventListener('keydown',event=>{
+  if(event.key==='Home'){native({action:'resizeReset'});event.preventDefault();}
+  if(event.key==='ArrowUp'||event.key==='ArrowDown'){
+    const height=panelHeight($('surface').getBoundingClientRect().height+(event.key==='ArrowUp'?24:-24));
+    native({action:'resizeEnd',height:height+16});event.preventDefault();
+  }
+});
 const el = (tag, cls, text) => { const node = document.createElement(tag); if(cls) node.className=cls; if(text !== undefined) node.textContent=String(text); return node; };
 function button(text, action, cls='') { const node=el('button',cls,text);node.addEventListener('click',action);return node; }
 function palette(node, colors) {node.style.setProperty('--tint',colors[0]);node.style.setProperty('--face',colors[1]);return node;}
@@ -248,6 +281,7 @@ function renderPage(){if(currentTab==='activity')activity();else if(currentTab==
 window.receive = incoming => {
   const oldConfig=JSON.stringify(state.config),oldUi=JSON.stringify(state.ui);
   state={...state,...incoming};history=C.decisions(state.history,state.threads);
+  if(!heightDrag && Number.isFinite(state.ui.panelHeight))panelHeight(state.ui.panelHeight-16);
   document.body.classList.toggle('reduced',!!state.ui.reduced);
   if(!document.body.classList.contains(state.ui.mode.toLowerCase()))setMode(state.ui.mode,false);
   const active=Object.values(state.threads).filter(row=>C.active(row.status)).length;

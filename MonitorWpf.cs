@@ -58,6 +58,10 @@ internal sealed partial class ModernRouterMonitor : Window
     MenuItem trayCompact, trayExpanded, trayHidden, trayPause, trayTopmost;
     MonitorMode mode = MonitorMode.Compact;
     bool quitting, reasonOpen;
+    readonly Dictionary<string, double> panelHeights = new Dictionary<string, double>();
+    readonly Thumb heightGrip = new Thumb();
+    double resizeStartY, resizeStartHeight;
+    Forms.Screen resizeScreen;
     string activitySignature;
     int lastActiveCount = -1;
     bool lastConnected;
@@ -123,6 +127,36 @@ internal sealed partial class ModernRouterMonitor : Window
         surface.Children.Add(new Border { Background = Panel, CornerRadius = shell.CornerRadius,
             Effect = new DropShadowEffect { Color = Colors.Black, Opacity = .34, BlurRadius = 15, ShadowDepth = 2 } });
         surface.Children.Add(shell);
+        heightGrip.Height = 14;
+        heightGrip.Margin = new Thickness(32, 0, 32, 0);
+        heightGrip.VerticalAlignment = VerticalAlignment.Top;
+        heightGrip.Cursor = Cursors.SizeNS;
+        heightGrip.Focusable = true;
+        heightGrip.ToolTip = "Arrastra para ajustar la altura. Doble clic para altura automática.";
+        System.Windows.Automation.AutomationProperties.SetName(heightGrip, "Ajustar altura del panel");
+        heightGrip.Template = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(@"
+<ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' TargetType='Thumb'>
+ <Grid Background='Transparent'><Border Width='38' Height='3' VerticalAlignment='Top' Margin='0,5,0,0' Background='#626472' CornerRadius='2'/></Grid>
+</ControlTemplate>");
+        heightGrip.DragStarted += delegate {
+            resizeScreen = CurrentScreen();
+            resizeStartY = Forms.Cursor.Position.Y;
+            resizeStartHeight = surface.ActualHeight + 16;
+            surface.BeginAnimation(FrameworkElement.HeightProperty, null);
+        };
+        heightGrip.DragDelta += delegate {
+            SetPanelHeight(resizeScreen, resizeStartHeight + (resizeStartY - Forms.Cursor.Position.Y) / (SystemDpi() / 96.0));
+        };
+        heightGrip.DragCompleted += delegate { SaveUiState(); resizeScreen = null; };
+        heightGrip.MouseDoubleClick += delegate { panelHeights.Remove(CurrentScreen().DeviceName); ApplyPanelHeight(); SaveUiState(); };
+        heightGrip.KeyDown += delegate(object sender, KeyEventArgs e) {
+            if (e.Key != Key.Up && e.Key != Key.Down && e.Key != Key.Home) return;
+            var screen = CurrentScreen();
+            if (e.Key == Key.Home) { panelHeights.Remove(screen.DeviceName); ApplyPanelHeight(); }
+            else SetPanelHeight(screen, surface.ActualHeight + 16 + (e.Key == Key.Up ? 24 : -24));
+            SaveUiState(); e.Handled = true;
+        };
+        surface.Children.Add(heightGrip);
         Content = surface;
 
         BuildCompact();
@@ -201,6 +235,17 @@ internal sealed partial class ModernRouterMonitor : Window
         return image;
     }
 
+    static FrameworkElement NavigationGlyph(string path, double width)
+    {
+        return new System.Windows.Shapes.Path {
+            Data = System.Windows.Media.Geometry.Parse(path), Stroke = Muted,
+            StrokeThickness = 1.6, StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round,
+            Width = width, Height = 10, Stretch = Stretch.Uniform,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
+        };
+    }
+
     void BuildCompact() { BuildAgentCapsule(); }
 
     void BuildExpanded()
@@ -225,8 +270,14 @@ internal sealed partial class ModernRouterMonitor : Window
         headerCopy.Children.Add(connectionRow); Grid.SetColumn(headerCopy, 1); header.Children.Add(headerCopy);
         var collapse = Btn("›", delegate { SwitchMode(MonitorMode.Compact, true); }, true);
         collapse.ToolTip = "Volver a vista compacta"; Grid.SetColumn(collapse, 2); header.Children.Add(collapse);
+        collapse.Content = NavigationGlyph("M0,0 L5,5 L0,10", 6);
+        collapse.VerticalAlignment = VerticalAlignment.Center;
+        System.Windows.Automation.AutomationProperties.SetName(collapse, "Volver a vista compacta");
         var hide = Btn("×", delegate { SwitchMode(MonitorMode.Hidden, true); }, true);
         hide.ToolTip = "Ocultar monitor"; Grid.SetColumn(hide, 3); header.Children.Add(hide);
+        hide.Content = NavigationGlyph("M0,0 L10,10 M10,0 L0,10", 10);
+        hide.VerticalAlignment = VerticalAlignment.Center;
+        System.Windows.Automation.AutomationProperties.SetName(hide, "Ocultar monitor");
         Grid.SetRow(header, 0); expandedView.Children.Add(header);
 
         var tabs = BuildTabBar(); Grid.SetRow(tabs, 1); expandedView.Children.Add(tabs);
@@ -410,10 +461,11 @@ internal sealed partial class ModernRouterMonitor : Window
         }
         compactView.Visibility = target == MonitorMode.Compact ? Visibility.Visible : Visibility.Collapsed;
         expandedView.Visibility = target == MonitorMode.Expanded ? Visibility.Visible : Visibility.Collapsed;
+        heightGrip.Visibility = target == MonitorMode.Expanded ? Visibility.Visible : Visibility.Collapsed;
         shell.CornerRadius = new CornerRadius(26);
         // Keep the transparent native window fixed. Only the bottom-aligned surface grows;
         // resizing and moving an HWND on separate frames causes lower-edge judder.
-        var envelope = TargetGeometry(MonitorMode.Expanded);
+        var envelope = Geometry(MonitorMode.Expanded, ScreenWork(CurrentScreen()), 1);
         var geometry = TargetGeometry(target);
         double from = surface.ActualHeight, to = Math.Max(1, geometry.Height - 16);
         double fromWidth = surface.ActualWidth, toWidth = Math.Max(1, geometry.Width - 16);
@@ -437,20 +489,47 @@ internal sealed partial class ModernRouterMonitor : Window
 
     Rect TargetGeometry(MonitorMode target)
     {
-        // Retain this display while expanding; the mouse may have moved to another screen.
-        var source = PresentationSource.FromVisual(this);
-        var screen = IsVisible && source != null
-            ? Forms.Screen.FromHandle(new System.Windows.Interop.WindowInteropHelper(this).Handle).WorkingArea
-            : Forms.Screen.FromPoint(Forms.Cursor.Position).WorkingArea;
-        double scale = SystemDpi() / 96.0;
-        return Geometry(target, new Rect(screen.Left / scale, screen.Top / scale, screen.Width / scale, screen.Height / scale));
+        var screen = CurrentScreen();
+        double ratio;
+        if (!panelHeights.TryGetValue(screen.DeviceName, out ratio)) ratio = .9;
+        return Geometry(target, ScreenWork(screen), ratio);
     }
 
-    internal static Rect Geometry(MonitorMode target, Rect work)
+    Forms.Screen CurrentScreen()
+    {
+        return IsVisible && PresentationSource.FromVisual(this) != null
+            ? Forms.Screen.FromHandle(new System.Windows.Interop.WindowInteropHelper(this).Handle)
+            : Forms.Screen.FromPoint(Forms.Cursor.Position);
+    }
+
+    static Rect ScreenWork(Forms.Screen screen)
+    {
+        // WinForms coordinates and WPF use the process's system-DPI coordinate space.
+        var work = screen.WorkingArea;
+        double scale = SystemDpi() / 96.0;
+        return new Rect(work.Left / scale, work.Top / scale, work.Width / scale, work.Height / scale);
+    }
+
+    void SetPanelHeight(Forms.Screen screen, double height)
+    {
+        if (screen == null) return;
+        var work = ScreenWork(screen);
+        panelHeights[screen.DeviceName] = Geometry(MonitorMode.Expanded, work, height / work.Height).Height / work.Height;
+        ApplyPanelHeight();
+    }
+
+    void ApplyPanelHeight()
+    {
+        surface.BeginAnimation(FrameworkElement.HeightProperty, null);
+        surface.Height = Math.Max(1, TargetGeometry(MonitorMode.Expanded).Height - 16);
+    }
+
+    internal static Rect Geometry(MonitorMode target, Rect work, double ratio = .9)
     {
         const double margin = 10; // The surface has an additional 8 DIP shadow inset.
         double width = Math.Min(target == MonitorMode.Compact ? 382 : 432, Math.Max(1, work.Width - margin * 2));
-        double height = Math.Min(target == MonitorMode.Compact ? 96 : 760, Math.Max(1, work.Height - margin * 2));
+        if (Double.IsNaN(ratio) || Double.IsInfinity(ratio) || ratio <= 0) ratio = .9;
+        double height = Math.Min(target == MonitorMode.Compact ? 96 : Math.Max(560, work.Height * ratio), Math.Max(1, work.Height - margin * 2));
         return new Rect(work.Right - width - margin, work.Bottom - height - margin, width, height);
     }
 
@@ -743,6 +822,14 @@ internal sealed partial class ModernRouterMonitor : Window
             var state = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(UiStatePath));
             MonitorMode parsed; if (Enum.TryParse(String(state, "mode", "Compact"), out parsed)) mode = parsed;
             if (state.ContainsKey("topmost")) Topmost = Convert.ToBoolean(state["topmost"]);
+            object heights;
+            if (state.TryGetValue("panelHeights", out heights))
+                foreach (var item in Dict(heights))
+                {
+                    double ratio = Convert.ToDouble(item.Value);
+                    if (!Double.IsNaN(ratio) && !Double.IsInfinity(ratio) && ratio > 0 && ratio <= 1)
+                        panelHeights[item.Key] = ratio;
+                }
         }
         catch { mode = MonitorMode.Compact; Topmost = true; }
     }
@@ -754,7 +841,7 @@ internal sealed partial class ModernRouterMonitor : Window
         {
             Directory.CreateDirectory(StateFolder);
             var temp = UiStatePath + ".tmp";
-            File.WriteAllText(temp, Json.Serialize(new Dictionary<string, object> { { "mode", mode.ToString() }, { "topmost", Topmost } }), new System.Text.UTF8Encoding(false));
+            File.WriteAllText(temp, Json.Serialize(new Dictionary<string, object> { { "mode", mode.ToString() }, { "topmost", Topmost }, { "panelHeights", panelHeights } }), new System.Text.UTF8Encoding(false));
             if (File.Exists(UiStatePath)) File.Replace(temp, UiStatePath, null); else File.Move(temp, UiStatePath);
         }
         catch { }

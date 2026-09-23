@@ -40,6 +40,17 @@ Instalación, diagnóstico, recuperación y límites:
    panel lateral, también anclado abajo a la derecha; al recoger el panel vuelve a la vista compacta. Nunca se muestran
 ambas formas al mismo tiempo y ocultarlas no detiene el selector.
 
+El panel usa por defecto el 90 % del área útil del monitor y conserva su base
+inferior al desplegarse. Arrastra el pequeño tirador del borde superior para
+cambiar la altura; se recuerda la proporción elegida por pantalla y se limita
+al espacio disponible cuando cambian la resolución, el escalado o la barra de
+tareas. Doble clic en el tirador recupera la altura automática. Con el tirador
+enfocado, las flechas arriba/abajo ajustan la altura y `Inicio` la restablece.
+La cabecera y las pestañas permanecen visibles mientras el contenido se desplaza.
+
+El enrutamiento sigue decidiendo al inicio de cada turno. La prueba aislada de
+[continuidad por fases](docs/PHASE-PROBE.md) no activa cambios automáticos en las tareas.
+
 Modelo y razonamiento aparecen como etiquetas. Luna es azul, Terra verde, Sol
 ámbar y Astra violeta; el texto permite identificarlos sin depender del color.
 Cada nivel de razonamiento tiene su propio tono. Las etiquetas de actividad

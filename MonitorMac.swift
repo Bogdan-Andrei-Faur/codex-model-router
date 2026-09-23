@@ -21,6 +21,8 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     var preview: Bool { CommandLine.arguments.contains("--preview") }
     var panel: RouterPanel!, web: WKWebView!, status: NSStatusItem!
     var mode = "Compact", topmost = true, ready = false, busy = false
+    var panelHeights = [String:Double](), resizing = false
+    var panelHeight: Double = 760
     var lockFD: Int32 = -1
     var timer: Timer?, hitTimer: Timer?
     var hitRect = NSRect.zero
@@ -42,6 +44,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         let saved = read(uiPath)
         if let value = saved["mode"] as? String, ["Compact","Expanded","Hidden"].contains(value) { mode = value }
         topmost = saved["topmost"] as? Bool ?? true
+        panelHeights = (saved["panelHeights"] as? [String:Double] ?? [:]).filter { $0.value.isFinite && $0.value > 0 && $0.value <= 1 }
         let configuration = WKWebViewConfiguration(); configuration.websiteDataStore = .nonPersistent()
         configuration.userContentController.add(self,name:"monitor")
         web = WKWebView(frame:.zero,configuration:configuration); web.navigationDelegate = self
@@ -66,12 +69,29 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     func position() {
         let screen = panel.screen ?? NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation,$0.frame,false) } ?? NSScreen.main
         guard let work = screen?.visibleFrame else { return }
-        let width = min(432,max(1,work.width-20)), height = min(760,max(1,work.height-20))
+        let width = min(432,max(1,work.width-20)), height = max(1,work.height-20)
+        panelHeight = min(height,max(560,work.height * (panelHeights[screenKey(screen)] ?? 0.9)))
         panel.setFrame(NSRect(x:work.maxX-width-10,y:work.minY+10,width:width,height:height),display:true)
+    }
+    func screenKey(_ screen:NSScreen?) -> String {
+        return String(describing:screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] ?? "main")
+    }
+    func resizePanel(_ height:Double?, finished:Bool) {
+        guard mode == "Expanded",let screen = panel.screen else {return}
+        if let height = height, height.isFinite {
+            let work = screen.visibleFrame
+            panelHeight = min(max(1,work.height-20),max(560,height))
+            panelHeights[screenKey(screen)] = panelHeight/work.height
+        } else if height == nil {
+            panelHeights.removeValue(forKey:screenKey(screen)); position()
+        }
+        if finished {saveUI()}
+        lastPayload = Data(); refresh()
     }
     @objc func displayChanged() { position(); lastPayload = Data(); refresh() }
     func updateHit() {
         guard mode != "Hidden" else { return }
+        if resizing {panel.ignoresMouseEvents = false; return}
         let inside = NSBezierPath(roundedRect:hitRect,xRadius:26,yRadius:26).contains(panel.convertPoint(fromScreen:NSEvent.mouseLocation))
         if panel.ignoresMouseEvents == inside { panel.ignoresMouseEvents = !inside }
     }
@@ -101,7 +121,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         saveUI(); lastPayload = Data(); refresh()
     }
     func setTopmost(_ value:Bool) { topmost = value; panel.level = value ? .floating : .normal; saveUI(); lastPayload = Data(); refresh() }
-    func saveUI() { do { try write(["mode":mode,"topmost":topmost],uiPath) } catch { feedback("No se pudo guardar la vista.") } }
+    func saveUI() { if preview {return}; do { try write(["mode":mode,"topmost":topmost,"panelHeights":panelHeights],uiPath) } catch { feedback("No se pudo guardar la vista.") } }
     func feedback(_ value:String) { web.callAsyncJavaScript("window.monitorFeedback(message)",arguments:["message":value],in:nil,in:.page,completionHandler:nil) }
     func webView(_ webView:WKWebView,decidePolicyFor action:WKNavigationAction,decisionHandler:@escaping(WKNavigationActionPolicy)->Void) {
         decisionHandler(action.request.url?.standardizedFileURL == resources.appendingPathComponent("index.html").standardizedFileURL ? .allow : .cancel)
@@ -118,6 +138,9 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
                 hitRect = NSRect(x:x,y:panel.frame.height-y-height,width:max(0,width),height:max(0,height)).intersection(NSRect(origin:.zero,size:panel.frame.size)); updateHit()
             }
         case "mode": if let value = data["value"] as? String { setMode(value) }
+        case "resizeStart": resizing = true
+        case "resizeEnd": resizing = false; resizePanel(data["height"] as? Double,finished:true)
+        case "resizeReset": resizePanel(nil,finished:true)
         case "topmost": if let value = data["value"] as? Bool { setTopmost(value) }
         case "config": if let key = data["key"] as? String, let value = data["value"] { configure(key,value) }
         case "quality": saveQuality(data)
@@ -243,7 +266,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
                 let safeConfig=config.filter{["enabled","history_days","routing_engine","comparison_engines","jev","routes"].contains($0.key)}
                 let ids=Set(rows.keys).union(self.journal.compactMap{$0["thread"] as? String})
                 let taskModes=Dictionary(uniqueKeysWithValues:ids.map{($0,self.taskMode($0))})
-                let payload:[String:Any]=["threads":rows,"connections":connections,"history":self.journal,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
+                let payload:[String:Any]=["threads":rows,"connections":connections,"history":self.journal,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
                 guard let encoded=try? JSONSerialization.data(withJSONObject:payload,options:[.sortedKeys]),encoded != self.lastPayload else{return}
                 self.lastPayload=encoded
                 self.web.callAsyncJavaScript("window.receive(payload)",arguments:["payload":payload],in:nil,in:.page){ result in if case .failure=result {self.lastPayload=Data()} }

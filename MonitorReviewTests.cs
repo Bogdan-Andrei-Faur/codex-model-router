@@ -307,18 +307,33 @@ internal sealed partial class ModernRouterMonitor
         var results = new List<string>();
         try
         {
-            foreach (var work in new[] { new Rect(0, 0, 1920, 1040), new Rect(0, 0, 1536, 824),
-                new Rect(0, 0, 1280, 680), new Rect(-1920, 0, 1920, 1040), new Rect(0, -900, 1600, 900) })
+            foreach (var work in new[] { new Rect(0, 0, 1920, 1040), new Rect(0, 0, 2560, 1400), new Rect(0, 0, 1536, 824),
+                new Rect(0, 0, 1280, 680), new Rect(-1920, 0, 1920, 1040), new Rect(0, -900, 1600, 900), new Rect(0, 0, 800, 480) })
             {
                 var compact = Geometry(MonitorMode.Compact, work); var expanded = Geometry(MonitorMode.Expanded, work);
                 Check(compact.Bottom == expanded.Bottom && compact.Right == expanded.Right, "Views lost shared bottom-right anchor");
                 Check(work.Contains(compact) && work.Contains(expanded), "View exceeds working area");
                 Check(Math.Abs(work.Bottom - expanded.Bottom - 10) < .1, "Panel is not bottom anchored");
+                Check(Math.Abs(expanded.Height - Math.Min(work.Height - 20, Math.Max(560, work.Height * .9))) < .1, "Panel does not use available display height");
+                foreach (var ratio in new[] { .2, .7, 1.0, 2.0, Double.NaN, Double.PositiveInfinity })
+                {
+                    var resized = Geometry(MonitorMode.Expanded, work, ratio);
+                    Check(work.Contains(resized) && resized.Bottom == compact.Bottom, "Manual height escaped screen or moved bottom");
+                }
             }
-            results.Add("PASS: common bottom-right anchor and bounds across five work areas");
+            results.Add("PASS: adaptive/manual heights and fixed bottom-right anchor across seven work areas, including 1080p, 1440p and small scaled displays");
             Topmost = false;
             SwitchMode(MonitorMode.Expanded, false); PaintFixtures(); UpdateLayout();
             Dispatcher.Invoke(delegate { }, DispatcherPriority.Render);
+            double resizeBottom = Top + surface.TransformToAncestor(this).Transform(new Point(0, surface.ActualHeight)).Y;
+            SetPanelHeight(CurrentScreen(), 600); UpdateLayout();
+            Check(Math.Abs(Top + surface.TransformToAncestor(this).Transform(new Point(0, surface.ActualHeight)).Y - resizeBottom) < 1.1, "Resizing shifted bottom edge");
+            double preferred = surface.ActualHeight;
+            SwitchMode(MonitorMode.Compact, false); SwitchMode(MonitorMode.Expanded, false); UpdateLayout();
+            Check(Math.Abs(surface.ActualHeight-preferred) < 1.1, "Height preference lost when collapsing");
+            Check(heightGrip.Visibility == Visibility.Visible, "Expanded panel lacks resize handle");
+            panelHeights.Clear(); ApplyPanelHeight(); UpdateLayout();
+            results.Add("PASS: manual resize preserves lower edge and survives compact/expanded transition");
             Check(mainTags.Children.Cast<Border>().All(badge => Math.Abs(badge.ActualHeight - 24) < .1),
                 "Featured badges do not share the same height");
             Check(ModeTransitionDuration.TotalMilliseconds >= 350, "Mode transition is still too abrupt");

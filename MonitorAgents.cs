@@ -64,9 +64,7 @@ internal sealed partial class ModernRouterMonitor
         Grid.SetColumn(crew, 1); bar.Children.Add(crew);
         expandAgents = Btn("", delegate { SwitchMode(MonitorMode.Expanded, true); }, true);
         expandAgents.MinWidth = 28; expandAgents.VerticalAlignment = VerticalAlignment.Center;
-        expandAgents.Content = new System.Windows.Shapes.Path { Data = System.Windows.Media.Geometry.Parse("M5,0 L0,5 L5,10"),
-            Stroke = Muted, StrokeThickness = 1.6, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
-            Width = 6, Height = 10, Stretch = Stretch.Uniform };
+        expandAgents.Content = NavigationGlyph("M5,0 L0,5 L5,10", 6);
         expandAgents.ToolTip = "Desplegar panel lateral";
         System.Windows.Automation.AutomationProperties.SetName(expandAgents, "Desplegar panel lateral");
         var expandDivider = new Border { BorderBrush = Line, BorderThickness = new Thickness(1, 0, 0, 0),
