@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from routing import DEFAULT_ROUTES, EFFORTS, classify, classify_agent_identity, select_route, select_route_details
-from decision_engines import inline_images
 from router import Router
 
 
@@ -17,12 +16,6 @@ def encode(value):
 
 
 class RoutingPolicyTests(unittest.TestCase):
-    def test_only_inline_image_data_is_eligible_for_opt_in_ollama_vision(self):
-        items = [{"type": "localImage", "path": r"C:\\private\\capture.png"},
-                 {"type": "image", "url": "data:image/png;base64,c2FmZQ=="},
-                 {"type": "image", "url": "https://example.com/image.png"}]
-        self.assertEqual(inline_images(items), ["c2FmZQ=="])
-
     def test_spanish_and_english_workloads(self):
         cases = [
             ("Traduce al ingles: Nos vemos mañana.", "simple"),
@@ -95,23 +88,20 @@ class RoutingPolicyTests(unittest.TestCase):
 
 
 class ProtocolTests(unittest.TestCase):
-    @patch("router.run_provider")
-    def test_manual_mode_is_persistent_scoped_and_preserves_exact_request_without_provider_calls(self, provider):
+    def test_manual_mode_is_persistent_scoped_and_preserves_exact_request(self):
         from task_modes import mode_path, read_mode
         from desktop import atomic_json
-        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "provider"}))
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         target=mode_path(self.router.state_dir,'t')
         atomic_json(target,{'schema':1,'thread':'t','mode':'manual'})
         raw=encode(self.request())
         self.assertEqual(self.router.client_line(raw),raw)
-        provider.assert_not_called()
         self.assertEqual(self.router.accepted_routes[7]['source'],'manual')
         self.assertEqual(read_mode(self.router.state_dir,'another-task'),'automatic')
         restarted=Router(self.path,self.router.state_dir)
         restarted.catalog=self.router.catalog
         restarted.threads['t']={'provider':'openai','model':'gpt-6-astra','seen_turn':False}
         self.assertEqual(restarted.client_line(raw),raw)
-        provider.assert_not_called()
         # Switching mode affects only future requests, not the pending turn.
         atomic_json(target,{'schema':1,'thread':'t','mode':'automatic'})
         self.assertEqual(restarted.client_line(raw),raw)
@@ -186,56 +176,6 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(records[0]["continuity_strategy"], "continue")
         fake_jev.assert_called_once()
 
-    @patch("router.run_provider")
-    def test_provider_failure_falls_back_to_rules(self, fake_provider):
-        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "provider"}))
-        fake_provider.return_value = {"engine": "provider", "status": "unavailable", "latency_ms": 10,
-                                      "engine_model": "Ollama · glm-5.3-flash:cloud"}
-        result = json.loads(self.router.client_line(encode(self.request("Traduce hola al inglés"))))
-        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-luna", "low"))
-        self.assertIn("no estuvo disponible", self.router.threads["t"]["model_reason"])
-        self.assertEqual(self.router.threads["t"]["routing_engine"], "rules")
-        records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
-        self.assertEqual(records[-1]["event"], "decision_routed")
-        self.assertEqual((records[-1]["routing_engine"], records[-1]["engine_applied"]), ("rules", False))
-
-    @patch("router.run_provider")
-    def test_invalid_provider_choice_is_not_presented_as_a_connection_failure(self, provider):
-        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "provider"}))
-        provider.return_value = {"engine": "provider", "status": "invalid", "latency_ms": 2200}
-        result = json.loads(self.router.client_line(encode(self.request("Traduce hola al inglés"))))
-        self.assertEqual(result["params"]["model"], "gpt-5.6-luna")
-        self.assertIn("respondió sin una elección única válida", self.router.threads["t"]["model_reason"])
-        self.assertNotIn("no estuvo disponible", self.router.threads["t"]["model_reason"])
-        self.assertIn("respaldo local:", self.router.threads["t"]["effort_reason"])
-
-    @patch("router.run_provider")
-    def test_rules_comparison_records_baseline_without_changing_provider_choice(self, provider):
-        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES,
-            "routing_engine": "provider", "comparison_engines": ["rules", "rules", "provider"]}))
-        provider.return_value = {"engine": "provider", "status": "ok", "route": {
-            "model": "gpt-5.6-terra", "effort": "medium", "tier": "normal"}}
-        result = json.loads(self.router.client_line(encode(self.request("Traduce hola al inglés"))))
-        self.assertEqual(result["params"]["model"], "gpt-5.6-terra")
-        records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
-        comparisons = [item for item in records if item["event"] == "engine_comparison"]
-        self.assertEqual([(item["routing_engine"], item["engine_active"]) for item in comparisons],
-                         [("provider", True), ("rules", False)])
-        self.assertEqual(comparisons[1]["proposed_model"], "gpt-5.6-luna")
-        provider.assert_called_once()
-
-    @patch("router.run_provider")
-    def test_comparison_aliases_do_not_duplicate_calls_or_replace_local_reasons(self, provider):
-        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES,
-            "routing_engine": "rules", "comparison_engines": ["rules", "ollama", "provider"]}))
-        provider.return_value = {"engine": "provider", "status": "ok", "route": {
-            "model": "gpt-5.6-terra", "effort": "medium", "tier": "normal"}}
-        result = json.loads(self.router.client_line(encode(self.request("Traduce hola al inglés"))))
-        self.assertEqual(result["params"]["model"], "gpt-5.6-luna")
-        self.assertNotIn("Proveedor", self.router.threads["t"]["model_reason"])
-        self.assertEqual(self.router.threads["t"]["routing_engine"], "rules")
-        provider.assert_called_once()
-
     def test_non_turn_messages_are_byte_identical(self):
         for data in [b'  {"id":9, "method":"turn/interrupt", "params":{"threadId":"t","turnId":"q"}} \n',
                      b'{"id":7,"result":{"decision":"approved"}}\n', b'not json\n', b'[1,2]\n']:
@@ -263,7 +203,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(self.router.client_line(raw), raw)
 
     def test_unknown_provider_or_model_is_preserved(self):
-        for provider, model in [("ollama", "gemma4:26b"), (None, "gpt-6-astra"), ("openai", "future-new-model")]:
+        for provider, model in [("other-service", "third-party-model"), (None, "gpt-6-astra"), ("openai", "future-new-model")]:
             with self.subTest(provider=provider, model=model):
                 self.router.pending.clear()
                 self.router.threads["t"]["provider"] = provider

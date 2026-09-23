@@ -1,8 +1,8 @@
 # Codex automático — selector personal
 
 Elige modelo y razonamiento antes de cada nuevo mensaje enviado a Codex. Sigue
-usando la app y la suscripción actuales. Puede decidir mediante reglas locales,
-Jev o un clasificador de Ollama Cloud.
+usando la app y la suscripción actuales. Puede decidir mediante reglas locales
+o Jev.
 
 ## macOS
 
@@ -76,9 +76,9 @@ El panel lateral tiene cuatro vistas:
   incidencias agrupadas, coincidencia entre propuestas y calidad por motor aplicado.
 - **Ajustes** permite pausar el selector, cambiar Mantener delante y conservar el
   historial 30, 90, 180 días o indefinidamente. También permite elegir el motor,
-  activar comparaciones en paralelo, configurar Jev y seleccionar Ollama Cloud.
+  activar comparaciones en paralelo y configurar Jev.
   Los selectores mantienen un contorno visible en todas sus opciones. La configuración
-  de Jev o Proveedor aparece solo al elegir ese motor; las claves se editan dentro
+  de Jev aparece solo al elegir ese motor; las claves se editan dentro
   del panel con **Guardar clave** y **Cancelar**, sin abrir otra ventana.
 
 El historial persistente empieza a recoger decisiones cuando Codex se abre con
@@ -134,26 +134,18 @@ proveedor adicional. **Jev** usa el clasificador estructurado de TypeSafe y
 permite elegir entre TypeSafe directo y Vercel AI Gateway. En Vercel utiliza el
 modelo virtual `vmc/jev`; la conexión directa conserva `jev-latest`. Requiere una
 clave introducida desde Ajustes. En Windows se cifra con DPAPI dentro de
-`state/`; en macOS se guarda en el llavero. **Proveedor** es el motor preparado
-para servicios externos: Ollama es el primer conector y otros podrán añadirse
-desde la misma sección.
-
-Para Ollama puedes usar la sesión ya iniciada en su aplicación local o conectar
-directamente con una clave API. La clave se cifra con la protección de Windows,
-no aparece en la configuración ni en el historial, y la conexión directa usa la
-API oficial de Ollama Cloud. El modelo inicial es `glm-5.3-flash:cloud`; también
-puede elegirse DeepSeek Flash.
+`state/`; en macOS se guarda en el llavero.
 
 En todos los casos siguen mandando las instrucciones explícitas, el catálogo de
-Codex y los límites para auditorías, UI/UX y adjuntos. Si Jev o el proveedor no están
-configurados, no responden a tiempo o devuelven un formato no válido, se aplica
+Codex y los límites para auditorías, UI/UX y adjuntos. Si Jev no está configurado,
+no responde a tiempo o devuelve un formato no válido, se aplica
 la política local sin interrumpir el mensaje.
 El clasificador devuelve una única selección JSON. Si un modelo mezcla razonamiento
 con la respuesta final mediante `</think>`, se valida solo la respuesta posterior;
 no se deduce una elección de las alternativas mencionadas durante el razonamiento.
 Una selección inválida se identifica como tal, sin confundirla con falta de conexión.
 
-**Comparación en paralelo** permite incluir Reglas, Jev y Proveedor. El motor activo
+**Comparación en paralelo** permite incluir Reglas y Jev. El motor activo
 ya se registra y aparece marcado; las demás opciones se pueden añadir o quitar.
 Las reglas aportan su propuesta local sin una llamada externa. Los demás motores proponen una combinación para
 la misma petición, pero solo el motor activo cambia Codex. El historial registra
@@ -170,11 +162,8 @@ ni credenciales. Si un motor falla, devuelve un formato inválido o una regla lo
 limita su propuesta, la decisión aplicada se atribuye a **Reglas locales** y el
 intento queda visible por separado.
 
-Jev recibe el texto y metadatos de adjuntos: presencia, cantidad y tipo. El proveedor
-también parte de esos metadatos. En Ajustes existe una opción independiente para
-permitir que Ollama reciba una imagen real, pero permanece desactivada por
-defecto. Solo se reenvían imágenes que Codex ya incluya como datos adjuntos; el
-selector nunca lee rutas locales de archivos para enviarlas a Ollama.
+Jev recibe el texto y metadatos de adjuntos: presencia, cantidad y tipo. El
+selector nunca lee rutas locales de archivos para reenviarlas a un clasificador.
 
 ## Control y consumo
 
@@ -212,7 +201,7 @@ suscripción. La calidad y el ahorro real requieren observar tareas representati
   generación automática de títulos, no aparecen como conversaciones ni pasan por
   el enrutador. Conservan la configuración nativa de Codex. Los agentes secundarios
   con una tarea principal identificada sí se muestran mientras están trabajando.
-- No cambia conversaciones de Ollama u otros proveedores ni modelos desconocidos.
+- No cambia conversaciones de otros proveedores ni modelos desconocidos.
 - Conserva adjuntos, instrucciones, herramientas y permisos. Si no puede decidir
   con un catálogo válido, deja pasar la petición original. No reintenta trabajos.
 - Los registros locales contienen identificadores, **títulos de tareas**, modelos,

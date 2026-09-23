@@ -16,7 +16,7 @@ import time
 import uuid
 
 from routing import DEFAULT_ROUTES, EFFORTS, classify_agent_identity, select_route_details, has_attachments, user_text
-from decision_engines import ENGINES, ENGINE_JEV, ENGINE_OLLAMA, ENGINE_PROVIDER, ENGINE_RULES, attachment_summary, build_state, candidate_routes, inline_images, run_jev, run_provider
+from decision_engines import ENGINES, ENGINE_JEV, ENGINE_RULES, attachment_summary, build_state, candidate_routes, run_jev
 from thread_inventory import ThreadInventory
 from platform_support import backend_path, creation_flags, uses_stdio, stop_backend, input_lines
 from desktop_runtime import discover
@@ -396,7 +396,7 @@ class Router:
         current = settings.get("model") or params.get("model") or state.get("model")
         routes = config.get("routes", DEFAULT_ROUTES)
         owned_models = {r["model"] for r in routes.values()}
-        # Do not move an Ollama/provider conversation to paid ChatGPT implicitly.
+        # Do not move a non-OpenAI conversation to paid ChatGPT implicitly.
         if state.get("provider") != "openai" or current not in owned_models:
             self.log({"event": "preserved", "thread": tid, "reason": "other_or_unknown_provider"})
             return raw
@@ -416,10 +416,6 @@ class Router:
         route, reasons = select_route_details(text, routes, previous, state.get("effort"), has_attachments(items))
         baseline_route, baseline_reasons = dict(route), dict(reasons)
         engine_name = config.get("routing_engine", ENGINE_RULES)
-        # v15 called the first external connector "ollama". Keep existing users
-        # working but record all new decisions under the product-level Provider.
-        if engine_name == ENGINE_OLLAMA:
-            engine_name = ENGINE_PROVIDER
         if engine_name not in ENGINES:
             engine_name = ENGINE_RULES
         candidates = candidate_routes(routes, self.catalog)
@@ -428,14 +424,10 @@ class Router:
         # expose an explicit strategy answer.
         external_allowed = reasons.get("source") == "automatic" and bool(candidates)
         state_for_engine = build_state(text, attachment_summary(items), current, state.get("effort"), reasons.get("signal") == "retry")
-        provider_settings = config.get("provider") or config.get("ollama") or {}
-        provider_images = inline_images(items) if provider_settings.get("send_attachment_content", False) else []
         engine_result = {"engine": ENGINE_RULES, "status": "ok", "latency_ms": 0,
                          "route": {"model": route["model"], "effort": route["effort"]}, "engine_model": "local-policy"}
         if external_allowed and engine_name == ENGINE_JEV:
             engine_result = run_jev(config, self.state_dir, state_for_engine, candidates)
-        elif external_allowed and engine_name == ENGINE_PROVIDER and not reasons["model"].startswith("continuación"):
-            engine_result = run_provider(config, self.state_dir, state_for_engine, candidates, provider_images)
         engine_applied = False
         if engine_result.get("engine") != ENGINE_RULES and engine_result.get("status") == "ok" and engine_result.get("route"):
             proposed = engine_result["route"]
@@ -452,7 +444,7 @@ class Router:
             if not strict or tiers.index(chosen_tier) >= tiers.index(baseline_tier):
                 route = chosen_route
                 engine_applied = True
-                label = "Jev" if engine_name == ENGINE_JEV else "Proveedor"
+                label = "Jev"
                 if engine_name == ENGINE_JEV and continuity_strategy == "continue":
                     reasons["model"] = "Jev decidió continuar con el modelo actual"
                     reasons["effort"] = "Jev decidió conservar el nivel de razonamiento actual"
@@ -462,7 +454,7 @@ class Router:
             else:
                 engine_result["status"] = "guardrail"
         elif engine_name != ENGINE_RULES and external_allowed:
-            label = "Jev" if engine_name == ENGINE_JEV else "Proveedor"
+            label = "Jev"
             failure = {"invalid": "respondió sin una elección única válida",
                        "not_configured": "no está configurado"}.get(engine_result.get("status"), "no estuvo disponible")
             reasons["model"] = "%s %s; se aplicó la política local: %s" % (label, failure, baseline_reasons["model"])
@@ -489,7 +481,7 @@ class Router:
         continuity_strategy = engine_result.get("continuity_strategy") if engine_applied and engine_name == ENGINE_JEV else None
         decision_id = self.new_decision(tid, model, effort, reasons["model"], reasons["effort"], reasons["source"],
                                         current, reasons.get("signal"), category, confidence, continuity_strategy)
-        self.record_engine_comparisons(config, decision_id, tid, candidates, state_for_engine, provider_images, engine_name,
+        self.record_engine_comparisons(config, decision_id, tid, candidates, state_for_engine, engine_name,
                                        engine_result, baseline_route, external_allowed)
         self.record_history("decision_routed", decision_id=decision_id, thread=tid, model=model, effort=effort,
                             routing_engine=effective_engine, engine_applied=engine_applied,
@@ -513,15 +505,13 @@ class Router:
                   "decision_id": decision_id, "routing_engine": effective_engine, "engine_status": engine_result.get("status")})
         return (json.dumps(changed, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
 
-    def record_engine_comparisons(self, config, decision_id, tid, candidates, state, provider_images, active_engine, active_result, baseline_route, allowed):
+    def record_engine_comparisons(self, config, decision_id, tid, candidates, state, active_engine, active_result, baseline_route, allowed):
         """Record comparable, content-free engine choices. Shadow engines never affect Codex."""
         results = [active_result]
         shadows = config.get("comparison_engines") or []
         seen = {active_result.get("engine", ENGINE_RULES), active_engine}
         if allowed:
             for name in shadows:
-                if name == ENGINE_OLLAMA:
-                    name = ENGINE_PROVIDER
                 if name not in ENGINES or name in seen:
                     continue
                 seen.add(name)
@@ -530,8 +520,6 @@ class Router:
                                     "route": baseline_route, "engine_model": "local-policy"})
                 elif name == ENGINE_JEV:
                     results.append(run_jev(config, self.state_dir, state, candidates))
-                elif name == ENGINE_PROVIDER:
-                    results.append(run_provider(config, self.state_dir, state, candidates, provider_images))
         for index, result in enumerate(results):
             proposed = result.get("route") or baseline_route
             self.record_history("engine_comparison", decision_id=decision_id, thread=tid, routing_engine=result.get("engine", ENGINE_RULES),

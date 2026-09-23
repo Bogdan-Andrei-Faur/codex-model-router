@@ -109,7 +109,7 @@ los cambios al puente Python sí se cargan al reiniciar la app de Codex.
 | Estadísticas | Historial acumulado, telemetría de motores y valoraciones |
 | Pausa y mantener delante | Controles nativos |
 | Cápsula animada, avatares y valoraciones | Portadas desde los contratos de Windows |
-| Editor de proveedores y comparaciones | Reglas, Jev, Ollama local/clave, modelos e imágenes |
+| Editor de motores y comparaciones | Reglas y Jev |
 | Lectura del historial recuperado de Windows | Fusiona `history.recovered.jsonl` sin duplicar decisiones |
 
 «Aceptado por Codex» indica aceptación de los ajustes del turno, no telemetría de

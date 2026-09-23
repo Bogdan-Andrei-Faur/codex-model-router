@@ -20,7 +20,7 @@ test('live usage refreshes while a timestamp stays unchanged and pending uses re
   assert.equal(C.setting({status:'pending',model:'gpt-6-astra'},'model'),undefined);
 });
 test('shadow comparison does not replace the applied routing engine',()=>{
-  const events=[{event:'decision_created',decision_id:'a',time:1},{event:'decision_routed',decision_id:'a',routing_engine:'rules',time:2},{event:'engine_comparison',decision_id:'a',routing_engine:'provider',engine_active:false,engine_status:'ok',proposed_model:'gpt-5.6-terra',time:3}];
+  const events=[{event:'decision_created',decision_id:'a',time:1},{event:'decision_routed',decision_id:'a',routing_engine:'rules',time:2},{event:'engine_comparison',decision_id:'a',routing_engine:'jev',engine_active:false,engine_status:'ok',proposed_model:'gpt-5.6-terra',time:3}];
   const d=C.decisions(events)[0];assert.equal(d.routing_engine,'rules');assert.equal(Object.keys(d.comparisons).length,1);
 });
 test('active agent ordering remains stable through refresh and reactivation',()=>{

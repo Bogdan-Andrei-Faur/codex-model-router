@@ -25,7 +25,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     var timer: Timer?, hitTimer: Timer?
     var hitRect = NSRect.zero
     var lastPayload = Data(), journal = [[String: Any]](), journalSignature = ""
-    var keys = ["jev": false, "ollama": false]
+    var keys = ["jev": false]
     let io = DispatchQueue(label:"local.codex-model-router.monitor-data",qos:.utility)
     init(root: URL) { self.root = root.standardizedFileURL.resolvingSymlinksInPath(); super.init() }
     func read(_ path: URL) -> [String: Any] {
@@ -55,7 +55,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         status.button?.image = NSImage(systemSymbolName:"circle.hexagongrid.fill",accessibilityDescription:"Codex automático")
         status.button?.target = self; status.button?.action = #selector(statusClick)
         status.button?.sendAction(on:[.leftMouseUp,.rightMouseUp])
-        if !preview { for provider in ["jev","ollama"] { keys[provider] = hasKey(provider) } }
+        if !preview { keys["jev"] = hasKey("jev") }
         loadPage()
         timer = Timer.scheduledTimer(timeInterval:2,target:self,selector:#selector(refresh),userInfo:nil,repeats:true)
         hitTimer = Timer.scheduledTimer(withTimeInterval:1.0/30,repeats:true) { [weak self] _ in self?.updateHit() }
@@ -123,7 +123,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         case "quality": saveQuality(data)
         case "taskMode": if let id=data["thread"] as? String,let mode=data["value"] as? String { setTaskMode(id,mode) }
         case "connection": if let value = data["value"] as? String, ["doctor","install","uninstall"].contains(value) { manageConnection(value) }
-        case "secret": if let provider = data["provider"] as? String, ["jev","ollama"].contains(provider), let value = data["value"] as? String, !value.isEmpty,value.utf8.count<16384 { storeKey(provider,value) }
+        case "secret": if let provider = data["provider"] as? String, provider == "jev", let value = data["value"] as? String, !value.isEmpty,value.utf8.count<16384 { storeKey(provider,value) }
         default: break
         }
     }
@@ -174,19 +174,17 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     func configure(_ key:String,_ value:Any) {
         var valid = false
         switch key {
-        case "enabled","provider.send_attachment_content": valid = CFGetTypeID(value as CFTypeRef) == CFBooleanGetTypeID()
+        case "enabled": valid = CFGetTypeID(value as CFTypeRef) == CFBooleanGetTypeID()
         case "history_days": valid = [0,30,90,180].contains(value as? Int ?? -1)
-        case "routing_engine": valid = ["rules","jev","provider"].contains(value as? String ?? "")
-        case "comparison_engines": if let values = value as? [String] { valid = values.count<=3 && Set(values).count==values.count && values.allSatisfy { ["rules","jev","provider"].contains($0) } }
+        case "routing_engine": valid = ["rules","jev"].contains(value as? String ?? "")
+        case "comparison_engines": if let values = value as? [String] { valid = values.count<=2 && Set(values).count==values.count && values.allSatisfy { ["rules","jev"].contains($0) } }
         case "jev.connection": valid = ["vercel","typesafe"].contains(value as? String ?? "")
-        case "provider.connection": valid = ["local","api_key"].contains(value as? String ?? "")
-        case "provider.model": valid = ["glm-5.3-flash:cloud","deepseek-v4.1-flash:cloud"].contains(value as? String ?? "")
         default: break
         }
         guard valid else { feedback("Ajuste no válido."); return }
         var config = read(configPath); guard !config.isEmpty else { feedback("No se pudo leer la configuración."); return }
         let parts = key.split(separator:".").map(String.init)
-        if parts.count==2 { var nested = config[parts[0]] as? [String:Any] ?? [:]; nested[parts[1]]=value;if parts[0]=="provider"{nested["id"]="ollama"}; config[parts[0]]=nested }
+        if parts.count==2 { var nested = config[parts[0]] as? [String:Any] ?? [:]; nested[parts[1]]=value; config[parts[0]]=nested }
         else { config[key]=value }
         do { try write(config,configPath); refresh() } catch { feedback("No se pudo guardar el ajuste.") }
     }
@@ -217,7 +215,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         if result==errSecItemNotFound {var item=query;item.merge(attributes){_,new in new};result=SecItemAdd(item as CFDictionary,nil)}
         guard result==errSecSuccess else {feedback("No se pudo guardar la clave en el llavero.");return}
         do {try markKeyChanged(provider)} catch {feedback("Clave guardada. Reinicia Codex para aplicarla.");return}
-        keys[provider]=true;if provider=="ollama"{configure("provider.connection","api_key")};lastPayload=Data();refresh();feedback("Clave guardada en el llavero.")
+        keys[provider]=true;lastPayload=Data();refresh();feedback("Clave guardada en el llavero.")
     }
     @objc func refresh() {
         guard ready,!busy else{return};busy=true
@@ -242,7 +240,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             }
             DispatchQueue.main.async {
                 self.busy=false;if let records=records{self.journal=records}
-                let safeConfig=config.filter{["enabled","history_days","routing_engine","comparison_engines","jev","provider","routes"].contains($0.key)}
+                let safeConfig=config.filter{["enabled","history_days","routing_engine","comparison_engines","jev","routes"].contains($0.key)}
                 let ids=Set(rows.keys).union(self.journal.compactMap{$0["thread"] as? String})
                 let taskModes=Dictionary(uniqueKeysWithValues:ids.map{($0,self.taskMode($0))})
                 let payload:[String:Any]=["threads":rows,"connections":connections,"history":self.journal,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]

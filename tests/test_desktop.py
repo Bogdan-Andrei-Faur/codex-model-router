@@ -75,7 +75,7 @@ class IntegrationTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name);(self.root/'dist').mkdir();(self.root/'dist/codex-router.exe').write_bytes(b'wrapper')
-        self.cfg={'enabled':True,'routes':{'custom':{}},'provider':{'id':'ollama'},'history_days':0}
+        self.cfg={'enabled':True,'routes':{'custom':{}},'history_days':0}
         for key,value in [('ROOT',self.root),('CONFIG',self.root/'config.local.json'),('STATE',self.root/'state')]:
             patcher=patch.object(desktop,key,value);patcher.start();self.addCleanup(patcher.stop)
         patcher=patch.object(desktop.sys,'platform','win32');patcher.start();self.addCleanup(patcher.stop)

@@ -636,9 +636,8 @@ internal sealed partial class ModernRouterMonitor
     {
         settingsContent.Children.Add(AnalyticsHeading("MOTOR DE ENRUTAMIENTO"));
         string current = selectedEngine ?? ReadConfigString("routing_engine", "rules");
-        if (current == "ollama") current = "provider";
         var engines = new WrapPanel();
-        foreach (var option in new[] { new[] { "rules", "Reglas" }, new[] { "jev", "Jev" }, new[] { "provider", "Proveedor" } })
+        foreach (var option in new[] { new[] { "rules", "Reglas" }, new[] { "jev", "Jev" } })
         {
             string key = option[0], label = option[1];
             var button = ChoiceButton(label, current == key, delegate { WriteConfigValue("routing_engine", key); RefreshSettings(); });
@@ -646,13 +645,12 @@ internal sealed partial class ModernRouterMonitor
         }
         settingsContent.Children.Add(engines);
         AddSettingsNote(current == "jev" ? "Jev decide con una respuesta estructurada; las reglas mantienen los límites de seguridad y compatibilidad." :
-            current == "provider" ? "El proveedor conectado clasifica la petición; una respuesta inválida o sin conexión vuelve a las reglas locales." :
             "Las reglas locales deciden al instante sin enviar el mensaje a otro servicio.");
 
         settingsContent.Children.Add(AnalyticsHeading("COMPARACIÓN EN PARALELO"));
-        var comparisons = ReadConfigStrings("comparison_engines").Select(value => value == "ollama" ? "provider" : value).ToList();
+        var comparisons = ReadConfigStrings("comparison_engines").Where(value => value == "rules" || value == "jev").ToList();
         var compare = new WrapPanel();
-        foreach (var option in new[] { new[] { "rules", "Reglas" }, new[] { "jev", "Jev" }, new[] { "provider", "Proveedor" } })
+        foreach (var option in new[] { new[] { "rules", "Reglas" }, new[] { "jev", "Jev" } })
         {
             string key = option[0], label = option[1]; bool active = current == key;
             var button = ChoiceButton(label, active || comparisons.Contains(key), delegate { ToggleComparison(key); RefreshSettings(); }, true);
@@ -664,7 +662,6 @@ internal sealed partial class ModernRouterMonitor
         AddSettingsNote("El motor activo ya se registra. Marca otros para comparar sus propuestas. Para configurar uno, selecciónalo arriba.");
 
         if (current == "jev") BuildJevSettings();
-        if (current == "provider") BuildProviderSettings();
     }
 
     void BuildJevSettings()
@@ -688,37 +685,6 @@ internal sealed partial class ModernRouterMonitor
         settingsContent.Children.Add(InlineKeySettings("jev", connection == "vercel" ? "Vercel AI Gateway" : "TypeSafe", keyReady));
     }
 
-    void BuildProviderSettings()
-    {
-        settingsContent.Children.Add(AnalyticsHeading("PROVEEDOR"));
-        string provider = ReadNestedConfigString("provider", "id", "ollama");
-        var providers = new WrapPanel();
-        var ollamaProvider = ChoiceButton("Ollama", provider == "ollama", delegate { WriteNestedConfigValue("provider", "id", "ollama"); RefreshSettings(); });
-        providers.Children.Add(ollamaProvider);
-        settingsContent.Children.Add(providers);
-        AddSettingsNote("Ollama es el primer conector. Esta sección permitirá añadir otros proveedores sin cambiar el motor de enrutamiento.");
-        bool providerKey = File.Exists(Path.Combine(StateFolder, "ollama.secret")) || !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable("OLLAMA_API_KEY"));
-        string connection = ReadNestedConfigString("provider", "connection", "local");
-        settingsContent.Children.Add(InlineKeySettings("ollama", "Ollama", providerKey));
-        settingsContent.Children.Add(SettingsAction(connection == "local" ? "✓  Usando la sesión local de Ollama" : "Usar sesión de Ollama instalada",
-            connection == "local" ? "El selector usa la aplicación de Ollama instalada y su sesión iniciada." : "Útil si ya has iniciado sesión en la aplicación de Ollama; no requiere pegar una clave.",
-            delegate { WriteNestedConfigValue("provider", "connection", "local"); RefreshSettings(); }));
-        settingsContent.Children.Add(AnalyticsHeading("MODELO PARA CLASIFICAR"));
-        string ollama = ReadNestedConfigString("provider", "model", "glm-5.3-flash:cloud");
-        var models = new WrapPanel();
-        foreach (var option in new[] { new[] { "glm-5.3-flash:cloud", "GLM Flash" }, new[] { "deepseek-v4.1-flash:cloud", "DeepSeek Flash" } })
-        {
-            string model = option[0], label = option[1];
-            var button = ChoiceButton(label, ollama == model, delegate { WriteNestedConfigValue("provider", "model", model); RefreshSettings(); });
-            models.Children.Add(button);
-        }
-        settingsContent.Children.Add(models);
-        bool images = ReadNestedConfigBool("provider", "send_attachment_content", false);
-        settingsContent.Children.Add(SettingsAction(images ? "✓  Permitir imágenes para Ollama" : "○  Mantener adjuntos como metadatos",
-            images ? "Ollama podrá recibir imágenes que Codex exponga como datos adjuntos. Jev seguirá viendo solo metadatos." : "Ollama recibe que hay adjuntos, cuántos y de qué tipo; no recibe su contenido.",
-            delegate { WriteNestedConfigValue("provider", "send_attachment_content", !images); RefreshSettings(); }));
-    }
-
     static Button ChoiceButton(string label, bool selected, RoutedEventHandler click, bool multiple = false)
     {
         var button = Btn((multiple ? (selected ? "✓  " : "+  ") : (selected ? "●  " : "○  ")) + label, click, false);
@@ -737,8 +703,7 @@ internal sealed partial class ModernRouterMonitor
     {
         var stack = new StackPanel();
         var editor = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 10, 0, 0) };
-        bool apiSelected = secretId == "ollama" && ReadNestedConfigString("provider", "connection", "local") == "api_key";
-        string title = keyReady ? (apiSelected ? "✓  Clave API de " : "Clave guardada de ") + name : "Añadir clave de " + name;
+        string title = keyReady ? "Clave guardada de " + name : "Añadir clave de " + name;
         var toggle = SettingsAction(title, keyReady ? "Pulsa para reemplazar la clave guardada." : "Introduce tu clave aquí mismo, dentro del panel.", delegate {
             editor.Visibility = editor.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
         });
@@ -761,11 +726,6 @@ internal sealed partial class ModernRouterMonitor
                 Directory.CreateDirectory(StateFolder);
                 byte[] cipher = ProtectedData.Protect(Encoding.UTF8.GetBytes(input.Password.Trim()), null, DataProtectionScope.CurrentUser);
                 File.WriteAllBytes(Path.Combine(StateFolder, secretId + ".secret"), cipher);
-                if (secretId == "ollama")
-                {
-                    WriteNestedConfigValue("provider", "id", "ollama");
-                    WriteNestedConfigValue("provider", "connection", "api_key");
-                }
                 input.Clear(); RefreshSettings();
             }
             catch { feedback.Text = "No se pudo guardar la clave. Inténtalo de nuevo."; }
@@ -779,9 +739,6 @@ internal sealed partial class ModernRouterMonitor
             if (editor.IsVisible) input.Focus(); else input.Clear();
         };
         stack.Children.Add(editor);
-        if (secretId == "ollama" && keyReady && !apiSelected)
-            stack.Children.Add(SettingsAction("Usar la clave guardada", "Cambiar a la conexión directa con Ollama Cloud.",
-                delegate { WriteNestedConfigValue("provider", "connection", "api_key"); RefreshSettings(); }));
         return stack;
     }
 
@@ -890,14 +847,14 @@ internal sealed partial class ModernRouterMonitor
     void ToggleComparison(string engine)
     {
         var values = ReadConfigStrings("comparison_engines");
-        values = values.Select(value => value == "ollama" ? "provider" : value).Distinct().ToList();
+        values = values.Where(value => value == "rules" || value == "jev").Distinct().ToList();
         if (values.Contains(engine)) values.Remove(engine); else values.Add(engine);
         WriteConfigValue("comparison_engines", values.Distinct().ToArray());
     }
 
     static string FriendlyEngine(string engine)
     {
-        switch (engine) { case "jev": return "Jev"; case "provider": case "ollama": return "Proveedor · Ollama"; default: return "Reglas locales"; }
+        switch (engine) { case "jev": return "Jev"; case "provider": return "Proveedor retirado"; default: return "Reglas locales"; }
     }
 
     static string FriendlyEngineStatus(string status)

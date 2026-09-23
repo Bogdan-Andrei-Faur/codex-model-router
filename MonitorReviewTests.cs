@@ -146,11 +146,11 @@ internal sealed partial class ModernRouterMonitor
             analyticsSignature = null; decisions.Clear(); RefreshAnalytics(rows, path);
             Check(decisions.First(d => d.Id == "two").Quality == "" && decisions.First(d => d.Id == "two").Time == 103,
                 "Cleared rating did not survive reload or changed execution time");
-            File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "engine_comparison", routing_engine = "provider", engine_active = true, time = 104 }) + Environment.NewLine);
+            File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "engine_comparison", routing_engine = "jev", engine_active = true, time = 104 }) + Environment.NewLine);
             File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "engine_comparison", routing_engine = "rules", engine_active = false, time = 104 }) + Environment.NewLine);
-            File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "decision_routed", routing_engine = "provider", engine_applied = true, time = 104 }) + Environment.NewLine);
+            File.AppendAllText(path, Json.Serialize(new { decision_id = "two", @event = "decision_routed", routing_engine = "jev", engine_applied = true, time = 104 }) + Environment.NewLine);
             RefreshAnalytics(rows, path);
-            Check(decisions.First(d => d.Id == "two").RoutingEngine == "provider" && decisions.First(d => d.Id == "two").Comparisons.Count == 2,
+            Check(decisions.First(d => d.Id == "two").RoutingEngine == "jev" && decisions.First(d => d.Id == "two").Comparisons.Count == 2,
                 "Shadow engine overwrote deciding engine in statistics");
             Check(ContainsText(statisticsContent, "FIABILIDAD DE LOS MOTORES") && ContainsText(statisticsContent, "respuestas válidas"),
                 "Engine reliability telemetry is absent from statistics");
@@ -178,16 +178,15 @@ internal sealed partial class ModernRouterMonitor
 
     void CheckSettingsInteraction()
     {
-        foreach (string engine in new[] { "rules", "jev", "provider" })
+        foreach (string engine in new[] { "rules", "jev" })
         {
             settingsContent.Children.Clear(); BuildRoutingEngineSettings(engine); UpdateLayout();
-            Check(ContainsText(settingsContent, "MODELO PARA CLASIFICAR") == (engine == "provider"), "Provider configuration visible under wrong engine");
             Check(settingsContent.Children.OfType<TextBlock>().Any(text => text.Text == "JEV") == (engine == "jev"), "Jev configuration visible under wrong engine");
             if (engine == "jev")
                 Check(ContainsText(settingsContent, "Vercel AI Gateway") && ContainsText(settingsContent, "TypeSafe directo"),
                     "Jev connection selector is incomplete on Windows");
             var comparisons = settingsContent.Children.OfType<WrapPanel>().ElementAt(1).Children.OfType<Button>().ToList();
-            Check(comparisons.Count == 3 && comparisons.Count(button => !button.IsEnabled) == 1, "Missing Rules comparison or active engine duplicated");
+            Check(comparisons.Count == 2 && comparisons.Count(button => !button.IsEnabled) == 1, "Missing Rules comparison or active engine duplicated");
             foreach (var button in settingsContent.Children.OfType<WrapPanel>().SelectMany(panel => panel.Children.OfType<Button>()))
                 Check(button.BorderThickness.Left == 1 && button.Background != TransparentBrush, "Unselected option has no visible outline");
             if (engine != "rules")

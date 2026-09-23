@@ -4,17 +4,10 @@
   "sync_picker": true,
   "history_days": 90,
   "routing_engine": "rules",
-  "comparison_engines": [],
+  "comparison_engines": ["rules"],
   "jev": {
     "connection": "typesafe",
     "timeout_seconds": 4
-  },
-  "provider": {
-    "id": "ollama",
-    "connection": "local",
-    "model": "glm-5.3-flash:cloud",
-    "timeout_seconds": 6,
-    "send_attachment_content": false
   },
   "python": "C:\\Python314\\python.exe",
   "routes": {

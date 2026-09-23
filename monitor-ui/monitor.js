@@ -127,7 +127,7 @@ function activity() {
 }
 const fmt = n => Number(n||0).toLocaleString('es-ES');
 const when = n => n ? new Date(n*1000).toLocaleString('es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Fecha sin confirmar';
-const engines = {rules:'Reglas',jev:'Jev',provider:'Proveedor',ollama:'Proveedor'};
+const engines = {rules:'Reglas',jev:'Jev',provider:'Proveedor retirado'};
 function renderHistory() {
   const page=$('history'),previousScroll=page.querySelector('.history-list')?.scrollTop || 0;
   const previousDetail=page.querySelector('.history-detail'),detailScroll=previousDetail?.scrollTop || 0,previousId=previousDetail?.dataset.decision;
@@ -228,24 +228,17 @@ function settings() {
   actionCard(box,config.enabled?'Ⅱ  Pausar selección automática':'▶  Activar selección automática',config.enabled?'Codex automático decide en cada nuevo mensaje.':'Se respeta la selección manual de Codex.',()=>configure('enabled',!config.enabled));
   actionCard(box,state.ui.topmost?'Desactivar Mantener delante':'Activar Mantener delante',state.ui.topmost?'El monitor permanece sobre otras ventanas.':'El monitor puede quedar detrás de otras ventanas.',()=>native({action:'topmost',value:!state.ui.topmost}));
   heading(box,'CONSERVAR HISTORIAL');choices(box,[[30,'30 días'],[90,'90 días'],[180,'180 días'],[0,'Siempre']],config.history_days??90,v=>configure('history_days',v));
-  const engine=config.routing_engine==='ollama'?'provider':config.routing_engine||'rules';
-  heading(box,'MOTOR DE ENRUTAMIENTO');choices(box,[['rules','Reglas'],['jev','Jev'],['provider','Proveedor']],engine,v=>configure('routing_engine',v));
+  const engine=['rules','jev'].includes(config.routing_engine)?config.routing_engine:'rules';
+  heading(box,'MOTOR DE ENRUTAMIENTO');choices(box,[['rules','Reglas'],['jev','Jev']],engine,v=>configure('routing_engine',v));
   box.append(el('p','small',engine==='rules'?'Las reglas locales deciden al instante sin enviar el mensaje a otro servicio.':'El clasificador recibe el mensaje de la tarea. Si falla o responde de forma inválida, se conservan las reglas locales. Puede consumir cuota del proveedor.'));
-  heading(box,'COMPARACIÓN EN PARALELO');const comparisons=(config.comparison_engines||[]).map(x=>x==='ollama'?'provider':x);
-  choices(box,[['rules','Reglas'],['jev','Jev'],['provider','Proveedor']],[engine,...comparisons],key=>configure('comparison_engines',comparisons.includes(key)?comparisons.filter(x=>x!==key):[...comparisons,key]),[engine]);
+  heading(box,'COMPARACIÓN EN PARALELO');const comparisons=(config.comparison_engines||[]).filter(x=>['rules','jev'].includes(x));
+  choices(box,[['rules','Reglas'],['jev','Jev']],[engine,...comparisons],key=>configure('comparison_engines',comparisons.includes(key)?comparisons.filter(x=>x!==key):[...comparisons,key]),[engine]);
   box.append(el('p','small','El motor activo ya se registra. Marca otros para comparar propuestas; las comparaciones externas también reciben el mensaje.'));
   if(engine==='jev'){
     const jev=config.jev||{},connection=jev.connection||'typesafe';heading(box,'CONEXIÓN DE JEV');
     choices(box,[['vercel','Vercel AI Gateway'],['typesafe','TypeSafe directo']],connection,v=>configure('jev.connection',v));
     box.append(el('p','small',connection==='vercel'?'Usa el modelo virtual vmc/jev de Vercel durante las pruebas.':'Conecta directamente con api.typesafe.ai usando jev-latest.'));
     keySettings(box,'jev',connection==='vercel'?'Vercel AI Gateway':'TypeSafe');
-  }
-  if(engine==='provider') {
-    const provider=config.provider||{};heading(box,'PROVEEDOR');choices(box,[['ollama','Ollama']],'ollama',()=>{});keySettings(box,'ollama','Ollama');
-    actionCard(box,provider.connection!=='api_key'?'✓  Usando la sesión local de Ollama':'Usar sesión de Ollama instalada','Utiliza la aplicación de Ollama instalada y su sesión iniciada.',()=>configure('provider.connection','local'));
-    if(state.keys?.ollama)actionCard(box,provider.connection==='api_key'?'✓  Usando clave guardada':'Usar la clave guardada','Conexión directa con Ollama Cloud.',()=>configure('provider.connection','api_key'));
-    heading(box,'MODELO PARA CLASIFICAR');choices(box,[['glm-5.3-flash:cloud','GLM Flash'],['deepseek-v4.1-flash:cloud','DeepSeek Flash']],provider.model||'glm-5.3-flash:cloud',v=>configure('provider.model',v));
-    actionCard(box,provider.send_attachment_content?'✓  Permitir imágenes para Ollama':'○  Mantener adjuntos como metadatos',provider.send_attachment_content?'Ollama podrá recibir imágenes que Codex exponga como datos adjuntos.':'Se comunica presencia, cantidad y tipo de adjuntos, sin su contenido.',()=>configure('provider.send_attachment_content',!provider.send_attachment_content));
   }
   heading(box,'POLÍTICA ACTUAL');for(const [tier,description] of [['simple','Tareas delimitadas'],['normal','Cambios concretos'],['complex','Ingeniería compleja'],['critical','UX, auditorías y gran alcance']]){const route=config.routes?.[tier];if(route){const row=el('div','policy');row.append(badge(route.model),el('span','',description),badge(route.effort,true));box.append(row);}}
   heading(box,'PRIVACIDAD');box.append(el('p','small','El historial guarda tareas, ajustes, motivos, estados y contadores. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales. Las claves se almacenan en el llavero de macOS.'));

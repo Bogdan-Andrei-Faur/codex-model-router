@@ -211,7 +211,7 @@ def install():
     write_environment(desired)
     record.update(status="registered", registered_at=time.time(), protocol_checks=checks, desktop_version=installation.version)
     atomic_json(registration_path(), record)
-    # Keep provider choices, history and credentials untouched.
+    # Keep local routing choices, history and credentials untouched.
     return {"registered": True, "desktop_version": installation.version,
             "message": "Conexión instalada. Cierra Desktop cuando terminen tus tareas y ábrelo desde su acceso habitual."
                        " La app que ya está abierta conserva su conexión anterior."}
