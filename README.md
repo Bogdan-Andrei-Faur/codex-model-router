@@ -15,19 +15,24 @@ python3 macos.py doctor
 python3 macos.py setup
 ```
 
-Después de terminar tus tareas y cerrar Codex por completo, abre
-`dist/Codex automático.app`. No muevas esta app fuera de `dist`: el acceso usa
-esta copia del proyecto. Puedes crear un alias. El uso descrito a continuación
-corresponde al monitor de Windows.
+Después de preparar el monitor, usa **Ajustes → Conectar al inicio habitual**.
+Cierra Desktop cuando terminen tus tareas y ábrelo desde su acceso normal.
+El acceso `dist/Codex automático.app` se conserva como alternativa. No muevas
+los bundles fuera de `dist`: esta instalación todavía depende del repositorio.
 
-**Monitor versión 15.** La interfaz se puede actualizar sin cerrar Codex ni
+**Integración y monitor versión 19.** La interfaz se puede actualizar sin cerrar Codex ni
 interrumpir sus tareas. Los accesos del escritorio apuntan a la versión actual.
 Los cambios del selector, cuando los haya, se cargan al volver a abrir Codex
-desde **Codex automático**. No hace falta cerrar sesión.
+desde su acceso habitual, si has conectado la integración. Una conexión instalada
+no demuestra que la app abierta ya la esté usando: compruébalo en Ajustes.
+
+Instalación, diagnóstico, recuperación y límites:
+[Conexión con Desktop](docs/DESKTOP-INTEGRATION.md).
 
 ## Uso diario
 
-1. Abre **Codex automático** desde el escritorio y escribe con normalidad.
+1. Con la integración instalada, abre **ChatGPT Desktop** desde su acceso habitual.
+   Abre **Estado de Codex automático** cuando quieras mostrar el monitor.
 2. El icono de Codex automático permanece en el área junto al reloj de Windows,
    posiblemente dentro de la flecha. Su menú permite mostrar la vista compacta,
    desplegar el panel lateral, ocultar el monitor o pausar la selección.
@@ -57,6 +62,9 @@ El panel lateral tiene cuatro vistas:
 
 - **Actividad** muestra lo que está ocurriendo ahora. Al pulsar cualquier tarea
   se abre su decisión más reciente en Historial.
+  La tarea destacada y el detalle de Historial permiten elegir **Automático** o
+  **Manual** por tarea. La elección persiste y afecta al siguiente mensaje;
+  Manual conserva el modelo y esfuerzo enviados por Desktop y no llama al clasificador.
 - **Historial** conserva decisiones activas y terminadas con dos explicaciones
   independientes: por qué se eligió el modelo y por qué se eligió el razonamiento.
   También muestra estado, fecha, duración, tokens observados e incidencias. Desde
@@ -212,8 +220,10 @@ suscripción. La calidad y el ahorro real requieren observar tareas representati
   solo se analiza localmente al enviarlo para obtener esa categoría; no se guarda.
   No copian mensajes, adjuntos,
   argumentos de herramientas, respuestas ni credenciales. `state/` se excluye de Git.
-- Las rutas de Codex están fijadas a la instalación comprobada. Una actualización
-  de la app puede requerir ajustar el selector. Si falla, usa el acceso habitual.
+- La instalación se descubre en cada arranque. Windows prepara una copia verificada
+  del motor y sus auxiliares; macOS utiliza el bundle descubierto. Si una actualización
+  cambia el protocolo, usa **Desconectar integración** antes de abrir Desktop normalmente.
+  La detección de rutas no garantiza compatibilidad con futuras versiones del protocolo.
 - Todo es personal, fuera de Grimaldi. El código está respaldado en el repositorio
   privado [Bogdan-Andrei-Faur/codex-model-router](https://github.com/Bogdan-Andrei-Faur/codex-model-router).
 

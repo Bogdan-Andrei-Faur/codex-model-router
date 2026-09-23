@@ -16,7 +16,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from platform_support import creation_flags
-WRAPPER = ROOT / "dist" / ("codex-router-v18.exe" if os.name == "nt" else "codex-router")
+WRAPPER = ROOT / "dist" / ("codex-router-v19.exe" if os.name == "nt" else "codex-router")
 
 
 class Client:

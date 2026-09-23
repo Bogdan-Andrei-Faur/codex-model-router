@@ -19,6 +19,8 @@ from routing import DEFAULT_ROUTES, EFFORTS, classify_agent_identity, select_rou
 from decision_engines import ENGINES, ENGINE_JEV, ENGINE_OLLAMA, ENGINE_PROVIDER, ENGINE_RULES, attachment_summary, build_state, candidate_routes, inline_images, run_jev, run_provider
 from thread_inventory import ThreadInventory
 from platform_support import backend_path, creation_flags, uses_stdio, stop_backend, input_lines
+from desktop_runtime import discover
+from task_modes import read_mode
 
 ROOT = Path(__file__).resolve().parent
 
@@ -47,6 +49,8 @@ class Router:
         self.history_writes = 0
         self.stats = {"accepted": 0, "non_astra": 0}
         self.inventory = ThreadInventory()
+        self.client_name = "unknown"
+        self.handshake_complete = False
 
     def load_thread_categories(self):
         """Recover only safe identity metadata, never prompt content, after restart."""
@@ -71,7 +75,7 @@ class Router:
                    "model_reason", "effort_reason", "agent_category", "agent_confidence", "source", "status", "signal", "error_type", "error_code",
                    "inputTokens", "outputTokens", "cachedInputTokens", "reasoningOutputTokens", "routing_engine", "engine_model",
                    "engine_status", "engine_confidence", "engine_latency_ms", "engine_failure", "engine_input_tokens",
-                   "engine_output_tokens", "engine_cached_tokens", "proposed_model", "proposed_effort", "engine_active", "engine_applied"}
+                   "engine_output_tokens", "engine_cached_tokens", "proposed_model", "proposed_effort", "engine_active", "engine_applied", "task_mode"}
         record = {"schema": 2, "time": time.time(), "time_iso":
                   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event,
                   "session": str(os.getpid())}
@@ -122,7 +126,8 @@ class Router:
         self.record_history("decision_created", decision_id=decision_id, thread=tid, title=title,
                             model=model, effort=effort, previous_model=previous_model,
                             model_reason=model_reason, effort_reason=effort_reason, source=source,
-                            agent_category=agent_category, agent_confidence=agent_confidence, status="pending")
+                            agent_category=agent_category, agent_confidence=agent_confidence, status="pending",
+                            task_mode="manual" if source == "manual" else "agent" if source == "agent" else "automatic")
         return decision_id
 
     def log(self, event):
@@ -137,6 +142,7 @@ class Router:
             temp = target.with_suffix(".tmp")
             temp.write_text(json.dumps({"version": 2, "pid": os.getpid(), "events": self.events,
                                        "heartbeat": time.time(), "threads": self.inventory.visible(self.threads),
+                                       "client_name": self.client_name, "handshake_complete": self.handshake_complete,
                                        "inventory_synced_at": self.inventory.synced_at,
                                        "catalog": {m: sorted(e) for m, e in self.catalog.items()},
                                        "stats": self.stats},
@@ -175,6 +181,7 @@ class Router:
                         # `initialized` notification through this bridge. The
                         # successful handshake response is authoritative.
                         self.inventory.ready = True
+                        self.handshake_complete = True
                     elif method == "model/list" and "error" not in message:
                         for model in result.get("data", []):
                             self.catalog[model["model"]] = {
@@ -316,6 +323,9 @@ class Router:
             if not isinstance(params, dict):
                 return raw
             with self.lock:
+                if method == "initialize":
+                    name = (params.get("clientInfo") or {}).get("name", "unknown")
+                    self.client_name = name if name in ("codex_desktop", "codex_app", "Codex Desktop") else "other"
                 if method == "initialized":
                     self.inventory.ready = True
                 if "id" in message and method in (
@@ -335,9 +345,10 @@ class Router:
                     self.log({"event": "preserved", "reason": "active_turn", "thread": tid})
                     return raw
                 self.pending.add(tid)
-                routed = self.route_turn(message, raw)
+                mode_at_submission = read_mode(self.state_dir, tid)
+                routed = self.route_turn(message, raw, mode_at_submission)
                 if routed == raw and "id" in message:
-                    self.observe_preserved(message)
+                    self.observe_preserved(message, mode_at_submission)
                 return routed
         except (ValueError, KeyError, TypeError, AttributeError, OSError) as error:
             with self.lock:
@@ -345,7 +356,7 @@ class Router:
                 self.record_history("router_error", error_type=type(error).__name__, status="error")
             return raw
 
-    def observe_preserved(self, message):
+    def observe_preserved(self, message, mode_at_submission=None):
         """Observe explicit settings even while paused; never label them routed."""
         params = message["params"]
         row = self.threads.get(params.get("threadId"), {})
@@ -357,17 +368,22 @@ class Router:
             items = params.get("input") if isinstance(params.get("input"), list) else []
             category, confidence = classify_agent_identity(user_text(items), row.get("name", ""), has_attachments(items),
                                                            previous=row.get("agent_category"))
-            model_reason = "configuración original; sin intervención del selector"
+            manual = (mode_at_submission or read_mode(self.state_dir, params.get("threadId"))) == "manual"
+            model_reason = "modo manual de esta tarea; se respeta el modelo elegido en Codex" if manual else "configuración original; sin intervención del selector"
             effort_reason = "nivel configurado manualmente en Codex"
-            decision_id = self.new_decision(tid, model, effort, model_reason, effort_reason, "preserved",
+            source = "manual" if manual else "preserved"
+            decision_id = self.new_decision(tid, model, effort, model_reason, effort_reason, source,
                                             row.get("model"), agent_category=category, agent_confidence=confidence)
             self.accepted_routes[message["id"]] = {"model": model, "effort": effort, "reason": model_reason,
-                "model_reason": model_reason, "effort_reason": effort_reason, "source": "preserved",
+                "model_reason": model_reason, "effort_reason": effort_reason, "source": source,
                 "agent_category": category, "agent_confidence": confidence, "decision_id": decision_id}
 
-    def route_turn(self, message, raw):
+    def route_turn(self, message, raw, mode_at_submission=None):
         params = message["params"]
         tid = params.get("threadId")
+        if (mode_at_submission or read_mode(self.state_dir, tid)) == "manual":
+            self.log({"event": "preserved", "thread": tid, "reason": "task_manual"})
+            return raw
         config = read_config(self.config_path)
         if not config.get("enabled", False):
             self.log({"event": "preserved", "thread": tid, "reason": "disabled"})
@@ -526,7 +542,8 @@ def main():
     config_path = Path(os.environ.get("PERSONAL_CODEX_ROUTER_CONFIG", ROOT / "config.local.json"))
     try:
         config = read_config(config_path)
-        binary = backend_path(config)
+        installation = discover(config) if config.get("installation_mode") == "auto" else None
+        binary = installation.backend if installation else backend_path(config)
     except (ValueError, KeyError, TypeError, OSError):
         # Don't expose config or credential-bearing arguments in diagnostics.
         print("Personal router: backend configuration is unavailable.", file=sys.stderr)
@@ -539,11 +556,13 @@ def main():
     env.pop("CODEX_CLI_PATH", None)
     # Desktop removes this identity when it sees a custom executable. Our child
     # is still its original installed engine, so preserve that original identity.
-    family = config.get("windows_sandbox_package_family")
+    family = installation.package_family if installation else config.get("windows_sandbox_package_family")
     if family and os.name == "nt":
         env["CODEX_WINDOWS_SANDBOX_PACKAGE_FAMILY"] = family
     flags = creation_flags()
     if not is_server:
+        if os.name != "nt":
+            os.execve(str(binary), [str(binary), *args], env)
         return subprocess.call([str(binary), *args], env=env, creationflags=flags,
                                stdin=sys.stdin.buffer, stdout=sys.stdout.buffer, stderr=sys.stderr.buffer)
     proc = subprocess.Popen([str(binary), *args], stdin=subprocess.PIPE, stdout=subprocess.PIPE,

@@ -121,8 +121,54 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         case "topmost": if let value = data["value"] as? Bool { setTopmost(value) }
         case "config": if let key = data["key"] as? String, let value = data["value"] { configure(key,value) }
         case "quality": saveQuality(data)
+        case "taskMode": if let id=data["thread"] as? String,let mode=data["value"] as? String { setTaskMode(id,mode) }
+        case "connection": if let value = data["value"] as? String, ["doctor","install","uninstall"].contains(value) { manageConnection(value) }
         case "secret": if let provider = data["provider"] as? String, ["jev","ollama"].contains(provider), let value = data["value"] as? String, !value.isEmpty,value.utf8.count<16384 { storeKey(provider,value) }
         default: break
+        }
+    }
+    func taskModePath(_ id:String)->URL {
+        let key=SHA256.hash(data:Data(id.utf8)).map{String(format:"%02x",$0)}.joined()
+        return state.appendingPathComponent("task-modes").appendingPathComponent(key+".json")
+    }
+    func taskMode(_ id:String)->String {
+        let path=taskModePath(id)
+        if !FileManager.default.fileExists(atPath:path.path) {return "automatic"}
+        let data=read(path)
+        return data["thread"] as? String == id && data["mode"] as? String == "automatic" ? "automatic" : "manual"
+    }
+    func setTaskMode(_ id:String,_ mode:String) {
+        guard !preview,!id.isEmpty,id.count<=200,["automatic","manual"].contains(mode) else{return}
+        do {
+            let path=taskModePath(id)
+            try FileManager.default.createDirectory(at:path.deletingLastPathComponent(),withIntermediateDirectories:true)
+            try write(["schema":1,"thread":id,"mode":mode],path)
+            lastPayload=Data();refresh();feedback("Modo guardado para el próximo mensaje de esta tarea.")
+        } catch {feedback("No se pudo guardar el modo de esta tarea.")}
+    }
+    var connectionBusy = false
+    func manageConnection(_ action:String) {
+        guard !preview,!connectionBusy,let python=read(configPath)["python"] as? String else {return}
+        connectionBusy=true;feedback("Comprobando conexión…")
+        DispatchQueue.global(qos:.utility).async {
+            let process=Process(),pipe=Pipe()
+            process.executableURL=URL(fileURLWithPath:python)
+            process.arguments=[self.root.appendingPathComponent("desktop.py").path,action]
+            process.standardOutput=pipe;process.standardError=pipe
+            var message="No se pudo completar la conexión. Tus tareas siguen abiertas."
+            do {
+                try process.run()
+                let output=pipe.fileHandleForReading.readDataToEndOfFile();process.waitUntilExit()
+                if let data=(try? JSONSerialization.jsonObject(with:output)) as? [String:Any] {
+                    if let error=data["error"] as? String {message=error}
+                    else if let detail=data["message"] as? String {message=detail}
+                    else if data["connection"] as? String == "desktop_connected" {message="Desktop conectado al selector."}
+                    else if data["connection"] as? String == "bridge_observed" {message="Hay un puente activo; falta confirmar la conexión de Desktop."}
+                    else if data["registered"] as? Bool == true {message="Conexión instalada. Falta observar el nuevo arranque de Desktop."}
+                    else {message="Desktop detectado. El inicio habitual todavía no está conectado."}
+                }
+            } catch {}
+            DispatchQueue.main.async {self.connectionBusy=false;self.feedback(message);self.refresh()}
         }
     }
     func configure(_ key:String,_ value:Any) {
@@ -197,7 +243,9 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             DispatchQueue.main.async {
                 self.busy=false;if let records=records{self.journal=records}
                 let safeConfig=config.filter{["enabled","history_days","routing_engine","comparison_engines","jev","provider","routes"].contains($0.key)}
-                let payload:[String:Any]=["threads":rows,"connections":connections,"history":self.journal,"config":safeConfig,"keys":self.keys,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
+                let ids=Set(rows.keys).union(self.journal.compactMap{$0["thread"] as? String})
+                let taskModes=Dictionary(uniqueKeysWithValues:ids.map{($0,self.taskMode($0))})
+                let payload:[String:Any]=["threads":rows,"connections":connections,"history":self.journal,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
                 guard let encoded=try? JSONSerialization.data(withJSONObject:payload,options:[.sortedKeys]),encoded != self.lastPayload else{return}
                 self.lastPayload=encoded
                 self.web.callAsyncJavaScript("window.receive(payload)",arguments:["payload":payload],in:nil,in:.page){ result in if case .failure=result {self.lastPayload=Data()} }

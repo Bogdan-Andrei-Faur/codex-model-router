@@ -29,22 +29,24 @@ python3 macos.py setup --app '/ruta/ChatGPT.app'
 
 `setup` genera `config.local.json`, `dist/codex-router`,
 `dist/Codex automático.app` y `dist/Monitor de Codex.app`.
-No modifica la app instalada, `~/.codex/config.toml`, los hooks, el inicio de
-sesión ni los accesos existentes. No requiere una clave de API: la configuración
+`setup` no modifica la app instalada, `~/.codex/config.toml`, los hooks, el inicio de
+sesión ni los accesos existentes. Conectar después la integración sí instala un
+LaunchAgent de usuario para restaurar la conexión al iniciar sesión. No requiere una clave de API: la configuración
 inicial usa reglas locales, sin comparaciones ni llamadas de clasificación.
 Una configuración de Windows copiada se rechaza para evitar activar proveedores
 externos por accidente. Consérvala con otro nombre antes de preparar este Mac.
 
-Si cambia la ruta del proyecto, del Python usado para compilar o de la app,
-ejecuta `setup` de nuevo. Se conservan los ajustes de una configuración Mac ya
+Si cambia la ruta del proyecto o del Python usado, desconecta la integración y
+ejecuta `setup` de nuevo antes de conectarla otra vez. La app se descubre en cada
+arranque. Se conservan los ajustes de una configuración Mac ya
 existente. Los accesos dependen del repositorio: crea alias en Finder o arrastra
 el acceso al Dock; no copies los bundles solos a otra carpeta. No son paquetes
 independientes, firmados ni notarizados para distribución a otros equipos.
 
 ## Activación y vuelta al funcionamiento habitual
 
-1. Termina las tareas en curso y cierra Codex/ChatGPT por completo con ⌘Q.
-2. Abre `dist/Codex automático.app`.
+1. Abre el monitor y usa Ajustes → Conectar al inicio habitual.
+2. Termina las tareas en curso, cierra Codex/ChatGPT por completo con ⌘Q y abre su acceso normal.
 3. Abre una tarea y envía un mensaje. El monitor debe pasar de «Esperando
    conexión» a mostrar la conexión y luego la decisión aceptada.
 
@@ -54,6 +56,7 @@ puente. Esta variable existe en el código de la instalación inspeccionada; es
 un punto de integración sujeto a cambios entre versiones, no una garantía de
 compatibilidad futura de Desktop.
 
+El acceso `dist/Codex automático.app` se conserva como alternativa.
 Para pausar sin reiniciar, usa el botón del monitor o:
 
 ```sh
@@ -62,8 +65,10 @@ python3 macos.py resume
 ```
 
 Los siguientes mensajes leen la configuración actualizada. Un turno ya iniciado
-no cambia de modelo. Para volver a abrir Codex sin el puente, cierra la app
-completamente y usa su acceso habitual. No hay que desinstalar nada.
+no cambia de modelo. Para volver a abrir Codex sin el puente, usa Ajustes →
+Desconectar integración (o `python3 desktop.py uninstall`) antes de cerrar la app
+y abrirla normalmente. Se conserva el historial. Detalles y límites de v19 en
+[Conexión con Desktop](DESKTOP-INTEGRATION.md).
 
 ## Monitor de Mac — cápsula y panel
 
@@ -156,8 +161,8 @@ de Desktop en el Mac inspeccionado. La primera versión del detector solo acepta
 
 La activación del puente corregido en Desktop y un turno real quedan como comprobación final
 tras cerrar las tareas activas. Un smoke correcto no demuestra que la app abierta
-haya cargado el puente. Si una actualización cambia la integración, utiliza el
-acceso habitual y vuelve a ejecutar los checks antes de reactivarlo.
+haya cargado el puente. Si una actualización cambia la integración, desconéctala
+y vuelve a ejecutar los checks antes de reactivarla.
 
 Para revisar visualmente ocho agentes y decisiones ficticias sin tocar el
 historial real, `python3 tests/preview_monitor.py` crea una carpeta temporal.

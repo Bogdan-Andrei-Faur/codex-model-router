@@ -13,6 +13,7 @@ import tempfile
 
 from platform_support import backend_path
 from routing import DEFAULT_ROUTES
+from desktop_runtime import discover_macos
 
 ROOT = Path(__file__).resolve().parent
 CONFIG = ROOT / "config.local.json"
@@ -21,20 +22,8 @@ MONITOR = DIST / "Monitor de Codex.app" / "Contents" / "MacOS" / "codex-monitor-
 
 
 def discover_app(explicit=None):
-    candidates = [Path(explicit).expanduser()] if explicit else [
-        base / name for base in (Path("/Applications"), Path.home() / "Applications")
-        for name in ("Codex.app", "ChatGPT.app")]
-    for app in candidates:
-        try:
-            with (app / "Contents/Info.plist").open("rb") as stream:
-                info = plistlib.load(stream)
-            desktop = app / "Contents/MacOS" / info["CFBundleExecutable"]
-            binary = backend_path({"codex": str(app / "Contents/Resources/codex")})
-            if desktop.is_file() and os.access(desktop, os.X_OK):
-                return app.resolve(), desktop.resolve(), binary
-        except (OSError, KeyError, ValueError):
-            continue
-    raise ValueError("No se encuentra Codex. Indica --app /ruta/Codex.app o /ruta/ChatGPT.app.")
+    found = discover_macos(explicit)
+    return found.desktop.parent.parent.parent, found.desktop, found.backend
 
 
 def save_config(config):
@@ -69,6 +58,9 @@ def setup(app_path=None):
                   "history_days": 90, "routing_engine": "rules", "comparison_engines": [],
                   "python": sys.executable, "codex": str(binary), "desktop": str(desktop),
                   "routes": DEFAULT_ROUTES}
+    config["installation_mode"] = "auto"
+    if app_path:
+        config["desktop_app"] = str(app)
     DIST.mkdir(exist_ok=True)
     MONITOR.parent.mkdir(parents=True, exist_ok=True)
     # Compile before replacing any working configuration or launcher.
@@ -109,18 +101,8 @@ def app_running(desktop):
 
 
 def open_app():
-    config = json.loads(CONFIG.read_text(encoding="utf-8-sig"))
-    backend_path(config)
-    desktop = Path(config["desktop"])
-    if app_running(desktop):
-        raise ValueError("Codex sigue abierto. Termina tus tareas, cierra la app por completo y abre Codex automático.")
-    bridge = DIST / "codex-router"
-    if not bridge.is_file():
-        raise ValueError("Ejecuta primero macos.py setup.")
-    env = dict(os.environ, CODEX_CLI_PATH=str(bridge), PERSONAL_CODEX_ROUTER_CONFIG=str(CONFIG), PYTHONUTF8="1")
-    subprocess.Popen([str(desktop)], env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                     stderr=subprocess.DEVNULL, start_new_session=True)
-    open_monitor()
+    from desktop import open_app as open_desktop
+    return open_desktop()
 
 
 def open_monitor():

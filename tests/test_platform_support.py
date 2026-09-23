@@ -13,6 +13,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import macos
 import decision_engines
+import desktop
+from desktop_runtime import Installation
 from platform_support import backend_path, uses_stdio
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -96,11 +98,24 @@ class PlatformTests(unittest.TestCase):
                 if os.name != "nt": self.assertEqual(macos.CONFIG.stat().st_mode & 0o777, 0o600)
 
     def test_running_desktop_refuses_launch(self):
-        with patch.object(macos.CONFIG.__class__, "read_text", return_value=json.dumps({"desktop": "/test/ChatGPT", "codex": "/test/codex"})), \
-             patch.object(macos, "backend_path"), patch.object(macos, "app_running", return_value=True), \
+        with patch.object(desktop, "config", return_value={}), \
+             patch.object(desktop, "discover", return_value=Installation(Path('/test/ChatGPT'),Path('/test/codex'),'1','test')), \
+             patch.object(desktop.sys, "platform", "darwin"), patch.object(macos, "app_running", return_value=True), \
              patch.object(macos.subprocess, "Popen") as spawn:
             with self.assertRaisesRegex(ValueError, "sigue abierto"): macos.open_app()
             spawn.assert_not_called()
+
+    @unittest.skipIf(os.name == "nt", "POSIX termination and signal behavior")
+    def test_passthrough_replaces_bridge_and_preserves_arguments(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);binary=root/'codex'
+            binary.write_text('#!' + sys.executable + '\nimport json,sys\nprint(json.dumps(sys.argv[1:]))\nsys.exit(7)\n')
+            binary.chmod(0o755)
+            config=root/'config.json';config.write_text(json.dumps({'codex':str(binary)}))
+            args=['--version','a b','quote\"','español']
+            result=subprocess.run([sys.executable,str(ROOT/'router.py'),*args],capture_output=True,text=True,timeout=5,
+                                  env=dict(os.environ,PERSONAL_CODEX_ROUTER_CONFIG=str(config)))
+            self.assertEqual(result.returncode,7);self.assertEqual(json.loads(result.stdout),args)
 
     @unittest.skipIf(os.name == "nt", "POSIX termination and signal behavior")
     def test_bridge_preserves_protocol_and_stops_child_on_sigterm(self):

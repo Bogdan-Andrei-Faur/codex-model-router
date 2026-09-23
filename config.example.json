@@ -1,4 +1,5 @@
 {
+  "installation_mode": "auto",
   "enabled": true,
   "sync_picker": true,
   "history_days": 90,
@@ -17,8 +18,6 @@
     "send_attachment_content": false
   },
   "python": "C:\\Python314\\python.exe",
-  "codex": "REPLACE_WITH_ORIGINAL_DESKTOP_CODEX_EXE",
-  "desktop": "REPLACE_WITH_INSTALLED_CHATGPT_EXE",
   "routes": {
     "simple": {"model": "gpt-5.6-luna", "effort": "low"},
     "normal": {"model": "gpt-5.6-terra", "effort": "medium"},

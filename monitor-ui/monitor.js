@@ -1,7 +1,7 @@
 'use strict';
 const C = MonitorCore, $ = id => document.getElementById(id);
 let state = {threads:{},history:[],config:{enabled:true},ui:{mode:'Compact',topmost:true},connections:0};
-let currentTab = 'activity', order = [], selectedDecision = null, peekId = null, peekTimer, reasonOpen = false;
+let currentTab = 'activity', order = [], selectedDecision = null, selectedThread = null, peekId = null, peekTimer, reasonOpen = false;
 let dataSignature = '', history = [], avatars = new Map(), orbitSequence = 0;
 const native = message => window.webkit?.messageHandlers?.monitor?.postMessage(message);
 const el = (tag, cls, text) => { const node = document.createElement(tag); if(cls) node.className=cls; if(text !== undefined) node.textContent=String(text); return node; };
@@ -83,20 +83,29 @@ function showTab(name) {
   renderPage();
 }
 function openHistory(id) {
+  selectedThread=id;
   selectedDecision=history.find(item=>item.thread===id)?.id || null;
   showTab('history');
 }
 function explanation(parent,label,value,kind='') {const box=el('div','reason-card'+(kind?' '+kind:''));box.append(el('h3','',label),el('p','',value || 'Registro anterior sin explicación separada.'));parent.append(box);}
+function taskModeControls(parent,id) {
+  if(!id)return;
+  const mode=state.taskModes?.[id] || 'automatic';
+  choices(parent,[['automatic','Automático'],['manual','Manual']],mode,value=>native({action:'taskMode',thread:id,value}));
+  parent.append(el('p','small',!state.config.enabled?'El selector está pausado para todas las tareas.':mode==='manual'?
+    'Próximo mensaje: usa el modelo y esfuerzo elegidos en Codex.':'Próximo mensaje: el selector decide modelo y esfuerzo.'));
+}
 function activity() {
   const page=$('activity'),scroll=page.scrollTop;page.replaceChildren();
   const rows=Object.entries(state.threads).sort((a,b)=>Number(C.active(b[1].status))-Number(C.active(a[1].status))+(C.active(a[1].status)===C.active(b[1].status)?((b[1].updated||0)-(a[1].updated||0)):0));
   const featured=el('div','section');featured.append(el('h3','','TAREA DESTACADA'));
   if(!rows.length) {
-    featured.append(el('h2','',state.connections?'Todo en calma':'Esperando conexión'),el('p','',state.connections?'Las tareas aparecerán cuando se observe actividad.':'Abre Codex desde Codex automático cuando hayas terminado tus tareas. El monitor puede actualizarse sin cerrar Codex.'));
+    featured.append(el('h2','',state.connections?'Todo en calma':'Esperando conexión'),el('p','',state.connections?'Las tareas aparecerán cuando se observe actividad.':'Comprueba la conexión en Ajustes. Si está instalada, vuelve a abrir Desktop desde su acceso habitual cuando terminen tus tareas.'));
   } else {
     const [id,row]=rows[0],line=el('div','featured-row'),copy=el('div','featured-copy');
     const title=el('div','featured-title',row.name || id);title.title=row.name || id;
     copy.append(title,tags(row));line.append(avatar(id,row,()=>openHistory(id)),copy);featured.append(line);
+    taskModeControls(featured,id);
     featured.append(el('div','confirmation',row.status==='pending'?'Selección pendiente de confirmar':row.confirmation || 'Sin confirmar'));
     featured.append(button('¿Por qué esta elección?',()=>{reasonOpen=!reasonOpen;activity();},'why'));
     if(reasonOpen){const detail=el('div','explanation');detail.append(el('h3','','POR QUÉ EL MODELO'),el('p','',row.model_reason || row.reason || 'Sin explicación registrada.'),el('h3','','POR QUÉ EL RAZONAMIENTO'),el('p','',row.effort_reason || 'Sin explicación registrada.'));featured.append(detail);}
@@ -123,10 +132,11 @@ function renderHistory() {
   const previousDetail=page.querySelector('.history-detail'),detailScroll=previousDetail?.scrollTop || 0,previousId=previousDetail?.dataset.decision;
   page.replaceChildren();
   const detail=el('div','history-detail'),list=el('div','history-list');
-  const chosen=history.find(d=>d.id===selectedDecision) || history[0];if(chosen)selectedDecision=chosen.id;
-  if(!chosen){detail.append(el('h2','','Aún no hay decisiones registradas'),el('p','','Las nuevas ejecuciones se guardan aquí y se conservan al cerrar Codex. Abrir una conversación antigua no crea una decisión nueva.'));}
+  const chosen=history.find(d=>d.id===selectedDecision) || (selectedThread?history.find(d=>d.thread===selectedThread):history[0]);if(chosen)selectedDecision=chosen.id;
+  if(!chosen){detail.append(el('h2','','Aún no hay decisiones registradas'),el('p','','Las nuevas ejecuciones se guardan aquí y se conservan al cerrar Codex. Abrir una conversación antigua no crea una decisión nueva.'));taskModeControls(detail,selectedThread);}
   else {
     detail.append(el('h2','',chosen.title || 'Tarea'),tags(chosen,true),el('p','small',when(chosen.started || chosen.time)+' · '+C.status(chosen.status)));
+    taskModeControls(detail,chosen.thread);
     explanation(detail,'Modelo elegido',chosen.model_reason,'model');explanation(detail,'Razonamiento elegido',chosen.effort_reason,'effort');
     detail.append(el('h3','quality-label','VALORA ESTA ELECCIÓN'));
     const choices=el('div','choices');for(const [key,label] of [['insufficient','Insuficiente'],['adequate','Adecuada'],['excessive','Excesiva']]){
@@ -149,7 +159,7 @@ function renderHistory() {
   }
   list.append(el('h3','section-title','DECISIONES RECIENTES'));
   for(const record of history.slice(0,80)) {
-    const row=button('',()=>{selectedDecision=record.id;renderHistory();},'history-row'+(record.id===selectedDecision?' selected':''));
+    const row=button('',()=>{selectedDecision=record.id;selectedThread=record.thread;renderHistory();},'history-row'+(record.id===selectedDecision?' selected':''));
     const copy=el('div','history-copy'),title=el('div','task-title',record.title || 'Tarea');title.title=record.title || 'Tarea';copy.append(title,el('div','small'+(record.error_type?' warning':''),when(record.time)+' · '+C.status(record.status)));row.append(copy,tags(record,true));list.append(row);
   }
   detail.dataset.decision=chosen?.id || '';page.append(detail,el('div','rule'),list);list.scrollTop=previousScroll;
@@ -209,6 +219,11 @@ function keySettings(parent,id,label) {
 function settings() {
   const page=$('settings'),scroll=page.scrollTop,box=el('div','section'),config=state.config;page.replaceChildren(box);
   box.append(el('h2','','Ajustes'),el('p','','Controla el selector, el motor que decide y cuánto tiempo se conserva su historial local.'));
+  heading(box,'CONEXIÓN CON DESKTOP');
+  box.append(el('p','small','La instalación se detecta al arrancar. Conecta el inicio habitual una vez. Cerrar el monitor no detiene el selector.'));
+  actionCard(box,'Comprobar conexión','Distingue instalación, registro y conexión observada.',()=>native({action:'connection',value:'doctor'}));
+  actionCard(box,'Conectar al inicio habitual','Se aplicará al volver a abrir Desktop; conserva las tareas en curso.',()=>native({action:'connection',value:'install'}));
+  actionCard(box,'Desconectar integración','Restaura el inicio habitual sin borrar ajustes ni historial.',()=>native({action:'connection',value:'uninstall'}));
   actionCard(box,config.enabled?'Ⅱ  Pausar selección automática':'▶  Activar selección automática',config.enabled?'Codex automático decide en cada nuevo mensaje.':'Se respeta la selección manual de Codex.',()=>configure('enabled',!config.enabled));
   actionCard(box,state.ui.topmost?'Desactivar Mantener delante':'Activar Mantener delante',state.ui.topmost?'El monitor permanece sobre otras ventanas.':'El monitor puede quedar detrás de otras ventanas.',()=>native({action:'topmost',value:!state.ui.topmost}));
   heading(box,'CONSERVAR HISTORIAL');choices(box,[[30,'30 días'],[90,'90 días'],[180,'180 días'],[0,'Siempre']],config.history_days??90,v=>configure('history_days',v));
@@ -245,7 +260,7 @@ window.receive = incoming => {
   $('connection').classList.toggle('disconnected',!state.connections);$('connection').querySelector('span').textContent=state.preview?'Vista previa · datos simulados':state.connections?`${active} ${active===1?'tarea activa':'tareas activas'}`:'Sin conexión';$('connection').querySelector('i').classList.toggle('working',active>0);
   $('pause').textContent=state.config.enabled?'Ⅱ  Pausar selección':'▶  Activar selección';
   capsule();
-  const signature=JSON.stringify([state.threads,state.history,state.connections]);
+  const signature=JSON.stringify([state.threads,state.history,state.connections,state.taskModes]);
   const settingsChanged=oldConfig!==JSON.stringify(state.config) || oldUi!==JSON.stringify(state.ui);
   if(signature!==dataSignature || settingsChanged){
     dataSignature=signature;

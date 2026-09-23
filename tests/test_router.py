@@ -95,6 +95,38 @@ class RoutingPolicyTests(unittest.TestCase):
 
 
 class ProtocolTests(unittest.TestCase):
+    @patch("router.run_provider")
+    def test_manual_mode_is_persistent_scoped_and_preserves_exact_request_without_provider_calls(self, provider):
+        from task_modes import mode_path, read_mode
+        from desktop import atomic_json
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "provider"}))
+        target=mode_path(self.router.state_dir,'t')
+        atomic_json(target,{'schema':1,'thread':'t','mode':'manual'})
+        raw=encode(self.request())
+        self.assertEqual(self.router.client_line(raw),raw)
+        provider.assert_not_called()
+        self.assertEqual(self.router.accepted_routes[7]['source'],'manual')
+        self.assertEqual(read_mode(self.router.state_dir,'another-task'),'automatic')
+        restarted=Router(self.path,self.router.state_dir)
+        restarted.catalog=self.router.catalog
+        restarted.threads['t']={'provider':'openai','model':'gpt-6-astra','seen_turn':False}
+        self.assertEqual(restarted.client_line(raw),raw)
+        provider.assert_not_called()
+        # Switching mode affects only future requests, not the pending turn.
+        atomic_json(target,{'schema':1,'thread':'t','mode':'automatic'})
+        self.assertEqual(restarted.client_line(raw),raw)
+        restarted.server_line(encode({'id':7,'result':{'turn':{'id':'turn'}}}))
+        self.path.write_text(json.dumps({'enabled':True,'routes':DEFAULT_ROUTES}))
+        self.assertEqual(json.loads(restarted.client_line(raw))['params']['model'],'gpt-5.6-luna')
+
+    def test_damaged_task_preference_cannot_reenable_routing(self):
+        from task_modes import mode_path, read_mode
+        target=mode_path(self.router.state_dir,'t');target.parent.mkdir(parents=True)
+        for contents in ('bad-json','[]','{"mode":"automatic","thread":"someone-else"}'):
+            target.write_text(contents)
+            self.assertEqual(read_mode(self.router.state_dir,'t'),'manual')
+        self.assertEqual(self.router.client_line(encode(self.request())),encode(self.request()))
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.path = Path(self.tmp.name) / "config.json"

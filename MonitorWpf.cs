@@ -45,6 +45,8 @@ internal sealed partial class ModernRouterMonitor : Window
     readonly TextBlock compactCount = Txt("0 activas", 12, Muted, FontWeights.Medium);
     readonly TextBlock connection = Txt("Esperando conexión", 12, Muted);
     readonly TextBlock mainTask = Txt("Sin tarea seleccionada", 17, Ink, FontWeights.SemiBold);
+    readonly Border taskModeHost = new Border();
+    string taskModeSignature;
     readonly TextBlock confirmation = Txt("Sin confirmación", 12, Muted);
     readonly TextBlock reason = Txt("Todavía no hay una decisión del selector.", 13, Muted);
     readonly TextBlock effortReason = Txt("Todavía no hay una decisión de razonamiento.", 13, Muted);
@@ -241,6 +243,7 @@ internal sealed partial class ModernRouterMonitor : Window
         mainTask.ToolTip = mainTask.Text;
         featuredCopy.Children.Add(mainTags); Grid.SetColumn(featuredCopy, 1); featuredRow.Children.Add(featuredCopy);
         main.Children.Add(featuredRow);
+        main.Children.Add(taskModeHost);
         confirmation.Margin = new Thickness(0, 9, 0, 0); main.Children.Add(confirmation);
         var why = Btn("¿Por qué esta elección?", delegate
         {
@@ -555,6 +558,12 @@ internal sealed partial class ModernRouterMonitor : Window
 
     void ApplyFocus(string id, Dictionary<string, object> row, int active)
     {
+        string modeSignature = id + ":" + ReadTaskMode(id) + ":" + ReadEnabled();
+        if (taskModeSignature != modeSignature)
+        {
+            taskModeSignature = modeSignature;
+            taskModeHost.Child = TaskModeControls(id, delegate { taskModeSignature = null; RefreshData(); });
+        }
         string name = String(row, "name", id.Substring(0, Math.Min(8, id.Length)));
         string model = Model(Setting(row, "model", "Sin confirmar"));
         string effort = Effort(Setting(row, "effort", ""));
@@ -572,6 +581,7 @@ internal sealed partial class ModernRouterMonitor : Window
         FillTags(mainTags, "Sin confirmar", "");
         featuredAgentHost.Child = null; featuredAvatar = null;
         mainTask.Text = "Sin tarea seleccionada"; mainTask.ToolTip = mainTask.Text;
+        taskModeHost.Child = null; taskModeSignature = null;
         confirmation.Text = "Sin confirmación"; reason.Text = "Todavía no hay una decisión del selector.";
         effortReason.Text = "Todavía no hay una decisión de razonamiento.";
         confirmation.Foreground = Muted;

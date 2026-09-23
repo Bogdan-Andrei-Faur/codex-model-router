@@ -7,6 +7,9 @@ import subprocess
 
 
 def backend_path(config):
+    if config.get("installation_mode") == "auto":
+        from desktop_runtime import discover
+        return discover(config).backend
     binary = Path(config["codex"]).expanduser().resolve(strict=True)
     expected = "codex.exe" if os.name == "nt" else "codex"
     if binary.name.lower() != expected or not binary.is_file():

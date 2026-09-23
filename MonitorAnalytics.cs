@@ -116,11 +116,17 @@ internal sealed partial class ModernRouterMonitor
         if (decision != null) ShowDecision(decision);
         else
         {
-            selectedDecisionId = null; historyDetail.Children.Clear();
-            historyDetail.Children.Add(Txt("Sin ejecución registrada todavía", 15, Ink, FontWeights.SemiBold));
-            var note = Txt("La próxima ejecución de esta tarea aparecerá aquí. Abrir una conversación antigua no crea una decisión nueva.", 12, Muted);
-            note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 8, 0, 0); historyDetail.Children.Add(note);
+            requestedHistoryThread = thread; ShowUnrecordedThread(thread);
         }
+    }
+
+    void ShowUnrecordedThread(string thread)
+    {
+        selectedDecisionId = null; historyDetail.Children.Clear();
+        historyDetail.Children.Add(Txt("Sin ejecución registrada todavía", 15, Ink, FontWeights.SemiBold));
+        historyDetail.Children.Add(TaskModeControls(thread, delegate { ShowUnrecordedThread(thread); }));
+        var note = Txt("La próxima ejecución de esta tarea aparecerá aquí. Abrir una conversación antigua no crea una decisión nueva.", 12, Muted);
+        note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 8, 0, 0); historyDetail.Children.Add(note);
     }
 
     void RefreshAnalytics(List<KeyValuePair<string, Dictionary<string, object>>> liveRows, string historyPath = null)
@@ -220,6 +226,12 @@ internal sealed partial class ModernRouterMonitor
     void RebuildHistory()
     {
         historyList.Children.Clear();
+        if (requestedHistoryThread != null && !decisions.Any(item => item.Thread == requestedHistoryThread))
+        {
+            ShowUnrecordedThread(requestedHistoryThread);
+            foreach (var item in decisions.Take(80)) historyList.Children.Add(HistoryRow(item));
+            return;
+        }
         if (decisions.Count == 0)
         {
             historyDetail.Children.Clear(); historyDetail.Children.Add(Txt("Aún no hay decisiones registradas", 15, Ink, FontWeights.SemiBold));
@@ -275,10 +287,13 @@ internal sealed partial class ModernRouterMonitor
     void ShowDecision(DecisionRecord decision)
     {
         if (decision == null) return;
+        requestedHistoryThread = null;
         selectedDecisionId = decision.Id;
         historyDetail.Children.Clear();
         var title = Txt(decision.Title ?? "Sin título", 16, Ink, FontWeights.SemiBold); title.TextWrapping = TextWrapping.Wrap;
         historyDetail.Children.Add(title);
+        if (!System.String.IsNullOrEmpty(decision.Thread))
+            historyDetail.Children.Add(TaskModeControls(decision.Thread, delegate { ShowDecision(decision); }));
         var tags = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 9, 0, 7) };
         tags.Children.Add(Badge(decision.Model ?? "Sin confirmar", true));
         if (!System.String.IsNullOrEmpty(decision.Effort)) { var effort = Badge(decision.Effort, false); effort.Margin = new Thickness(6, 0, 0, 0); tags.Children.Add(effort); }
@@ -317,6 +332,50 @@ internal sealed partial class ModernRouterMonitor
             decision.Signal == "retry" ? "La siguiente petición indicó que el resultado no había resuelto la tarea." :
             "La siguiente petición cambió el modelo explícitamente.");
         if (decision.Error != null) AddExplanation(historyDetail, "INCIDENCIA", decision.Error);
+    }
+
+    string TaskModeFile(string id)
+    {
+        using (var hash = SHA256.Create())
+            return Path.Combine(StateFolder, "task-modes", BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(id))).Replace("-", "").ToLowerInvariant() + ".json");
+    }
+    string ReadTaskMode(string id)
+    {
+        string file = TaskModeFile(id);
+        if (!File.Exists(file)) return "automatic";
+        try
+        {
+            var data = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(file));
+            return String(data, "thread", "") == id && String(data, "mode", "") == "automatic" ? "automatic" : "manual";
+        }
+        catch { return "manual"; }
+    }
+    UIElement TaskModeControls(string id, Action changed)
+    {
+        var panel = new StackPanel { Margin = new Thickness(0, 10, 0, 4) };
+        string mode = ReadTaskMode(id);
+        var choices = new WrapPanel();
+        foreach (var option in new[] { new[] { "automatic", "Automático" }, new[] { "manual", "Manual" } })
+        {
+            string captured = option[0];
+            choices.Children.Add(ChoiceButton(option[1], mode == captured, delegate {
+                if (preview) return;
+                try
+                {
+                    string target = TaskModeFile(id), temporary = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                    Directory.CreateDirectory(Path.GetDirectoryName(target));
+                    File.WriteAllText(temporary, Json.Serialize(new { schema = 1, thread = id, mode = captured }), new UTF8Encoding(false));
+                    if (File.Exists(target)) File.Replace(temporary, target, null); else File.Move(temporary, target);
+                    changed();
+                }
+                catch { connection.Text = "No se pudo guardar el modo de esta tarea"; connection.Foreground = Warning; }
+            }));
+        }
+        panel.Children.Add(choices);
+        var note = Txt(!ReadEnabled() ? "El selector está pausado para todas las tareas." : mode == "manual" ? "Próximo mensaje: usa el modelo y esfuerzo elegidos en Codex." :
+            "Próximo mensaje: el selector decide modelo y esfuerzo.", 11, Muted);
+        note.TextWrapping = TextWrapping.Wrap; panel.Children.Add(note);
+        return panel;
     }
 
     void AddQualityControls(DecisionRecord decision)
@@ -445,6 +504,12 @@ internal sealed partial class ModernRouterMonitor
     {
         settingsContent.Children.Clear(); settingsContent.Children.Add(Txt("Ajustes", 17, Ink, FontWeights.SemiBold));
         AddSettingsNote("Controla el selector, el motor que decide y cuánto tiempo se conserva su historial local.");
+        settingsContent.Children.Add(AnalyticsHeading("CONEXIÓN CON DESKTOP"));
+        AddSettingsNote("La instalación se detecta al arrancar. Conecta el inicio habitual una vez y después abre Desktop desde su propio acceso. El monitor se puede cerrar sin detener el selector.");
+        settingsContent.Children.Add(SettingsAction("Comprobar conexión", "Distingue instalación, registro y conexión observada.", delegate { ManageConnection("doctor"); }));
+        settingsContent.Children.Add(SettingsAction("Conectar al inicio habitual", "Se aplicará al volver a abrir Desktop; conserva las tareas en curso.", delegate { ManageConnection("install"); }));
+        settingsContent.Children.Add(SettingsAction("Desconectar integración", "Restaura el inicio habitual sin borrar ajustes ni historial.", delegate { ManageConnection("uninstall"); }));
+        if (!System.String.IsNullOrEmpty(connectionMessage)) AddSettingsNote(connectionMessage);
         settingsContent.Children.Add(SettingsAction(ReadEnabled() ? "Ⅱ  Pausar selección automática" : "▶  Activar selección automática",
             ReadEnabled() ? "Codex automático decide en cada nuevo mensaje." : "Se respeta la selección manual de Codex.", delegate { TogglePause(); RefreshSettings(); }));
         settingsContent.Children.Add(SettingsAction(Topmost ? "Desactivar Mantener delante" : "Activar Mantener delante",
@@ -465,6 +530,43 @@ internal sealed partial class ModernRouterMonitor
         AddPolicy("Sol", "Ingeniería compleja", "Alto"); AddPolicy("Astra", "UX, auditorías y gran alcance", "Muy alto");
         settingsContent.Children.Add(AnalyticsHeading("PRIVACIDAD"));
         AddSettingsNote("El historial guarda fecha, tarea, modelo, razonamiento, motores, tiempos, motivos, estado, incidencias y contadores de tokens. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales.");
+    }
+
+    string connectionMessage;
+    bool connectionBusy;
+    void ManageConnection(string action)
+    {
+        if (preview || connectionBusy) return;
+        connectionBusy = true; connectionMessage = "Comprobando conexión…"; RefreshSettings();
+        System.Threading.ThreadPool.QueueUserWorkItem(delegate {
+            string message = "No se pudo completar la operación. Tus tareas siguen abiertas.";
+            try
+            {
+                var cfg = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(Path.Combine(Root, "config.local.json")));
+                var start = new System.Diagnostics.ProcessStartInfo((string)cfg["python"])
+                {
+                    Arguments = "\"" + Path.Combine(Root, "desktop.py") + "\" " + action,
+                    UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true,
+                    RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
+                };
+                start.EnvironmentVariables["PYTHONUTF8"] = "1";
+                using (var process = System.Diagnostics.Process.Start(start))
+                {
+                    var errors = process.StandardError.ReadToEndAsync();
+                    string output = process.StandardOutput.ReadToEnd(); process.WaitForExit();
+                    var data = Json.Deserialize<Dictionary<string, object>>(process.ExitCode == 0 ? output : errors.Result);
+                    if (data.ContainsKey("error")) message = (string)data["error"];
+                    else if (data.ContainsKey("message")) message = (string)data["message"];
+                    else message = String(data, "discovery", "") != "ready" ? "No se ha encontrado una instalación compatible." :
+                        String(data, "connection", "") == "desktop_connected" ? "Desktop conectado al selector." :
+                        String(data, "connection", "") == "bridge_observed" ? "Hay un puente activo; falta confirmar la conexión de Desktop." :
+                        data.ContainsKey("registered") && (bool)data["registered"] ? "Conexión instalada. Falta observar el nuevo arranque de Desktop." :
+                        "Desktop detectado. El inicio habitual todavía no está conectado.";
+                }
+            }
+            catch { }
+            Dispatcher.BeginInvoke((Action)delegate { connectionBusy = false; connectionMessage = message; RefreshSettings(); });
+        });
     }
 
     static bool ValidEngineResponse(EngineComparison item)
