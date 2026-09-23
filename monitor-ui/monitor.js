@@ -88,6 +88,7 @@ function openHistory(id) {
   showTab('history');
 }
 function explanation(parent,label,value,kind='') {const box=el('div','reason-card'+(kind?' '+kind:''));box.append(el('h3','',label),el('p','',value || 'Registro anterior sin explicación separada.'));parent.append(box);}
+function continuity(value) {return value==='continue'?'Jev consideró que es un seguimiento directo y conservó la configuración anterior.':value==='reassess'?'Jev consideró que esta petición debía evaluarse de nuevo antes de elegir modelo y razonamiento.':'';}
 function taskModeControls(parent,id) {
   if(!id)return;
   const mode=state.taskModes?.[id] || 'automatic';
@@ -108,7 +109,7 @@ function activity() {
     taskModeControls(featured,id);
     featured.append(el('div','confirmation',row.status==='pending'?'Selección pendiente de confirmar':row.confirmation || 'Sin confirmar'));
     featured.append(button('¿Por qué esta elección?',()=>{reasonOpen=!reasonOpen;activity();},'why'));
-    if(reasonOpen){const detail=el('div','explanation');detail.append(el('h3','','POR QUÉ EL MODELO'),el('p','',row.model_reason || row.reason || 'Sin explicación registrada.'),el('h3','','POR QUÉ EL RAZONAMIENTO'),el('p','',row.effort_reason || 'Sin explicación registrada.'));featured.append(detail);}
+    if(reasonOpen){const detail=el('div','explanation');detail.append(el('h3','','POR QUÉ EL MODELO'),el('p','',row.model_reason || row.reason || 'Sin explicación registrada.'),el('h3','','POR QUÉ EL RAZONAMIENTO'),el('p','',row.effort_reason || 'Sin explicación registrada.'));if(row.continuity_strategy)detail.append(el('h3','','DECISIÓN DE CONTINUIDAD'),el('p','',continuity(row.continuity_strategy)));featured.append(detail);}
   }
   page.append(featured,el('div','rule'),el('h3','section-title','ACTIVIDAD'));
   for(const [id,row] of rows.slice(1)) {
@@ -137,7 +138,7 @@ function renderHistory() {
   else {
     detail.append(el('h2','',chosen.title || 'Tarea'),tags(chosen,true),el('p','small',when(chosen.started || chosen.time)+' · '+C.status(chosen.status)));
     taskModeControls(detail,chosen.thread);
-    explanation(detail,'Modelo elegido',chosen.model_reason,'model');explanation(detail,'Razonamiento elegido',chosen.effort_reason,'effort');
+    explanation(detail,'Modelo elegido',chosen.model_reason,'model');explanation(detail,'Razonamiento elegido',chosen.effort_reason,'effort');if(chosen.continuity_strategy)explanation(detail,'Decisión de continuidad',continuity(chosen.continuity_strategy),'continuity');
     detail.append(el('h3','quality-label','VALORA ESTA ELECCIÓN'));
     const choices=el('div','choices');for(const [key,label] of [['insufficient','Insuficiente'],['adequate','Adecuada'],['excessive','Excesiva']]){
       choices.append(button(label,()=>native({action:'quality',id:chosen.id,thread:chosen.thread || '',value:chosen.quality===key?'':key}),'choice'+(chosen.quality===key?' selected':'')));

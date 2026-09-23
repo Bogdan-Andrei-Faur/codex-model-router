@@ -172,6 +172,20 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(records[-1]["routing_engine"], "jev")
         self.assertNotIn("PRIVATE_JEV_SENTINEL", (Path(self.tmp.name) / "state" / "history.jsonl").read_text())
 
+    @patch("router.run_jev")
+    def test_jev_decides_continuation_instead_of_the_local_shortcut(self, fake_jev):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
+        self.router.threads["t"].update(model="gpt-6-astra", effort="high", tier="critical", seen_turn=True)
+        fake_jev.return_value = {"engine": "jev", "status": "ok", "latency_ms": 25, "confidence": .91,
+                                 "engine_model": "jev-test", "continuity_strategy": "continue",
+                                 "route": {"model": "gpt-5.6-luna", "effort": "low", "tier": "simple", "label": "Luna · low"}}
+        result = json.loads(self.router.client_line(encode(self.request("Vale, sigue con ello", effort="high"))))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6-astra", "high"))
+        self.assertIn("Jev decidió continuar", self.router.threads["t"]["model_reason"])
+        records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
+        self.assertEqual(records[0]["continuity_strategy"], "continue")
+        fake_jev.assert_called_once()
+
     @patch("router.run_provider")
     def test_provider_failure_falls_back_to_rules(self, fake_provider):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "provider"}))

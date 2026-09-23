@@ -251,26 +251,45 @@ def run_jev(config, state_dir, state, candidates):
     if not key:
         return {"engine": ENGINE_JEV, "status": "not_configured", "latency_ms": 0}
     criteria = {name: "%s: %s" % (item["label"], item["description"]) for name, item in candidates.items()}
+    has_previous_route = bool(state.get("previous_model") and state.get("previous_effort"))
+    strategy_criteria = {
+        "reassess": "La petición introduce un objetivo, alcance o complejidad que exige volver a elegir modelo y razonamiento.",
+    }
+    if has_previous_route:
+        strategy_criteria["continue"] = "La petición es una continuación directa y la combinación anterior conserva calidad suficiente.",
     payload = {
         "model": model,
         "state": state,
-        "questions": {"route": {"type": "choice", "instructions":
-            "Elige la combinación de modelo Codex y razonamiento más pequeña que mantenga buena calidad. "
-            "Si hay adjuntos o una tarea visual, no infravalores la capacidad necesaria.", "criteria": criteria}},
+        "questions": {
+            "strategy": {"type": "choice", "instructions":
+                "Decide si esta petición debe conservar la configuración anterior o volver a evaluarse. "
+                "Continuar solo aplica a seguimientos directos sin un nuevo objetivo material.", "criteria": strategy_criteria},
+            "route": {"type": "choice", "instructions":
+                "Elige la combinación de modelo Codex y razonamiento más pequeña que mantenga buena calidad. "
+                "Si hay adjuntos o una tarea visual, no infravalores la capacidad necesaria.", "criteria": criteria},
+        },
     }
     try:
         response = _post_json(endpoint, payload,
                               {"Authorization": "Bearer " + key}, float(settings.get("timeout_seconds", 4)))
-        answer = ((response.get("answers") or {}).get("route") or (response.get("questions") or {}).get("route")
+        answers = response.get("answers") or response.get("questions") or {}
+        answer = (answers.get("route")
                   or response.get("route") or {})
         choice = answer.get("choice") if isinstance(answer, dict) else answer
         usage = engine_usage(response)
         if choice not in candidates:
             return {"engine": ENGINE_JEV, "status": "invalid", "engine_failure": "invalid_response",
                     "latency_ms": elapsed(started), "engine_model": payload["model"], **usage}
+        strategy_answer = answers.get("strategy") if isinstance(answers, dict) else None
+        strategy = strategy_answer.get("choice") if isinstance(strategy_answer, dict) else strategy_answer
+        # Older JEV endpoints may not yet answer the extra question. Treat their
+        # route as a re-evaluation rather than silently preserving a prior route.
+        if strategy not in strategy_criteria:
+            strategy = "reassess"
         confidence = answer.get("confidence") if isinstance(answer, dict) else None
         return {"engine": ENGINE_JEV, "status": "ok", "latency_ms": elapsed(started),
-                "route": candidates[choice], "confidence": number(confidence), "engine_model": payload["model"], **usage}
+                "route": candidates[choice], "continuity_strategy": strategy,
+                "confidence": number(confidence), "engine_model": payload["model"], **usage}
     except (OSError, ValueError, KeyError, TypeError, urllib.error.URLError, urllib.error.HTTPError, socket.timeout) as error:
         return {"engine": ENGINE_JEV, "status": "unavailable", "engine_failure": engine_failure(error),
                 "latency_ms": elapsed(started), "engine_model": payload["model"]}

@@ -46,7 +46,7 @@
       if (event.event === 'decision_created') item.started = Number(event.time)||0;
       if (['decision_accepted','decision_recovered'].includes(event.event)) item.accepted = true;
       if (['decision_completed','decision_rejected','decision_error'].includes(event.event)) item.finished = Number(event.time)||0;
-      for (const key of ['thread','title','model','effort','model_reason','effort_reason','source','status','signal','error_type','quality','routing_engine','engine_model','engine_status','engine_confidence','engine_latency_ms','inputTokens','outputTokens','cachedInputTokens','reasoningOutputTokens']) {
+      for (const key of ['thread','title','model','effort','model_reason','effort_reason','continuity_strategy','source','status','signal','error_type','quality','routing_engine','engine_model','engine_status','engine_confidence','engine_latency_ms','inputTokens','outputTokens','cachedInputTokens','reasoningOutputTokens']) {
         if (Object.prototype.hasOwnProperty.call(event,key)) item[key] = event[key];
       }
       if (event.event === 'engine_comparison') {

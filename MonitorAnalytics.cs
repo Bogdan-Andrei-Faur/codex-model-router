@@ -12,7 +12,7 @@ using System.Windows.Media;
 
 internal sealed class DecisionRecord
 {
-    public string Id, Thread, Title, Model, Effort, ModelReason, EffortReason, Source, Status, Signal, Error, Quality;
+    public string Id, Thread, Title, Model, Effort, ModelReason, EffortReason, ContinuityStrategy, Source, Status, Signal, Error, Quality;
     public string RoutingEngine, EngineModel, EngineStatus;
     public double EngineConfidence, EngineLatencyMs;
     public double Time, StartedTime, FinishedTime;
@@ -192,6 +192,7 @@ internal sealed partial class ModernRouterMonitor
         if (data.ContainsKey("model")) item.Model = Model(String(data, "model"));
         if (data.ContainsKey("effort")) item.Effort = Effort(String(data, "effort"));
         item.ModelReason = String(data, "model_reason", item.ModelReason); item.EffortReason = String(data, "effort_reason", item.EffortReason);
+        item.ContinuityStrategy = String(data, "continuity_strategy", item.ContinuityStrategy);
         item.Source = String(data, "source", item.Source); item.Status = String(data, "status", item.Status);
         item.Signal = String(data, "signal", item.Signal);
         item.Error = String(data, "error_type", item.Error);
@@ -307,6 +308,8 @@ internal sealed partial class ModernRouterMonitor
         }
         AddExplanation(historyDetail, "POR QUÉ EL MODELO", decision.ModelReason);
         AddExplanation(historyDetail, "POR QUÉ EL RAZONAMIENTO", decision.EffortReason);
+        if (!System.String.IsNullOrEmpty(decision.ContinuityStrategy))
+            AddExplanation(historyDetail, "DECISIÓN DE CONTINUIDAD", FriendlyContinuityStrategy(decision.ContinuityStrategy));
         AddQualityControls(decision);
         if (decision.Comparisons.Count > 0)
         {
@@ -431,6 +434,12 @@ internal sealed partial class ModernRouterMonitor
         var card = new Border { Background = Panel2, BorderBrush = rail, BorderThickness = new Thickness(3, 0, 0, 0),
             CornerRadius = new CornerRadius(16), Padding = new Thickness(10, 9, 11, 9), Margin = new Thickness(0, 10, 0, 0), Child = stack };
         panel.Children.Add(card);
+    }
+
+    static string FriendlyContinuityStrategy(string value)
+    {
+        return value == "continue" ? "Jev consideró que es un seguimiento directo y conservó la configuración anterior." :
+            value == "reassess" ? "Jev consideró que esta petición debía evaluarse de nuevo antes de elegir modelo y razonamiento." : value;
     }
 
     void RebuildStatistics()
