@@ -6,8 +6,7 @@
   "routing_engine": "rules",
   "comparison_engines": [],
   "jev": {
-    "model": "jev-latest",
-    "endpoint": "https://api.typesafe.ai/v1/systemone",
+    "connection": "typesafe",
     "timeout_seconds": 4
   },
   "provider": {

@@ -183,6 +183,9 @@ internal sealed partial class ModernRouterMonitor
             settingsContent.Children.Clear(); BuildRoutingEngineSettings(engine); UpdateLayout();
             Check(ContainsText(settingsContent, "MODELO PARA CLASIFICAR") == (engine == "provider"), "Provider configuration visible under wrong engine");
             Check(settingsContent.Children.OfType<TextBlock>().Any(text => text.Text == "JEV") == (engine == "jev"), "Jev configuration visible under wrong engine");
+            if (engine == "jev")
+                Check(ContainsText(settingsContent, "Vercel AI Gateway") && ContainsText(settingsContent, "TypeSafe directo"),
+                    "Jev connection selector is incomplete on Windows");
             var comparisons = settingsContent.Children.OfType<WrapPanel>().ElementAt(1).Children.OfType<Button>().ToList();
             Check(comparisons.Count == 3 && comparisons.Count(button => !button.IsEnabled) == 1, "Missing Rules comparison or active engine duplicated");
             foreach (var button in settingsContent.Children.OfType<WrapPanel>().SelectMany(panel => panel.Children.OfType<Button>()))

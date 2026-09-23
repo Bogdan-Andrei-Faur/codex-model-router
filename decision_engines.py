@@ -239,11 +239,11 @@ def run_jev(config, state_dir, state, candidates):
     settings = config.get("jev") or {}
     connection = settings.get("connection", "typesafe")
     if connection == "vercel":
-        default_endpoint = "https://ai-gateway.vercel.sh/v1/evaluate"
-        default_model = "vmc/jev"
+        endpoint = "https://ai-gateway.vercel.sh/v1/evaluate"
+        model = "vmc/jev"
     elif connection == "typesafe":
-        default_endpoint = "https://api.typesafe.ai/v1/systemone"
-        default_model = "jev-latest"
+        endpoint = "https://api.typesafe.ai/v1/systemone"
+        model = "jev-latest"
     else:
         return {"engine": ENGINE_JEV, "status": "not_configured", "latency_ms": 0,
                 "engine_failure": "unsupported_connection"}
@@ -252,14 +252,14 @@ def run_jev(config, state_dir, state, candidates):
         return {"engine": ENGINE_JEV, "status": "not_configured", "latency_ms": 0}
     criteria = {name: "%s: %s" % (item["label"], item["description"]) for name, item in candidates.items()}
     payload = {
-        "model": settings.get("model") or default_model,
+        "model": model,
         "state": state,
         "questions": {"route": {"type": "choice", "instructions":
             "Elige la combinación de modelo Codex y razonamiento más pequeña que mantenga buena calidad. "
             "Si hay adjuntos o una tarea visual, no infravalores la capacidad necesaria.", "criteria": criteria}},
     }
     try:
-        response = _post_json(settings.get("endpoint") or default_endpoint, payload,
+        response = _post_json(endpoint, payload,
                               {"Authorization": "Bearer " + key}, float(settings.get("timeout_seconds", 4)))
         answer = ((response.get("answers") or {}).get("route") or (response.get("questions") or {}).get("route")
                   or response.get("route") or {})

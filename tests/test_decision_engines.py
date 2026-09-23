@@ -67,6 +67,17 @@ class ProviderResponseTests(unittest.TestCase):
 
     @patch("decision_engines.jev_key", return_value="synthetic-key")
     @patch("decision_engines._post_json")
+    def test_jev_connection_ignores_stale_other_provider_endpoint_and_model(self, post, key):
+        post.return_value = {"answers": {"route": {"choice": "simple_low"}}}
+        result = run_jev({"jev": {"connection": "vercel", "endpoint": "https://api.typesafe.ai/v1/systemone",
+                                  "model": "jev-latest"}}, "", {"task": "PRIVATE_SENTINEL"}, self.candidates)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["engine_model"], "vmc/jev")
+        self.assertEqual(post.call_args.args[0], "https://ai-gateway.vercel.sh/v1/evaluate")
+        self.assertEqual(post.call_args.args[1]["model"], "vmc/jev")
+
+    @patch("decision_engines.jev_key", return_value="synthetic-key")
+    @patch("decision_engines._post_json")
     def test_jev_keeps_direct_typesafe_as_default(self, post, key):
         post.return_value = {"answers": {"route": {"choice": "critical_high"}}}
         result = run_jev({}, "", {"task": "PRIVATE_SENTINEL"}, self.candidates)

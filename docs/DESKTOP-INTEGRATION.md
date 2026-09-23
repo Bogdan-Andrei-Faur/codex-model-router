@@ -97,7 +97,7 @@ instalador independiente, firmado y notarizado para distribuir a terceros.
 
 ## Evidencia de esta entrega (2026-09-23)
 
-- 74 pruebas Python: Windows, 71 superadas y 3 POSIX omitidas; WSL/Linux, 74 superadas.
+- 75 pruebas Python: Windows, 72 superadas y 3 POSIX omitidas; WSL/Linux, 75 superadas.
 - Build de Windows y self-test del monitor: correctos. Imágenes de Actividad,
   Historial y Ajustes revisadas con controles de modo y conexión.
 - 7 pruebas del núcleo de UI de Mac y sintaxis JavaScript: correctas.
@@ -113,3 +113,7 @@ instalador independiente, firmado y notarizado para distribuir a terceros.
 
 No se ha demostrado compatibilidad con versiones futuras ni ahorro/calidad de
 modelos a partir de estas pruebas de integración.
+
+JEV guarda únicamente el tipo de conexión (`vercel` o `typesafe`). Endpoint y
+modelo se vinculan a esa elección para evitar mezclar una clave de un servicio
+con la URL del otro al migrar configuraciones antiguas.

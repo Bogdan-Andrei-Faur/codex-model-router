@@ -661,8 +661,22 @@ internal sealed partial class ModernRouterMonitor
     void BuildJevSettings()
     {
         settingsContent.Children.Add(AnalyticsHeading("JEV"));
-        bool keyReady = File.Exists(Path.Combine(StateFolder, "jev.secret")) || !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable("PERSONAL_CODEX_JEV_API_KEY")) || !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable("TYPESAFE_API_KEY"));
-        settingsContent.Children.Add(InlineKeySettings("jev", "TypeSafe", keyReady));
+        string connection = ReadNestedConfigString("jev", "connection", "typesafe");
+        var connections = new WrapPanel();
+        foreach (var option in new[] { new[] { "vercel", "Vercel AI Gateway" }, new[] { "typesafe", "TypeSafe directo" } })
+        {
+            string value = option[0], label = option[1];
+            connections.Children.Add(ChoiceButton(label, connection == value, delegate {
+                WriteNestedConfigValue("jev", "connection", value); RefreshSettings();
+            }));
+        }
+        settingsContent.Children.Add(connections);
+        AddSettingsNote(connection == "vercel" ? "Usa el modelo virtual vmc/jev mediante Vercel AI Gateway." :
+            "Conecta directamente con TypeSafe usando jev-latest.");
+        bool keyReady = File.Exists(Path.Combine(StateFolder, "jev.secret")) ||
+            !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable("PERSONAL_CODEX_JEV_API_KEY")) ||
+            !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable(connection == "vercel" ? "AI_GATEWAY_API_KEY" : "TYPESAFE_API_KEY"));
+        settingsContent.Children.Add(InlineKeySettings("jev", connection == "vercel" ? "Vercel AI Gateway" : "TypeSafe", keyReady));
     }
 
     void BuildProviderSettings()
