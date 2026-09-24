@@ -242,7 +242,7 @@ class Router:
                                                 phase_model=accepted.get("model"), phase_effort=accepted.get("effort"),
                                                 phase_transition=accepted.get("phase_transition"),
                                                 accepted_model=accepted.get("model"), accepted_effort=accepted.get("effort"),
-                                                pipeline_mode="observation", phase_pipeline=accepted.get("phase_pipeline"))
+                                                pipeline_mode="observation", phase_pipeline=row.get("phase_pipeline"))
                         if "error" not in message and sync:
                             # After acknowledgement, turn/start has already applied
                             # the user's mode and permissions. Ask the native server
@@ -258,6 +258,8 @@ class Router:
                     self.active.add(tid)
                     row = self.threads.setdefault(tid, {})
                     row.update(status="inProgress", updated=time.time(), **phase_update(row, "active"))
+                    self.record_history("phase_started", decision_id=self.current_decisions.get(tid), thread=tid,
+                                        **phase_update(row, "active"))
                 elif method == "turn/completed":
                     self.active.discard(tid)
                     self.pending.discard(tid)
@@ -272,7 +274,8 @@ class Router:
                                         thread=tid, title=row.get("name"), status=row.get("status"), **tokens,
                                         phase_status=row.get("phase_status"), phase_name=row.get("phase_name"),
                                         phase_model=row.get("phase_model"), phase_effort=row.get("phase_effort"),
-                                        phase_transition=row.get("phase_transition"))
+                                        phase_transition=row.get("phase_transition"), pipeline_mode="observation",
+                                        phase_pipeline=row.get("phase_pipeline"))
                 elif method == "thread/name/updated":
                     self.threads.setdefault(tid, {})["name"] = params.get("threadName", params.get("name", tid))
                 elif method == "thread/status/changed":
@@ -329,16 +332,15 @@ class Router:
                     if settings.get("model"):
                         state["configured_model"] = settings["model"]
                         state["configured_effort"] = settings.get("effort")
-                        state.update(configured_model=settings["model"], configured_effort=settings.get("effort"),
-                                     **phase_update(state, "accepted", model=settings["model"], effort=settings.get("effort")))
+                        # Published picker settings can arrive after start/completion,
+                        # and may already describe the next turn. Keep lifecycle intact.
                         if not state.get("confirmation") == "Aceptado por Codex":
                             state.update(model=settings["model"], effort=settings.get("effort"))
                         self.log({"event": "native_settings", "thread": tid,
                                   "model": settings["model"], "effort": settings.get("effort")})
                         self.record_history("phase_settings_published", decision_id=self.current_decisions.get(tid),
                                             thread=tid, title=state.get("name"), status=state.get("status"),
-                                            phase_status="accepted", phase_name=state.get("phase_name", "execution"),
-                                            phase_model=settings["model"], phase_effort=settings.get("effort"),
+                                            phase_status=state.get("phase_status"), phase_name=state.get("phase_name", "execution"),
                                             phase_transition=state.get("phase_transition"), configured_model=settings["model"],
                                             configured_effort=settings.get("effort"), pipeline_mode="observation",
                                             phase_pipeline=state.get("phase_pipeline"))

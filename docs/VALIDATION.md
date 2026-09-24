@@ -1,5 +1,27 @@
 # Validation and integration notes
 
+## Windows phase UI correction — 2026-09-24
+
+- Added the missing WPF phase pipeline, history provenance and evidence counters.
+  The web assets previously changed are used by macOS, not the Windows monitor.
+- Native v20 builds alongside the running v19. Native review checks exercise
+  Activity, History and Statistics with phase fixtures and unknown inference.
+  Rendered `review-phase-activity.png` and `review-phase-history.png` were inspected.
+- Python regression covers delayed picker notifications after turn start and
+  completion: neither changes lifecycle state nor claims an observed inference.
+  Started/completed pipeline state is persisted for history replay.
+- Actual inference telemetry collection is still not connected. The counter
+  must remain zero without evidence. Automatic model switching remains disabled.
+- After replacement, v20 remained running and its `--render` path consumed the
+  current status snapshots: the actual featured task rendered as active with
+  the pipeline visible. This is an in-process native render, not a desktop screenshot.
+- Publishing the stable launcher was blocked because it is in use by Desktop.
+  It was preserved. Only the owned v19 monitor process was stopped; v20 was
+  launched, and the stopped legacy monitor path received the same v20 binary
+  (matching SHA-256), so the still-running old launcher remains compatible.
+  No backend or Desktop process was stopped. A later build when Desktop is
+  closed can replace the stable launcher normally.
+
 ## macOS visual fidelity follow-up — 2026-09-22
 
 The owner identified visual omissions after functional acceptance. Compared

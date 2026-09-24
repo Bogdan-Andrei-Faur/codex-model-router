@@ -345,6 +345,27 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(self.router.threads["t"]["status"], "completed")
         self.assertEqual(self.router.threads["t"]["phase_status"], "completed")
 
+    def test_late_picker_settings_do_not_regress_pipeline_or_claim_inference(self):
+        self.router.client_line(encode(self.request()))
+        self.router.server_line(encode({"id": 7, "result": {"turn": {"id": "q"}}}))
+        self.router.server_line(encode({"method": "turn/started", "params": {"threadId": "t"}}))
+        settings = encode({"method": "thread/settings/updated", "params": {"threadId": "t",
+                           "threadSettings": {"model": "gpt-6-astra", "effort": "max"}}})
+        self.router.server_line(settings)
+        self.assertEqual(self.router.threads["t"]["phase_status"], "active")
+        self.assertEqual(self.router.threads["t"]["phase_model"], "gpt-5.6-luna")
+        self.router.server_line(encode({"method": "turn/completed", "params": {
+            "threadId": "t", "turn": {"status": "completed"}}}))
+        self.router.server_line(settings)
+        row = self.router.threads["t"]
+        self.assertEqual(row["phase_status"], "completed")
+        self.assertEqual(row["phase_pipeline"][1]["state"], "completed")
+        self.assertNotIn("observed_model", row)
+        records = [json.loads(line) for line in (self.router.state_dir / "history.jsonl").read_text().splitlines()]
+        self.assertEqual(next(r for r in records if r["event"] == "decision_accepted")["phase_pipeline"][1]["state"], "accepted")
+        self.assertEqual(records[-1]["phase_pipeline"][1]["state"], "completed")
+        self.assertTrue(any(r["event"] == "phase_started" for r in records))
+
     def test_paused_turn_is_observed_without_changing_it(self):
         self.path.write_text('{"enabled": false}')
         raw = encode(self.request())

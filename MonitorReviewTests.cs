@@ -459,6 +459,26 @@ internal sealed partial class ModernRouterMonitor
             CheckSettingsInteraction();
             results.Add("PASS: outlined selectors, Rules comparison, engine-specific settings, inline keys with cancel, persistent rating removal and active-engine attribution");
             results.Add("PASS: Statistics and Settings tabs contain real metrics and working controls");
+            var phases = Fixture("Pipeline de Windows", "gpt-5.6-terra", "medium", "active");
+            phases["phase_status"] = "active"; phases["pipeline_mode"] = "observation";
+            phases["accepted_model"] = "gpt-5.6-terra"; phases["accepted_effort"] = "medium";
+            phases["configured_model"] = "gpt-5.6-sol"; phases["configured_effort"] = "high";
+            SelectMonitorTab(0); ApplyFocus("phase-test", phases, 1); UpdateLayout();
+            Check(ContainsText(phaseHost, "PIPELINE") && ContainsText(phaseHost, "En curso") && ContainsText(phaseHost, "Pendiente de evidencia"),
+                "Native Windows Activity omitted the phase pipeline");
+            SaveVisual(this, Path.Combine(StateFolder, "review-phase-activity.png"), 1.25);
+            var phaseDecision = new DecisionRecord { Id = "phase-test", Title = "Pipeline de Windows", Model = "Terra", Effort = "Medio" };
+            ApplyHistoryEvent(phaseDecision, phases);
+            Check(String(phaseDecision.PhaseEvidence, "configured_model") == "gpt-5.6-sol" && String(phaseDecision.PhaseEvidence, "observed_model") == "",
+                "Settings were promoted to inference evidence");
+            SelectMonitorTab(1); ShowDecision(phaseDecision); UpdateLayout();
+            Check(ContainsText(historyDetail, "EVIDENCIA DEL MODELO") && ContainsText(historyDetail, "sin confirmación disponible"),
+                "Native history omitted provenance or claimed inference");
+            SaveVisual(this, Path.Combine(StateFolder, "review-phase-history.png"), 1.25);
+            decisions.Clear(); decisions.Add(phaseDecision); SelectMonitorTab(2); RebuildStatistics(); UpdateLayout();
+            Check(ContainsText(statisticsContent, "Configuraciones publicadas") && ContainsText(statisticsContent, "Inferencias confirmadas"),
+                "Native statistics omitted phase evidence");
+            results.Add("PASS: native phase pipeline, history provenance and statistics preserve unknown inference evidence");
             File.WriteAllLines(report, results); quitting = true; Close(); return 0;
         }
         catch (Exception exception)

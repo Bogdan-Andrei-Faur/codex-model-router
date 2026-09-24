@@ -17,6 +17,7 @@ internal sealed class DecisionRecord
     public double EngineConfidence, EngineLatencyMs;
     public double Time, StartedTime, FinishedTime;
     public bool Accepted;
+    public readonly Dictionary<string, object> PhaseEvidence = new Dictionary<string, object>();
     public int InputTokens, OutputTokens, CachedTokens, ReasoningTokens;
     public readonly Dictionary<string, EngineComparison> Comparisons = new Dictionary<string, EngineComparison>();
 }
@@ -168,6 +169,7 @@ internal sealed partial class ModernRouterMonitor
             item.ModelReason = String(pair.Value, "model_reason", String(pair.Value, "reason", "Registro anterior sin explicación separada."));
             item.EffortReason = String(pair.Value, "effort_reason", "Registro anterior sin explicación separada del razonamiento.");
             item.Time = Math.Max(item.Time, Number(pair.Value, "updated"));
+            CopyPhaseEvidence(item.PhaseEvidence, pair.Value);
             if (pair.Value.ContainsKey("tokens"))
             {
                 var tokens = Dict(pair.Value["tokens"]);
@@ -182,6 +184,7 @@ internal sealed partial class ModernRouterMonitor
     static void ApplyHistoryEvent(DecisionRecord item, Dictionary<string, object> data)
     {
         string eventName = String(data, "event");
+        CopyPhaseEvidence(item.PhaseEvidence, data);
         // A later user rating must not make an old execution look newly run.
         if (eventName != "decision_quality") item.Time = Math.Max(item.Time, Number(data, "time"));
         if (eventName == "decision_created") item.StartedTime = Number(data, "time");
@@ -301,6 +304,9 @@ internal sealed partial class ModernRouterMonitor
         historyDetail.Children.Add(tags);
         historyDetail.Children.Add(Txt(FriendlyStatus(decision.Status) + " · " + HistoryTime(decision.Time), 11,
             decision.Error == null ? Muted : Warning, FontWeights.Medium));
+        historyDetail.Children.Add(BuildPhasePipeline(decision.PhaseEvidence));
+        if (decision.PhaseEvidence.Count > 0)
+            AddExplanation(historyDetail, "EVIDENCIA DEL MODELO", ExecutionEvidence(decision.PhaseEvidence, decision.Model, decision.Effort, decision.Source));
         if (decision.Source == "recovered")
         {
             var recovered = Txt("Recuperada de registros anteriores · detalles limitados", 11, Muted);
@@ -456,6 +462,14 @@ internal sealed partial class ModernRouterMonitor
         int retries = decisions.Count(item => item.Signal == "retry");
         AddMetric("Incidencias registradas", errors.ToString(), total == 0 ? 0 : errors * 1.0 / total, errors == 0 ? Good : Warning);
         AddMetric("Reintentos registrados", retries.ToString(), total == 0 ? 0 : retries * 1.0 / total, Good);
+        statisticsContent.Children.Add(AnalyticsHeading("FASES · OBSERVACIÓN"));
+        foreach (var group in decisions.Where(item => item.PhaseEvidence.ContainsKey("phase_status"))
+            .GroupBy(item => String(item.PhaseEvidence, "phase_status")))
+            AddMetric(PhaseStatus(group.Key), group.Count().ToString(), group.Count() * 1.0 / Math.Max(1, total), Accent);
+        int published = decisions.Count(item => !System.String.IsNullOrEmpty(String(item.PhaseEvidence, "configured_model")));
+        int inferred = decisions.Count(item => !System.String.IsNullOrEmpty(String(item.PhaseEvidence, "observed_model")));
+        AddMetric("Configuraciones publicadas", published.ToString(), published * 1.0 / Math.Max(1, total), Good);
+        AddMetric("Inferencias confirmadas localmente", inferred.ToString(), inferred * 1.0 / Math.Max(1, total), Muted);
         statisticsContent.Children.Add(AnalyticsHeading("MODELOS"));
         AddBreakdown(decisions.Where(item => item.Model != null).GroupBy(item => item.Model).ToDictionary(group => group.Key, group => group.Count()), true);
         statisticsContent.Children.Add(AnalyticsHeading("RAZONAMIENTO"));
@@ -533,6 +547,8 @@ internal sealed partial class ModernRouterMonitor
             choices.Children.Add(button);
         }
         settingsContent.Children.Add(choices);
+        settingsContent.Children.Add(AnalyticsHeading("FASES Y EVIDENCIA"));
+        AddSettingsNote("La pipeline observa la ejecución. Revisión y cierre siguen pendientes de evidencia. El cambio automático de modelo entre fases aún no está activado.");
         BuildRoutingEngineSettings();
         settingsContent.Children.Add(AnalyticsHeading("POLÍTICA ACTUAL"));
         AddPolicy("Luna", "Tareas delimitadas", "Ligero"); AddPolicy("Terra", "Cambios concretos", "Medio");

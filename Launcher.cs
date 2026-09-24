@@ -133,7 +133,7 @@ internal static class Launcher
 
     static void OpenMonitor(bool hidden)
     {
-        Process.Start(new ProcessStartInfo(Path.Combine(Root, "dist", "codex-monitor-v19.exe"), hidden ? "--tray" : "")
+        Process.Start(new ProcessStartInfo(Path.Combine(Root, "dist", "codex-monitor-v20.exe"), hidden ? "--tray" : "")
             { UseShellExecute = false, CreateNoWindow = true });
     }
 

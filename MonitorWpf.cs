@@ -310,12 +310,16 @@ internal sealed partial class ModernRouterMonitor : Window
         reasonStack.Children.Add(Label("POR QUÉ EL RAZONAMIENTO"));
         effortReason.Margin = new Thickness(0, 4, 0, 0); reasonStack.Children.Add(effortReason);
         reasonBox.Child = reasonStack; reasonBox.Visibility = Visibility.Collapsed; main.Children.Add(reasonBox);
-        Grid.SetRow(main, 2); expandedView.Children.Add(main);
+        main.Children.Add(phaseHost);
+        var mainScroll = new ScrollViewer { Content = main, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        surface.SizeChanged += delegate { mainScroll.MaxHeight = Math.Max(140, surface.ActualHeight * .62); };
+        Grid.SetRow(mainScroll, 2); expandedView.Children.Add(mainScroll);
 
         var separator = new Border { Background = Line, Height = 1, Margin = new Thickness(18, 0, 18, 0) };
         Grid.SetRow(separator, 3); expandedView.Children.Add(separator);
         activityScroll.Content = taskList; Grid.SetRow(activityScroll, 4); expandedView.Children.Add(activityScroll);
-        RegisterActivityElements(main, separator, activityScroll);
+        RegisterActivityElements(mainScroll, separator, activityScroll);
         foreach (var page in new[] { historyPage, statisticsPage, settingsPage })
         {
             Grid.SetRow(page, 2); Grid.SetRowSpan(page, 3); expandedView.Children.Add(page);
@@ -648,6 +652,7 @@ internal sealed partial class ModernRouterMonitor : Window
         string effort = Effort(Setting(row, "effort", ""));
         FillTags(mainTags, model, effort);
         UpdateFeaturedAgent(id, row);
+        RefreshPhasePipeline(id, row);
         mainTask.Text = name; mainTask.ToolTip = name;
         confirmation.Text = String(row, "status") == "pending" ? "Enviando · pendiente de confirmar" : String(row, "confirmation", "Sin confirmar");
         confirmation.Foreground = confirmation.Text == "Aceptado por Codex" ? Good : Muted;
@@ -661,6 +666,7 @@ internal sealed partial class ModernRouterMonitor : Window
         featuredAgentHost.Child = null; featuredAvatar = null;
         mainTask.Text = "Sin tarea seleccionada"; mainTask.ToolTip = mainTask.Text;
         taskModeHost.Child = null; taskModeSignature = null;
+        phaseHost.Child = null; phaseSignature = null;
         confirmation.Text = "Sin confirmación"; reason.Text = "Todavía no hay una decisión del selector.";
         effortReason.Text = "Todavía no hay una decisión de razonamiento.";
         confirmation.Foreground = Muted;

@@ -44,6 +44,17 @@ El rechazo de Astra fue `the destination changes the admitted node REPL review r
 
 ## Estado del código
 
+Corrección Windows (24/09/2026): `monitor-ui/` solo se renderiza en macOS;
+Windows usa WPF (`MonitorWpf.cs`, `MonitorAnalytics.cs`, `MonitorPhases.cs`).
+La entrega `db33986` no había implementado la pipeline en WPF, y reiniciar
+Desktop no podía hacerla aparecer. El monitor v20 ahora muestra la pipeline,
+la procedencia del modelo en Historial y las métricas de evidencia en Windows.
+`build.ps1` compila v20 sin sobrescribir el monitor v19 abierto. El lanzador y
+`desktop.py` apuntan a v20. Reiniciar solo el monitor es suficiente para este
+cambio visual; el puente Python carga correcciones al reiniciar Desktop.
+Validar ambos renderizadores antes de afirmar paridad. Una compilación fallida
+por ejecutable bloqueado no constituye una actualización instalada.
+
 El puente de producción sigue decidiendo únicamente al inicio de cada turno. Ya incorpora una capa de observación de fases: registra la propuesta, la aceptación de Codex, el inicio, la publicación de la configuración, la finalización y los bloqueos. Esto prepara la futura pipeline sin cambiar modelos durante tareas reales.
 
 La capa no llama a un clasificador adicional, no inventa fases semánticas a partir del prompt y no interpreta una actualización visual del selector como inferencia ejecutada. El panel muestra una pipeline amplia de observación: preparación y ejecución se actualizan desde el puente; revisión y cierre permanecen marcadas como pendientes de evidencia. También separa modelo propuesto, aceptado por Codex, configuración publicada e inferencia confirmada. `Modelo observado` queda reservado para una futura fuente de telemetría de inferencia.

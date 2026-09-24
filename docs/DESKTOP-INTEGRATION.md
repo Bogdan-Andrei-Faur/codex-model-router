@@ -3,7 +3,7 @@
 ## Uso
 
 En Windows, `build.ps1` prepara el lanzador estable `dist/codex-router.exe`, el
-monitor v19 y los accesos. En macOS, `python3 macos.py setup` prepara el puente y
+monitor v20 y los accesos. En macOS, `python3 macos.py setup` prepara el puente y
 el monitor nativo. Después, **Ajustes → Conectar al inicio habitual** configura
 una conexión por usuario. También se puede ejecutar:
 
