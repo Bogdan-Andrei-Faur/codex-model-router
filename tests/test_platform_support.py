@@ -54,12 +54,37 @@ class PlatformTests(unittest.TestCase):
         self.assertFalse(uses_stdio(["app-server", "--listen=stdio://", "--listen=ws://localhost:1"]))
         original = ["-c", "model=\"gpt-6-astra\"", "app-server", "--analytics-default-enabled"]
         injected = with_loopback_telemetry(original, "http://127.0.0.1:4321/v1/logs")
-        self.assertEqual(injected[-2:], ["app-server", "--analytics-default-enabled"])
+        self.assertEqual(injected[:len(original)], original)
         self.assertIn("otel.log_user_prompt=false", injected)
         self.assertIn("127.0.0.1:4321", " ".join(injected))
         self.assertEqual(injected.count("--analytics-default-enabled"), 1)
         self.assertIn("--analytics-default-enabled", with_loopback_telemetry(["app-server"], "http://127.0.0.1"))
         self.assertEqual(with_loopback_telemetry(["--version"], "http://127.0.0.1"), ["--version"])
+
+    def test_loopback_overrides_follow_desktop_subcommand_options(self):
+        original = ["-c", "features.code_mode_host=true", "app-server", "--analytics-default-enabled",
+                    "-c", "bundled.mcp_servers.codex_app.enabled=true", "-c", 'otel.exporter="none"']
+        endpoint = "http://127.0.0.1:4321/v1/logs"
+        injected = with_loopback_telemetry(original, endpoint)
+        self.assertEqual(injected[:len(original)], original)
+        # Last override wins in the native app-server config. Injecting before
+        # app-server is ignored once Desktop supplies any subcommand override.
+        self.assertGreater(injected.index("otel.log_user_prompt=false"), len(original))
+        self.assertEqual(injected[-2:], ["-c", 'otel.exporter={otlp-http={endpoint="' + endpoint + '",protocol="json"}}'])
+        self.assertEqual(injected.count("--analytics-default-enabled"), 1)
+
+    def test_loopback_preserves_effective_root_overrides_without_resurrecting_shadowed_ones(self):
+        for root in (["-c", 'model_reasoning_effort="low"'], ["--config", 'model_reasoning_effort="low"'],
+                     ['--config=model_reasoning_effort="low"'], ['-cmodel_reasoning_effort="low"']):
+            with self.subTest(root=root):
+                args = [*root, "app-server"]
+                injected = with_loopback_telemetry(args, "http://127.0.0.1")
+                self.assertEqual(injected[:len(args)], args)
+                self.assertIn('model_reasoning_effort="low"', injected[len(args):])
+                desktop = [*args, "-c", 'model_reasoning_effort="high"']
+                injected = with_loopback_telemetry(desktop, "http://127.0.0.1")
+                self.assertEqual(injected[:len(desktop)], desktop)
+                self.assertNotIn('model_reasoning_effort="low"', injected[len(desktop):])
 
     def test_only_stdio_server_is_intercepted(self):
         for args in (["app-server"], ["app-server", "--listen", "stdio://"], ["app-server", "--listen=stdio://"]):

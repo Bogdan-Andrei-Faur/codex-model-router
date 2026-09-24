@@ -1,5 +1,32 @@
 # Validation and integration notes
 
+## Desktop telemetry correction — 0.2.1, 2026-09-24
+
+- Reproduced on Desktop 26.917.9434.0 / backend 0.155.0-alpha.16.4:
+  root OTel overrides appear in native `config/read` until an override is added
+  after `app-server`. Desktop supplies a bundled-MCP override there; the native
+  CLI then discards the entire root override list, including OTel. Two completed
+  production turns and an open loopback listener had produced zero requests.
+- Append OTel in the subcommand list. Carry over existing root overrides only
+  when there was no subcommand override list, preserving native effective config.
+  No persisted Codex settings, permissions, prompt logging or application files
+  are changed. The earlier analytics-flag hypothesis did not fix this defect.
+- `python tests/smoke_telemetry.py` passed all three argument layouts against the
+  installed backend. It verifies the effective endpoint, prompt redaction and
+  unrelated tool restrictions through `config/read`, and receives real native
+  telemetry without any model request.
+- `python tests/smoke_telemetry.py --layout desktop --live` passed with one small
+  ephemeral Luna/Low response. The production receiver parsed completed-response
+  events before process shutdown. It stores only the existing safe allowlist.
+- These are isolated native checks. The already-running Desktop retains 0.2.0
+  until a user-controlled restart; that follow-up remains a separate validation.
+  Native macOS compilation/runtime validation still requires the MacBook.
+- Statistics invalidation includes telemetry counters in both renderers, so a
+  received batch refreshes without waiting for a task/history change. WPF checks
+  this with an unchanged empty history and a changing receiver count. All 80
+  Python tests (77 passed, 3 POSIX skips), 9 JS tests and the native monitor
+  self-test pass. The zero-event state and v0.2.1 footer were visually inspected.
+
 ## Windows phase UI correction — 2026-09-24
 
 - Added the missing WPF phase pipeline, history provenance and evidence counters.

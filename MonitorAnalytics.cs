@@ -139,6 +139,7 @@ internal sealed partial class ModernRouterMonitor
         signature += ":" + System.String.Join("|", liveRows.Select(pair => pair.Key + ":" + Json.Serialize(pair.Value)));
         analyticsFreshness.Text = (analyticsConnected ? "Conectado · consultado " : "Sin conexión · consultado ") + DateTime.Now.ToString("HH:mm:ss") + " · cada 2 s";
         signature += ":" + analyticsConnected;
+        signature += ":" + telemetryReceiverAvailable + ":" + Json.Serialize(telemetryHealth) + ":" + ReadConfigBool("inference_telemetry", false);
         if (signature == analyticsSignature) return;
         decisions.Clear();
         var indexed = new Dictionary<string, DecisionRecord>();
@@ -489,15 +490,19 @@ internal sealed partial class ModernRouterMonitor
             statisticsContent.Children.Add(Txt("Pendiente de reiniciar Desktop para abrir el receptor local.", 12, Warning));
         else
         {
-            AddMetric("Receptor local", "Activo", 1, Good);
+            bool receiving = Telemetry("requests") > 0;
+            AddMetric("Receptor local", receiving ? "Recibiendo" : "Abierto · sin datos", receiving ? 1 : 0, receiving ? Good : Warning);
             AddMetric("Solicitudes recibidas", Telemetry("requests").ToString("N0"), Math.Min(1, Telemetry("requests") / Math.Max(1, total)), Accent);
             AddMetric("Registros con modelo", Telemetry("eligible_records").ToString("N0"), Math.Min(1, Telemetry("eligible_records") / Math.Max(1, Telemetry("records_scanned"))), Accent);
             AddMetric("Finalizaciones recibidas", Telemetry("telemetry_events").ToString("N0"), Math.Min(1, Telemetry("telemetry_events") / Math.Max(1, Telemetry("eligible_records"))), Accent);
             AddMetric("Inferencias asociadas", Telemetry("telemetry_confirmed").ToString("N0"), Math.Min(1, Telemetry("telemetry_confirmed") / Math.Max(1, Telemetry("telemetry_events"))), Good);
-            if (Telemetry("requests") == 0)
-                statisticsContent.Children.Add(Txt("Desktop todavía no ha enviado eventos al receptor en esta sesión.", 12, Warning));
-            else if (Telemetry("eligible_records") == 0)
-                statisticsContent.Children.Add(Txt("Se recibieron eventos sin modelo utilizable; no se conserva su contenido.", 12, Warning));
+            string telemetryNote = !receiving ? "El receptor está abierto, pero no recibe eventos. Esto no significa que no haya agentes trabajando." :
+                Telemetry("eligible_records") == 0 ? "Se recibieron eventos sin modelo utilizable; no se conserva su contenido." : null;
+            if (telemetryNote != null)
+            {
+                var notice = Txt(telemetryNote, 12, Warning); notice.TextWrapping = TextWrapping.Wrap;
+                statisticsContent.Children.Add(notice);
+            }
         }
         statisticsContent.Children.Add(AnalyticsHeading("MODELOS"));
         AddBreakdown(decisions.Where(item => item.Model != null).GroupBy(item => item.Model).ToDictionary(group => group.Key, group => group.Count()), true);

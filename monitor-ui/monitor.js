@@ -243,7 +243,16 @@ function statistics() {
   heading(content,'TELEMETRÍA LOCAL');const telemetry=state.telemetry||{};
   if(!state.config.inference_telemetry)content.append(el('p','','Desactivada en Ajustes.'));
   else if(!telemetry.enabled)content.append(el('p','warning','Pendiente de reiniciar Desktop para abrir el receptor local.'));
-  else {metric(content,'Receptor local','Activo',1,'var(--good)');metric(content,'Solicitudes recibidas',fmt(telemetry.requests),Math.min(1,(telemetry.requests||0)/(total||1)));metric(content,'Registros con modelo',fmt(telemetry.eligible_records),Math.min(1,(telemetry.eligible_records||0)/Math.max(1,telemetry.records_scanned||0)));metric(content,'Finalizaciones recibidas',fmt(telemetry.telemetry_events),Math.min(1,(telemetry.telemetry_events||0)/Math.max(1,telemetry.eligible_records||0)));metric(content,'Inferencias asociadas',fmt(telemetry.telemetry_confirmed),Math.min(1,(telemetry.telemetry_confirmed||0)/Math.max(1,telemetry.telemetry_events||0)),'var(--good)');if(!(telemetry.requests||0))content.append(el('p','warning','Desktop todavía no ha enviado eventos al receptor en esta sesión.'));else if(!(telemetry.eligible_records||0))content.append(el('p','warning','Se recibieron eventos sin modelo utilizable; no se conserva su contenido.'));}
+  else {
+    const receiving=(telemetry.requests||0)>0;
+    metric(content,'Receptor local',receiving?'Recibiendo':'Abierto · sin datos',receiving?1:0,receiving?'var(--good)':'var(--warning)');
+    metric(content,'Solicitudes recibidas',fmt(telemetry.requests),Math.min(1,(telemetry.requests||0)/(total||1)));
+    metric(content,'Registros con modelo',fmt(telemetry.eligible_records),Math.min(1,(telemetry.eligible_records||0)/Math.max(1,telemetry.records_scanned||0)));
+    metric(content,'Finalizaciones recibidas',fmt(telemetry.telemetry_events),Math.min(1,(telemetry.telemetry_events||0)/Math.max(1,telemetry.eligible_records||0)));
+    metric(content,'Inferencias asociadas',fmt(telemetry.telemetry_confirmed),Math.min(1,(telemetry.telemetry_confirmed||0)/Math.max(1,telemetry.telemetry_events||0)),'var(--good)');
+    if(!receiving)content.append(el('p','warning','El receptor está abierto, pero no recibe eventos. Esto no significa que no haya agentes trabajando.'));
+    else if(!(telemetry.eligible_records||0))content.append(el('p','warning','Se recibieron eventos sin modelo utilizable; no se conserva su contenido.'));
+  }
   const transitions={compatible_group:'Cambios compatibles',same_model:'Mismo modelo',blocked_astra_boundary:'Frontera de Astra',unknown_model:'Modelo desconocido'};
   const transitionRows=history.filter(d=>d.phase_transition);
   if(transitionRows.length)for(const [key,label] of Object.entries(transitions)){const count=transitionRows.filter(d=>d.phase_transition===key).length;if(count)metric(content,label,fmt(count),count/transitionRows.length,key==='blocked_astra_boundary'?'var(--warning)':'var(--good)');}
@@ -325,7 +334,7 @@ window.receive = incoming => {
   $('pause').textContent=state.config.enabled?'Ⅱ  Pausar selección':'▶  Activar selección';
   $('product-version').textContent='v'+(state.productVersion || '—');
   capsule();
-  const signature=JSON.stringify([state.threads,state.history,state.connections,state.taskModes]);
+  const signature=JSON.stringify([state.threads,state.history,state.connections,state.taskModes,state.telemetry]);
   const settingsChanged=oldConfig!==JSON.stringify(state.config) || oldUi!==JSON.stringify(state.ui);
   if(signature!==dataSignature || settingsChanged){
     dataSignature=signature;

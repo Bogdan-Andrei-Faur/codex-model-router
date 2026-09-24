@@ -6,9 +6,14 @@ Este documento permite que otro agente continúe el trabajo aunque esta conversa
 
 `https://github.com/Bogdan-Andrei-Faur/codex-model-router.git`
 
-Última base publicada: `8cb3b22` (`v0.1.0`, 24/09/2026). La siguiente entrega
-preparada para publicar es `0.2.0`: telemetría diagnosticable, planes dinámicos,
-calibración de Jev, valoraciones separadas y paquete autocontenido de Windows.
+Base publicada: `54bab27` (`0.2.0`, 24/09/2026): telemetría diagnosticable,
+planes dinámicos, calibración de Jev, valoraciones separadas y paquete Windows.
+La corrección `0.2.1` resuelve el receptor abierto con cero eventos: Desktop añade
+opciones tras `app-server` que sustituyen la lista global donde se inyectaba OTel.
+Ver [VALIDATION.md](VALIDATION.md) para reproducción, prueba nativa y límites.
+No confundir un receptor escuchando con recepción ni configuración aceptada con
+inferencia. Tras instalar 0.2.1, validar recepción real después del reinicio
+controlado por el usuario; no interrumpir Desktop ni tareas para forzarlo.
 
 ## Decisión actual
 

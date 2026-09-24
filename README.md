@@ -2,7 +2,7 @@
 
 ## Versión
 
-El producto usa versiones semánticas. La versión funcional actual es **0.2.0**:
+El producto usa versiones semánticas. La versión funcional actual es **0.2.1**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en la esquina inferior derecha del
 panel procede del archivo común `VERSION`.
@@ -223,8 +223,11 @@ locales no se publican en GitHub.
 La sección **Telemetría local** muestra receptor, solicitudes, registros con
 modelo, finalizaciones e inferencias asociadas. Si indica «Pendiente de reiniciar
 Desktop», termina las tareas activas y reinicia Desktop desde su acceso habitual.
-Si el receptor está activo y marca cero solicitudes, Desktop aún no ha emitido
-eventos en esa sesión; el monitor no conserva la carga para inspeccionarla.
+«Abierto · sin datos» significa que el receptor escucha pero no está recibiendo
+eventos; no indica si hay agentes trabajando. «Recibiendo» confirma que han
+llegado datos, y los contadores siguientes distinguen registros utilizables e
+inferencias asociadas. La versión 0.2.1 corrige el orden de las opciones de
+arranque que impedía a Desktop cargar la dirección local de telemetría.
 
 No se convierte el precio de la API ni el número bruto de tokens en cuota de
 suscripción. La calidad y el ahorro real requieren observar tareas representativas.

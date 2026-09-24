@@ -272,7 +272,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             }
             DispatchQueue.main.async {
                 self.busy=false;if let records=records{self.journal=records}
-                let safeConfig=config.filter{["enabled","history_days","routing_engine","comparison_engines","jev","routes"].contains($0.key)}
+                let safeConfig=config.filter{["enabled","inference_telemetry","history_days","routing_engine","comparison_engines","jev","routes"].contains($0.key)}
                 let ids=Set(rows.keys).union(self.journal.compactMap{$0["thread"] as? String})
                 let taskModes=Dictionary(uniqueKeysWithValues:ids.map{($0,self.taskMode($0))})
                 let payload:[String:Any]=["productVersion":self.productVersion,"threads":rows,"connections":connections,"history":self.journal,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"telemetry":telemetry,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]

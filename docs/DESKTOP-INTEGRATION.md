@@ -1,4 +1,4 @@
-# Conexión con Desktop — producto 0.2.0
+# Conexión con Desktop — producto 0.2.1
 
 ## Uso
 
@@ -37,9 +37,15 @@ atribuir. El cambio se aplica al próximo arranque de Desktop.
 **Estadísticas → Telemetría local** permite comprobar la salud del receptor sin
 mostrar contenido privado: informa de receptor activo, solicitudes, registros con
 modelo, finalizaciones e inferencias asociadas. Cero solicitudes con receptor
-activo significa que Desktop todavía no ha enviado eventos; no prueba un fallo de
-la tarea. «Pendiente de reiniciar Desktop» significa que la conexión abierta aún
-usa el proceso anterior.
+abierto significa que no han llegado datos; no prueba un fallo ni inactividad de
+las tareas. Desde 0.2.1 el estado es «Abierto · sin datos» o «Recibiendo».
+«Pendiente de reiniciar Desktop» significa que aún no se ha abierto el receptor.
+
+La corrección 0.2.1 se carga al reiniciar Desktop: inyecta OTel al final de las
+opciones propias de `app-server`. Las opciones de subcomando de esta versión
+nativa sustituyen la lista de opciones globales. Si solo había opciones globales,
+el puente las conserva al añadir la nueva lista. Si ya existía una lista del
+subcomando, conserva su precedencia nativa. No modifica la configuración global.
 
 ## Paquete autocontenido de Windows
 

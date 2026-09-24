@@ -426,6 +426,31 @@ internal sealed partial class ModernRouterMonitor
 
             CheckLiveStatistics();
             results.Add("PASS: decisions and accepted totals persist without live tasks; recovered records merge without duplicates; resumed tasks trigger no false warning");
+            var savedTelemetry = new Dictionary<string, double>(telemetryHealth);
+            bool savedReceiver = telemetryReceiverAvailable;
+            try
+            {
+                var noTasks = new List<KeyValuePair<string, Dictionary<string, object>>>();
+                string absentHistory = Path.Combine(StateFolder, "review-telemetry-" + Guid.NewGuid().ToString("N") + ".jsonl");
+                telemetryHealth.Clear(); telemetryReceiverAvailable = true;
+                RefreshAnalytics(noTasks, absentHistory);
+                var firstStatistics = statisticsContent.Children[0];
+                telemetryHealth["requests"] = 2;
+                RefreshAnalytics(noTasks, absentHistory);
+                Check(!Object.ReferenceEquals(firstStatistics, statisticsContent.Children[0]),
+                    "Telemetry counters changed but the statistics view did not refresh");
+                if (ReadConfigBool("inference_telemetry", false))
+                {
+                    SelectMonitorTab(2); UpdateLayout();
+                    Check(ContainsText(statisticsContent, "Recibiendo"), "Received telemetry is not reflected in receiver status");
+                }
+            }
+            finally
+            {
+                telemetryHealth.Clear(); foreach (var pair in savedTelemetry) telemetryHealth[pair.Key] = pair.Value;
+                telemetryReceiverAvailable = savedReceiver; analyticsSignature = null;
+            }
+            results.Add("PASS: telemetry-only changes refresh statistics without a new task or history event");
             SelectMonitorTab(2); UpdateLayout();
             SaveVisual(this, Path.Combine(StateFolder, "review-statistics-live.png"), 1);
             PaintAnalyticsFixtures();

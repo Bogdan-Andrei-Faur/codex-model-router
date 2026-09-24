@@ -64,8 +64,30 @@ def uses_stdio(args):
     return app_server_index(args) is not None
 
 
+def config_overrides(args):
+    """Copy native -c values without interpreting their possibly private TOML."""
+    result = []
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg in ("-c", "--config") and index + 1 < len(args):
+            result.extend(["-c", args[index + 1]])
+            index += 2
+        elif arg.startswith("--config="):
+            result.extend(["-c", arg[len("--config="):]])
+            index += 1
+        elif arg.startswith("-c") and len(arg) > 2:
+            result.extend(["-c", arg[2:]])
+            index += 1
+        elif arg in ("--enable", "--disable", "--listen"):
+            index += 2
+        else:
+            index += 1
+    return result
+
+
 def with_loopback_telemetry(args, endpoint):
-    """Add process-local OTel settings before the app-server command only."""
+    """Append process-local OTel settings to the app-server's own overrides."""
     index = app_server_index(args)
     if index is None:
         return list(args)
@@ -75,12 +97,17 @@ def with_loopback_telemetry(args, endpoint):
         "-c", 'otel.metrics_exporter="none"',
         "-c", 'otel.exporter={otlp-http={endpoint="' + endpoint + '",protocol="json"}}',
     ]
-    # The native app-server emits the event stream only when analytics is
-    # enabled. Keep this process-local and avoid adding a duplicate flag when
-    # Desktop already supplied it.
+    # Desktop adds -c overrides after app-server (for example its bundled MCP).
+    # With both layouts present, the native CLI uses the subcommand's overrides
+    # instead of the root ones. Inject last in that same list or OTel silently
+    # disappears from config/read. Preserve the original arguments and order.
     server_args = args[index + 1:]
+    # If the invocation has only root overrides, adding a subcommand list would
+    # shadow them too. Carry them over verbatim. When a subcommand list already
+    # exists, keep its native precedence and do not resurrect ignored settings.
+    inherited = [] if config_overrides(server_args) else config_overrides(args[:index])
     analytics = [] if "--analytics-default-enabled" in server_args else ["--analytics-default-enabled"]
-    return [*args[:index], *overrides, args[index], *analytics, *server_args]
+    return [*args, *analytics, *inherited, *overrides]
 
 
 def stop_backend(proc):
