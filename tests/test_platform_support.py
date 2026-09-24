@@ -57,6 +57,8 @@ class PlatformTests(unittest.TestCase):
         self.assertEqual(injected[-2:], ["app-server", "--analytics-default-enabled"])
         self.assertIn("otel.log_user_prompt=false", injected)
         self.assertIn("127.0.0.1:4321", " ".join(injected))
+        self.assertEqual(injected.count("--analytics-default-enabled"), 1)
+        self.assertIn("--analytics-default-enabled", with_loopback_telemetry(["app-server"], "http://127.0.0.1"))
         self.assertEqual(with_loopback_telemetry(["--version"], "http://127.0.0.1"), ["--version"])
 
     def test_only_stdio_server_is_intercepted(self):

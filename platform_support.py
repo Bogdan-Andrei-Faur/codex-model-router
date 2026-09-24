@@ -75,7 +75,12 @@ def with_loopback_telemetry(args, endpoint):
         "-c", 'otel.metrics_exporter="none"',
         "-c", 'otel.exporter={otlp-http={endpoint="' + endpoint + '",protocol="json"}}',
     ]
-    return [*args[:index], *overrides, *args[index:]]
+    # The native app-server emits the event stream only when analytics is
+    # enabled. Keep this process-local and avoid adding a duplicate flag when
+    # Desktop already supplied it.
+    server_args = args[index + 1:]
+    analytics = [] if "--analytics-default-enabled" in server_args else ["--analytics-default-enabled"]
+    return [*args[:index], *overrides, args[index], *analytics, *server_args]
 
 
 def stop_backend(proc):

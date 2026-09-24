@@ -1,9 +1,9 @@
-# Conexión con Desktop — producto 0.1.0
+# Conexión con Desktop — producto 0.2.0
 
 ## Uso
 
 En Windows, `build.ps1` prepara el lanzador estable `dist/codex-router.exe`, el
-monitor v22 y los accesos. En macOS, `python3 macos.py setup` prepara el puente y
+monitor v24 y los accesos. En macOS, `python3 macos.py setup` prepara el puente y
 el monitor nativo. Después, **Ajustes → Conectar al inicio habitual** configura
 una conexión por usuario. También se puede ejecutar:
 
@@ -33,6 +33,22 @@ acepta modelo, nivel de razonamiento y una señal de respuesta completada. Nunca
 guarda mensajes, respuestas, adjuntos, herramientas, credenciales ni la carga
 bruta. Si no puede asociar un evento a una única tarea compatible, lo deja sin
 atribuir. El cambio se aplica al próximo arranque de Desktop.
+
+**Estadísticas → Telemetría local** permite comprobar la salud del receptor sin
+mostrar contenido privado: informa de receptor activo, solicitudes, registros con
+modelo, finalizaciones e inferencias asociadas. Cero solicitudes con receptor
+activo significa que Desktop todavía no ha enviado eventos; no prueba un fallo de
+la tarea. «Pendiente de reiniciar Desktop» significa que la conexión abierta aún
+usa el proceso anterior.
+
+## Paquete autocontenido de Windows
+
+`python package_windows.py` produce un ZIP con lanzador, monitor y runtimes
+congelados. Extrae el ZIP en una ubicación permanente y ejecuta
+`dist\\codex-router.exe --install-integration`. No incluye Python, tu historial,
+claves ni Desktop; descubre el paquete instalado de Desktop al iniciar. Es un
+paquete personal sin firma de distribución todavía. La validación nativa de macOS
+sigue siendo requisito antes de una publicación multiplataforma.
 
 ## Recuperación
 

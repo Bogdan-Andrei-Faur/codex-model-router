@@ -12,7 +12,7 @@ using System.Windows.Media;
 
 internal sealed class DecisionRecord
 {
-    public string Id, Thread, Title, Model, Effort, ModelReason, EffortReason, ContinuityStrategy, Source, Status, Signal, Error, Quality;
+    public string Id, Thread, Title, Model, Effort, ModelReason, EffortReason, ContinuityStrategy, Source, Status, Signal, Error, Quality, ModelQuality, EffortQuality;
     public string RoutingEngine, EngineModel, EngineStatus;
     public double EngineConfidence, EngineLatencyMs;
     public double Time, StartedTime, FinishedTime;
@@ -200,6 +200,8 @@ internal sealed partial class ModernRouterMonitor
         item.Signal = String(data, "signal", item.Signal);
         item.Error = String(data, "error_type", item.Error);
         item.Quality = String(data, "quality", item.Quality);
+        item.ModelQuality = String(data, "model_quality", item.ModelQuality);
+        item.EffortQuality = String(data, "effort_quality", item.EffortQuality);
         if (eventName == "engine_comparison")
         {
             string engine = String(data, "routing_engine", "rules");
@@ -391,37 +393,47 @@ internal sealed partial class ModernRouterMonitor
     {
         var title = Txt("VALORA ESTA ELECCIÓN", 11, Muted, FontWeights.SemiBold);
         title.Margin = new Thickness(0, 12, 0, 7); historyDetail.Children.Add(title);
-        var choices = new WrapPanel();
-        foreach (var option in new[] { new[] { "insufficient", "Insuficiente" }, new[] { "adequate", "Adecuada" }, new[] { "excessive", "Excesiva" } })
-        {
-            string quality = option[0], label = option[1]; bool selected = decision.Quality == quality;
-            var button = ChoiceButton(label, selected, delegate { WriteDecisionQuality(decision, selected ? "" : quality); });
-            choices.Children.Add(button);
-        }
-        historyDetail.Children.Add(choices);
-        if (!System.String.IsNullOrEmpty(decision.Quality))
-        {
-            var clear = Btn("Quitar valoración", delegate { WriteDecisionQuality(decision, ""); }, false);
-            clear.HorizontalAlignment = HorizontalAlignment.Left; clear.Foreground = Muted;
-            historyDetail.Children.Add(clear);
-        }
-        var note = Txt(System.String.IsNullOrEmpty(decision.Quality) ? "Tu valoración mejora las estadísticas sin guardar el mensaje ni la respuesta." :
-            "Valoración guardada: " + FriendlyQuality(decision.Quality) + ". Puedes cambiarla o quitarla.", 11, Muted);
+        AddQualityChoice(decision, "Resultado global", decision.Quality, "quality");
+        AddQualityChoice(decision, "Modelo elegido", decision.ModelQuality, "model_quality");
+        AddQualityChoice(decision, "Razonamiento elegido", decision.EffortQuality, "effort_quality");
+        var note = Txt("Puedes valorar el resultado global, el modelo y el razonamiento por separado. No se guarda el mensaje ni la respuesta.", 11, Muted);
         note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 6, 0, 0); historyDetail.Children.Add(note);
     }
 
-    void WriteDecisionQuality(DecisionRecord decision, string quality)
+    void AddQualityChoice(DecisionRecord decision, string label, string selectedValue, string field)
+    {
+        historyDetail.Children.Add(Txt(label, 11, Muted, FontWeights.Medium));
+        var choices = new WrapPanel();
+        foreach (var option in new[] { new[] { "insufficient", "Insuficiente" }, new[] { "adequate", "Adecuada" }, new[] { "excessive", "Excesiva" } })
+        {
+            string quality = option[0], optionLabel = option[1]; bool selected = selectedValue == quality;
+            var button = ChoiceButton(optionLabel, selected, delegate { WriteDecisionQuality(decision, selected ? "" : quality, field); });
+            choices.Children.Add(button);
+        }
+        historyDetail.Children.Add(choices);
+        if (!System.String.IsNullOrEmpty(selectedValue))
+        {
+            var clear = Btn("Quitar valoración", delegate { WriteDecisionQuality(decision, "", field); }, false);
+            clear.HorizontalAlignment = HorizontalAlignment.Left; clear.Foreground = Muted;
+            historyDetail.Children.Add(clear);
+        }
+    }
+
+    void WriteDecisionQuality(DecisionRecord decision, string quality, string field)
     {
         try
         {
             Directory.CreateDirectory(StateFolder);
             var entry = new Dictionary<string, object> {
                 { "schema", 2 }, { "time", DateTimeOffset.UtcNow.ToUnixTimeSeconds() }, { "time_iso", DateTime.UtcNow.ToString("o") },
-                { "event", "decision_quality" }, { "decision_id", decision.Id }, { "thread", decision.Thread ?? "" }, { "quality", quality }
+                { "event", "decision_quality" }, { "decision_id", decision.Id }, { "thread", decision.Thread ?? "" }, { field, quality }
             };
             using (var stream = new FileStream(Path.Combine(StateFolder, "history.jsonl"), FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
             using (var writer = new StreamWriter(stream, new UTF8Encoding(false))) writer.WriteLine(Json.Serialize(entry));
-            decision.Quality = quality; analyticsSignature = null; RefreshData();
+            if (field == "model_quality") decision.ModelQuality = quality;
+            else if (field == "effort_quality") decision.EffortQuality = quality;
+            else decision.Quality = quality;
+            analyticsSignature = null; RefreshData();
         }
         catch { connection.Text = "No se pudo guardar la valoración"; connection.Foreground = Warning; }
     }
@@ -470,6 +482,23 @@ internal sealed partial class ModernRouterMonitor
         int inferred = decisions.Count(item => !System.String.IsNullOrEmpty(String(item.PhaseEvidence, "observed_model")));
         AddMetric("Configuraciones publicadas", published.ToString(), published * 1.0 / Math.Max(1, total), Good);
         AddMetric("Inferencias confirmadas localmente", inferred.ToString(), inferred * 1.0 / Math.Max(1, total), Muted);
+        statisticsContent.Children.Add(AnalyticsHeading("TELEMETRÍA LOCAL"));
+        if (!ReadConfigBool("inference_telemetry", false))
+            statisticsContent.Children.Add(Txt("Desactivada en Ajustes.", 12, Muted));
+        else if (!telemetryReceiverAvailable)
+            statisticsContent.Children.Add(Txt("Pendiente de reiniciar Desktop para abrir el receptor local.", 12, Warning));
+        else
+        {
+            AddMetric("Receptor local", "Activo", 1, Good);
+            AddMetric("Solicitudes recibidas", Telemetry("requests").ToString("N0"), Math.Min(1, Telemetry("requests") / Math.Max(1, total)), Accent);
+            AddMetric("Registros con modelo", Telemetry("eligible_records").ToString("N0"), Math.Min(1, Telemetry("eligible_records") / Math.Max(1, Telemetry("records_scanned"))), Accent);
+            AddMetric("Finalizaciones recibidas", Telemetry("telemetry_events").ToString("N0"), Math.Min(1, Telemetry("telemetry_events") / Math.Max(1, Telemetry("eligible_records"))), Accent);
+            AddMetric("Inferencias asociadas", Telemetry("telemetry_confirmed").ToString("N0"), Math.Min(1, Telemetry("telemetry_confirmed") / Math.Max(1, Telemetry("telemetry_events"))), Good);
+            if (Telemetry("requests") == 0)
+                statisticsContent.Children.Add(Txt("Desktop todavía no ha enviado eventos al receptor en esta sesión.", 12, Warning));
+            else if (Telemetry("eligible_records") == 0)
+                statisticsContent.Children.Add(Txt("Se recibieron eventos sin modelo utilizable; no se conserva su contenido.", 12, Warning));
+        }
         statisticsContent.Children.Add(AnalyticsHeading("MODELOS"));
         AddBreakdown(decisions.Where(item => item.Model != null).GroupBy(item => item.Model).ToDictionary(group => group.Key, group => group.Count()), true);
         statisticsContent.Children.Add(AnalyticsHeading("RAZONAMIENTO"));
@@ -560,6 +589,11 @@ internal sealed partial class ModernRouterMonitor
         AddPolicy("Sol", "Ingeniería compleja", "Alto"); AddPolicy("Astra", "UX, auditorías y gran alcance", "Muy alto");
         settingsContent.Children.Add(AnalyticsHeading("PRIVACIDAD"));
         AddSettingsNote("El historial guarda fecha, tarea, modelo, razonamiento, motores, tiempos, motivos, estado, incidencias y contadores de tokens. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales.");
+    }
+
+    double Telemetry(string key)
+    {
+        double value; return telemetryHealth.TryGetValue(key, out value) ? value : 0;
     }
 
     string connectionMessage;

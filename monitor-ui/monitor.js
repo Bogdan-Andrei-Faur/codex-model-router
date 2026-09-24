@@ -126,9 +126,9 @@ function phaseStatus(value) {return ({proposed:'Fase propuesta',accepted:'Acepta
 function pipeline(parent,row) {
   const phases=Array.isArray(row.phase_pipeline)?row.phase_pipeline:[];
   if(!phases.length)return;
-  const box=el('div','pipeline');box.append(el('div','pipeline-title','PIPELINE · OBSERVACIÓN'));
-  for(const phase of phases){const item=el('div','pipeline-step '+phase.state);item.append(el('i',''),el('span','',phase.label),el('small','',phase.state==='not_observed'?'Pendiente de evidencia':phase.state==='configured'?'Configurada':phaseStatus(phase.state)));box.append(item);}
-  parent.append(box,el('p','small','Preparación y ejecución se actualizan con el puente. Revisión y cierre no se atribuyen hasta que Codex publique un límite verificable.'));
+  const dynamic=row.pipeline_mode==='plan_and_observation',box=el('div','pipeline');box.append(el('div','pipeline-title',dynamic?'PLAN DE TRABAJO · OBSERVACIÓN':'PIPELINE · OBSERVACIÓN'));
+  for(const phase of phases){const item=el('div','pipeline-step '+phase.state+(phase.evidence==='observed'?' observed':''));const label=phase.state==='planned'?'Planificada':phase.state==='selected'?'Seleccionada':phase.state==='not_observed'?'Pendiente de evidencia':phase.state==='configured'?'Configurada':phaseStatus(phase.state);item.append(el('i',''),el('span','',phase.label),el('small','',label));box.append(item);}
+  parent.append(box,el('p','small',dynamic?'Las etapas son un plan. Solo “Ejecución en Codex” se actualiza con evidencia real.':'La evidencia interna de esta ejecución es limitada.'));
 }
 function executionEvidence(parent,row) {
   if(!row.model && !row.accepted_model && !row.configured_model && !row.observed_model)return;
@@ -194,12 +194,8 @@ function renderHistory() {
     taskModeControls(detail,chosen.thread);
     explanation(detail,'Modelo elegido',chosen.model_reason,'model');explanation(detail,'Razonamiento elegido',chosen.effort_reason,'effort');if(chosen.continuity_strategy)explanation(detail,'Decisión de continuidad',continuity(chosen.continuity_strategy),'continuity');
     detail.append(el('h3','quality-label','VALORA ESTA ELECCIÓN'));
-    const choices=el('div','choices');for(const [key,label] of [['insufficient','Insuficiente'],['adequate','Adecuada'],['excessive','Excesiva']]){
-      choices.append(button(label,()=>native({action:'quality',id:chosen.id,thread:chosen.thread || '',value:chosen.quality===key?'':key}),'choice'+(chosen.quality===key?' selected':'')));
-    }
-    detail.append(choices);
-    if(chosen.quality)detail.append(button('Quitar valoración',()=>native({action:'quality',id:chosen.id,thread:chosen.thread || '',value:''}),'clear-quality'));
-    detail.append(el('p','small',chosen.quality?'Valoración guardada. Puedes cambiarla o quitarla.':'Tu valoración mejora las estadísticas sin guardar el mensaje ni la respuesta.'));
+    for(const [aspect,label,key] of [['overall','Resultado global','quality'],['model','Modelo elegido','model_quality'],['effort','Razonamiento elegido','effort_quality']]){detail.append(el('p','small',label));const choices=el('div','choices');for(const [value,choiceLabel] of [['insufficient','Insuficiente'],['adequate','Adecuada'],['excessive','Excesiva']])choices.append(button(choiceLabel,()=>native({action:'quality',id:chosen.id,thread:chosen.thread || '',aspect,value:chosen[key]===value?'':value}),'choice'+(chosen[key]===value?' selected':'')));detail.append(choices);if(chosen[key])detail.append(button('Quitar valoración',()=>native({action:'quality',id:chosen.id,thread:chosen.thread || '',aspect,value:''}),'clear-quality'));}
+    detail.append(el('p','small','Puedes valorar el resultado global, el modelo y el razonamiento por separado. No se guarda el mensaje ni la respuesta.'));
     detail.append(el('p','small','Motor aplicado: '+(engines[chosen.routing_engine] || 'Sin confirmar')));
     if(chosen.finished>=chosen.started&&chosen.started)detail.append(el('p','small','Duración: '+Math.round(chosen.finished-chosen.started)+' s'));
     const comparisons=Object.values(chosen.comparisons);
@@ -244,6 +240,10 @@ function statistics() {
   const configured=history.filter(d=>d.configured_model).length,observed=history.filter(d=>d.observed_model).length;
   metric(content,'Configuraciones publicadas',fmt(configured),configured/(total||1),'var(--good)');
   metric(content,'Inferencias confirmadas localmente',fmt(observed),observed/(total||1),observed?'var(--good)':'var(--muted)');
+  heading(content,'TELEMETRÍA LOCAL');const telemetry=state.telemetry||{};
+  if(!state.config.inference_telemetry)content.append(el('p','','Desactivada en Ajustes.'));
+  else if(!telemetry.enabled)content.append(el('p','warning','Pendiente de reiniciar Desktop para abrir el receptor local.'));
+  else {metric(content,'Receptor local','Activo',1,'var(--good)');metric(content,'Solicitudes recibidas',fmt(telemetry.requests),Math.min(1,(telemetry.requests||0)/(total||1)));metric(content,'Registros con modelo',fmt(telemetry.eligible_records),Math.min(1,(telemetry.eligible_records||0)/Math.max(1,telemetry.records_scanned||0)));metric(content,'Finalizaciones recibidas',fmt(telemetry.telemetry_events),Math.min(1,(telemetry.telemetry_events||0)/Math.max(1,telemetry.eligible_records||0)));metric(content,'Inferencias asociadas',fmt(telemetry.telemetry_confirmed),Math.min(1,(telemetry.telemetry_confirmed||0)/Math.max(1,telemetry.telemetry_events||0)),'var(--good)');if(!(telemetry.requests||0))content.append(el('p','warning','Desktop todavía no ha enviado eventos al receptor en esta sesión.'));else if(!(telemetry.eligible_records||0))content.append(el('p','warning','Se recibieron eventos sin modelo utilizable; no se conserva su contenido.'));}
   const transitions={compatible_group:'Cambios compatibles',same_model:'Mismo modelo',blocked_astra_boundary:'Frontera de Astra',unknown_model:'Modelo desconocido'};
   const transitionRows=history.filter(d=>d.phase_transition);
   if(transitionRows.length)for(const [key,label] of Object.entries(transitions)){const count=transitionRows.filter(d=>d.phase_transition===key).length;if(count)metric(content,label,fmt(count),count/transitionRows.length,key==='blocked_astra_boundary'?'var(--warning)':'var(--good)');}
@@ -267,6 +267,7 @@ function statistics() {
   if(!rated.length)content.append(el('p','','Valora decisiones para comparar la calidad aplicada'));
   for(const key of [...new Set(rated.map(d=>d.routing_engine||'rules'))]){const rows=rated.filter(d=>(d.routing_engine||'rules')===key),good=rows.filter(d=>d.quality==='adequate').length;metric(content,(engines[key]||key)+' · adecuadas',good+' / '+rows.length,good/rows.length,'var(--good)');}
   heading(content,'VALORACIÓN DE LA ELECCIÓN');metric(content,'Decisiones valoradas',rated.length+' / '+total,rated.length/(total||1));breakdown(content,'',rated,d=>({insufficient:'Insuficiente',adequate:'Adecuada',excessive:'Excesiva'}[d.quality]));
+  const modelRated=history.filter(d=>d.model_quality),effortRated=history.filter(d=>d.effort_quality);metric(content,'Modelos valorados',modelRated.length+' / '+total,modelRated.length/(total||1));metric(content,'Razonamientos valorados',effortRated.length+' / '+total,effortRated.length/(total||1));
   const input=history.reduce((n,d)=>n+(d.inputTokens||0),0),output=history.reduce((n,d)=>n+(d.outputTokens||0),0),cached=history.reduce((n,d)=>n+(d.cachedInputTokens||0),0);
   if(input+output){heading(content,'TOKENS · ÚLTIMA LLAMADA OBSERVADA POR REGISTRO');metric(content,'Entrada',fmt(input));metric(content,'Salida',fmt(output),output/(input||1),'var(--good)');metric(content,'Entrada en caché',fmt(cached),cached/(input||1),'var(--muted)');}
   const durations=history.filter(d=>d.started&&d.finished>=d.started);if(durations.length)metric(content,'Duración media',Math.round(durations.reduce((n,d)=>n+d.finished-d.started,0)/durations.length)+' s');

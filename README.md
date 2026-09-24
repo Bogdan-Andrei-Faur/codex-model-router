@@ -2,7 +2,7 @@
 
 ## Versión
 
-El producto usa versiones semánticas. La primera versión funcional es **0.1.0**:
+El producto usa versiones semánticas. La versión funcional actual es **0.2.0**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en la esquina inferior derecha del
 panel procede del archivo común `VERSION`.
@@ -27,7 +27,7 @@ Cierra Desktop cuando terminen tus tareas y ábrelo desde su acceso normal.
 El acceso `dist/Codex automático.app` se conserva como alternativa. No muevas
 los bundles fuera de `dist`: esta instalación todavía depende del repositorio.
 
-**Compilación interna del lanzador: v19.** No es la versión de producto; esta se
+**Compilación interna del lanzador: v19; monitor Windows: v24.** No son la versión de producto; esta se
 consulta en la esquina inferior derecha del monitor. La interfaz se puede actualizar sin cerrar Codex ni
 interrumpir sus tareas. Los accesos del escritorio apuntan a la compilación actual.
 Los cambios del selector, cuando los haya, se cargan al volver a abrir Codex
@@ -58,11 +58,11 @@ La cabecera y las pestañas permanecen visibles mientras el contenido se desplaz
 
 El enrutamiento sigue decidiendo al inicio de cada turno. La prueba aislada de
 [continuidad por fases](docs/PHASE-PROBE.md) no activa cambios automáticos en las tareas.
-El puente registra además el ciclo observado de cada fase (propuesta, aceptación,
-actividad, configuración publicada, finalización o bloqueo). La pipeline amplia
-de preparación, ejecución, revisión y cierre enseña qué tiene evidencia: por ahora
-solo las dos primeras fases se actualizan desde el puente; las demás quedan como
-pendientes de evidencia, sin afirmar que el selector ya sea una inferencia.
+El panel genera un plan breve y variable según el tipo de tarea: una traducción
+puede mostrar solo «Responder», mientras una interfaz muestra «Revisar interfaz»,
+«Implementar» y «Comprobar». Distingue pasos **planificados** de la única
+**ejecución en Codex** que el puente observa. No deduce etapas internas del texto
+ni afirma que haya cambiado el modelo durante la tarea.
 
 Modelo y razonamiento aparecen como etiquetas. Luna es azul, Terra verde, Sol
 ámbar y Astra violeta; el texto permite identificarlos sin depender del color.
@@ -102,8 +102,9 @@ El panel lateral tiene cuatro vistas:
 - **Historial** conserva decisiones activas y terminadas con dos explicaciones
   independientes: por qué se eligió el modelo y por qué se eligió el razonamiento.
   También muestra estado, fecha, duración, tokens observados e incidencias. Desde
-  cada decisión puedes marcarla como **Insuficiente**, **Adecuada** o **Excesiva**.
-  Vuelve a pulsar la opción marcada o usa **Quitar valoración** para dejarla sin valorar.
+  cada decisión puedes valorar por separado el **resultado global**, el
+  **modelo** y el **razonamiento** como **Insuficiente**, **Adecuada** o
+  **Excesiva**. Vuelve a pulsar una opción marcada o usa **Quitar valoración**.
 - **Estadísticas** resume distribución por modelo, razonamiento y motor de
   enrutamiento, valoraciones, errores, reintentos detectados, duración y tokens cuando están disponibles.
   Añade fiabilidad de cada motor, demoras, tokens consumidos para clasificar,
@@ -218,6 +219,12 @@ en `state/history.recovered.jsonl` y se identifican como datos con detalles limi
 Los tokens mostrados corresponden a la última llamada observada por registro,
 no al consumo total de todas las llamadas de cada tarea. Los datos personales
 locales no se publican en GitHub.
+
+La sección **Telemetría local** muestra receptor, solicitudes, registros con
+modelo, finalizaciones e inferencias asociadas. Si indica «Pendiente de reiniciar
+Desktop», termina las tareas activas y reinicia Desktop desde su acceso habitual.
+Si el receptor está activo y marca cero solicitudes, Desktop aún no ha emitido
+eventos en esa sesión; el monitor no conserva la carga para inspeccionarla.
 
 No se convierte el precio de la API ni el número bruto de tokens en cuota de
 suscripción. La calidad y el ahorro real requieren observar tareas representativas.

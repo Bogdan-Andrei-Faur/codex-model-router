@@ -12,6 +12,13 @@ test('rating and clearing survive replay without changing execution order',()=>{
   assert.equal(C.decisions(events)[0].id,'b');assert.equal(C.decisions(events)[1].quality,'adequate');
   events.push({event:'decision_quality',decision_id:'a',time:40,quality:''});assert.equal(C.decisions(events)[1].quality,'');assert.equal(C.decisions(events)[1].time,10);
 });
+test('model and reasoning ratings remain independent from the overall result',()=>{
+  const events=[{event:'decision_created',decision_id:'a',time:10},{event:'decision_quality',decision_id:'a',time:20,quality:'adequate'},{event:'decision_quality',decision_id:'a',time:21,model_quality:'insufficient'},{event:'decision_quality',decision_id:'a',time:22,effort_quality:'excessive'}];
+  const row=C.decisions(events)[0];
+  assert.equal(row.quality,'adequate');assert.equal(row.model_quality,'insufficient');assert.equal(row.effort_quality,'excessive');
+  events.push({event:'decision_quality',decision_id:'a',time:23,model_quality:''});
+  assert.equal(C.decisions(events)[0].model_quality,'');assert.equal(C.decisions(events)[0].quality,'adequate');
+});
 test('live usage refreshes while a timestamp stays unchanged and pending uses requested settings',()=>{
   const events=[{event:'decision_created',decision_id:'a',time:10,model:'gpt-6-astra',effort:'high'}];
   const row={decision_id:'a',status:'pending',model:'gpt-6-astra',effort:'high',requested_model:'gpt-5.6-terra',requested_effort:'medium',tokens:{inputTokens:40}};

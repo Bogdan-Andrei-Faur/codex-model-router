@@ -1,26 +1,41 @@
-"""Small, conservative phase-state helpers for the router.
+"""Conservative, dynamic task plans and observed lifecycle evidence.
 
-This module describes observed lifecycle state. It does not infer semantic
-phases from prompts and it never changes a model or an approval policy.
+The router never claims that Codex completed an internal semantic step. Plans
+are derived from the privacy-safe task category; only the native turn lifecycle
+is marked as observed.
 """
 
 ASTRA = "gpt-6-astra"
 COMPATIBLE_LIVE_MODELS = frozenset(("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"))
 
 
-def broad_pipeline(execution_status="proposed"):
-    """Return the deliberately broad, content-free observation pipeline.
+PLAN_TEMPLATES = {
+    "text": (("deliver", "Responder"),),
+    "research": (("investigate", "Investigar"), ("decide", "Decidir"), ("deliver", "Entregar")),
+    "interface": (("review", "Revisar interfaz"), ("implement", "Implementar"), ("validate", "Comprobar")),
+    "correction": (("diagnose", "Diagnosticar"), ("fix", "Corregir"), ("validate", "Validar")),
+    "tests": (("inspect", "Revisar"), ("verify", "Verificar"), ("report", "Informar")),
+    "audit": (("inspect", "Inspeccionar"), ("assess", "Evaluar"), ("report", "Informar")),
+    "architecture": (("map", "Entender"), ("design", "Diseñar"), ("review", "Revisar")),
+    "configuration": (("prepare", "Preparar"), ("apply", "Aplicar"), ("verify", "Comprobar")),
+    "automation": (("design", "Diseñar"), ("automate", "Automatizar"), ("verify", "Comprobar")),
+    "general": (("solve", "Resolver"),),
+}
 
-    Codex does not currently publish trustworthy internal boundaries for a
-    task's preparation, review, or delivery work.  Those stages are therefore
-    shown as a plan, while only the native turn's execution state is observed.
-    """
-    return [
-        {"id": "preparation", "label": "Preparación", "state": "configured"},
-        {"id": "execution", "label": "Ejecución", "state": execution_status},
-        {"id": "review", "label": "Revisión", "state": "not_observed"},
-        {"id": "closure", "label": "Cierre", "state": "not_observed"},
-    ]
+
+def task_plan(category="general"):
+    """Return a content-free plan. Every step remains explicitly planned."""
+    return [{"id": step_id, "label": label, "state": "planned", "evidence": "plan"}
+            for step_id, label in PLAN_TEMPLATES.get(category, PLAN_TEMPLATES["general"])]
+
+
+def dynamic_pipeline(category="general", execution_status="proposed"):
+    """Combine a variable plan with one independently observed Codex state."""
+    plan = task_plan(category)
+    plan[0]["state"] = "selected"
+    plan.append({"id": "codex_execution", "label": "Ejecución en Codex",
+                 "state": execution_status, "evidence": "observed"})
+    return plan
 
 
 def transition_kind(source, destination):
@@ -39,16 +54,16 @@ def can_switch_within_turn(source, destination):
     return transition_kind(source, destination) in ("same_model", "compatible_group")
 
 
-def proposed_phase(source, model, effort):
-    """Create content-free metadata for a proposed execution phase."""
+def proposed_phase(source, model, effort, category="general"):
+    """Create a dynamic plan and the proposed observed execution state."""
     return {
         "phase_name": "execution",
         "phase_status": "proposed",
         "phase_model": model,
         "phase_effort": effort,
         "phase_transition": transition_kind(source, model),
-        "pipeline_mode": "observation",
-        "phase_pipeline": broad_pipeline(),
+        "pipeline_mode": "plan_and_observation",
+        "phase_pipeline": dynamic_pipeline(category),
     }
 
 
@@ -61,6 +76,6 @@ def phase_update(row, status, model=None, effort=None, transition=None):
         result["phase_effort"] = effort
     if transition:
         result["phase_transition"] = transition
-    result["pipeline_mode"] = "observation"
-    result["phase_pipeline"] = broad_pipeline(status)
+    result["pipeline_mode"] = "plan_and_observation"
+    result["phase_pipeline"] = dynamic_pipeline(row.get("agent_category", "general"), status)
     return result

@@ -460,11 +460,16 @@ internal sealed partial class ModernRouterMonitor
             results.Add("PASS: outlined selectors, Rules comparison, engine-specific settings, inline keys with cancel, persistent rating removal and active-engine attribution");
             results.Add("PASS: Statistics and Settings tabs contain real metrics and working controls");
             var phases = Fixture("Pipeline de Windows", "gpt-5.6-terra", "medium", "active");
-            phases["phase_status"] = "active"; phases["pipeline_mode"] = "observation";
+            phases["phase_status"] = "active"; phases["pipeline_mode"] = "plan_and_observation";
             phases["accepted_model"] = "gpt-5.6-terra"; phases["accepted_effort"] = "medium";
             phases["configured_model"] = "gpt-5.6-sol"; phases["configured_effort"] = "high";
+            phases["phase_pipeline"] = new object[] {
+                new Dictionary<string, object> { { "id", "investigate" }, { "label", "Investigar" }, { "state", "selected" }, { "evidence", "plan" } },
+                new Dictionary<string, object> { { "id", "decide" }, { "label", "Decidir" }, { "state", "planned" }, { "evidence", "plan" } },
+                new Dictionary<string, object> { { "id", "codex_execution" }, { "label", "Ejecución en Codex" }, { "state", "active" }, { "evidence", "observed" } }
+            };
             SelectMonitorTab(0); ApplyFocus("phase-test", phases, 1); UpdateLayout();
-            Check(ContainsText(phaseHost, "PIPELINE") && ContainsText(phaseHost, "En curso") && ContainsText(phaseHost, "Pendiente de evidencia"),
+            Check(ContainsText(phaseHost, "PLAN DE TRABAJO") && ContainsText(phaseHost, "Investigar") && ContainsText(phaseHost, "Planificada") && ContainsText(phaseHost, "En curso"),
                 "Native Windows Activity omitted the phase pipeline");
             SaveVisual(this, Path.Combine(StateFolder, "review-phase-activity.png"), 1.25);
             var phaseDecision = new DecisionRecord { Id = "phase-test", Title = "Pipeline de Windows", Model = "Terra", Effort = "Medio" };

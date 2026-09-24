@@ -66,6 +66,8 @@ internal sealed partial class ModernRouterMonitor : Window
     string activitySignature;
     int lastActiveCount = -1;
     bool lastConnected;
+    readonly Dictionary<string, double> telemetryHealth = new Dictionary<string, double>();
+    bool telemetryReceiverAvailable;
     internal static readonly TimeSpan ModeTransitionDuration = TimeSpan.FromMilliseconds(420);
 
     public ModernRouterMonitor(bool isPreview)
@@ -593,6 +595,8 @@ internal sealed partial class ModernRouterMonitor : Window
             bool enabled = ReadEnabled();
             pauseButton.Content = enabled ? "Ⅱ  Pausar selección" : "▶  Activar selección";
             var rows = new Dictionary<string, Dictionary<string, object>>();
+            var telemetry = new Dictionary<string, double>();
+            bool telemetryAvailable = false;
             int connected = 0, modern = 0;
             foreach (var file in Directory.GetFiles(StateFolder, "status-*.json").OrderBy(File.GetLastWriteTimeUtc))
             {
@@ -611,6 +615,16 @@ internal sealed partial class ModernRouterMonitor : Window
                 }
                 catch { continue; }
                 connected++;
+                if (data.ContainsKey("telemetry"))
+                {
+                    var health = Dict(data["telemetry"]);
+                    telemetryAvailable |= String(health, "enabled") == "True" || String(health, "enabled") == "true";
+                    foreach (var key in new[] { "requests", "records_scanned", "eligible_records", "events_without_model", "unrecognized_records", "invalid_requests", "unexpected_path" })
+                        telemetry[key] = telemetry.ContainsKey(key) ? telemetry[key] + Number(health, key) : Number(health, key);
+                    var stats = Dict(data.ContainsKey("stats") ? data["stats"] : null);
+                    foreach (var key in new[] { "telemetry_events", "telemetry_confirmed", "telemetry_unattributed" })
+                        telemetry[key] = telemetry.ContainsKey(key) ? telemetry[key] + Number(stats, key) : Number(stats, key);
+                }
                 if (data.ContainsKey("threads"))
                 {
                     modern++;
@@ -648,6 +662,8 @@ internal sealed partial class ModernRouterMonitor : Window
             }
             RefreshAgentCapsule(ordered);
             analyticsConnected = connected > 0;
+            telemetryHealth.Clear(); foreach (var pair in telemetry) telemetryHealth[pair.Key] = pair.Value;
+            telemetryReceiverAvailable = telemetryAvailable;
             RefreshAnalytics(ordered);
             UpdateTray();
         }

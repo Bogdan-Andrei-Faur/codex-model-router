@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -34,30 +35,39 @@ internal sealed partial class ModernRouterMonitor
     static UIElement BuildPhasePipeline(Dictionary<string, object> data)
     {
         var content = new StackPanel();
-        content.Children.Add(Txt("PIPELINE · OBSERVACIÓN", 11, Accent, FontWeights.SemiBold));
+        bool dynamic = String(data, "pipeline_mode") == "plan_and_observation";
+        content.Children.Add(Txt(dynamic ? "PLAN DE TRABAJO · OBSERVACIÓN" : "PIPELINE · OBSERVACIÓN", 11, Accent, FontWeights.SemiBold));
         string status = String(data, "phase_status");
-        string[] labels = { "Preparación", "Ejecución", "Revisión", "Cierre" };
-        string[] states = { status == "" ? "Sin confirmar" : "Selección preparada", PhaseStatus(status),
-            "Pendiente de evidencia", "Pendiente de evidencia" };
-        for (int i = 0; i < labels.Length; i++)
+        var steps = new List<Dictionary<string, object>>();
+        if (data.ContainsKey("phase_pipeline"))
+            foreach (var item in (IEnumerable)data["phase_pipeline"]) steps.Add(Dict(item));
+        if (steps.Count == 0)
         {
+            steps.Add(new Dictionary<string, object> { { "label", "Ejecución en Codex" }, { "state", status } });
+        }
+        foreach (var step in steps)
+        {
+            string labelValue = String(step, "label", "Fase");
+            string state = String(step, "state");
+            bool observed = String(step, "evidence") == "observed" || labelValue == "Ejecución en Codex";
             var row = new Grid { Margin = new Thickness(0, 8, 0, 0) };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.45, GridUnitType.Star) });
-            Brush color = i == 0 && status != "" || i == 1 && status == "completed" ? Good :
-                i == 1 && status == "active" ? Accent : Muted;
+            Brush color = state == "completed" ? Good : state == "active" ? Accent :
+                observed && state != "" ? Accent : state == "selected" ? Good : Muted;
             row.Children.Add(new Border { Width = 7, Height = 7, CornerRadius = new CornerRadius(4),
-                BorderThickness = new Thickness(1), BorderBrush = color, Background = i < 2 && status != "" ? color : TransparentBrush,
+                BorderThickness = new Thickness(1), BorderBrush = color, Background = observed || state == "selected" ? color : TransparentBrush,
                 HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center });
-            var label = Txt(labels[i], 12, i < 2 ? Ink : Muted, FontWeights.Medium);
+            var label = Txt(labelValue, 12, observed || state == "selected" ? Ink : Muted, FontWeights.Medium);
             Grid.SetColumn(label, 1); row.Children.Add(label);
-            var text = Txt(states[i], 11, color); text.TextWrapping = TextWrapping.Wrap;
+            string stateText = state == "planned" ? "Planificada" : state == "selected" ? "Seleccionada" : PhaseStatus(state);
+            var text = Txt(stateText, 11, color); text.TextWrapping = TextWrapping.Wrap;
             text.TextAlignment = TextAlignment.Right; Grid.SetColumn(text, 2); row.Children.Add(text);
             content.Children.Add(row);
         }
-        var note = Txt(status == "" ? "Esta ejecución no tiene estados de fase registrados." :
-            "Revisión y cierre aún no tienen confirmación independiente.", 11, Muted);
+        var note = Txt(dynamic ? "Las etapas son un plan; solo la ejecución en Codex se confirma por eventos reales." :
+            status == "" ? "Esta ejecución no tiene estados de fase registrados." : "La evidencia interna de esta ejecución es limitada.", 11, Muted);
         note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 9, 0, 0); content.Children.Add(note);
         return new Border { Background = Panel2, CornerRadius = new CornerRadius(16), Padding = new Thickness(12),
             Margin = new Thickness(0, 10, 0, 0), Child = content };

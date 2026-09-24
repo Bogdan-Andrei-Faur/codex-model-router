@@ -2,6 +2,14 @@
 
 Este proyecto usa [versionado semántico](https://semver.org/lang/es/).
 
+## 0.2.0 — 2026-09-24
+
+- Diagnóstico visible de la telemetría local, sin conservar contenido.
+- Plan de trabajo dinámico por categoría con ejecución observada separada.
+- JEV conserva el mínimo de calidad local para trabajo sensible.
+- Valoraciones independientes de resultado, modelo y razonamiento.
+- Paquete ZIP autocontenido para Windows, preparado por `package_windows.py`.
+
 ## 0.1.0 — 2026-09-24
 
 Primera versión funcional personal de Codex automático.

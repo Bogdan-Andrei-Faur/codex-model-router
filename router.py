@@ -24,7 +24,7 @@ from task_modes import read_mode
 from phase_tracking import phase_update, proposed_phase
 from inference_telemetry import LocalInferenceTelemetry
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(os.environ.get("PERSONAL_CODEX_ROUTER_ROOT", Path(__file__).resolve().parent)).resolve()
 PRODUCT_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 
 
@@ -55,6 +55,10 @@ class Router:
         self.inventory = ThreadInventory()
         self.client_name = "unknown"
         self.handshake_complete = False
+        self.telemetry = None
+
+    def set_telemetry(self, collector):
+        self.telemetry = collector
 
     def load_thread_categories(self):
         """Recover only safe identity metadata, never prompt content, after restart."""
@@ -82,7 +86,8 @@ class Router:
                    "engine_output_tokens", "engine_cached_tokens", "proposed_model", "proposed_effort", "engine_active", "engine_applied", "task_mode",
                    "continuity_strategy", "phase_name", "phase_status", "phase_model", "phase_effort",
                    "phase_transition", "observed_model", "observed_effort", "configured_model", "configured_effort",
-                   "accepted_model", "accepted_effort", "pipeline_mode", "phase_pipeline", "inference_source"}
+                   "accepted_model", "accepted_effort", "pipeline_mode", "phase_pipeline", "inference_source",
+                   "model_quality", "effort_quality"}
         record = {"schema": 2, "time": time.time(), "time_iso":
                   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event,
                   "session": str(os.getpid())}
@@ -153,7 +158,8 @@ class Router:
                                        "client_name": self.client_name, "handshake_complete": self.handshake_complete,
                                        "inventory_synced_at": self.inventory.synced_at,
                                        "catalog": {m: sorted(e) for m, e in self.catalog.items()},
-                                       "stats": self.stats},
+                                       "stats": self.stats,
+                                       "telemetry": self.telemetry.snapshot() if self.telemetry else {"enabled": False}},
                                        ensure_ascii=False, indent=2), encoding="utf-8")
             os.replace(temp, target)
         except OSError:
@@ -500,15 +506,24 @@ class Router:
                 previous = None
         route, reasons = select_route_details(text, routes, previous, state.get("effort"), has_attachments(items))
         baseline_route, baseline_reasons = dict(route), dict(reasons)
+        category, confidence = classify_agent_identity(text, state.get("name", ""), has_attachments(items),
+                                                       baseline_reasons["model"], state.get("agent_category"))
         engine_name = config.get("routing_engine", ENGINE_RULES)
         if engine_name not in ENGINES:
             engine_name = ENGINE_RULES
         candidates = candidate_routes(routes, self.catalog)
+        tiers = ("simple", "normal", "complex", "critical")
+        baseline_tier = next((tier for tier, item in routes.items() if item["model"] == baseline_route["model"]), "simple")
+        quality_sensitive = category in ("interface", "audit", "research", "architecture") or baseline_tier in ("complex", "critical")
+        if quality_sensitive:
+            floor = tiers.index(baseline_tier)
+            candidates = {key: item for key, item in candidates.items() if tiers.index(item["tier"]) >= floor}
         # JEV must decide whether a follow-up keeps its route. The previous
         # local continuation shortcut is retained only for engines that do not
         # expose an explicit strategy answer.
         external_allowed = reasons.get("source") == "automatic" and bool(candidates)
         state_for_engine = build_state(text, attachment_summary(items), current, state.get("effort"), reasons.get("signal") == "retry")
+        state_for_engine["quality_floor"] = baseline_tier if quality_sensitive else None
         engine_result = {"engine": ENGINE_RULES, "status": "ok", "latency_ms": 0,
                          "route": {"model": route["model"], "effort": route["effort"]}, "engine_model": "local-policy"}
         if external_allowed and engine_name == ENGINE_JEV:
@@ -516,16 +531,15 @@ class Router:
         engine_applied = False
         if engine_result.get("engine") != ENGINE_RULES and engine_result.get("status") == "ok" and engine_result.get("route"):
             proposed = engine_result["route"]
-            # Hard local policy remains a floor for visual work, attachments, audits and risk.
-            strict = baseline_reasons["model"].startswith(("auditoría", "diseño de interfaces", "interpretación de adjuntos"))
-            tiers = ("simple", "normal", "complex", "critical")
+            # JEV may optimize within the candidate set, but never below a
+            # local quality floor for UI, audit, research and complex work.
+            strict = quality_sensitive
             continuity_strategy = engine_result.get("continuity_strategy")
             chosen_route = {"model": proposed["model"], "effort": proposed["effort"]}
             if (engine_name == ENGINE_JEV and continuity_strategy == "continue" and current and state.get("effort")
                     and current in self.catalog and state.get("effort") in self.catalog[current]):
                 chosen_route = {"model": current, "effort": state["effort"]}
             chosen_tier = next((tier for tier, item in routes.items() if item["model"] == chosen_route["model"]), "simple")
-            baseline_tier = next((tier for tier, item in routes.items() if item["model"] == baseline_route["model"]), "simple")
             if not strict or tiers.index(chosen_tier) >= tiers.index(baseline_tier):
                 route = chosen_route
                 engine_applied = True
@@ -547,8 +561,6 @@ class Router:
         # The configured engine may have been attempted, but local policy owns
         # the final selection after a malformed response, failure or guardrail.
         effective_engine = engine_result.get("engine", ENGINE_RULES) if engine_applied else ENGINE_RULES
-        category, confidence = classify_agent_identity(text, state.get("name", ""), has_attachments(items),
-                                                       reasons["model"], state.get("agent_category"))
         model, effort = route["model"], route["effort"]
         if effort == "ultra" and model in self.catalog and effort not in self.catalog[model] and "max" in self.catalog[model]:
             effort = "max"
@@ -570,7 +582,7 @@ class Router:
                                        engine_result, baseline_route, external_allowed)
         self.record_history("decision_routed", decision_id=decision_id, thread=tid, model=model, effort=effort,
                             routing_engine=effective_engine, engine_applied=engine_applied,
-                            continuity_strategy=continuity_strategy, **proposed_phase(current, model, effort))
+                            continuity_strategy=continuity_strategy, **proposed_phase(current, model, effort, category))
         decision = {"model": model, "effort": effort, "reason": reasons["model"],
                     "model_reason": reasons["model"], "effort_reason": reasons["effort"],
                     "source": reasons["source"], "agent_category": category,
@@ -579,7 +591,7 @@ class Router:
                     "engine_status": engine_result.get("status"), "engine_confidence": engine_result.get("confidence"),
                     "engine_latency_ms": engine_result.get("latency_ms"), "engine_applied": engine_applied,
                     "continuity_strategy": continuity_strategy}
-        decision.update(proposed_phase(current, model, effort))
+        decision.update(proposed_phase(current, model, effort, category))
         self.threads.setdefault(tid, {}).update(tier=tier, seen_turn=True, requested_model=model,
                                               requested_effort=effort, status="pending", updated=time.time(), **decision)
         if "id" in message:
@@ -661,6 +673,7 @@ def main():
     if config.get("inference_telemetry", False):
         try:
             telemetry = LocalInferenceTelemetry(router.observe_inference)
+            router.set_telemetry(telemetry)
             args = with_loopback_telemetry(args, telemetry.endpoint)
         except OSError:
             telemetry = None

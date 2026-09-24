@@ -19,7 +19,7 @@ import time
 
 from desktop_runtime import discover, DiscoveryError
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(os.environ.get("PERSONAL_CODEX_ROUTER_ROOT", Path(__file__).resolve().parent)).resolve()
 CONFIG = ROOT / "config.local.json"
 STATE = ROOT / "state"
 VARIABLE = "CODEX_CLI_PATH"
@@ -312,7 +312,7 @@ def open_app():
         if sys.platform == "darwin":
             open_monitor()
         else:
-            subprocess.Popen([str(ROOT / "dist/codex-monitor-v22.exe"), "--tray"], creationflags=subprocess.CREATE_NO_WINDOW)
+            subprocess.Popen([str(ROOT / "dist/codex-monitor-v24.exe"), "--tray"], creationflags=subprocess.CREATE_NO_WINDOW)
     except OSError:
         pass
     return {"opened": True}

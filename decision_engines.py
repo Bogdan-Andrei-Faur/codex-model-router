@@ -223,8 +223,9 @@ def run_jev(config, state_dir, state, candidates):
                 "Decide si esta petición debe conservar la configuración anterior o volver a evaluarse. "
                 "Continuar solo aplica a seguimientos directos sin un nuevo objetivo material.", "criteria": strategy_criteria},
             "route": {"type": "choice", "instructions":
-                "Elige la combinación de modelo Codex y razonamiento más pequeña que mantenga buena calidad. "
-                "Si hay adjuntos o una tarea visual, no infravalores la capacidad necesaria.", "criteria": criteria},
+                "Elige la combinación de modelo Codex y razonamiento que mantenga buena calidad. "
+                "No reduzcas capacidad por coste cuando haya UI/UX, auditoría, investigación, arquitectura, adjuntos o varios pasos. "
+                "Las opciones ya respetan el mínimo de calidad local cuando existe.", "criteria": criteria},
         },
     }
     try:

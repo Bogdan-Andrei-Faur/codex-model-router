@@ -39,6 +39,10 @@ class InferenceTelemetryTests(unittest.TestCase):
             self.assertEqual(events, [{"event_name": "codex.sse_event", "event_kind": "response.completed",
                                        "model": "gpt-5.6-terra", "effort": "medium"}])
             self.assertNotIn("PRIVATE_PROMPT", repr(events))
+            self.assertEqual(collector.snapshot(), {"enabled": True, "requests": 1, "records_scanned": 1,
+                                                     "eligible_records": 1, "events_without_model": 0,
+                                                     "unrecognized_records": 0, "invalid_requests": 0,
+                                                     "unexpected_path": 0})
         finally:
             collector.close()
 

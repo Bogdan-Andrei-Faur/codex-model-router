@@ -176,6 +176,16 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(records[0]["continuity_strategy"], "continue")
         fake_jev.assert_called_once()
 
+    @patch("router.run_jev")
+    def test_jev_cannot_reduce_a_research_quality_floor(self, fake_jev):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
+        fake_jev.return_value = {"engine": "jev", "status": "ok", "latency_ms": 25, "confidence": .91,
+                                 "engine_model": "jev-test", "route": {"model": "gpt-5.6-luna", "effort": "low", "tier": "simple", "label": "Luna · low"}}
+        result = json.loads(self.router.client_line(encode(self.request("Investiga una condición de carrera entre servicios"))))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-sol", "high"))
+        state = fake_jev.call_args.args[2]
+        self.assertEqual(state["quality_floor"], "complex")
+
     def test_non_turn_messages_are_byte_identical(self):
         for data in [b'  {"id":9, "method":"turn/interrupt", "params":{"threadId":"t","turnId":"q"}} \n',
                      b'{"id":7,"result":{"decision":"approved"}}\n', b'not json\n', b'[1,2]\n']:

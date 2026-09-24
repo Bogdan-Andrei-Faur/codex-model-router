@@ -68,6 +68,11 @@ internal static class Launcher
         if (!quiet) MessageBox.Show(message, "Codex automático");
         else { var bytes = Encoding.UTF8.GetBytes(Json.Serialize(new { message = message })); Console.OpenStandardOutput().Write(bytes, 0, bytes.Length); }
     }
+    static string RuntimePath(Dictionary<string, object> config, string key)
+    {
+        string value = (string)config[key];
+        return Path.IsPathRooted(value) ? value : Path.Combine(Root, value);
+    }
     static int Disconnect(bool quiet)
     {
         string path = Path.Combine(Root, "state", "desktop-integration.json");
@@ -97,14 +102,17 @@ internal static class Launcher
 
     static int Manage(Dictionary<string, object> config, string action, bool visible)
     {
-        var start = new ProcessStartInfo((string)config["python"])
+        bool bundled = config.ContainsKey("desktop_runtime");
+        var start = new ProcessStartInfo(bundled ? RuntimePath(config, "desktop_runtime") : (string)config["python"])
         {
-            Arguments = Quote(Path.Combine(Root, "desktop.py")) + " " + action,
+            Arguments = bundled ? action : Quote(Path.Combine(Root, "desktop.py")) + " " + action,
             UseShellExecute = false, CreateNoWindow = true,
             RedirectStandardOutput = true, RedirectStandardError = true,
             StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
         };
         start.EnvironmentVariables["PYTHONUTF8"] = "1";
+        start.EnvironmentVariables["PERSONAL_CODEX_ROUTER_CONFIG"] = ConfigPath;
+        start.EnvironmentVariables["PERSONAL_CODEX_ROUTER_ROOT"] = Root;
         using (var child = Process.Start(start))
         {
             var errors = child.StandardError.ReadToEndAsync();
@@ -133,7 +141,7 @@ internal static class Launcher
 
     static void OpenMonitor(bool hidden)
     {
-        Process.Start(new ProcessStartInfo(Path.Combine(Root, "dist", "codex-monitor-v22.exe"), hidden ? "--tray" : "")
+        Process.Start(new ProcessStartInfo(Path.Combine(Root, "dist", "codex-monitor-v24.exe"), hidden ? "--tray" : "")
             { UseShellExecute = false, CreateNoWindow = true });
     }
 
@@ -161,9 +169,10 @@ internal static class Launcher
 
     static int Bridge(Dictionary<string, object> config, string[] args)
     {
-        var start = new ProcessStartInfo((string)config["python"])
+        bool bundled = config.ContainsKey("router_runtime");
+        var start = new ProcessStartInfo(bundled ? RuntimePath(config, "router_runtime") : (string)config["python"])
         {
-            Arguments = String.Join(" ", new[] { Quote(Path.Combine(Root, "router.py")) }.Concat(args.Select(Quote))),
+            Arguments = bundled ? String.Join(" ", args.Select(Quote)) : String.Join(" ", new[] { Quote(Path.Combine(Root, "router.py")) }.Concat(args.Select(Quote))),
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardInput = true,
@@ -172,6 +181,7 @@ internal static class Launcher
         };
         start.EnvironmentVariables["PYTHONUTF8"] = "1";
         start.EnvironmentVariables["PERSONAL_CODEX_ROUTER_CONFIG"] = ConfigPath;
+        start.EnvironmentVariables["PERSONAL_CODEX_ROUTER_ROOT"] = Root;
         using (var job = new ChildJob())
         using (var child = Process.Start(start))
         {

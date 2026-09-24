@@ -6,7 +6,9 @@ Este documento permite que otro agente continúe el trabajo aunque esta conversa
 
 `https://github.com/Bogdan-Andrei-Faur/codex-model-router.git`
 
-Última entrega documentada: commit `17751c9` en `main` (23/09/2026). El árbol local de Windows quedó limpio y sincronizado con `origin/main` después de esa entrega.
+Última base publicada: `8cb3b22` (`v0.1.0`, 24/09/2026). La siguiente entrega
+preparada para publicar es `0.2.0`: telemetría diagnosticable, planes dinámicos,
+calibración de Jev, valoraciones separadas y paquete autocontenido de Windows.
 
 ## Decisión actual
 
@@ -57,7 +59,12 @@ por ejecutable bloqueado no constituye una actualización instalada.
 
 El puente de producción sigue decidiendo únicamente al inicio de cada turno. Ya incorpora una capa de observación de fases: registra la propuesta, la aceptación de Codex, el inicio, la publicación de la configuración, la finalización y los bloqueos. Esto prepara la futura pipeline sin cambiar modelos durante tareas reales.
 
-La capa no llama a un clasificador adicional, no inventa fases semánticas a partir del prompt y no interpreta una actualización visual del selector como inferencia ejecutada. El panel muestra una pipeline amplia de observación: preparación y ejecución se actualizan desde el puente; revisión y cierre permanecen marcadas como pendientes de evidencia. También separa modelo propuesto, aceptado por Codex, configuración publicada e inferencia confirmada. `Modelo observado` solo se asigna desde la fuente local de telemetría cuando la asociación es inequívoca.
+La capa no llama a un clasificador adicional, no interpreta una actualización
+visual del selector como inferencia ejecutada y no activa cambios durante una
+tarea. El panel crea un plan breve según la categoría y añade una ejecución
+observada desde el puente. También separa modelo propuesto, aceptado por Codex,
+configuración publicada e inferencia confirmada. `Modelo observado` solo se
+asigna desde la telemetría local cuando la asociación es inequívoca.
 
 Telemetría local (24/09/2026): el puente puede activar `inference_telemetry`
 para crear un receptor OTLP temporal de loopback y configurar únicamente su

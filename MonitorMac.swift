@@ -215,7 +215,8 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     }
     func saveQuality(_ data:[String:Any]) {
         guard let id = data["id"] as? String,let quality = data["value"] as? String,["","insufficient","adequate","excessive"].contains(quality),journal.contains(where:{$0["decision_id"] as? String == id}) else { feedback("Decisión no disponible.");return }
-        let record:[String:Any] = ["schema":2,"event":"decision_quality","decision_id":id,"quality":quality,"time":Date().timeIntervalSince1970,"time_iso":ISO8601DateFormatter().string(from:Date())]
+        let aspect=data["aspect"] as? String ?? "overall",field=aspect == "model" ? "model_quality" : aspect == "effort" ? "effort_quality" : "quality"
+        let record:[String:Any] = ["schema":2,"event":"decision_quality","decision_id":id,field:quality,"time":Date().timeIntervalSince1970,"time_iso":ISO8601DateFormatter().string(from:Date())]
         guard var bytes = try? JSONSerialization.data(withJSONObject:record) else {return};bytes.append(10)
         let fd = Darwin.open(state.appendingPathComponent("history.jsonl").path,O_WRONLY|O_CREAT|O_APPEND,0o600)
         guard fd>=0 else {feedback("No se pudo guardar la valoración.");return}
@@ -248,11 +249,17 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             guard let self=self else{return}
             let config=self.read(self.configPath)
             var rows=[String:Any](),connections=0
+            var telemetry=[String:Any](dictionaryLiteral:("enabled",false))
             let files=(try? FileManager.default.contentsOfDirectory(at:self.state,includingPropertiesForKeys:nil)) ?? []
             for file in files.sorted(by:{$0.lastPathComponent<$1.lastPathComponent}) where file.lastPathComponent.hasPrefix("status-") && file.pathExtension=="json" {
                 let data=self.read(file)
                 guard let heartbeat=data["heartbeat"] as? Double,abs(Date().timeIntervalSince1970-heartbeat)<12,let pid=data["pid"] as? Int32,kill(pid,0)==0,let threads=data["threads"] as? [String:[String:Any]] else{continue}
                 connections+=1
+                if let health=data["telemetry"] as? [String:Any] {
+                    telemetry["enabled"] = (telemetry["enabled"] as? Bool ?? false) || (health["enabled"] as? Bool ?? false)
+                    for key in ["requests","records_scanned","eligible_records","events_without_model","unrecognized_records","invalid_requests","unexpected_path"] { telemetry[key]=(telemetry[key] as? Double ?? 0)+(health[key] as? Double ?? 0) }
+                    if let stats=data["stats"] as? [String:Any] { for key in ["telemetry_events","telemetry_confirmed","telemetry_unattributed"] { telemetry[key]=(telemetry[key] as? Double ?? 0)+(stats[key] as? Double ?? 0) } }
+                }
                 for (id,row) in threads {let old=rows[id] as? [String:Any] ?? [:];if (row["updated"] as? Double ?? 0)>=(old["updated"] as? Double ?? 0){rows[id]=row}}
             }
             if self.preview { let fixture=self.read(self.root.appendingPathComponent("preview.json"));rows=fixture["threads"] as? [String:Any] ?? [:];connections=1 }
@@ -268,7 +275,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
                 let safeConfig=config.filter{["enabled","history_days","routing_engine","comparison_engines","jev","routes"].contains($0.key)}
                 let ids=Set(rows.keys).union(self.journal.compactMap{$0["thread"] as? String})
                 let taskModes=Dictionary(uniqueKeysWithValues:ids.map{($0,self.taskMode($0))})
-                let payload:[String:Any]=["productVersion":self.productVersion,"threads":rows,"connections":connections,"history":self.journal,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
+                let payload:[String:Any]=["productVersion":self.productVersion,"threads":rows,"connections":connections,"history":self.journal,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"telemetry":telemetry,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
                 guard let encoded=try? JSONSerialization.data(withJSONObject:payload,options:[.sortedKeys]),encoded != self.lastPayload else{return}
                 self.lastPayload=encoded
                 self.web.callAsyncJavaScript("window.receive(payload)",arguments:["payload":payload],in:nil,in:.page){ result in if case .failure=result {self.lastPayload=Data()} }

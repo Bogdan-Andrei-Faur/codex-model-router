@@ -146,7 +146,9 @@ a failed verification, never interpreted as a successful model switch.
    `blocked`/`failed`) and the monitor displays it. Its opt-in loopback OTel
    collector now records `response.completed` model/effort evidence only when
    it can associate exactly one active task. It deliberately does not label a
-   selector/settings notification as an observed inference.
+   selector/settings notification as an observed inference. El monitor convierte
+   esa evidencia en un plan dinámico con pasos planificados y una ejecución
+   observada; esos nombres no activan cambios automáticos de modelo ni esfuerzo.
 3. Validate Desktop's presentation, cancellation, approvals and new user input
    when phases use successive native turns. This probe does not establish a
    seamless single-response experience in Desktop.

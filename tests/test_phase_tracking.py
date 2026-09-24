@@ -3,18 +3,18 @@ from pathlib import Path
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from phase_tracking import broad_pipeline, can_switch_within_turn, phase_update, proposed_phase, transition_kind
+from phase_tracking import can_switch_within_turn, dynamic_pipeline, phase_update, proposed_phase, transition_kind
 
 
 class PhaseTrackingTests(unittest.TestCase):
     def test_compatible_group_is_explicit(self):
         self.assertEqual(transition_kind("gpt-5.6-luna", "gpt-5.6-sol"), "compatible_group")
-        phase = proposed_phase("gpt-5.6-luna", "gpt-5.6-sol", "high")
+        phase = proposed_phase("gpt-5.6-luna", "gpt-5.6-sol", "high", "interface")
         self.assertEqual({key: phase[key] for key in ("phase_name", "phase_status", "phase_model", "phase_effort", "phase_transition")}, {
             "phase_name": "execution", "phase_status": "proposed",
             "phase_model": "gpt-5.6-sol", "phase_effort": "high",
             "phase_transition": "compatible_group"})
-        self.assertEqual(phase["pipeline_mode"], "observation")
+        self.assertEqual(phase["pipeline_mode"], "plan_and_observation")
 
     def test_astra_boundary_is_blocked_without_mutating_policy(self):
         self.assertEqual(transition_kind("gpt-5.6-terra", "gpt-6-astra"), "blocked_astra_boundary")
@@ -24,12 +24,16 @@ class PhaseTrackingTests(unittest.TestCase):
         self.assertFalse(can_switch_within_turn("gpt-5.6-terra", "gpt-6-astra"))
         self.assertTrue(can_switch_within_turn("gpt-5.6-terra", "gpt-5.6-sol"))
 
-    def test_broad_pipeline_never_claims_unpublished_internal_boundaries(self):
-        proposed = broad_pipeline()
-        self.assertEqual([item["id"] for item in proposed], ["preparation", "execution", "review", "closure"])
-        self.assertEqual(proposed[0]["state"], "configured")
-        self.assertEqual(proposed[2]["state"], "not_observed")
-        self.assertEqual(phase_update({}, "active")["phase_pipeline"][1]["state"], "active")
+    def test_dynamic_plan_varies_without_claiming_internal_completion(self):
+        interface = dynamic_pipeline("interface")
+        text = dynamic_pipeline("text")
+        self.assertEqual([item["label"] for item in interface], ["Revisar interfaz", "Implementar", "Comprobar", "Ejecución en Codex"])
+        self.assertEqual([item["label"] for item in text], ["Responder", "Ejecución en Codex"])
+        self.assertEqual(interface[0]["state"], "selected")
+        self.assertTrue(all(item["evidence"] == "plan" for item in interface[:-1]))
+        active = phase_update({"agent_category": "correction"}, "active")["phase_pipeline"]
+        self.assertEqual(active[-1]["state"], "active")
+        self.assertEqual(active[-1]["evidence"], "observed")
 
     def test_unknown_and_same_model_are_conservative(self):
         self.assertEqual(transition_kind(None, "gpt-5.6-terra"), "same_model")
