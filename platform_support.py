@@ -23,7 +23,7 @@ def creation_flags():
     return subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
 
-def uses_stdio(args):
+def app_server_index(args):
     # Desktop puts global -c overrides BEFORE the subcommand on macOS.
     # Consume only known global options, never search a prompt for app-server.
     index = 0
@@ -31,15 +31,16 @@ def uses_stdio(args):
         arg = args[index]
         if arg in ("-c", "--config", "--enable", "--disable"):
             if index + 1 >= len(args):
-                return False
+                return None
             index += 2
         elif arg.startswith(("--config=", "--enable=", "--disable=")) or (arg.startswith("-c") and len(arg) > 2):
             index += 1
         else:
             break
     if index >= len(args) or args[index] != "app-server":
-        return False
-    server_args = args[index + 1:]
+        return None
+    command_index = index
+    server_args = args[command_index + 1:]
     index = 0
     while index < len(server_args):
         arg = server_args[index]
@@ -47,16 +48,34 @@ def uses_stdio(args):
             index += 2
             continue
         if arg in ("daemon", "proxy", "generate-ts", "generate-json-schema"):
-            return False
+            return None
         if arg == "--listen":
             if index + 1 >= len(server_args) or server_args[index + 1] != "stdio://":
-                return False
+                return None
             index += 2
             continue
         if arg.startswith("--listen=") and arg != "--listen=stdio://":
-            return False
+            return None
         index += 1
-    return True
+    return command_index
+
+
+def uses_stdio(args):
+    return app_server_index(args) is not None
+
+
+def with_loopback_telemetry(args, endpoint):
+    """Add process-local OTel settings before the app-server command only."""
+    index = app_server_index(args)
+    if index is None:
+        return list(args)
+    overrides = [
+        "-c", "otel.log_user_prompt=false",
+        "-c", 'otel.trace_exporter="none"',
+        "-c", 'otel.metrics_exporter="none"',
+        "-c", 'otel.exporter={otlp-http={endpoint="' + endpoint + '",protocol="json"}}',
+    ]
+    return [*args[:index], *overrides, *args[index:]]
 
 
 def stop_backend(proc):

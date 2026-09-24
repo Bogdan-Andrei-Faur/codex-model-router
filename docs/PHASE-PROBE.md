@@ -143,9 +143,10 @@ a failed verification, never interpreted as a successful model switch.
    but it is not a guarantee for every permission profile or child agent.
 2. The production bridge now records conservative phase lifecycle metadata
    (`proposed`, `accepted`, `active`, `settings_published`, `completed`,
-   `blocked`/`failed`) and the monitor displays it. It deliberately does not
-   label a selector/settings notification as an observed inference; connect a
-   verified inference telemetry source before adding that label.
+   `blocked`/`failed`) and the monitor displays it. Its opt-in loopback OTel
+   collector now records `response.completed` model/effort evidence only when
+   it can associate exactly one active task. It deliberately does not label a
+   selector/settings notification as an observed inference.
 3. Validate Desktop's presentation, cancellation, approvals and new user input
    when phases use successive native turns. This probe does not establish a
    seamless single-response experience in Desktop.

@@ -18,10 +18,11 @@ import uuid
 from routing import DEFAULT_ROUTES, EFFORTS, classify_agent_identity, select_route_details, has_attachments, user_text
 from decision_engines import ENGINES, ENGINE_JEV, ENGINE_RULES, attachment_summary, build_state, candidate_routes, run_jev
 from thread_inventory import ThreadInventory
-from platform_support import backend_path, creation_flags, uses_stdio, stop_backend, input_lines
+from platform_support import backend_path, creation_flags, uses_stdio, stop_backend, input_lines, with_loopback_telemetry
 from desktop_runtime import discover
 from task_modes import read_mode
 from phase_tracking import phase_update, proposed_phase
+from inference_telemetry import LocalInferenceTelemetry
 
 ROOT = Path(__file__).resolve().parent
 
@@ -48,7 +49,8 @@ class Router:
         self.current_decisions = {}
         self.thread_categories = self.load_thread_categories()
         self.history_writes = 0
-        self.stats = {"accepted": 0, "non_astra": 0}
+        self.stats = {"accepted": 0, "non_astra": 0, "telemetry_events": 0,
+                      "telemetry_confirmed": 0, "telemetry_unattributed": 0}
         self.inventory = ThreadInventory()
         self.client_name = "unknown"
         self.handshake_complete = False
@@ -155,6 +157,50 @@ class Router:
             os.replace(temp, target)
         except OSError:
             pass  # Diagnostics must never break a user's message.
+
+    def observe_inference(self, record):
+        """Associate a completed local OTel event only when it is unambiguous."""
+        if record.get("event_kind") != "response.completed":
+            return
+        model, effort = record.get("model"), record.get("effort")
+        if not model:
+            return
+        with self.lock:
+            now = time.time()
+            self.stats["telemetry_events"] += 1
+            candidates = []
+            for tid, row in self.threads.items():
+                status = row.get("phase_status")
+                if status not in ("accepted", "active", "completed"):
+                    continue
+                # OTel completion can be delivered just after the bridge receives
+                # turn/completed. Keep that boundary observable without allowing
+                # old history to be attributed to a new inference.
+                if status == "completed":
+                    try:
+                        recent_completion = now - float(row.get("updated", 0)) <= 15
+                    except (TypeError, ValueError):
+                        recent_completion = False
+                    if not recent_completion:
+                        continue
+                expected_model = row.get("phase_model") or row.get("accepted_model") or row.get("model")
+                expected_effort = row.get("phase_effort") or row.get("accepted_effort") or row.get("effort")
+                if model == expected_model and (not effort or not expected_effort or effort == expected_effort):
+                    candidates.append((tid, row))
+            if len(candidates) != 1:
+                self.stats["telemetry_unattributed"] += 1
+                self.log({"event": "inference_unattributed", "model": model, "effort": effort})
+                return
+            tid, row = candidates[0]
+            row.update(observed_model=model, observed_effort=effort,
+                       inference_source="otlp_loopback", updated=time.time())
+            self.stats["telemetry_confirmed"] += 1
+            self.record_history("inference_observed", decision_id=self.current_decisions.get(tid), thread=tid,
+                                title=row.get("name"), status=row.get("status"), observed_model=model,
+                                observed_effort=effort, inference_source="otlp_loopback",
+                                phase_status=row.get("phase_status"), phase_name=row.get("phase_name"),
+                                phase_pipeline=row.get("phase_pipeline"), pipeline_mode="observation")
+            self.log({"event": "inference_observed", "thread": tid, "model": model, "effort": effort})
 
     def server_line(self, raw):
         try:
@@ -609,17 +655,30 @@ def main():
             os.execve(str(binary), [str(binary), *args], env)
         return subprocess.call([str(binary), *args], env=env, creationflags=flags,
                                stdin=sys.stdin.buffer, stdout=sys.stdout.buffer, stderr=sys.stderr.buffer)
-    proc = subprocess.Popen([str(binary), *args], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+    router = Router(config_path, os.environ.get("PERSONAL_CODEX_ROUTER_STATE"))
+    telemetry = None
+    if config.get("inference_telemetry", False):
+        try:
+            telemetry = LocalInferenceTelemetry(router.observe_inference)
+            args = with_loopback_telemetry(args, telemetry.endpoint)
+        except OSError:
+            telemetry = None
+    try:
+        proc = subprocess.Popen([str(binary), *args], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE, env=env, creationflags=flags,
                             start_new_session=os.name != "nt")
+    except OSError:
+        if telemetry:
+            telemetry.close()
+        raise
     if os.name != "nt":
         def interrupted(signum, frame):
             stop_backend(proc)
             raise SystemExit(128 + signum)
         signal.signal(signal.SIGTERM, interrupted)
         signal.signal(signal.SIGINT, interrupted)
-    router = Router(config_path, os.environ.get("PERSONAL_CODEX_ROUTER_STATE"))
-    router.log({"event": "bridge_started", "backend_pid": proc.pid})
+    router.log({"event": "bridge_started", "backend_pid": proc.pid,
+                "inference_telemetry": bool(telemetry)})
     heartbeat_stop = threading.Event()
     write_lock = threading.Lock()
 
@@ -685,6 +744,8 @@ def main():
             stop_backend(proc)
         stderr_worker.join(timeout=1)
         router.log({"event": "bridge_stopped", "exit_code": proc.returncode})
+        if telemetry:
+            telemetry.close()
         if proc.returncode:
             router.record_history("bridge_error", status="error", error_type="backend_exit",
                                   error_code=proc.returncode)

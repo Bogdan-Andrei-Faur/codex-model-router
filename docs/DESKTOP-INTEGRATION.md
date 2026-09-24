@@ -1,9 +1,9 @@
-# Conexión con Desktop — v19
+# Conexión con Desktop — v21
 
 ## Uso
 
 En Windows, `build.ps1` prepara el lanzador estable `dist/codex-router.exe`, el
-monitor v20 y los accesos. En macOS, `python3 macos.py setup` prepara el puente y
+monitor v21 y los accesos. En macOS, `python3 macos.py setup` prepara el puente y
 el monitor nativo. Después, **Ajustes → Conectar al inicio habitual** configura
 una conexión por usuario. También se puede ejecutar:
 
@@ -25,6 +25,14 @@ tarea. Las nuevas tareas son automáticas; la pausa global prevalece. Manual
 conserva exactamente modelo, esfuerzo, permisos y petición enviados por Desktop,
 sin llamadas a Jev/Proveedor ni comparaciones. Cambiar el modo nunca modifica un
 turno en curso. El historial explica las selecciones manuales como tales.
+
+La telemetría de inferencia es opcional y se activa por separado en **Ajustes**.
+Mientras el puente está conectado, abre un receptor temporal que escucha solo en
+`127.0.0.1`. Antes de conservar nada descarta el contenido de los eventos y solo
+acepta modelo, nivel de razonamiento y una señal de respuesta completada. Nunca
+guarda mensajes, respuestas, adjuntos, herramientas, credenciales ni la carga
+bruta. Si no puede asociar un evento a una única tarea compatible, lo deja sin
+atribuir. El cambio se aplica al próximo arranque de Desktop.
 
 ## Recuperación
 

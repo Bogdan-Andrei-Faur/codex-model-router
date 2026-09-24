@@ -74,6 +74,14 @@ inferencia interna. El panel separa el modelo propuesto, aceptado por Codex,
 configuración publicada e inferencia confirmada localmente. Si no conoce un dato,
 muestra «Sin confirmar».
 
+La telemetría de inferencia es opcional. Al activarla desde **Ajustes**, el
+puente crea un receptor temporal que escucha exclusivamente en el propio equipo
+(`127.0.0.1`) durante esa conexión de Codex. Solo conserva modelo,
+razonamiento y el tipo de evento completado; no conserva el mensaje, respuesta,
+adjuntos, herramientas, credenciales ni los datos brutos de telemetría. Si hay
+dos tareas que podrían coincidir, deja el evento sin atribuir en vez de asignarlo
+incorrectamente. Se aplica al reiniciar Desktop.
+
 ## Panel e historial
 
 El panel lateral tiene cuatro vistas:

@@ -295,6 +295,7 @@ function settings() {
   heading(box,'CONSERVAR HISTORIAL');choices(box,[[30,'30 días'],[90,'90 días'],[180,'180 días'],[0,'Siempre']],config.history_days??90,v=>configure('history_days',v));
   heading(box,'FASES Y EVIDENCIA');
   box.append(el('p','small','La pipeline es de observación: no cambia el modelo durante una tarea. El panel separa la propuesta, la aceptación y la configuración publicada; una inferencia solo se marca como confirmada cuando existe telemetría local segura.'));
+  actionCard(box,config.inference_telemetry?'Desactivar telemetría local':'Activar telemetría local',config.inference_telemetry?'Confirma inferencias mediante un receptor temporal en este equipo. Se aplicará al reiniciar Codex.':'Confirma modelo y razonamiento ejecutados. Solo usa un receptor temporal en este equipo; no guarda mensajes ni respuestas.',()=>configure('inference_telemetry',!config.inference_telemetry));
   const engine=['rules','jev'].includes(config.routing_engine)?config.routing_engine:'rules';
   heading(box,'MOTOR DE ENRUTAMIENTO');choices(box,[['rules','Reglas'],['jev','Jev']],engine,v=>configure('routing_engine',v));
   box.append(el('p','small',engine==='rules'?'Las reglas locales deciden al instante sin enviar el mensaje a otro servicio.':'El clasificador recibe el mensaje de la tarea. Si falla o responde de forma inválida, se conservan las reglas locales. Puede consumir cuota del proveedor.'));

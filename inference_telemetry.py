@@ -1,0 +1,83 @@
+"""Loopback-only inference evidence for the local Codex bridge.
+
+The collector deliberately discards raw OTel payloads. It retains only an
+allowlist sufficient to establish model/effort evidence and never persists
+prompts, resources, URLs, tool calls, identities, headers or response text.
+"""
+import gzip
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import threading
+
+MODELS = frozenset(("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-6-astra"))
+EFFORTS = frozenset(("low", "medium", "high", "xhigh", "max", "ultra"))
+EVENT_NAMES = frozenset(("codex.api_request", "codex.sse_event", "codex.websocket_event"))
+EVENT_KINDS = frozenset(("response.created", "response.completed", "response.failed"))
+MAX_BYTES = 512 * 1024
+
+
+def safe_records(payload):
+    """Extract a tiny, content-free set of OTel log fields."""
+    for resource in payload.get("resourceLogs", []):
+        for scope in resource.get("scopeLogs", []):
+            for log in scope.get("logRecords", []):
+                record = {}
+                for attribute in log.get("attributes", []):
+                    key = attribute.get("key")
+                    value = attribute.get("value", {}).get("stringValue")
+                    if key in ("model", "slug", "gen_ai.request.model", "gen_ai.response.model") and value in MODELS:
+                        record["model"] = value
+                    elif key in ("model_reasoning_effort", "reasoning_effort") and value in EFFORTS:
+                        record["effort"] = value
+                    elif key == "event.name" and value in EVENT_NAMES:
+                        record["event_name"] = value
+                    elif key == "event.kind" and value in EVENT_KINDS:
+                        record["event_kind"] = value
+                if record.get("event_name") and record.get("model"):
+                    yield record
+
+
+class LocalInferenceTelemetry:
+    """A short-lived HTTP collector bound only to the loopback interface."""
+    def __init__(self, receive):
+        self.receive = receive
+        self.requests = 0
+        self.errors = 0
+        owner = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_POST(self):
+                try:
+                    size = int(self.headers.get("Content-Length", "0"))
+                    if not 0 < size <= MAX_BYTES:
+                        raise ValueError("invalid payload size")
+                    raw = self.rfile.read(size)
+                    if self.headers.get("Content-Encoding") == "gzip":
+                        raw = gzip.decompress(raw)
+                    for record in safe_records(json.loads(raw)):
+                        owner.receive(record)
+                    owner.requests += 1
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b"{}")
+                except (ValueError, TypeError, json.JSONDecodeError, OSError, EOFError):
+                    owner.errors += 1
+                    self.send_response(400)
+                    self.end_headers()
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.worker = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.worker.start()
+
+    @property
+    def endpoint(self):
+        return "http://127.0.0.1:%d/v1/logs" % self.server.server_port
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+        self.worker.join(timeout=2)

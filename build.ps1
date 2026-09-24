@@ -17,7 +17,7 @@ try {
 } finally { $routerWriter.Dispose() }
 & $routerCompiler /nologo /target:winexe /optimize+ /r:System.Windows.Forms.dll /r:System.Web.Extensions.dll "/win32icon:$routerIcon" "/out:$routerOutput\codex-router-v19.exe" "$routerRoot\Launcher.cs"
 if ($LASTEXITCODE -ne 0) { throw 'Compilation failed' }
-& $routerCompiler /nologo /target:winexe /optimize+ /main:RouterMonitorProgram /r:System.Core.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Web.Extensions.dll /r:System.Security.dll "/r:$routerFramework\System.Xaml.dll" "/r:$routerFramework\WindowsBase.dll" "/r:$routerFramework\PresentationCore.dll" "/r:$routerFramework\PresentationFramework.dll" "/win32icon:$routerIcon" "/out:$routerOutput\codex-monitor-v20.exe" "$routerRoot\MonitorWpf.cs" "$routerRoot\MonitorAgents.cs" "$routerRoot\MonitorAnalytics.cs" "$routerRoot\MonitorPhases.cs" "$routerRoot\MonitorReviewTests.cs"
+& $routerCompiler /nologo /target:winexe /optimize+ /main:RouterMonitorProgram /r:System.Core.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Web.Extensions.dll /r:System.Security.dll "/r:$routerFramework\System.Xaml.dll" "/r:$routerFramework\WindowsBase.dll" "/r:$routerFramework\PresentationCore.dll" "/r:$routerFramework\PresentationFramework.dll" "/win32icon:$routerIcon" "/out:$routerOutput\codex-monitor-v21.exe" "$routerRoot\MonitorWpf.cs" "$routerRoot\MonitorAgents.cs" "$routerRoot\MonitorAnalytics.cs" "$routerRoot\MonitorPhases.cs" "$routerRoot\MonitorReviewTests.cs"
 if ($LASTEXITCODE -ne 0) { throw 'Monitor compilation failed' }
 if ($BuildOnly) { Write-Output 'Compilación preparada sin cambiar los accesos.'; return }
 $routerStable = Join-Path $routerOutput 'codex-router.exe'

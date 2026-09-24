@@ -549,6 +549,11 @@ internal sealed partial class ModernRouterMonitor
         settingsContent.Children.Add(choices);
         settingsContent.Children.Add(AnalyticsHeading("FASES Y EVIDENCIA"));
         AddSettingsNote("La pipeline observa la ejecución. Revisión y cierre siguen pendientes de evidencia. El cambio automático de modelo entre fases aún no está activado.");
+        bool telemetry = ReadConfigBool("inference_telemetry", false);
+        settingsContent.Children.Add(SettingsAction(telemetry ? "Desactivar telemetría local" : "Activar telemetría local",
+            telemetry ? "Confirma inferencias mediante un receptor temporal en este equipo. Se aplicará al reiniciar Desktop." :
+            "Confirma modelo y razonamiento ejecutados. Solo usa un receptor temporal en este equipo; no guarda mensajes ni respuestas.",
+            delegate { WriteConfigValue("inference_telemetry", !telemetry); RefreshSettings(); }));
         BuildRoutingEngineSettings();
         settingsContent.Children.Add(AnalyticsHeading("POLÍTICA ACTUAL"));
         AddPolicy("Luna", "Tareas delimitadas", "Ligero"); AddPolicy("Terra", "Cambios concretos", "Medio");
@@ -790,6 +795,16 @@ internal sealed partial class ModernRouterMonitor
             return data.ContainsKey("history_days") ? Convert.ToInt32(data["history_days"]) : 90;
         }
         catch { return 90; }
+    }
+
+    bool ReadConfigBool(string key, bool fallback)
+    {
+        try
+        {
+            var data = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(Path.Combine(Root, "config.local.json")));
+            return data.ContainsKey(key) ? Convert.ToBoolean(data[key]) : fallback;
+        }
+        catch { return fallback; }
     }
 
     string ReadConfigString(string key, string fallback)

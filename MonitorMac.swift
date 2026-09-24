@@ -198,6 +198,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         var valid = false
         switch key {
         case "enabled": valid = CFGetTypeID(value as CFTypeRef) == CFBooleanGetTypeID()
+        case "inference_telemetry": valid = CFGetTypeID(value as CFTypeRef) == CFBooleanGetTypeID()
         case "history_days": valid = [0,30,90,180].contains(value as? Int ?? -1)
         case "routing_engine": valid = ["rules","jev"].contains(value as? String ?? "")
         case "comparison_engines": if let values = value as? [String] { valid = values.count<=2 && Set(values).count==values.count && values.allSatisfy { ["rules","jev"].contains($0) } }

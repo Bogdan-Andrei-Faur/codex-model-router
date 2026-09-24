@@ -15,7 +15,7 @@ import macos
 import decision_engines
 import desktop
 from desktop_runtime import Installation
-from platform_support import backend_path, uses_stdio
+from platform_support import backend_path, uses_stdio, with_loopback_telemetry
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -52,6 +52,12 @@ class PlatformTests(unittest.TestCase):
         self.assertFalse(uses_stdio(["-c", "x=1", "exec", "app-server"]))
         self.assertFalse(uses_stdio(["-c", "app-server"]))
         self.assertFalse(uses_stdio(["app-server", "--listen=stdio://", "--listen=ws://localhost:1"]))
+        original = ["-c", "model=\"gpt-6-astra\"", "app-server", "--analytics-default-enabled"]
+        injected = with_loopback_telemetry(original, "http://127.0.0.1:4321/v1/logs")
+        self.assertEqual(injected[-2:], ["app-server", "--analytics-default-enabled"])
+        self.assertIn("otel.log_user_prompt=false", injected)
+        self.assertIn("127.0.0.1:4321", " ".join(injected))
+        self.assertEqual(with_loopback_telemetry(["--version"], "http://127.0.0.1"), ["--version"])
 
     def test_only_stdio_server_is_intercepted(self):
         for args in (["app-server"], ["app-server", "--listen", "stdio://"], ["app-server", "--listen=stdio://"]):

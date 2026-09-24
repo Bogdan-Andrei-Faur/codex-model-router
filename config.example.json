@@ -2,6 +2,7 @@
   "installation_mode": "auto",
   "enabled": true,
   "sync_picker": true,
+  "inference_telemetry": false,
   "history_days": 90,
   "routing_engine": "rules",
   "comparison_engines": ["rules"],
