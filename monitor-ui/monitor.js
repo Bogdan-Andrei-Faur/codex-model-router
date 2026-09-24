@@ -217,6 +217,14 @@ function statistics() {
   const total=history.length,accepted=history.filter(d=>d.accepted).length,errors=history.filter(d=>d.error_type||['error','failed'].includes(d.status)).length,retries=history.filter(d=>d.signal==='retry').length;
   metric(content,'Decisiones con historial',fmt(total),total?1:0);metric(content,'Envíos aceptados · acumulado',fmt(accepted),accepted/(total||1));
   metric(content,'Incidencias registradas',fmt(errors),errors/(total||1),errors?'var(--warning)':'var(--good)');metric(content,'Reintentos registrados',fmt(retries),retries/(total||1),'var(--good)');
+  heading(content,'FASES DE EJECUCIÓN');
+  const phaseLabels={proposed:'Propuestas',accepted:'Aceptadas por Codex',active:'Activas',observed:'Inferencias observadas',completed:'Completadas',blocked:'Bloqueadas',failed:'Con incidencia'};
+  const phaseRows=history.filter(d=>d.phase_status);
+  if(!phaseRows.length)content.append(el('p','','Todavía no hay estados de fase registrados'));
+  else for(const [key,label] of Object.entries(phaseLabels)){const count=phaseRows.filter(d=>d.phase_status===key).length;if(count)metric(content,label,fmt(count),count/phaseRows.length,key==='blocked'||key==='failed'?'var(--warning)':'var(--accent)');}
+  const transitions={compatible_group:'Cambios compatibles',same_model:'Mismo modelo',blocked_astra_boundary:'Frontera de Astra',unknown_model:'Modelo desconocido'};
+  const transitionRows=history.filter(d=>d.phase_transition);
+  if(transitionRows.length)for(const [key,label] of Object.entries(transitions)){const count=transitionRows.filter(d=>d.phase_transition===key).length;if(count)metric(content,label,fmt(count),count/transitionRows.length,key==='blocked_astra_boundary'?'var(--warning)':'var(--good)');}
   breakdown(content,'MODELOS',history,d=>d.model?C.model(d.model):'',C.models);breakdown(content,'RAZONAMIENTO',history,d=>C.efforts[d.effort],Object.fromEntries(Object.entries(C.efforts).map(([key,label])=>[label,C.effortColors[key]])));breakdown(content,'MOTOR DE ENRUTAMIENTO',history,d=>engines[d.routing_engine]);
   heading(content,'FIABILIDAD DE LOS MOTORES');
   const attempts=history.flatMap(d=>Object.values(d.comparisons));

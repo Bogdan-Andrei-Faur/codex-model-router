@@ -3,7 +3,7 @@ from pathlib import Path
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from phase_tracking import phase_update, proposed_phase, transition_kind
+from phase_tracking import can_switch_within_turn, phase_update, proposed_phase, transition_kind
 
 
 class PhaseTrackingTests(unittest.TestCase):
@@ -19,6 +19,8 @@ class PhaseTrackingTests(unittest.TestCase):
         self.assertEqual(transition_kind("gpt-6-astra", "gpt-5.6-terra"), "blocked_astra_boundary")
         row = {"phase_name": "execution", "phase_model": "gpt-5.6-terra", "phase_effort": "medium"}
         self.assertEqual(phase_update(row, "observed", "gpt-5.6-terra", "medium")["phase_status"], "observed")
+        self.assertFalse(can_switch_within_turn("gpt-5.6-terra", "gpt-6-astra"))
+        self.assertTrue(can_switch_within_turn("gpt-5.6-terra", "gpt-5.6-sol"))
 
     def test_unknown_and_same_model_are_conservative(self):
         self.assertEqual(transition_kind(None, "gpt-5.6-terra"), "same_model")

@@ -19,6 +19,11 @@ def transition_kind(source, destination):
     return "unknown_model"
 
 
+def can_switch_within_turn(source, destination):
+    """Whether Codex's tested live-switch safety boundary permits the pair."""
+    return transition_kind(source, destination) in ("same_model", "compatible_group")
+
+
 def proposed_phase(source, model, effort):
     """Create content-free metadata for a proposed execution phase."""
     return {
