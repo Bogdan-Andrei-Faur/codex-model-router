@@ -50,6 +50,9 @@ La cabecera y las pestañas permanecen visibles mientras el contenido se desplaz
 
 El enrutamiento sigue decidiendo al inicio de cada turno. La prueba aislada de
 [continuidad por fases](docs/PHASE-PROBE.md) no activa cambios automáticos en las tareas.
+El puente registra además el ciclo observado de cada fase (propuesta, aceptación,
+actividad, configuración publicada, finalización o bloqueo) para preparar una
+pipeline futura sin afirmar que la configuración del selector ya sea una inferencia.
 
 Modelo y razonamiento aparecen como etiquetas. Luna es azul, Terra verde, Sol
 ámbar y Astra violeta; el texto permite identificarlos sin depender del color.

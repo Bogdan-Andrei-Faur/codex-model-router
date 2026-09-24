@@ -21,6 +21,7 @@ from thread_inventory import ThreadInventory
 from platform_support import backend_path, creation_flags, uses_stdio, stop_backend, input_lines
 from desktop_runtime import discover
 from task_modes import read_mode
+from phase_tracking import phase_update, proposed_phase
 
 ROOT = Path(__file__).resolve().parent
 
@@ -76,7 +77,8 @@ class Router:
                    "inputTokens", "outputTokens", "cachedInputTokens", "reasoningOutputTokens", "routing_engine", "engine_model",
                    "engine_status", "engine_confidence", "engine_latency_ms", "engine_failure", "engine_input_tokens",
                    "engine_output_tokens", "engine_cached_tokens", "proposed_model", "proposed_effort", "engine_active", "engine_applied", "task_mode",
-                   "continuity_strategy"}
+                   "continuity_strategy", "phase_name", "phase_status", "phase_model", "phase_effort",
+                   "phase_transition", "observed_model", "observed_effort"}
         record = {"schema": 2, "time": time.time(), "time_iso":
                   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event,
                   "session": str(os.getpid())}
@@ -211,15 +213,21 @@ class Router:
                         sync = self.sync_after_ack.pop(message.get("id"), None)
                         accepted = self.accepted_routes.pop(message.get("id"), None)
                         if "error" in message:
-                            self.threads.setdefault(tid, {}).update(**(accepted or {}), status="error", confirmation="Rechazado")
+                            row = self.threads.setdefault(tid, {})
+                            row.update({**(accepted or {}), "status": "error", "confirmation": "Rechazado",
+                                        **phase_update(row, "blocked", transition=(accepted or {}).get("phase_transition"))})
                             self.log({"event": "turn_rejected", "thread": tid})
                             if accepted:
                                 error = message.get("error") or {}
                                 self.record_history("decision_rejected", decision_id=accepted.get("decision_id"),
                                                     thread=tid, status="error", error_type="turn_rejected",
-                                                    error_code=error.get("code"))
+                                                    error_code=error.get("code"), phase_status="blocked",
+                                                    phase_transition=accepted.get("phase_transition"))
                         elif accepted:
-                            self.threads.setdefault(tid, {}).update(**accepted, confirmation="Aceptado por Codex", status="inProgress", updated=time.time())
+                            row = self.threads.setdefault(tid, {})
+                            row.update({**accepted, "confirmation": "Aceptado por Codex", "status": "inProgress",
+                                        "updated": time.time(),
+                                        **phase_update(row, "accepted", model=accepted.get("model"), effort=accepted.get("effort"))})
                             self.stats["accepted"] += 1
                             if accepted["model"] in {"gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"}:
                                 self.stats["non_astra"] += 1
@@ -227,7 +235,10 @@ class Router:
                             self.record_history("decision_accepted", decision_id=accepted.get("decision_id"),
                                                 thread=tid, title=self.threads.get(tid, {}).get("name"),
                                                 model=accepted.get("model"), effort=accepted.get("effort"),
-                                                status="inProgress")
+                                                status="inProgress", phase_status="accepted",
+                                                phase_name=accepted.get("phase_name", "execution"),
+                                                phase_model=accepted.get("model"), phase_effort=accepted.get("effort"),
+                                                phase_transition=accepted.get("phase_transition"))
                         if "error" not in message and sync:
                             # After acknowledgement, turn/start has already applied
                             # the user's mode and permissions. Ask the native server
@@ -241,25 +252,37 @@ class Router:
                 tid = params.get("threadId")
                 if method == "turn/started":
                     self.active.add(tid)
-                    self.threads.setdefault(tid, {}).update(status="inProgress", updated=time.time())
+                    row = self.threads.setdefault(tid, {})
+                    row.update(status="inProgress", updated=time.time(), **phase_update(row, "active"))
                 elif method == "turn/completed":
                     self.active.discard(tid)
                     self.pending.discard(tid)
-                    self.threads.setdefault(tid, {}).update(status=params.get("turn", {}).get("status", "completed"), updated=time.time())
+                    status = params.get("turn", {}).get("status", "completed")
+                    row = self.threads.setdefault(tid, {})
+                    phase_status = "completed" if status == "completed" else "failed"
+                    row.update(status=status, updated=time.time(), **phase_update(row, phase_status))
                     self.log({"event": "turn_completed", "thread": tid})
                     row = self.threads.get(tid, {})
                     tokens = row.get("tokens") or {}
                     self.record_history("decision_completed", decision_id=self.current_decisions.get(tid),
-                                        thread=tid, title=row.get("name"), status=row.get("status"), **tokens)
+                                        thread=tid, title=row.get("name"), status=row.get("status"), **tokens,
+                                        phase_status=row.get("phase_status"), phase_name=row.get("phase_name"),
+                                        phase_model=row.get("phase_model"), phase_effort=row.get("phase_effort"),
+                                        phase_transition=row.get("phase_transition"))
                 elif method == "thread/name/updated":
                     self.threads.setdefault(tid, {})["name"] = params.get("threadName", params.get("name", tid))
                 elif method == "thread/status/changed":
                     status = params.get("status", {}).get("type", "unknown")
                     self.threads.setdefault(tid, {}).update(status=status, updated=time.time())
                     if status in ("error", "failed", "interrupted"):
+                        row = self.threads.get(tid, {})
+                        row.update(**phase_update(row, "failed"))
                         self.record_history("decision_error", decision_id=self.current_decisions.get(tid),
                                             thread=tid, title=self.threads.get(tid, {}).get("name"),
-                                            status=status, error_type="thread_" + status)
+                                            status=status, error_type="thread_" + status,
+                                            phase_status="failed", phase_name=row.get("phase_name", "execution"),
+                                            phase_model=row.get("phase_model"), phase_effort=row.get("phase_effort"),
+                                            phase_transition=row.get("phase_transition"))
                 elif method == "thread/started":
                     thread = params.get("thread", {})
                     if thread.get("id"):
@@ -302,10 +325,17 @@ class Router:
                     if settings.get("model"):
                         state["configured_model"] = settings["model"]
                         state["configured_effort"] = settings.get("effort")
+                        state.update(configured_model=settings["model"], configured_effort=settings.get("effort"),
+                                     **phase_update(state, "accepted", model=settings["model"], effort=settings.get("effort")))
                         if not state.get("confirmation") == "Aceptado por Codex":
                             state.update(model=settings["model"], effort=settings.get("effort"))
                         self.log({"event": "native_settings", "thread": tid,
                                   "model": settings["model"], "effort": settings.get("effort")})
+                        self.record_history("phase_settings_published", decision_id=self.current_decisions.get(tid),
+                                            thread=tid, title=state.get("name"), status=state.get("status"),
+                                            phase_status="accepted", phase_name=state.get("phase_name", "execution"),
+                                            phase_model=settings["model"], phase_effort=settings.get("effort"),
+                                            phase_transition=state.get("phase_transition"))
         except (ValueError, KeyError, TypeError, AttributeError):
             pass
         return True
@@ -485,7 +515,7 @@ class Router:
                                        engine_result, baseline_route, external_allowed)
         self.record_history("decision_routed", decision_id=decision_id, thread=tid, model=model, effort=effort,
                             routing_engine=effective_engine, engine_applied=engine_applied,
-                            continuity_strategy=continuity_strategy)
+                            continuity_strategy=continuity_strategy, **proposed_phase(current, model, effort))
         decision = {"model": model, "effort": effort, "reason": reasons["model"],
                     "model_reason": reasons["model"], "effort_reason": reasons["effort"],
                     "source": reasons["source"], "agent_category": category,
@@ -494,6 +524,7 @@ class Router:
                     "engine_status": engine_result.get("status"), "engine_confidence": engine_result.get("confidence"),
                     "engine_latency_ms": engine_result.get("latency_ms"), "engine_applied": engine_applied,
                     "continuity_strategy": continuity_strategy}
+        decision.update(proposed_phase(current, model, effort))
         self.threads.setdefault(tid, {}).update(tier=tier, seen_turn=True, requested_model=model,
                                               requested_effort=effort, status="pending", updated=time.time(), **decision)
         if "id" in message:

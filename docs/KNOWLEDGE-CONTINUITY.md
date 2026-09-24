@@ -44,7 +44,11 @@ El rechazo de Astra fue `the destination changes the admitted node REPL review r
 
 ## Estado del código
 
-El puente de producción sigue decidiendo únicamente al inicio de cada turno. Las pruebas de compatibilidad son herramientas de investigación y no se ejecutan automáticamente:
+El puente de producción sigue decidiendo únicamente al inicio de cada turno. Ya incorpora una capa de observación de fases: registra la propuesta, la aceptación de Codex, el inicio, la publicación de la configuración, la finalización y los bloqueos. Esto prepara la futura pipeline sin cambiar modelos durante tareas reales.
+
+La capa no llama a un clasificador adicional, no inventa fases semánticas a partir del prompt y no interpreta una actualización visual del selector como inferencia ejecutada. `Modelo observado` queda reservado para una futura fuente de telemetría de inferencia.
+
+Las pruebas de compatibilidad son herramientas de investigación y no se ejecutan automáticamente:
 
 ```text
 python tests/probe_model_compatibility.py --live
@@ -92,9 +96,9 @@ La validación nativa de macOS debe ejecutarse en el MacBook del usuario; este e
 
 6. Registrar versión de Desktop, versión del backend, arquitectura (Apple Silicon o Intel), resultado de cada comando y cualquier rechazo. No copiar prompts, claves ni el contenido de `state/` al repositorio.
 
-## Criterio para implementar fases
+## Criterio para implementar cambios automáticos de fase
 
-Solo avanzar a una primera implementación cuando macOS confirme que:
+La observación ya está implementada. Solo avanzar a cambios automáticos de modelo cuando macOS confirme que:
 
 - el puente se carga desde el arranque habitual de Desktop;
 - el modelo y esfuerzo del turno aparecen en el monitor con estado claramente diferenciado: propuesto, aceptado, observado o bloqueado;

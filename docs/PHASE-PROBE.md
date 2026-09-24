@@ -141,9 +141,11 @@ a failed verification, never interpreted as a successful model switch.
 1. Integrate an explicit broad-phase checkpoint with Desktop and test realistic
    tool/approval configurations. The synthetic compatibility matrix is established,
    but it is not a guarantee for every permission profile or child agent.
-2. Add compatibility checks and model/effort observation to the production bridge
-   before labeling a phase as confirmed in the monitor. The probe establishes a
-   telemetry path; the production router still observes only per-turn selection.
+2. The production bridge now records conservative phase lifecycle metadata
+   (`proposed`, `accepted`, `active`, `settings_published`, `completed`,
+   `blocked`/`failed`) and the monitor displays it. It deliberately does not
+   label a selector/settings notification as an observed inference; connect a
+   verified inference telemetry source before adding that label.
 3. Validate Desktop's presentation, cancellation, approvals and new user input
    when phases use successive native turns. This probe does not establish a
    seamless single-response experience in Desktop.

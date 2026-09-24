@@ -23,6 +23,10 @@ test('shadow comparison does not replace the applied routing engine',()=>{
   const events=[{event:'decision_created',decision_id:'a',time:1},{event:'decision_routed',decision_id:'a',routing_engine:'rules',time:2},{event:'engine_comparison',decision_id:'a',routing_engine:'jev',engine_active:false,engine_status:'ok',proposed_model:'gpt-5.6-terra',time:3}];
   const d=C.decisions(events)[0];assert.equal(d.routing_engine,'rules');assert.equal(Object.keys(d.comparisons).length,1);
 });
+test('phase lifecycle metadata is retained without changing the decision model',()=>{
+  const events=[{event:'decision_created',decision_id:'p',thread:'t',model:'gpt-5.6-terra',effort:'medium',time:1},{event:'decision_accepted',decision_id:'p',phase_status:'accepted',phase_transition:'compatible_group',time:2},{event:'phase_settings_published',decision_id:'p',phase_status:'accepted',phase_model:'gpt-5.6-terra',phase_effort:'medium',time:3}];
+  const row=C.decisions(events)[0];assert.equal(row.model,'gpt-5.6-terra');assert.equal(row.phase_status,'accepted');assert.equal(row.phase_transition,'compatible_group');assert.equal(row.phase_model,'gpt-5.6-terra');
+});
 test('active agent ordering remains stable through refresh and reactivation',()=>{
   const rows={b:{status:'active'},a:{status:'running'},c:{status:'idle'}};
   assert.deepEqual(C.stableOrder(['a','b'],rows),['a','b']);

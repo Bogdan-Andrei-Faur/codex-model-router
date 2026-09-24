@@ -122,6 +122,7 @@ function openHistory(id) {
 }
 function explanation(parent,label,value,kind='') {const box=el('div','reason-card'+(kind?' '+kind:''));box.append(el('h3','',label),el('p','',value || 'Registro anterior sin explicación separada.'));parent.append(box);}
 function continuity(value) {return value==='continue'?'Jev consideró que es un seguimiento directo y conservó la configuración anterior.':value==='reassess'?'Jev consideró que esta petición debía evaluarse de nuevo antes de elegir modelo y razonamiento.':'';}
+function phaseStatus(value) {return ({proposed:'Fase propuesta',accepted:'Aceptada por Codex',active:'Fase activa',observed:'Modelo observado',completed:'Fase completada',blocked:'Cambio bloqueado',failed:'Fase con incidencia'}[value] || 'Fase sin confirmar');}
 function taskModeControls(parent,id) {
   if(!id)return;
   const mode=state.taskModes?.[id] || 'automatic';
@@ -140,7 +141,7 @@ function activity() {
     const title=el('div','featured-title',row.name || id);title.title=row.name || id;
     copy.append(title,tags(row));line.append(avatar(id,row,()=>openHistory(id)),copy);featured.append(line);
     taskModeControls(featured,id);
-    featured.append(el('div','confirmation',row.status==='pending'?'Selección pendiente de confirmar':row.confirmation || 'Sin confirmar'));
+    featured.append(el('div','confirmation',row.phase_status?phaseStatus(row.phase_status):(row.status==='pending'?'Selección pendiente de confirmar':row.confirmation || 'Sin confirmar')));
     featured.append(button('¿Por qué esta elección?',()=>{reasonOpen=!reasonOpen;activity();},'why'));
     if(reasonOpen){const detail=el('div','explanation');detail.append(el('h3','','POR QUÉ EL MODELO'),el('p','',row.model_reason || row.reason || 'Sin explicación registrada.'),el('h3','','POR QUÉ EL RAZONAMIENTO'),el('p','',row.effort_reason || 'Sin explicación registrada.'));if(row.continuity_strategy)detail.append(el('h3','','DECISIÓN DE CONTINUIDAD'),el('p','',continuity(row.continuity_strategy)));featured.append(detail);}
   }
@@ -148,7 +149,7 @@ function activity() {
   for(const [id,row] of rows.slice(1)) {
     const card=button('',()=>openHistory(id),'task-row'),copy=el('div');copy.style.minWidth='0';
     const title=el('div','task-title',row.name || id);title.title=row.name || id;
-    copy.append(title,el('div','task-status',C.status(row.status)));
+    copy.append(title,el('div','task-status',C.status(row.status)+(row.phase_status?' · '+phaseStatus(row.phase_status):'')));
     const art=avatar(id,row,()=>{});art.tabIndex=-1;
     const badges=el('div','row-tags');badges.append(badge(C.setting(row,'model')),badge(C.setting(row,'effort'),true));
     // Avoid nested interactive controls while preserving the shared avatar.
@@ -170,6 +171,7 @@ function renderHistory() {
   if(!chosen){detail.append(el('h2','','Aún no hay decisiones registradas'),el('p','','Las nuevas ejecuciones se guardan aquí y se conservan al cerrar Codex. Abrir una conversación antigua no crea una decisión nueva.'));taskModeControls(detail,selectedThread);}
   else {
     detail.append(el('h2','',chosen.title || 'Tarea'),tags(chosen,true),el('p','small',when(chosen.started || chosen.time)+' · '+C.status(chosen.status)));
+    if(chosen.phase_status) explanation(detail,'ESTADO DE LA FASE',phaseStatus(chosen.phase_status)+(chosen.phase_transition?' · '+chosen.phase_transition:''),'phase');
     taskModeControls(detail,chosen.thread);
     explanation(detail,'Modelo elegido',chosen.model_reason,'model');explanation(detail,'Razonamiento elegido',chosen.effort_reason,'effort');if(chosen.continuity_strategy)explanation(detail,'Decisión de continuidad',continuity(chosen.continuity_strategy),'continuity');
     detail.append(el('h3','quality-label','VALORA ESTA ELECCIÓN'));

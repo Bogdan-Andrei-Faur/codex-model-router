@@ -330,15 +330,20 @@ class ProtocolTests(unittest.TestCase):
 
     def test_monitor_keeps_accepted_turn_separate_from_next_settings(self):
         self.router.client_line(encode(self.request()))
+        self.assertEqual(self.router.threads["t"]["phase_status"], "proposed")
+        self.assertEqual(self.router.threads["t"]["phase_transition"], "blocked_astra_boundary")
         self.assertNotEqual(self.router.threads["t"].get("confirmation"), "Aceptado por Codex")
         self.router.server_line(encode({"id": 7, "result": {"turn": {"id": "q"}}}))
+        self.assertEqual(self.router.threads["t"]["phase_status"], "accepted")
         self.router.server_line(encode({"method": "thread/settings/updated", "params": {"threadId": "t", "threadSettings": {"model": "gpt-6-astra", "effort": "max"}}}))
         self.assertEqual(self.router.threads["t"]["model"], "gpt-5.6-luna")
         self.assertEqual(self.router.threads["t"]["effort"], "low")
         self.assertEqual(self.router.threads["t"]["confirmation"], "Aceptado por Codex")
+        self.assertEqual(self.router.threads["t"]["phase_status"], "accepted")
         self.assertEqual(self.router.stats, {"accepted": 1, "non_astra": 1})
         self.router.server_line(encode({"method": "turn/completed", "params": {"threadId": "t", "turn": {"status": "completed"}}}))
         self.assertEqual(self.router.threads["t"]["status"], "completed")
+        self.assertEqual(self.router.threads["t"]["phase_status"], "completed")
 
     def test_paused_turn_is_observed_without_changing_it(self):
         self.path.write_text('{"enabled": false}')
