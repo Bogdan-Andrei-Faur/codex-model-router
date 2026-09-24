@@ -24,8 +24,10 @@ test('shadow comparison does not replace the applied routing engine',()=>{
   const d=C.decisions(events)[0];assert.equal(d.routing_engine,'rules');assert.equal(Object.keys(d.comparisons).length,1);
 });
 test('phase lifecycle metadata is retained without changing the decision model',()=>{
-  const events=[{event:'decision_created',decision_id:'p',thread:'t',model:'gpt-5.6-terra',effort:'medium',time:1},{event:'decision_accepted',decision_id:'p',phase_status:'accepted',phase_transition:'compatible_group',time:2},{event:'phase_settings_published',decision_id:'p',phase_status:'accepted',phase_model:'gpt-5.6-terra',phase_effort:'medium',time:3}];
+  const plan=[{id:'preparation',state:'configured'},{id:'execution',state:'accepted'}];
+  const events=[{event:'decision_created',decision_id:'p',thread:'t',model:'gpt-5.6-terra',effort:'medium',time:1},{event:'decision_accepted',decision_id:'p',phase_status:'accepted',phase_transition:'compatible_group',accepted_model:'gpt-5.6-terra',phase_pipeline:plan,time:2},{event:'phase_settings_published',decision_id:'p',phase_status:'accepted',phase_model:'gpt-5.6-terra',phase_effort:'medium',configured_model:'gpt-5.6-terra',configured_effort:'medium',time:3}];
   const row=C.decisions(events)[0];assert.equal(row.model,'gpt-5.6-terra');assert.equal(row.phase_status,'accepted');assert.equal(row.phase_transition,'compatible_group');assert.equal(row.phase_model,'gpt-5.6-terra');
+  assert.equal(row.accepted_model,'gpt-5.6-terra');assert.equal(row.configured_model,'gpt-5.6-terra');assert.deepEqual(row.phase_pipeline,plan);assert.equal(row.observed_model,undefined);
 });
 test('active agent ordering remains stable through refresh and reactivation',()=>{
   const rows={b:{status:'active'},a:{status:'running'},c:{status:'idle'}};

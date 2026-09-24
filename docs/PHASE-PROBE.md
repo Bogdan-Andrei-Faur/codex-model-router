@@ -151,6 +151,7 @@ a failed verification, never interpreted as a successful model switch.
    seamless single-response experience in Desktop.
 4. Validate restart recovery and macOS against that platform's installed backend.
 
-Until these are established, expose no automatic phase-switching toggle and no
-pipeline of invented phases. A future pipeline should distinguish planned,
+Until these are established, expose no automatic phase-switching toggle. The
+observation pipeline must show review and closure as pending evidence, rather
+than invented internal activity. A future pipeline should distinguish planned,
 active, completed, interrupted and blocked stages, with model/effort provenance.

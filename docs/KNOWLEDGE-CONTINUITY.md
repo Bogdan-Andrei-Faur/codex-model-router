@@ -46,7 +46,7 @@ El rechazo de Astra fue `the destination changes the admitted node REPL review r
 
 El puente de producción sigue decidiendo únicamente al inicio de cada turno. Ya incorpora una capa de observación de fases: registra la propuesta, la aceptación de Codex, el inicio, la publicación de la configuración, la finalización y los bloqueos. Esto prepara la futura pipeline sin cambiar modelos durante tareas reales.
 
-La capa no llama a un clasificador adicional, no inventa fases semánticas a partir del prompt y no interpreta una actualización visual del selector como inferencia ejecutada. `Modelo observado` queda reservado para una futura fuente de telemetría de inferencia.
+La capa no llama a un clasificador adicional, no inventa fases semánticas a partir del prompt y no interpreta una actualización visual del selector como inferencia ejecutada. El panel muestra una pipeline amplia de observación: preparación y ejecución se actualizan desde el puente; revisión y cierre permanecen marcadas como pendientes de evidencia. También separa modelo propuesto, aceptado por Codex, configuración publicada e inferencia confirmada. `Modelo observado` queda reservado para una futura fuente de telemetría de inferencia.
 
 Las pruebas de compatibilidad son herramientas de investigación y no se ejecutan automáticamente:
 

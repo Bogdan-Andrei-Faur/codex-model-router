@@ -78,7 +78,8 @@ class Router:
                    "engine_status", "engine_confidence", "engine_latency_ms", "engine_failure", "engine_input_tokens",
                    "engine_output_tokens", "engine_cached_tokens", "proposed_model", "proposed_effort", "engine_active", "engine_applied", "task_mode",
                    "continuity_strategy", "phase_name", "phase_status", "phase_model", "phase_effort",
-                   "phase_transition", "observed_model", "observed_effort"}
+                   "phase_transition", "observed_model", "observed_effort", "configured_model", "configured_effort",
+                   "accepted_model", "accepted_effort", "pipeline_mode", "phase_pipeline", "inference_source"}
         record = {"schema": 2, "time": time.time(), "time_iso":
                   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event,
                   "session": str(os.getpid())}
@@ -227,6 +228,7 @@ class Router:
                             row = self.threads.setdefault(tid, {})
                             row.update({**accepted, "confirmation": "Aceptado por Codex", "status": "inProgress",
                                         "updated": time.time(),
+                                        "accepted_model": accepted.get("model"), "accepted_effort": accepted.get("effort"),
                                         **phase_update(row, "accepted", model=accepted.get("model"), effort=accepted.get("effort"))})
                             self.stats["accepted"] += 1
                             if accepted["model"] in {"gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"}:
@@ -238,7 +240,9 @@ class Router:
                                                 status="inProgress", phase_status="accepted",
                                                 phase_name=accepted.get("phase_name", "execution"),
                                                 phase_model=accepted.get("model"), phase_effort=accepted.get("effort"),
-                                                phase_transition=accepted.get("phase_transition"))
+                                                phase_transition=accepted.get("phase_transition"),
+                                                accepted_model=accepted.get("model"), accepted_effort=accepted.get("effort"),
+                                                pipeline_mode="observation", phase_pipeline=accepted.get("phase_pipeline"))
                         if "error" not in message and sync:
                             # After acknowledgement, turn/start has already applied
                             # the user's mode and permissions. Ask the native server
@@ -335,7 +339,9 @@ class Router:
                                             thread=tid, title=state.get("name"), status=state.get("status"),
                                             phase_status="accepted", phase_name=state.get("phase_name", "execution"),
                                             phase_model=settings["model"], phase_effort=settings.get("effort"),
-                                            phase_transition=state.get("phase_transition"))
+                                            phase_transition=state.get("phase_transition"), configured_model=settings["model"],
+                                            configured_effort=settings.get("effort"), pipeline_mode="observation",
+                                            phase_pipeline=state.get("phase_pipeline"))
         except (ValueError, KeyError, TypeError, AttributeError):
             pass
         return True

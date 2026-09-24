@@ -123,6 +123,23 @@ function openHistory(id) {
 function explanation(parent,label,value,kind='') {const box=el('div','reason-card'+(kind?' '+kind:''));box.append(el('h3','',label),el('p','',value || 'Registro anterior sin explicación separada.'));parent.append(box);}
 function continuity(value) {return value==='continue'?'Jev consideró que es un seguimiento directo y conservó la configuración anterior.':value==='reassess'?'Jev consideró que esta petición debía evaluarse de nuevo antes de elegir modelo y razonamiento.':'';}
 function phaseStatus(value) {return ({proposed:'Fase propuesta',accepted:'Aceptada por Codex',active:'Fase activa',observed:'Modelo observado',completed:'Fase completada',blocked:'Cambio bloqueado',failed:'Fase con incidencia'}[value] || 'Fase sin confirmar');}
+function pipeline(parent,row) {
+  const phases=Array.isArray(row.phase_pipeline)?row.phase_pipeline:[];
+  if(!phases.length)return;
+  const box=el('div','pipeline');box.append(el('div','pipeline-title','PIPELINE · OBSERVACIÓN'));
+  for(const phase of phases){const item=el('div','pipeline-step '+phase.state);item.append(el('i',''),el('span','',phase.label),el('small','',phase.state==='not_observed'?'Pendiente de evidencia':phase.state==='configured'?'Configurada':phaseStatus(phase.state)));box.append(item);}
+  parent.append(box,el('p','small','Preparación y ejecución se actualizan con el puente. Revisión y cierre no se atribuyen hasta que Codex publique un límite verificable.'));
+}
+function executionEvidence(parent,row) {
+  if(!row.model && !row.accepted_model && !row.configured_model && !row.observed_model)return;
+  const lines=[];
+  if(row.model)lines.push('Propuesto por el selector · '+C.model(row.model)+' · '+(C.efforts[row.effort]||'Sin confirmar'));
+  if(row.accepted_model)lines.push('Aceptado por Codex · '+C.model(row.accepted_model)+' · '+(C.efforts[row.accepted_effort]||'Sin confirmar'));
+  if(row.configured_model)lines.push('Configuración publicada · '+C.model(row.configured_model)+' · '+(C.efforts[row.configured_effort]||'Sin confirmar'));
+  if(row.observed_model)lines.push('Inferencia confirmada localmente · '+C.model(row.observed_model)+' · '+(C.efforts[row.observed_effort]||'Sin confirmar'));
+  else lines.push('Inferencia real · sin confirmación disponible todavía');
+  explanation(parent,'EVIDENCIA DEL MODELO',lines.join('\n'),'phase');
+}
 function taskModeControls(parent,id) {
   if(!id)return;
   const mode=state.taskModes?.[id] || 'automatic';
@@ -144,6 +161,7 @@ function activity() {
     featured.append(el('div','confirmation',row.phase_status?phaseStatus(row.phase_status):(row.status==='pending'?'Selección pendiente de confirmar':row.confirmation || 'Sin confirmar')));
     featured.append(button('¿Por qué esta elección?',()=>{reasonOpen=!reasonOpen;activity();},'why'));
     if(reasonOpen){const detail=el('div','explanation');detail.append(el('h3','','POR QUÉ EL MODELO'),el('p','',row.model_reason || row.reason || 'Sin explicación registrada.'),el('h3','','POR QUÉ EL RAZONAMIENTO'),el('p','',row.effort_reason || 'Sin explicación registrada.'));if(row.continuity_strategy)detail.append(el('h3','','DECISIÓN DE CONTINUIDAD'),el('p','',continuity(row.continuity_strategy)));featured.append(detail);}
+    pipeline(featured,row);
   }
   page.append(featured,el('div','rule'),el('h3','section-title','ACTIVIDAD'));
   for(const [id,row] of rows.slice(1)) {
@@ -172,6 +190,7 @@ function renderHistory() {
   else {
     detail.append(el('h2','',chosen.title || 'Tarea'),tags(chosen,true),el('p','small',when(chosen.started || chosen.time)+' · '+C.status(chosen.status)));
     if(chosen.phase_status) explanation(detail,'ESTADO DE LA FASE',phaseStatus(chosen.phase_status)+(chosen.phase_transition?' · '+chosen.phase_transition:''),'phase');
+    pipeline(detail,chosen);executionEvidence(detail,chosen);
     taskModeControls(detail,chosen.thread);
     explanation(detail,'Modelo elegido',chosen.model_reason,'model');explanation(detail,'Razonamiento elegido',chosen.effort_reason,'effort');if(chosen.continuity_strategy)explanation(detail,'Decisión de continuidad',continuity(chosen.continuity_strategy),'continuity');
     detail.append(el('h3','quality-label','VALORA ESTA ELECCIÓN'));
@@ -222,6 +241,9 @@ function statistics() {
   const phaseRows=history.filter(d=>d.phase_status);
   if(!phaseRows.length)content.append(el('p','','Todavía no hay estados de fase registrados'));
   else for(const [key,label] of Object.entries(phaseLabels)){const count=phaseRows.filter(d=>d.phase_status===key).length;if(count)metric(content,label,fmt(count),count/phaseRows.length,key==='blocked'||key==='failed'?'var(--warning)':'var(--accent)');}
+  const configured=history.filter(d=>d.configured_model).length,observed=history.filter(d=>d.observed_model).length;
+  metric(content,'Configuraciones publicadas',fmt(configured),configured/(total||1),'var(--good)');
+  metric(content,'Inferencias confirmadas localmente',fmt(observed),observed/(total||1),observed?'var(--good)':'var(--muted)');
   const transitions={compatible_group:'Cambios compatibles',same_model:'Mismo modelo',blocked_astra_boundary:'Frontera de Astra',unknown_model:'Modelo desconocido'};
   const transitionRows=history.filter(d=>d.phase_transition);
   if(transitionRows.length)for(const [key,label] of Object.entries(transitions)){const count=transitionRows.filter(d=>d.phase_transition===key).length;if(count)metric(content,label,fmt(count),count/transitionRows.length,key==='blocked_astra_boundary'?'var(--warning)':'var(--good)');}
@@ -271,6 +293,8 @@ function settings() {
   actionCard(box,config.enabled?'Ⅱ  Pausar selección automática':'▶  Activar selección automática',config.enabled?'Codex automático decide en cada nuevo mensaje.':'Se respeta la selección manual de Codex.',()=>configure('enabled',!config.enabled));
   actionCard(box,state.ui.topmost?'Desactivar Mantener delante':'Activar Mantener delante',state.ui.topmost?'El monitor permanece sobre otras ventanas.':'El monitor puede quedar detrás de otras ventanas.',()=>native({action:'topmost',value:!state.ui.topmost}));
   heading(box,'CONSERVAR HISTORIAL');choices(box,[[30,'30 días'],[90,'90 días'],[180,'180 días'],[0,'Siempre']],config.history_days??90,v=>configure('history_days',v));
+  heading(box,'FASES Y EVIDENCIA');
+  box.append(el('p','small','La pipeline es de observación: no cambia el modelo durante una tarea. El panel separa la propuesta, la aceptación y la configuración publicada; una inferencia solo se marca como confirmada cuando existe telemetría local segura.'));
   const engine=['rules','jev'].includes(config.routing_engine)?config.routing_engine:'rules';
   heading(box,'MOTOR DE ENRUTAMIENTO');choices(box,[['rules','Reglas'],['jev','Jev']],engine,v=>configure('routing_engine',v));
   box.append(el('p','small',engine==='rules'?'Las reglas locales deciden al instante sin enviar el mensaje a otro servicio.':'El clasificador recibe el mensaje de la tarea. Si falla o responde de forma inválida, se conservan las reglas locales. Puede consumir cuota del proveedor.'));

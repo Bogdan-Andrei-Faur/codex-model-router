@@ -46,7 +46,7 @@
       if (event.event === 'decision_created') item.started = Number(event.time)||0;
       if (['decision_accepted','decision_recovered'].includes(event.event)) item.accepted = true;
       if (['decision_completed','decision_rejected','decision_error'].includes(event.event)) item.finished = Number(event.time)||0;
-      for (const key of ['thread','title','model','effort','model_reason','effort_reason','continuity_strategy','source','status','signal','error_type','quality','routing_engine','engine_model','engine_status','engine_confidence','engine_latency_ms','inputTokens','outputTokens','cachedInputTokens','reasoningOutputTokens','phase_name','phase_status','phase_model','phase_effort','phase_transition','observed_model','observed_effort']) {
+      for (const key of ['thread','title','model','effort','model_reason','effort_reason','continuity_strategy','source','status','signal','error_type','quality','routing_engine','engine_model','engine_status','engine_confidence','engine_latency_ms','inputTokens','outputTokens','cachedInputTokens','reasoningOutputTokens','phase_name','phase_status','phase_model','phase_effort','phase_transition','observed_model','observed_effort','configured_model','configured_effort','accepted_model','accepted_effort','pipeline_mode','phase_pipeline','inference_source']) {
         if (Object.prototype.hasOwnProperty.call(event,key)) item[key] = event[key];
       }
       if (event.event === 'engine_comparison') {
@@ -64,7 +64,7 @@
       item.thread = id; item.title = row.name || item.title; item.status = row.status || item.status;
       for (const key of ['model','effort']) { const value = setting(row,key); if (value) item[key]=value; }
       for (const key of ['model_reason','effort_reason']) if (row[key]) item[key] = row[key];
-      for (const key of ['phase_name','phase_status','phase_model','phase_effort','phase_transition','observed_model','observed_effort']) if (row[key]) item[key] = row[key];
+      for (const key of ['phase_name','phase_status','phase_model','phase_effort','phase_transition','observed_model','observed_effort','configured_model','configured_effort','accepted_model','accepted_effort','pipeline_mode','phase_pipeline','inference_source']) if (row[key]) item[key] = row[key];
       for (const key of ['inputTokens','outputTokens','cachedInputTokens','reasoningOutputTokens']) if (row.tokens?.[key] !== undefined) item[key] = row.tokens[key];
     }
     return [...map.values()].sort((a,b)=>b.time-a.time);

@@ -51,8 +51,10 @@ La cabecera y las pestañas permanecen visibles mientras el contenido se desplaz
 El enrutamiento sigue decidiendo al inicio de cada turno. La prueba aislada de
 [continuidad por fases](docs/PHASE-PROBE.md) no activa cambios automáticos en las tareas.
 El puente registra además el ciclo observado de cada fase (propuesta, aceptación,
-actividad, configuración publicada, finalización o bloqueo) para preparar una
-pipeline futura sin afirmar que la configuración del selector ya sea una inferencia.
+actividad, configuración publicada, finalización o bloqueo). La pipeline amplia
+de preparación, ejecución, revisión y cierre enseña qué tiene evidencia: por ahora
+solo las dos primeras fases se actualizan desde el puente; las demás quedan como
+pendientes de evidencia, sin afirmar que el selector ya sea una inferencia.
 
 Modelo y razonamiento aparecen como etiquetas. Luna es azul, Terra verde, Sol
 ámbar y Astra violeta; el texto permite identificarlos sin depender del color.
@@ -68,7 +70,9 @@ El panel se actualiza cada dos segundos. La cápsula muestra la tarea destacada,
 modelo, razonamiento y número de tareas activas. El panel añade las tareas en
 paralelo, su estado, la confirmación y el motivo. **Aceptado por Codex** significa
 que el motor aceptó la petición con esos ajustes; no es telemetría de cada
-inferencia interna. Si no conoce un dato, muestra «Sin confirmar».
+inferencia interna. El panel separa el modelo propuesto, aceptado por Codex,
+configuración publicada e inferencia confirmada localmente. Si no conoce un dato,
+muestra «Sin confirmar».
 
 ## Panel e historial
 
