@@ -1,9 +1,9 @@
-# Conexión con Desktop — v21
+# Conexión con Desktop — producto 0.1.0
 
 ## Uso
 
 En Windows, `build.ps1` prepara el lanzador estable `dist/codex-router.exe`, el
-monitor v21 y los accesos. En macOS, `python3 macos.py setup` prepara el puente y
+monitor v22 y los accesos. En macOS, `python3 macos.py setup` prepara el puente y
 el monitor nativo. Después, **Ajustes → Conectar al inicio habitual** configura
 una conexión por usuario. También se puede ejecutar:
 

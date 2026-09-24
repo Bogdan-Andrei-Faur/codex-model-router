@@ -322,6 +322,7 @@ window.receive = incoming => {
   const active=Object.values(state.threads).filter(row=>C.active(row.status)).length;
   $('connection').classList.toggle('disconnected',!state.connections);$('connection').querySelector('span').textContent=state.preview?'Vista previa · datos simulados':state.connections?`${active} ${active===1?'tarea activa':'tareas activas'}`:'Sin conexión';$('connection').querySelector('i').classList.toggle('working',active>0);
   $('pause').textContent=state.config.enabled?'Ⅱ  Pausar selección':'▶  Activar selección';
+  $('product-version').textContent='v'+(state.productVersion || '—');
   capsule();
   const signature=JSON.stringify([state.threads,state.history,state.connections,state.taskModes]);
   const settingsChanged=oldConfig!==JSON.stringify(state.config) || oldUi!==JSON.stringify(state.ui);

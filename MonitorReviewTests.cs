@@ -479,6 +479,8 @@ internal sealed partial class ModernRouterMonitor
             Check(ContainsText(statisticsContent, "Configuraciones publicadas") && ContainsText(statisticsContent, "Inferencias confirmadas"),
                 "Native statistics omitted phase evidence");
             results.Add("PASS: native phase pipeline, history provenance and statistics preserve unknown inference evidence");
+            Check(ContainsText(expandedView, "v" + ProductVersion), "Product version is not visible in the monitor footer");
+            results.Add("PASS: product version is read from the shared VERSION file and visible in the footer");
             File.WriteAllLines(report, results); quitting = true; Close(); return 0;
         }
         catch (Exception exception)

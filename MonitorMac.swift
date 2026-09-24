@@ -15,6 +15,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     let root: URL
     var state: URL { root.appendingPathComponent("state") }
     var configPath: URL { root.appendingPathComponent("config.local.json") }
+    var productVersion: String { (try? String(contentsOf:root.appendingPathComponent("VERSION"),encoding:.utf8).trimmingCharacters(in:.whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? "0.1.0" }
     var uiPath: URL { state.appendingPathComponent("monitor-ui-mac.json") }
     let resources = Bundle.main.resourceURL!.appendingPathComponent("ui")
     var service: String { "local.codex-model-router." + SHA256.hash(data: Data(root.path.utf8)).map { String(format:"%02x",$0) }.joined() }
@@ -50,7 +51,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         web = WKWebView(frame:.zero,configuration:configuration); web.navigationDelegate = self
         web.setValue(false,forKey:"drawsBackground"); web.underPageBackgroundColor = .clear
         panel = RouterPanel(contentRect:.zero,styleMask:[.borderless,.nonactivatingPanel],backing:.buffered,defer:false)
-        panel.title = "Codex automático · Monitor"; panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = false
+        panel.title = "Codex automático · Monitor · v" + productVersion; panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = false
         panel.hidesOnDeactivate = false; panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces,.fullScreenAuxiliary]; panel.contentView = web
         panel.level = topmost ? .floating : .normal; position()
@@ -267,7 +268,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
                 let safeConfig=config.filter{["enabled","history_days","routing_engine","comparison_engines","jev","routes"].contains($0.key)}
                 let ids=Set(rows.keys).union(self.journal.compactMap{$0["thread"] as? String})
                 let taskModes=Dictionary(uniqueKeysWithValues:ids.map{($0,self.taskMode($0))})
-                let payload:[String:Any]=["threads":rows,"connections":connections,"history":self.journal,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
+                let payload:[String:Any]=["productVersion":self.productVersion,"threads":rows,"connections":connections,"history":self.journal,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
                 guard let encoded=try? JSONSerialization.data(withJSONObject:payload,options:[.sortedKeys]),encoded != self.lastPayload else{return}
                 self.lastPayload=encoded
                 self.web.callAsyncJavaScript("window.receive(payload)",arguments:["payload":payload],in:nil,in:.page){ result in if case .failure=result {self.lastPayload=Data()} }

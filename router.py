@@ -25,6 +25,7 @@ from phase_tracking import phase_update, proposed_phase
 from inference_telemetry import LocalInferenceTelemetry
 
 ROOT = Path(__file__).resolve().parent
+PRODUCT_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 
 
 def read_config(path):
@@ -147,7 +148,7 @@ class Router:
             self.state_dir.mkdir(parents=True, exist_ok=True)
             target = self.state_dir / ("status-%s.json" % os.getpid())
             temp = target.with_suffix(".tmp")
-            temp.write_text(json.dumps({"version": 2, "pid": os.getpid(), "events": self.events,
+            temp.write_text(json.dumps({"version": 2, "product_version": PRODUCT_VERSION, "pid": os.getpid(), "events": self.events,
                                        "heartbeat": time.time(), "threads": self.inventory.visible(self.threads),
                                        "client_name": self.client_name, "handshake_complete": self.handshake_complete,
                                        "inventory_synced_at": self.inventory.synced_at,

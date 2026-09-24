@@ -312,7 +312,7 @@ def open_app():
         if sys.platform == "darwin":
             open_monitor()
         else:
-            subprocess.Popen([str(ROOT / "dist/codex-monitor-v21.exe"), "--tray"], creationflags=subprocess.CREATE_NO_WINDOW)
+            subprocess.Popen([str(ROOT / "dist/codex-monitor-v22.exe"), "--tray"], creationflags=subprocess.CREATE_NO_WINDOW)
     except OSError:
         pass
     return {"opened": True}

@@ -25,6 +25,7 @@ internal sealed partial class ModernRouterMonitor : Window
 {
     const string WindowTitle = "Codex automático · Monitor";
     static readonly string Root = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".."));
+    static readonly string ProductVersion = ReadProductVersion();
     static readonly string StateFolder = Path.Combine(Root, "state");
     static readonly string UiStatePath = Path.Combine(StateFolder, "monitor-ui.json");
     static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = 8 * 1024 * 1024 };
@@ -70,7 +71,7 @@ internal sealed partial class ModernRouterMonitor : Window
     public ModernRouterMonitor(bool isPreview)
     {
         preview = isPreview;
-        Title = WindowTitle;
+        Title = WindowTitle + " · v" + ProductVersion;
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -328,7 +329,11 @@ internal sealed partial class ModernRouterMonitor : Window
         var footer = new Grid { Margin = new Thickness(10, 8, 10, 10) };
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         Grid.SetColumn(pauseButton, 0); footer.Children.Add(pauseButton);
+        var version = Txt("v" + ProductVersion, 10, Muted);
+        version.ToolTip = "Versión de Codex automático";
+        Grid.SetColumn(version, 2); footer.Children.Add(version);
         Grid.SetRow(footer, 5); expandedView.Children.Add(footer);
         SelectMonitorTab(0);
     }
@@ -336,6 +341,16 @@ internal sealed partial class ModernRouterMonitor : Window
     static TextBlock Label(string text)
     {
         return Txt(text, 11, Muted, FontWeights.SemiBold);
+    }
+
+    static string ReadProductVersion()
+    {
+        try
+        {
+            var value = File.ReadAllText(Path.Combine(Root, "VERSION")).Trim();
+            return value.Length > 0 && value.Length <= 20 ? value : "0.1.0";
+        }
+        catch { return "0.1.0"; }
     }
 
     void BuildTray(string iconPath)

@@ -1,5 +1,12 @@
 # Codex automático — selector personal
 
+## Versión
+
+El producto usa versiones semánticas. La primera versión funcional es **0.1.0**:
+el primer número marca cambios incompatibles, el segundo añade funciones y el
+tercero corrige fallos. La versión visible en la esquina inferior derecha del
+panel procede del archivo común `VERSION`.
+
 Elige modelo y razonamiento antes de cada nuevo mensaje enviado a Codex. Sigue
 usando la app y la suscripción actuales. Puede decidir mediante reglas locales
 o Jev.
@@ -20,8 +27,9 @@ Cierra Desktop cuando terminen tus tareas y ábrelo desde su acceso normal.
 El acceso `dist/Codex automático.app` se conserva como alternativa. No muevas
 los bundles fuera de `dist`: esta instalación todavía depende del repositorio.
 
-**Integración y monitor versión 19.** La interfaz se puede actualizar sin cerrar Codex ni
-interrumpir sus tareas. Los accesos del escritorio apuntan a la versión actual.
+**Compilación interna del lanzador: v19.** No es la versión de producto; esta se
+consulta en la esquina inferior derecha del monitor. La interfaz se puede actualizar sin cerrar Codex ni
+interrumpir sus tareas. Los accesos del escritorio apuntan a la compilación actual.
 Los cambios del selector, cuando los haya, se cargan al volver a abrir Codex
 desde su acceso habitual, si has conectado la integración. Una conexión instalada
 no demuestra que la app abierta ya la esté usando: compruébalo en Ajustes.
