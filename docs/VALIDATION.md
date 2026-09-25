@@ -1,6 +1,13 @@
 # Validation and integration notes
 
-## Estado actual — 0.3.1, 25/09/2026
+## Estado actual — 0.4.0, 25/09/2026
+
+148 pruebas Python, 10 de núcleo de interfaz, diseño/interacción y compilación
+del monitor macOS superadas. [Preparación de esta entrega](#040-local-release-preparation--2026-09-25)
+detalla los resultados y lo pendiente. Las secciones anteriores por versión
+conservan evidencia histórica; no sustituyen a la validación de 0.4.0.
+
+## Estado histórico — 0.3.1, 25/09/2026
 
 Chats laterales: [alcance, pruebas y activación](SIDE-CHATS.md). Suite local:
 124 pruebas Python (121 superadas, tres omisiones de plataforma), incluidas ocho
@@ -8,6 +15,19 @@ regresiones nuevas. La sonda nativa sin inferencia no permite bifurcar una
 conversación vacía; queda pendiente la validación real de chats laterales en Desktop.
 
 ### Validación macOS — 25/09/2026
+
+Integración experimental de fases añadida después de las verificaciones de
+publicación descritas abajo: **144 pruebas Python superadas** y una prueba real
+del puente completo con **Terra/Medio → Sol/Alto dentro del mismo turno**.
+`tests/smoke_phase_bridge.py --live` verificó la confirmación del cambio, la
+continuidad del resultado y ambos modelos en telemetría nativa; archivó su tarea
+sintética y terminó con código 0. El controlador conserva los modos manual y
+explícito, aplica límites de calidad, espera la respuesta nativa sin bloquear el
+protocolo y limita repeticiones/tiempo de espera. No añade llamadas a Jev.
+La opción `phase_routing` está desactivada por defecto y requiere reinicio para
+activarse; la primera prueba en Desktop necesita una tarea nueva. No se ha
+validado todavía la presentación, las aprobaciones reales ni la recuperación
+nativa tras reiniciar. Detalles en [PHASE-PROBE.md](PHASE-PROBE.md).
 
 - Fuente 0.3.1 en Apple Silicon, Python 3.9.6 y Swift 6.4. `python3 macos.py setup`
   compiló el monitor AppKit/WebKit y regeneró los accesos y el puente. El bundle
@@ -33,6 +53,22 @@ conversación vacía; queda pendiente la validación real de chats laterales en 
   tampoco sustituye una revisión visual de WebKit. Siguen pendientes la prueba
   real de chats laterales, Manual/Automático y los controles nuevos del monitor.
   No se ha medido ahorro ni calidad de selección, ni revalidado TypeSafe directo.
+
+### Cambio dentro del turno: protocolo nativo en Mac — 25/09/2026
+
+Se ejecutaron las tres sondas optativas de [PHASE-PROBE.md](PHASE-PROBE.md)
+con Python 3.11.16 y el motor instalado `0.155.0-alpha.16.4`: nueve turnos
+sintéticos en conversaciones efímeras. Pasaron la continuidad entre turnos y
+la matriz completa: Luna, Terra y Sol intercambian modelo dentro del turno;
+Astra permite cambiar esfuerzo, pero rechaza los cruces con los otros modelos
+por sus requisitos de revisión. Las siete pruebas de matriz observaron las
+inferencias de origen y destino mediante telemetría nativa, conservaron el
+contexto, ejecutaron la herramienta una sola vez y cerraron con código 0.
+No hubo errores de análisis de telemetría. La conexión de Desktop del usuario
+se mantuvo activa. En ese momento aún no se había implementado el controlador;
+la integración posterior y sus límites se describen arriba y en PHASE-PROBE.md.
+Quedan pendientes las comprobaciones reales en Desktop de cancelaciones,
+permisos, mensajes durante el trabajo y recuperación tras reinicio.
 
 ## Base de la auditoría — 0.3.0, 24/09/2026
 
@@ -669,6 +705,25 @@ explicit note when their separate reasoning explanation was not previously store
   synchronization still completed and private responses remained isolated.
 - `python tests/smoke_native.py`: native handshake, model catalog, ChatGPT account
   and clean shutdown passed. No inference request was made by either smoke test.
+
+## 0.4.0 local release preparation — 2026-09-25
+
+- `python3 -m unittest discover -s tests -p 'test_*.py'`: 148 passing tests.
+- `npm test`: 10 passing monitor core tests; `npm run test:layout`: layout,
+  featured-task hold/expiry, keyboard interaction and component-version labels.
+- `python3 macos.py setup`: native Swift monitor build; launcher and monitor
+  bundle versions read from `VERSION` (0.4.0). Only the monitor is relaunched;
+  active Desktop tasks and its previously loaded router remain untouched.
+- Policy 4 regressions allow a concrete independent request to accept a lighter
+  Jev proposal despite a persisted critical contract, while a subsequent request
+  to continue pending work still retains that critical floor. Provider responses
+  are synthetic; these checks do not make paid provider calls.
+- Component identity checks cover UI-only edits, backend edits, generated stamp
+  exclusion and frozen builds. Historical version fixtures intentionally remain
+  unchanged to exercise mixed-version history.
+- Pending: live policy 4 decisions after Desktop restart, real Desktop phase
+  checkpoints and resume/approval acceptance, and Windows compilation/native
+  checks. Prior CI and isolated subscription probes do not close those gaps.
 
 ## References and provenance
 

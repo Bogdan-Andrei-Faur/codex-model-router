@@ -2,10 +2,13 @@
 
 ## Versión
 
-El producto usa versiones semánticas. La versión funcional actual es **0.3.1**:
+El producto usa versiones semánticas. La versión actual es **0.4.0**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en la esquina inferior derecha del
-panel procede del archivo común `VERSION`.
+panel procede del archivo común `VERSION`. Cada entrega se registra en
+[CHANGELOG.md](CHANGELOG.md) y una etiqueta Git anotada `v<versión>` apunta a su
+commit. La huella de compilación y la versión de política son identificadores
+técnicos independientes; no sustituyen a la versión del producto.
 
 Elige modelo y razonamiento antes de cada nuevo mensaje enviado a Codex. Sigue
 usando la app y la suscripción actuales. Puede decidir mediante reglas locales
@@ -42,7 +45,19 @@ no demuestra que la app abierta ya la esté usando: compruébalo en Ajustes.
 Instalación, diagnóstico, recuperación y límites:
 [Conexión con Desktop](docs/DESKTOP-INTEGRATION.md).
 
-## Entrega 0.3.0
+## Entrega 0.4.0
+
+Incluye cambios de modelo mediante checkpoints de fase, selección temporal de
+la tarea destacada y reevaluación de peticiones independientes sin heredar por
+defecto el nivel crítico del historial. Los avisos de actualización comparan el
+router por separado de la interfaz.
+
+El cambio dentro de un turno es **opcional y está desactivado por defecto**.
+Las pruebas aisladas de macOS no sustituyen a la aceptación completa en Desktop;
+la compilación y validación nativa de estos cambios en Windows siguen pendientes.
+Consulta [los límites y pruebas de esta entrega](CHANGELOG.md#040--2026-09-25).
+
+## Distribución y base 0.3.0
 
 La auditoría general, correcciones, pruebas y límites están en
 [AUDIT-REMEDIATION.md](docs/AUDIT-REMEDIATION.md). El pie del monitor distingue su
@@ -73,13 +88,16 @@ tareas. Doble clic en el tirador recupera la altura automática. Con el tirador
 enfocado, las flechas arriba/abajo ajustan la altura y `Inicio` la restablece.
 La cabecera y las pestañas permanecen visibles mientras el contenido se desplaza.
 
-El enrutamiento sigue decidiendo al inicio de cada turno. La prueba aislada de
-[continuidad por fases](docs/PHASE-PROBE.md) no activa cambios automáticos en las tareas.
+El enrutamiento decide al inicio de cada turno. Con `phase_routing: true`,
+las tareas nuevas pueden registrar un checkpoint para cambiar de modelo o
+esfuerzo en fases posteriores del mismo turno, dentro de la compatibilidad
+admitida por Codex. Las tareas existentes sin ese checkpoint mantienen el
+cambio entre turnos. Consulta [activación y límites](docs/PHASE-PROBE.md).
 El panel extrae acciones de la petición y del plan pendiente: cantidad y orden
 pueden cambiar. No usa tres etapas fijas por categoría. Sin acciones detectadas
-muestra una etapa genérica. Los pasos siguen marcados como **planificados**; solo
-el ciclo de ejecución de Codex tiene evidencia nativa. Esto no activa cambios
-automáticos de modelo dentro del turno.
+muestra una etapa genérica. Los pasos siguen marcados como **planificados**;
+dibujar ese plan no ejecuta transiciones. Un ajuste aceptado por Codex y una
+inferencia observada son evidencias distintas.
 
 Modelo y razonamiento aparecen como etiquetas. Luna es azul, Terra verde, Sol
 ámbar y Astra violeta; el texto permite identificarlos sin depender del color.
@@ -111,8 +129,12 @@ incorrectamente. Se aplica al reiniciar Desktop.
 
 El panel lateral tiene cuatro vistas:
 
-- **Actividad** muestra lo que está ocurriendo ahora. Al pulsar cualquier tarea
-  se abre su decisión más reciente en Historial.
+- **Actividad** destaca por defecto la tarea actualizada más recientemente.
+  Al pulsar una tarea, queda destacada durante **un minuto** y su pipeline sigue
+  actualizándose sin que otra tarea la sustituya. Otro clic renueva el minuto;
+  **Volver al más reciente** recupera inmediatamente la selección automática.
+  **Ver historial** abre sus decisiones. Si la tarea deja de estar disponible,
+  la vista vuelve automáticamente a la más reciente.
   La tarea destacada y el detalle de Historial permiten elegir **Automático** o
   **Manual** por tarea. La elección persiste y afecta al siguiente mensaje;
   Manual conserva el modelo y esfuerzo enviados por Desktop y no llama al clasificador.
@@ -201,6 +223,14 @@ acordado conserva su mínimo de capacidad. La ambigüedad o el título del agent
 no establecen por sí solos un mínimo. Máx. automático solo está disponible
 ante riesgo y alcance excepcional juntos, o tras un intento fallido con muy
 alto/máximo; las instrucciones explícitas y el modo manual prevalecen.
+La política 4 reevalúa cada petición independiente: un cambio concreto no hereda
+el nivel crítico del trabajo pendiente solo por pertenecer a la misma tarea.
+«Continúa con lo pendiente» conserva ese mínimo; las señales de riesgo de la
+petición actual también se siguen aplicando. El contrato pendiente se conserva
+para poder retomarlo después.
+El monitor compara la huella del router por separado de los estilos y la interfaz.
+«Puente sin verificar» identifica un puente anterior que no publica esa huella;
+no equivale a un reinicio pendiente confirmado.
 Desde 0.2.3, una confirmación breve puede usar un resumen efímero de la
 respuesta anterior de la IA: plan, implementación, pruebas, despliegue y riesgo.
 Solo se conservan esas etiquetas; no se guarda ni se envía el texto completo.

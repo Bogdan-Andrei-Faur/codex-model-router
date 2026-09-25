@@ -1,6 +1,21 @@
 # Continuidad del proyecto: fases automáticas y validación multiplataforma
 
-## Estado actual — 0.3.1, 25/09/2026
+## Estado actual — 0.4.0, 25/09/2026
+
+Entrega local descrita en [CHANGELOG.md](../CHANGELOG.md): checkpoints de fase
+opcionales, selección destacada por un minuto, política 4 y huella independiente
+del router. Atlas está disponible y conserva las tareas de validación abiertas.
+148 pruebas Python y 10 pruebas de núcleo de interfaz superadas, más diseño e
+interacción y compilación del monitor macOS. Windows pendiente en esta revisión.
+
+El monitor puede actualizarse sin interrumpir Desktop. El puente abierto sigue
+con el código cargado antes; terminar tareas activas y reiniciar para cargar
+0.4.0. Verificar entonces versión/huella y decisiones con política 4. Los
+checkpoints solo se registran en tareas nuevas cuando la opción está activada;
+la aceptación en Desktop real sigue pendiente. No confundir pruebas nativas
+aisladas con aceptación general: [PHASE-PROBE.md](PHASE-PROBE.md).
+
+## Estado histórico — 0.3.1, 25/09/2026
 
 Corrección de los chats laterales locales: [SIDE-CHATS.md](SIDE-CHATS.md).
 Procesa `thread/fork`, distingue el origen `user` de generadores internos y
@@ -12,7 +27,7 @@ activas para activarlo. La integración nativa del MacBook sigue pendiente.
 La base 0.3.0 se publicó como `c129beb` y pasó las cinco comprobaciones de
 [CI Windows/macOS](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/36113819551).
 Ese resultado corresponde a 0.3.0, no valida retrospectivamente este cambio.
-Atlas no está disponible mediante herramientas en esta sesión.
+En aquella sesión no estaban disponibles las herramientas de Atlas.
 
 ## Base de la auditoría — 0.3.0, 24/09/2026
 

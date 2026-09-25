@@ -1,5 +1,37 @@
 # Cambios
 
+## 0.4.0 — 2026-09-25
+
+- Cambio opcional de modelo y esfuerzo dentro del turno mediante
+  `router_phase_checkpoint`, registrado al crear tareas nuevas. Incluye espera
+  de confirmación nativa, límite de transiciones y tiempo de espera, cancelación,
+  respeto al modo manual y recuperación de la propiedad del checkpoint al reiniciar.
+- `phase_routing` está desactivado por defecto. En el backend probado se permiten
+  transiciones entre Luna, Terra y Sol; cruzar la frontera de Astra requiere otro
+  turno. Se conservan los requisitos nativos de revisión y los mínimos de capacidad.
+  Las tareas anteriores sin checkpoint continúan enrutándose entre turnos.
+- En Actividad, pulsar un agente lo mantiene en Tarea destacada durante un minuto,
+  con su pipeline actualizado y un botón para volver al más reciente. Otra
+  pulsación renueva el plazo; al expirar se recupera la selección automática.
+- Política de enrutamiento 4: una petición independiente se evalúa por su propio
+  alcance. El historial crítico no restringe por sí solo las opciones de Jev;
+  retomar trabajo pendiente o presentar riesgo actual conserva el mínimo adecuado.
+- Huella independiente del router en estado, historial y metadatos de compilación.
+  Los cambios de estilos o interfaz no provocan por sí solos un aviso de reinicio
+  del router. Un puente antiguo sin esa huella se identifica como sin verificar.
+- Lanzador y monitor de macOS toman su versión del archivo común `VERSION`.
+
+Validación: 148 pruebas Python, 10 pruebas de núcleo de interfaz, comprobaciones
+de diseño e interacción y compilación nativa del monitor macOS. La prueba aislada
+del puente Terra → Sol y la matriz de compatibilidad nativa se documentan en
+[PHASE-PROBE.md](docs/PHASE-PROBE.md); no se repitieron inferencias para versionar.
+
+Pendiente: cargar la política 4 en Desktop tras terminar las tareas activas y
+reiniciar, comprobar checkpoints en tareas nuevas reales (incluidos permisos,
+cancelación y reanudación), y compilar/validar esta entrega en Windows. Los
+resultados de CI de versiones anteriores no acreditan esta entrega. No se
+distribuye un nuevo ZIP Windows como parte de esta preparación local.
+
 ## 0.3.1 — 2026-09-25
 
 - Los chats laterales locales se enrutan con Reglas o JEV y aparecen mientras
