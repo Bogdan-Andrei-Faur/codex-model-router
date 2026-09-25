@@ -5,7 +5,34 @@
 Chats laterales: [alcance, pruebas y activación](SIDE-CHATS.md). Suite local:
 124 pruebas Python (121 superadas, tres omisiones de plataforma), incluidas ocho
 regresiones nuevas. La sonda nativa sin inferencia no permite bifurcar una
-conversación vacía; queda pendiente la validación real en Desktop tras reinicio.
+conversación vacía; queda pendiente la validación real de chats laterales en Desktop.
+
+### Validación macOS — 25/09/2026
+
+- Fuente 0.3.1 en Apple Silicon, Python 3.9.6 y Swift 6.4. `python3 macos.py setup`
+  compiló el monitor AppKit/WebKit y regeneró los accesos y el puente. El bundle
+  identifica versión 0.3.1 y build `99a5c024a776e207`.
+- ChatGPT Desktop `26.917.71314`, motor `codex-cli 0.155.0-alpha.16.4`.
+  `python3 desktop.py install` registró la conexión de launchd. Después del
+  reinicio realizado por el usuario desde el acceso habitual, el diagnóstico
+  confirmó `desktop_connected`, handshake y un puente 0.3.1 activo.
+- Un turno real produjo `routed`, `native_settings` y `turn_accepted` para
+  Terra/Medio mediante el respaldo local. Jev registró un timeout mientras el
+  usuario autorizaba el acceso al llavero. En el siguiente turno, Jev/Vercel
+  (`vmc/jev`) respondió correctamente en 542 ms y Codex aceptó Sol/Alto.
+- 124 pruebas Python superadas sin omisiones; 10 pruebas del núcleo del monitor
+  superadas. Los smokes nativo y de inventario pasaron sin solicitar inferencias.
+  El smoke de inventario consulta ahora el estado temporal aislado de su cliente.
+- Tras `npm ci`, `npm run test:layout` pasó con Google Chrome en macOS: altura
+  adaptable, anclaje inferior, arrastre, teclado, búsqueda y paginación del
+  historial. Chrome es el canal predeterminado del test en Mac; Windows conserva
+  Edge y CI puede seleccionar Chromium con `ROUTER_TEST_BROWSER=chromium`.
+- Esta evidencia confirma la integración y aceptación de ajustes por Desktop.
+  La telemetría opcional de inferencia estaba desactivada: los eventos de uso no
+  prueban el modelo de cada inferencia interna. El test de layout en Chromium
+  tampoco sustituye una revisión visual de WebKit. Siguen pendientes la prueba
+  real de chats laterales, Manual/Automático y los controles nuevos del monitor.
+  No se ha medido ahorro ni calidad de selección, ni revalidado TypeSafe directo.
 
 ## Base de la auditoría — 0.3.0, 24/09/2026
 

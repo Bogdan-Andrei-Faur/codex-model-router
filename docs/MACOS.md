@@ -126,8 +126,11 @@ guarda en JSON, argumentos de comandos ni registros. El lector de Python consult
 solo la clave del proveedor seleccionado. Para Jev, Ajustes permite usar Vercel
 AI Gateway con el modelo virtual `vmc/jev` o la conexión directa a TypeSafe con
 `jev-latest`. macOS puede pedir autorización de acceso al llavero la primera vez;
-dispone de 45 segundos para completarla y conserva la lectura autorizada en
-memoria durante esa sesión. Al reemplazar una clave, el monitor invalida esa
+el lector del llavero permite hasta 45 segundos, pero el turno espera como máximo
+el presupuesto total de Jev (4 segundos por defecto, configurable hasta 8).
+La primera autorización puede provocar un respaldo a reglas en ese turno;
+si la lectura termina correctamente, la clave queda en memoria durante esa
+sesión para los siguientes mensajes. Al reemplazar una clave, el monitor invalida esa
 caché mediante un marcador sin contenido secreto. Si no puede leerla, el motor
 vuelve a reglas.
 Mover el proyecto cambia ese ámbito de claves y requiere volver a configurarlas.
@@ -143,13 +146,21 @@ python3 -m unittest discover -s tests -v
 python3 tests/smoke_native.py
 python3 tests/smoke_inventory.py
 node --test tests/test_monitor_core.cjs
+npm ci
+npm run test:layout
 ```
 
 Las pruebas nativas predeterminadas consultan versión, handshake, catálogo,
 tipo de cuenta y metadatos de tareas; no hacen inferencia ni modifican
-conversaciones. Usan la sesión local existente y escriben sus informes en
-`state/`. `--live` es una prueba opcional distinta que consume cuota y requiere
+conversaciones. Usan la sesión local existente y un directorio temporal aislado
+para el estado del puente. `--live` es una prueba opcional distinta que consume cuota y requiere
 Python 3.11+; no se ha ejecutado para esta adaptación.
+
+La prueba de layout requiere Node.js, las dependencias de `npm ci` y Google
+Chrome en macOS. Como alternativa, instala Chromium con
+`npx playwright install chromium` y ejecuta
+`ROUTER_TEST_BROWSER=chromium npm run test:layout`. Estos requisitos son solo
+para validar la interfaz; el monitor nativo usa el WebKit de macOS.
 
 El puente intercepta únicamente el transporte JSONL por stdio. Comandos de
 versión/esquema y transportes alternativos pasan al motor original sin aplicar
@@ -159,8 +170,11 @@ El smoke nativo incluye ahora `-c valor app-server`, igual que el arranque real
 de Desktop en el Mac inspeccionado. La primera versión del detector solo aceptaba
 `app-server` como primer argumento y dejaba pasar esa conexión sin enrutar.
 
-La activación del puente corregido en Desktop y un turno real quedan como comprobación final
-tras cerrar las tareas activas. Un smoke correcto no demuestra que la app abierta
+La versión 0.3.1 se compiló y activó en Apple Silicon con ChatGPT `26.917.71314`:
+el arranque habitual y turnos reales con respaldo local y Jev/Vercel quedaron
+confirmados el 25/09/2026. Véanse la evidencia y sus límites en
+[VALIDATION.md](VALIDATION.md#validación-macos--25092026).
+En cada actualización, un smoke correcto no demuestra que la app abierta
 haya cargado el puente. Si una actualización cambia la integración, desconéctala
 y vuelve a ejecutar los checks antes de reactivarla.
 

@@ -4,7 +4,9 @@ const { pathToFileURL } = require('node:url');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 (async () => {
-  const browser = await chromium.launch({...(process.env.ROUTER_TEST_BROWSER==='chromium'?{}:{channel:'msedge'}),headless:true});
+  const channel = process.env.ROUTER_TEST_BROWSER === 'chromium' ? undefined :
+    process.env.ROUTER_TEST_BROWSER || (process.platform === 'darwin' ? 'chrome' : 'msedge');
+  const browser = await chromium.launch({...channel ? {channel} : {},headless:true});
   try {
     const page = await browser.newPage();
     const errors=[];page.on('pageerror',error=>errors.push(String(error)));

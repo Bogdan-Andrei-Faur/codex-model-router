@@ -17,7 +17,10 @@ def main():
         thread = next(iter(page["data"]), None)
         if thread:
             client.call("thread/read", {"threadId": thread["id"], "includeTurns": False})
-        snapshot_path = ROOT / "state" / ("status-%s.json" % client.p.pid)
+        # Client always gives the bridge an isolated state directory. Reading
+        # the workspace state here races with unrelated desktop sessions and
+        # leaves this native smoke unable to find its own snapshot.
+        snapshot_path = client.state / ("status-%s.json" % client.p.pid)
         deadline = time.monotonic() + 25
         while time.monotonic() < deadline:
             snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
