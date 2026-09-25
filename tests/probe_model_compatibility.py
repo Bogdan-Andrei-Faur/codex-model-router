@@ -28,63 +28,29 @@ FINAL_TARGET = dict(zip(MODELS, (MODELS[1], MODELS[2], MODELS[0], MODELS[3])))
 
 class Collector:
     def __init__(self):
+        from inference_telemetry import LocalInferenceTelemetry
         self.events = []
-        self.requests = 0
-        self.errors = 0
-        owner = self
+        self.receiver = LocalInferenceTelemetry(self.consume)
+        self.server = self.receiver.server
+        self.token = self.receiver.token
 
-        class Handler(BaseHTTPRequestHandler):
-            def log_message(self, *args):
-                pass
+    @property
+    def requests(self):
+        return self.receiver.snapshot()['requests']
 
-            def do_POST(self):
-                try:
-                    size = int(self.headers.get("Content-Length", "0"))
-                    if not 0 < size <= 8 * 1024 * 1024:
-                        raise ValueError("Invalid telemetry size")
-                    raw = self.rfile.read(size)
-                    if self.headers.get("Content-Encoding") == "gzip":
-                        raw = gzip.decompress(raw)
-                    owner.consume(json.loads(raw))
-                    owner.requests += 1
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(b"{}")
-                except Exception:
-                    owner.errors += 1
-                    self.send_response(400)
-                    self.end_headers()
+    @property
+    def errors(self):
+        return self.receiver.snapshot()['invalid_requests']
 
-        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.worker = threading.Thread(target=self.server.serve_forever, daemon=True)
-        self.worker.start()
-
-    def consume(self, payload):
-        # Ignore resources, identities, prompts, tool output, URLs and log bodies.
-        for resource in payload.get("resourceLogs", []):
-            for scope in resource.get("scopeLogs", []):
-                for log in scope.get("logRecords", []):
-                    record = {}
-                    for attribute in log.get("attributes", []):
-                        key = attribute.get("key")
-                        value = attribute.get("value", {}).get("stringValue")
-                        if key in ("model", "slug", "gen_ai.request.model", "gen_ai.response.model") and value in MODELS:
-                            record[key] = value
-                        elif key in ("model_reasoning_effort", "reasoning_effort") and value in EFFORTS:
-                            record[key] = value
-                        elif key == "event.name" and value in ("codex.api_request", "codex.sse_event", "codex.websocket_event", "codex.conversation_starts"):
-                            record[key] = value
-                        elif key == "event.kind" and value in ("response.created", "response.completed", "response.failed"):
-                            record[key] = value
-                    if record.get("event.name") and (record.get("model") or record.get("slug")):
-                        record["time_unix_nano"] = str(log.get("timeUnixNano") if log.get("timeUnixNano") not in (None, "0", 0) else log.get("observedTimeUnixNano", "0"))
-                        self.events.append(record)
+    def consume(self, record):
+        self.events.append({'model': record.get('model'),
+                            'model_reasoning_effort': record.get('effort'),
+                            'event.name': record.get('event_name'),
+                            'event.kind': record.get('event_kind'),
+                            'time_unix_nano': str(int(record.get('timestamp', 0) * 1e9))})
 
     def close(self):
-        self.server.shutdown()
-        self.server.server_close()
-        self.worker.join(timeout=2)
+        self.receiver.close()
 
 
 class MatrixClient(Client):
@@ -192,7 +158,7 @@ def main():
                 for key, value in overrides.items():
                     command += ["-c", key + "=" + json.dumps(value)]
                 endpoint = "http://127.0.0.1:" + str(collector.server.server_port) + "/v1/logs"
-                command += ["-c", 'otel.exporter={otlp-http={endpoint="' + endpoint + '",protocol="json"}}', "app-server"]
+                command += ["-c", 'otel.exporter={otlp-http={endpoint="' + endpoint + '",protocol="json",headers={"Authorization"="Bearer ' + collector.token + '"}}}', "app-server"]
                 client = MatrixClient(command, source, targets[source])
                 client.call("initialize", {"clientInfo": {"name": "model_compatibility_probe", "version": "0.1.0"},
                     "capabilities": {"experimentalApi": True}})

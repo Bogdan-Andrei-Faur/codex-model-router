@@ -11,6 +11,7 @@ import queue
 import subprocess
 import sys
 import threading
+import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,10 +22,13 @@ WRAPPER = ROOT / "dist" / ("codex-router-v19.exe" if os.name == "nt" else "codex
 
 class Client:
     def __init__(self, command=None):
+        self.temp = tempfile.TemporaryDirectory(prefix="router-smoke-")
+        self.state = Path(self.temp.name)
+        env = dict(os.environ, PERSONAL_CODEX_ROUTER_STATE=str(self.state))
         self.started_at = time.time()
         self.p = subprocess.Popen(command or [str(WRAPPER), "-c", "model_reasoning_effort=\"high\"", "app-server", "--analytics-default-enabled"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-            creationflags=creation_flags())
+            creationflags=creation_flags(), env=env)
         self.messages = queue.Queue()
         self.sequence = 0
         self.notifications = []
@@ -112,6 +116,7 @@ class Client:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--live", action="store_true")
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     version = subprocess.run([str(WRAPPER), "--version"],
         capture_output=True, timeout=15, creationflags=creation_flags())
@@ -124,15 +129,15 @@ def main():
         client.send({"method": "initialized", "params": {}})
         models = client.call("model/list", {})
         if os.name != "nt":
-            snapshot = json.loads((ROOT / "state" / ("status-%s.json" % client.p.pid)).read_text(encoding="utf-8"))
+            snapshot = json.loads((client.state / ("status-%s.json" % client.p.pid)).read_text(encoding="utf-8"))
             assert snapshot.get("heartbeat", 0) >= client.started_at - 1, "Bridge snapshot is stale"
             assert any(event.get("event") == "bridge_started" for event in snapshot.get("events", [])), "Desktop-style invocation bypassed the bridge"
             print("Desktop-style global -c arguments use the routing bridge: OK", flush=True)
         report["models"] = [m["model"] for m in models["data"] if m["model"].startswith("gpt-")]
-        (ROOT / "state" / "catalog.json").write_text(json.dumps({"checked": time.time(), "models": {
+        report["catalog"] = {"checked": time.time(), "models": {
             m["model"]: [e["reasoningEffort"] for e in m.get("supportedReasoningEfforts", [])]
             for m in models["data"] if m["model"] in ("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-6-astra")
-        }}, indent=2))
+        }}
         account = client.call("account/read", {"refreshToken": False})
         report["account_type"] = (account.get("account") or {}).get("type")
         assert report["account_type"] == "chatgpt", "This test requires the existing ChatGPT subscription"
@@ -174,8 +179,9 @@ def main():
     report["bridge_exit"] = client.p.returncode
     assert client.p.returncode == 0, "Bridge did not shut down cleanly"
     report["checked_at_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    (ROOT / "state").mkdir(exist_ok=True)
-    (ROOT / "state" / "smoke-report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    if args.output:
+        args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    client.temp.cleanup()
     print("Clean shutdown: OK", flush=True)
 
 

@@ -15,7 +15,8 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     let root: URL
     var state: URL { root.appendingPathComponent("state") }
     var configPath: URL { root.appendingPathComponent("config.local.json") }
-    var productVersion: String { (try? String(contentsOf:root.appendingPathComponent("VERSION"),encoding:.utf8).trimmingCharacters(in:.whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? "0.1.0" }
+    let productVersion: String = Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "sin identificar"
+    let productBuildId: String = Bundle.main.object(forInfoDictionaryKey:"RouterBuildId") as? String ?? ""
     var uiPath: URL { state.appendingPathComponent("monitor-ui-mac.json") }
     let resources = Bundle.main.resourceURL!.appendingPathComponent("ui")
     var service: String { "local.codex-model-router." + SHA256.hash(data: Data(root.path.utf8)).map { String(format:"%02x",$0) }.joined() }
@@ -28,7 +29,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     var timer: Timer?, hitTimer: Timer?
     var hitRect = NSRect.zero
     var lastPayload = Data(), journal = [[String: Any]](), journalSignature = ""
-    var keys = ["jev": false]
+    var keys = ["jev-typesafe": false, "jev-vercel": false]
     let io = DispatchQueue(label:"local.codex-model-router.monitor-data",qos:.utility)
     init(root: URL) { self.root = root.standardizedFileURL.resolvingSymlinksInPath(); super.init() }
     func read(_ path: URL) -> [String: Any] {
@@ -59,14 +60,14 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         status.button?.image = NSImage(systemSymbolName:"circle.hexagongrid.fill",accessibilityDescription:"Codex automático")
         status.button?.target = self; status.button?.action = #selector(statusClick)
         status.button?.sendAction(on:[.leftMouseUp,.rightMouseUp])
-        if !preview { keys["jev"] = hasKey("jev") }
+        if !preview { for key in ["jev-typesafe", "jev-vercel"] { keys[key] = hasKey(key) } }
         loadPage()
         timer = Timer.scheduledTimer(timeInterval:2,target:self,selector:#selector(refresh),userInfo:nil,repeats:true)
         hitTimer = Timer.scheduledTimer(withTimeInterval:1.0/30,repeats:true) { [weak self] _ in self?.updateHit() }
         NotificationCenter.default.addObserver(self,selector:#selector(displayChanged),name:NSApplication.didChangeScreenParametersNotification,object:nil)
         NSWorkspace.shared.notificationCenter.addObserver(self,selector:#selector(displayChanged),name:NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,object:nil)
     }
-    func loadPage() { ready = false; web.loadFileURL(resources.appendingPathComponent("index.html"),allowingReadAccessTo:resources) }
+    func loadPage() { journalSignature = ""; ready = false; web.loadFileURL(resources.appendingPathComponent("index.html"),allowingReadAccessTo:resources) }
     func position() {
         let screen = panel.screen ?? NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation,$0.frame,false) } ?? NSScreen.main
         guard let work = screen?.visibleFrame else { return }
@@ -147,7 +148,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         case "quality": saveQuality(data)
         case "taskMode": if let id=data["thread"] as? String,let mode=data["value"] as? String { setTaskMode(id,mode) }
         case "connection": if let value = data["value"] as? String, ["doctor","install","uninstall"].contains(value) { manageConnection(value) }
-        case "secret": if let provider = data["provider"] as? String, provider == "jev", let value = data["value"] as? String, !value.isEmpty,value.utf8.count<16384 { storeKey(provider,value) }
+        case "secret": if let provider = data["provider"] as? String, ["jev-typesafe", "jev-vercel"].contains(provider), let value = data["value"] as? String, !value.isEmpty,value.utf8.count<16384 { storeKey(provider,value) }
         default: break
         }
     }
@@ -218,6 +219,10 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         let aspect=data["aspect"] as? String ?? "overall",field=aspect == "model" ? "model_quality" : aspect == "effort" ? "effort_quality" : "quality"
         let record:[String:Any] = ["schema":2,"event":"decision_quality","decision_id":id,field:quality,"time":Date().timeIntervalSince1970,"time_iso":ISO8601DateFormatter().string(from:Date())]
         guard var bytes = try? JSONSerialization.data(withJSONObject:record) else {return};bytes.append(10)
+        let gate = Darwin.open(state.appendingPathComponent("history.lock").path,O_RDWR|O_CREAT,0o600)
+        guard gate>=0 else {feedback("No se pudo guardar la valoración.");return}
+        guard flock(gate,LOCK_EX|LOCK_NB)==0 else {Darwin.close(gate);feedback("Historial ocupado. Reintenta la valoración.");return}
+        defer {flock(gate,LOCK_UN);Darwin.close(gate)}
         let fd = Darwin.open(state.appendingPathComponent("history.jsonl").path,O_WRONLY|O_CREAT|O_APPEND,0o600)
         guard fd>=0 else {feedback("No se pudo guardar la valoración.");return}
         let count = bytes.withUnsafeBytes {Darwin.write(fd,$0.baseAddress,$0.count)};Darwin.close(fd)
@@ -249,16 +254,21 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             guard let self=self else{return}
             let config=self.read(self.configPath)
             var rows=[String:Any](),connections=0
+            var bridgeVersions=Set<String>()
+            var bridgeBuildMismatch=false
             var telemetry=[String:Any](dictionaryLiteral:("enabled",false))
             let files=(try? FileManager.default.contentsOfDirectory(at:self.state,includingPropertiesForKeys:nil)) ?? []
             for file in files.sorted(by:{$0.lastPathComponent<$1.lastPathComponent}) where file.lastPathComponent.hasPrefix("status-") && file.pathExtension=="json" {
                 let data=self.read(file)
+                if data["client_name"] as? String == "other" {continue}
                 guard let heartbeat=data["heartbeat"] as? Double,abs(Date().timeIntervalSince1970-heartbeat)<12,let pid=data["pid"] as? Int32,kill(pid,0)==0,let threads=data["threads"] as? [String:[String:Any]] else{continue}
                 connections+=1
+                bridgeVersions.insert(data["product_version"] as? String ?? "desconocida")
+                if let build=data["build_id"] as? String,!self.productBuildId.isEmpty,build != self.productBuildId {bridgeBuildMismatch=true}
                 if let health=data["telemetry"] as? [String:Any] {
                     telemetry["enabled"] = (telemetry["enabled"] as? Bool ?? false) || (health["enabled"] as? Bool ?? false)
                     for key in ["requests","records_scanned","eligible_records","events_without_model","unrecognized_records","invalid_requests","unexpected_path"] { telemetry[key]=(telemetry[key] as? Double ?? 0)+(health[key] as? Double ?? 0) }
-                    if let stats=data["stats"] as? [String:Any] { for key in ["telemetry_events","telemetry_confirmed","telemetry_unattributed"] { telemetry[key]=(telemetry[key] as? Double ?? 0)+(stats[key] as? Double ?? 0) } }
+                    if let stats=data["stats"] as? [String:Any] { for key in ["telemetry_events","telemetry_confirmed","telemetry_probable","telemetry_unattributed"] { telemetry[key]=(telemetry[key] as? Double ?? 0)+(stats[key] as? Double ?? 0) } }
                 }
                 for (id,row) in threads {let old=rows[id] as? [String:Any] ?? [:];if (row["updated"] as? Double ?? 0)>=(old["updated"] as? Double ?? 0){rows[id]=row}}
             }
@@ -270,12 +280,14 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
                 records=paths.flatMap{path->[[String:Any]] in guard let text=try? String(contentsOf:path,encoding:.utf8) else{return []};return text.split(separator:"\n").compactMap{(try? JSONSerialization.jsonObject(with:Data($0.utf8))) as? [String:Any]}}
                 self.journalSignature=signature
             }
+            let currentJournal=records ?? self.journal
+            let ids=Set(rows.keys).union(currentJournal.compactMap{$0["thread"] as? String})
+            let taskModes=Dictionary(uniqueKeysWithValues:ids.map{($0,self.taskMode($0))})
             DispatchQueue.main.async {
                 self.busy=false;if let records=records{self.journal=records}
                 let safeConfig=config.filter{["enabled","inference_telemetry","history_days","routing_engine","comparison_engines","jev","routes"].contains($0.key)}
-                let ids=Set(rows.keys).union(self.journal.compactMap{$0["thread"] as? String})
-                let taskModes=Dictionary(uniqueKeysWithValues:ids.map{($0,self.taskMode($0))})
-                let payload:[String:Any]=["productVersion":self.productVersion,"threads":rows,"connections":connections,"history":self.journal,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"telemetry":telemetry,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
+                var payload:[String:Any]=["productVersion":self.productVersion,"bridgeVersions":Array(bridgeVersions).sorted(),"bridgeBuildMismatch":bridgeBuildMismatch,"threads":rows,"connections":connections,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"telemetry":telemetry,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
+                if records != nil {payload["history"]=self.journal}
                 guard let encoded=try? JSONSerialization.data(withJSONObject:payload,options:[.sortedKeys]),encoded != self.lastPayload else{return}
                 self.lastPayload=encoded
                 self.web.callAsyncJavaScript("window.receive(payload)",arguments:["payload":payload],in:nil,in:.page){ result in if case .failure=result {self.lastPayload=Data()} }

@@ -1,38 +1,26 @@
 """Conservative, dynamic task plans and observed lifecycle evidence.
 
 The router never claims that Codex completed an internal semantic step. Plans
-are derived from the privacy-safe task category; only the native turn lifecycle
+are derived from requested actions, stored as symbols; only the native turn lifecycle
 is marked as observed.
 """
 
 ASTRA = "gpt-6-astra"
+from workload import STEPS
 COMPATIBLE_LIVE_MODELS = frozenset(("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"))
 
 
-PLAN_TEMPLATES = {
-    "text": (("deliver", "Responder"),),
-    "research": (("investigate", "Investigar"), ("decide", "Decidir"), ("deliver", "Entregar")),
-    "interface": (("review", "Revisar interfaz"), ("implement", "Implementar"), ("validate", "Comprobar")),
-    "correction": (("diagnose", "Diagnosticar"), ("fix", "Corregir"), ("validate", "Validar")),
-    "tests": (("inspect", "Revisar"), ("verify", "Verificar"), ("report", "Informar")),
-    "audit": (("inspect", "Inspeccionar"), ("assess", "Evaluar"), ("report", "Informar")),
-    "architecture": (("map", "Entender"), ("design", "Diseñar"), ("review", "Revisar")),
-    "configuration": (("prepare", "Preparar"), ("apply", "Aplicar"), ("verify", "Comprobar")),
-    "automation": (("design", "Diseñar"), ("automate", "Automatizar"), ("verify", "Comprobar")),
-    "general": (("solve", "Resolver"),),
-}
-
-
-def task_plan(category="general"):
+def task_plan(category="general", steps=None):
     """Return a content-free plan. Every step remains explicitly planned."""
-    return [{"id": step_id, "label": label, "state": "planned", "evidence": "plan"}
-            for step_id, label in PLAN_TEMPLATES.get(category, PLAN_TEMPLATES["general"])]
+    labels = {key: label for key, label, _ in STEPS}
+    selected = list(dict.fromkeys(key for key in (steps or []) if key in labels))
+    return [{"id": key, "label": labels[key], "state": "planned", "evidence": "plan"} for key in selected] or [
+        {"id": "solve", "label": "Resolver la petición", "state": "planned", "evidence": "plan"}]
 
 
-def dynamic_pipeline(category="general", execution_status="proposed"):
+def dynamic_pipeline(category="general", execution_status="proposed", steps=None):
     """Combine a variable plan with one independently observed Codex state."""
-    plan = task_plan(category)
-    plan[0]["state"] = "selected"
+    plan = task_plan(category, steps)
     plan.append({"id": "codex_execution", "label": "Ejecución en Codex",
                  "state": execution_status, "evidence": "observed"})
     return plan
@@ -54,7 +42,7 @@ def can_switch_within_turn(source, destination):
     return transition_kind(source, destination) in ("same_model", "compatible_group")
 
 
-def proposed_phase(source, model, effort, category="general"):
+def proposed_phase(source, model, effort, category="general", steps=None):
     """Create a dynamic plan and the proposed observed execution state."""
     return {
         "phase_name": "execution",
@@ -63,7 +51,7 @@ def proposed_phase(source, model, effort, category="general"):
         "phase_effort": effort,
         "phase_transition": transition_kind(source, model),
         "pipeline_mode": "plan_and_observation",
-        "phase_pipeline": dynamic_pipeline(category),
+        "phase_pipeline": dynamic_pipeline(category, steps=steps),
     }
 
 
@@ -77,5 +65,6 @@ def phase_update(row, status, model=None, effort=None, transition=None):
     if transition:
         result["phase_transition"] = transition
     result["pipeline_mode"] = "plan_and_observation"
-    result["phase_pipeline"] = dynamic_pipeline(row.get("agent_category", "general"), status)
+    steps = [step.get("id") for step in row.get("phase_pipeline", []) if step.get("evidence") == "plan"]
+    result["phase_pipeline"] = dynamic_pipeline(row.get("agent_category", "general"), status, steps)
     return result

@@ -86,7 +86,7 @@ def config_overrides(args):
     return result
 
 
-def with_loopback_telemetry(args, endpoint):
+def with_loopback_telemetry(args, endpoint, token=None):
     """Append process-local OTel settings to the app-server's own overrides."""
     index = app_server_index(args)
     if index is None:
@@ -95,7 +95,8 @@ def with_loopback_telemetry(args, endpoint):
         "-c", "otel.log_user_prompt=false",
         "-c", 'otel.trace_exporter="none"',
         "-c", 'otel.metrics_exporter="none"',
-        "-c", 'otel.exporter={otlp-http={endpoint="' + endpoint + '",protocol="json"}}',
+        "-c", 'otel.exporter={otlp-http={endpoint="' + endpoint + '",protocol="json"' +
+        (',headers={"Authorization"="Bearer ' + token + '"}' if token else '') + '}}',
     ]
     # Desktop adds -c overrides after app-server (for example its bundled MCP).
     # With both layouts present, the native CLI uses the subcommand's overrides

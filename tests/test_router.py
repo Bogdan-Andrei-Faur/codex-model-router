@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from routing import DEFAULT_ROUTES, EFFORTS, classify, classify_agent_identity, select_route, select_route_details
+from routing import DEFAULT_ROUTES, EFFORTS, classify, classify_agent_identity, select_route, select_route_details, summarize_response_context
 from router import Router
 
 
@@ -59,9 +59,51 @@ class RoutingPolicyTests(unittest.TestCase):
             self.assertEqual(route, {"model": "gpt-6-astra", "effort": effort})
         for prompt in ("Explica qué significa razonamiento Ultra", "El usuario suele usar esfuerzo Ultra", 'Traduce: "Usa razonamiento Ultra"', "No uses esfuerzo Ultra"):
             self.assertNotEqual(select_route(prompt, DEFAULT_ROUTES)[0]["effort"], "ultra")
-        self.assertEqual(classify("Continúa", "critical", previous_effort="max").effort, "max")
+        self.assertEqual(classify("Continúa", "critical", previous_effort="max").effort, "xhigh")
         self.assertEqual(classify("Crea un formulario", "simple").tier, "normal")
         self.assertEqual(classify("Sigue fallando", "critical", previous_effort="xhigh").effort, "max")
+
+    def test_acknowledgements_and_status_do_not_inherit_expensive_work(self):
+        for prompt in ("Parece que ahora si esta funcionando", "Ok, perfecto", "Gracias!", "It is working now."):
+            with self.subTest(prompt=prompt):
+                result = classify(prompt, "critical", previous_effort="max")
+                self.assertEqual((result.tier, result.effort, result.request_kind), ("simple", "low", "acknowledgement"))
+                self.assertIsNone(result.quality_floor)
+        result = classify("Comprueba cuantas solicitudes de telemetria han llegado", "critical", previous_effort="max")
+        self.assertEqual((result.tier, result.effort, result.request_kind), ("normal", "medium", "status_check"))
+
+    def test_execution_followups_and_mixed_messages_keep_required_capacity(self):
+        for prompt in ("Adelante, impleméntalo", "Ok, implementa lo que acordamos", "Vale, sigue con ello", "Ok, arréglalo"):
+            with self.subTest(prompt=prompt):
+                result = classify(prompt, "critical", previous_effort="max")
+                self.assertEqual((result.tier, result.quality_floor, result.request_kind), ("critical", "critical", "work_followup"))
+                self.assertFalse(result.max_effort_allowed)
+        for prompt in ("Gracias, audita la autenticación", "Ahora funciona, investiga la pérdida de datos", "Check telemetry counters and audit authentication"):
+            self.assertEqual(classify(prompt, "critical").quality_floor, "critical")
+        self.assertEqual(classify("Ok, perfecto", "simple", attachments=True).quality_floor, "critical")
+        self.assertEqual(classify("Ok, haz una auditoría exhaustiva de autenticación", "critical", previous_effort="high").effort, "max")
+
+    def test_ambiguity_is_not_a_quality_floor(self):
+        result = classify("Tengo una duda sobre esto")
+        self.assertEqual(result.request_kind, "ambiguous")
+        self.assertIsNone(result.quality_floor)
+
+    def test_previous_response_summary_turns_confirmation_into_planned_followup(self):
+        context = summarize_response_context("He preparado el plan de implementación en tres pasos. Cuando digas adelante, implemento el cambio y ejecuto las pruebas.")
+        self.assertEqual(context["response_kind"], "plan")
+        result = classify("Adelante", "normal", previous_effort="medium", response_context=context)
+        self.assertEqual((result.request_kind, result.quality_floor), ("planned_followup", "normal"))
+
+    def test_pending_points_in_response_set_the_next_turn_minimum(self):
+        context = summarize_response_context("Quedan cuatro puntos pendientes: integrar el proveedor, corregir el estado, añadir pruebas y validar la migración.")
+        self.assertEqual((context["response_kind"], context["work_floor"]), ("pending_work", "complex"))
+        result = classify("Adelante", "simple", previous_effort="low", response_context=context)
+        self.assertEqual((result.tier, result.quality_floor, result.request_kind), ("complex", "complex", "planned_followup"))
+        route, reasons = select_route_details("Adelante", DEFAULT_ROUTES, "simple", "low", response_context=context)
+        self.assertEqual(route, {"model": "gpt-5.6-sol", "effort": "high"})
+        self.assertEqual(reasons["quality_floor"], "complex")
+        reset = classify("Nueva tarea: traduce hola al inglés", "simple", previous_effort="low", response_context=context)
+        self.assertEqual((reset.tier, reset.quality_floor), ("simple", None))
 
     def test_model_and_effort_explanations_are_separate(self):
         route, reasons = select_route_details("Rediseña a fondo la UX del panel", DEFAULT_ROUTES)
@@ -163,18 +205,120 @@ class ProtocolTests(unittest.TestCase):
         self.assertNotIn("PRIVATE_JEV_SENTINEL", (Path(self.tmp.name) / "state" / "history.jsonl").read_text())
 
     @patch("router.run_jev")
-    def test_jev_decides_continuation_instead_of_the_local_shortcut(self, fake_jev):
+    def test_jev_can_reduce_effort_while_continuing_complex_work(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
-        self.router.threads["t"].update(model="gpt-6-astra", effort="high", tier="critical", seen_turn=True)
+        self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True)
         fake_jev.return_value = {"engine": "jev", "status": "ok", "latency_ms": 25, "confidence": .91,
                                  "engine_model": "jev-test", "continuity_strategy": "continue",
-                                 "route": {"model": "gpt-5.6-luna", "effort": "low", "tier": "simple", "label": "Luna · low"}}
+                                 "route": {"model": "gpt-6-astra", "effort": "high", "tier": "critical", "label": "Astra · high"}}
         result = json.loads(self.router.client_line(encode(self.request("Vale, sigue con ello", effort="high"))))
         self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6-astra", "high"))
-        self.assertIn("Jev decidió continuar", self.router.threads["t"]["model_reason"])
+        self.assertIn("Jev continuó la tarea", self.router.threads["t"]["model_reason"])
         records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
         self.assertEqual(records[0]["continuity_strategy"], "continue")
         fake_jev.assert_called_once()
+
+    @patch("router.run_jev")
+    def test_jev_continuation_does_not_override_a_lightweight_route(self, fake_jev):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
+        self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True,
+                                      name="Auditoría de seguridad", agent_category="audit")
+        fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
+                                "route": {"model": "gpt-5.6-terra", "effort": "medium", "label": "Terra · medium"}}
+        result = json.loads(self.router.client_line(encode(self.request("Parece que ahora si esta funcionando"))))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-terra", "medium"))
+        policy, candidates = fake_jev.call_args.args[2:4]
+        self.assertEqual(policy["request_kind"], "acknowledgement")
+        self.assertIsNone(policy["quality_floor"])
+        self.assertTrue(all(r["tier"] in ("simple", "normal") and r["effort"] in ("low", "medium") for r in candidates.values()))
+        records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
+        self.assertEqual(records[0]["routing_policy_version"], 3)
+        self.assertEqual(records[0]["request_kind"], "acknowledgement")
+        self.assertNotIn("Parece que ahora", str(records))
+
+    @patch("router.run_jev")
+    def test_jev_may_downgrade_ambiguity_even_with_inherited_audit_identity(self, fake_jev):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
+        self.router.threads["t"].update(name="Auditoría de seguridad", agent_category="audit")
+        fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "reassess",
+                                "route": {"model": "gpt-5.6-luna", "effort": "low", "label": "Luna · low"}}
+        result = json.loads(self.router.client_line(encode(self.request("Tengo una duda sobre esto"))))
+        self.assertEqual(result["params"]["model"], "gpt-5.6-luna")
+        self.assertIsNone(fake_jev.call_args.args[2]["quality_floor"])
+        self.assertIn("simple_low", fake_jev.call_args.args[3])
+
+    @patch("router.run_jev")
+    def test_jev_cannot_force_maximum_for_an_acknowledgement(self, fake_jev):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
+        self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True)
+        fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
+                                "route": {"model": "gpt-6-astra", "effort": "max", "label": "Astra · max"}}
+        result = json.loads(self.router.client_line(encode(self.request("Parece que ahora si esta funcionando"))))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-luna", "low"))
+        self.assertEqual(self.router.threads["t"]["engine_status"], "guardrail")
+        self.assertEqual(self.router.threads["t"]["routing_engine"], "rules")
+
+    @patch("router.run_jev")
+    def test_jev_cannot_drop_the_capacity_of_work_it_is_asked_to_resume(self, fake_jev):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
+        self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True)
+        fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
+                                "route": {"model": "gpt-5.6-luna", "effort": "low"}}
+        result = json.loads(self.router.client_line(encode(self.request("Adelante, impleméntalo"))))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6-astra", "xhigh"))
+        self.assertEqual(self.router.threads["t"]["engine_status"], "guardrail")
+
+    @patch("router.run_jev")
+    def test_jev_outage_uses_lightweight_fallback_for_confirmation(self, fake_jev):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
+        self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True)
+        fake_jev.return_value = {"engine": "jev", "status": "unavailable", "engine_failure": "rate_limited"}
+        result = json.loads(self.router.client_line(encode(self.request("Parece que ahora si esta funcionando"))))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-luna", "low"))
+        self.assertEqual(self.router.threads["t"]["routing_engine"], "rules")
+
+    @patch("router.run_jev")
+    def test_response_plan_is_sent_as_metadata_for_brief_confirmation(self, fake_jev):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
+        self.router.threads["t"].update(model="gpt-5.6-terra", effort="medium", tier="normal", seen_turn=True,
+                                      response_context={"has_plan": True, "implementation_pending": True,
+                                                        "mentions_tests": True, "mentions_deployment": False,
+                                                        "risk_signals": False, "response_kind": "plan"})
+        fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
+                                "route": {"model": "gpt-5.6-terra", "effort": "medium", "label": "Terra · medium"}}
+        result = json.loads(self.router.client_line(encode(self.request("Adelante"))))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-terra", "medium"))
+        state = fake_jev.call_args.args[2]
+        self.assertEqual(state["previous_response_context"]["response_kind"], "plan")
+        self.assertTrue(state["previous_response_context"]["mentions_tests"])
+
+    @patch("router.run_jev")
+    def test_pending_points_prevent_jev_from_selecting_luna(self, fake_jev):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
+        context = summarize_response_context("Faltan varios puntos: integrar los cambios entre servicios, corregir el flujo y validar las pruebas.")
+        self.router.threads["t"].update(model="gpt-5.6-luna", effort="low", tier="simple", seen_turn=True, response_context=context)
+        fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
+                                "route": {"model": "gpt-5.6-luna", "effort": "low", "label": "Luna · low"}}
+        result = json.loads(self.router.client_line(encode(self.request("Adelante"))))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-sol", "high"))
+        self.assertEqual(self.router.threads["t"]["engine_status"], "guardrail")
+        state, candidates = fake_jev.call_args.args[2:4]
+        self.assertEqual(state["previous_response_context"]["work_floor"], "complex")
+        self.assertTrue(all(route["tier"] in ("complex", "critical") for route in candidates.values()))
+
+    @patch("router.run_jev")
+    def test_pending_tests_keep_floor_for_elliptical_followup_after_luna(self, fake_jev):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
+        context = summarize_response_context("Todavía quedan cambios por hacer y después hay que ejecutar las pruebas.")
+        self.router.threads["t"].update(model="gpt-5.6-luna", effort="low", tier="simple",
+                                        seen_turn=True, response_context=context)
+        fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
+                                "route": {"model": "gpt-5.6-luna", "effort": "low", "label": "Luna · low"}}
+        result = json.loads(self.router.client_line(encode(self.request("Haz lo que consideres necesario para dejarlo bien."))))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-sol", "high"))
+        state, candidates = fake_jev.call_args.args[2:4]
+        self.assertEqual((state["request_kind"], state["quality_floor"]), ("planned_followup", "complex"))
+        self.assertTrue(all(route["tier"] in ("complex", "critical") for route in candidates.values()))
 
     @patch("router.run_jev")
     def test_jev_cannot_reduce_a_research_quality_floor(self, fake_jev):
@@ -195,6 +339,20 @@ class ProtocolTests(unittest.TestCase):
         self.router.server_line(encode({"method": "turn/started", "params": {"threadId": "t"}}))
         raw = encode(self.request())
         self.assertEqual(self.router.client_line(raw), raw)
+
+    def test_completed_response_blocks_keep_only_pending_work_metadata(self):
+        self.router.server_line(encode({"method": "item/completed", "params": {"threadId": "t", "item": {
+            "type": "agentMessage", "content": [
+                {"text": "PRIVATE_SENTINEL: quedan varios puntos pendientes para integrar los servicios y validar pruebas."}
+            ]}}}))
+        context = self.router.threads["t"]["response_context"]
+        self.assertEqual((context["response_kind"], context["work_floor"]), ("pending_work", "complex"))
+        history = self.router.state_dir / "history.jsonl"
+        persisted = history.read_text(encoding="utf-8")
+        self.assertIn('"event":"task_context"', persisted)
+        self.assertIn('"task_floor":"complex"', persisted)
+        self.assertNotIn("PRIVATE_SENTINEL", persisted)
+        self.assertNotIn("PRIVATE_SENTINEL", str(context))
 
     def test_internal_ephemeral_root_keeps_native_settings_and_creates_no_decision(self):
         self.router.threads["helper"] = {"provider": "openai", "model": "gpt-5.6-luna",
@@ -307,7 +465,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertIn("model_reason", records[0])
         self.assertIn("effort_reason", records[0])
         self.assertEqual(records[0]["agent_category"], "text")
-        self.assertEqual(records[0]["agent_confidence"], "media")
+        self.assertEqual(records[0]["agent_confidence"], "alta")
         self.assertEqual(records[1]["routing_engine"], "rules")
         self.assertEqual(records[1]["proposed_model"], "gpt-5.6-luna")
         self.assertEqual((records[2]["routing_engine"], records[2]["engine_applied"]), ("rules", False))
@@ -409,6 +567,46 @@ class ProtocolTests(unittest.TestCase):
             "modelProvider": "openai", "model": "gpt-6-astra"}}))
         restarted.client_line(encode(self.request("Sí, continúa")))
         self.assertEqual(restarted.threads["t"]["agent_category"], "architecture")
+
+    @patch("router.run_jev")
+    def test_pending_work_floor_survives_restart_without_response_text(self, fake_jev):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
+        self.router.server_line(encode({"method": "item/completed", "params": {"threadId": "t", "item": {
+            "type": "agentMessage", "text": "PRIVATE_SENTINEL: todavía quedan cambios y hay que ejecutar las pruebas."
+        }}}))
+        self.assertEqual(self.router.threads["t"]["task_floor"], "complex")
+
+        restarted = Router(self.path, Path(self.tmp.name) / "state")
+        restarted.catalog = {x["model"]: set(EFFORTS) for x in DEFAULT_ROUTES.values()}
+        self.assertEqual(restarted.thread_categories["t"]["task_floor"], "complex")
+        restarted.threads["t"] = {**restarted.thread_categories["t"], "provider": "openai",
+                                  "model": "gpt-5.6-luna", "effort": "low", "tier": "simple", "seen_turn": True}
+        fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
+                                "route": {"model": "gpt-5.6-luna", "effort": "low", "label": "Luna · low"}}
+        result = json.loads(restarted.client_line(encode(self.request("Sigue con lo que falta"))))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-sol", "high"))
+        self.assertEqual(restarted.threads["t"]["engine_status"], "guardrail")
+        history = (Path(self.tmp.name) / "state" / "history.jsonl").read_text(encoding="utf-8")
+        self.assertNotIn("PRIVATE_SENTINEL", history)
+
+    def test_plan_does_not_clear_a_complex_task_floor(self):
+        self.router.server_line(encode({"method": "item/completed", "params": {"threadId": "t", "item": {
+            "type": "agentMessage", "text": "Quedan cambios pendientes y hay que ejecutar las pruebas."
+        }}}))
+        self.assertEqual(self.router.threads["t"]["task_floor"], "complex")
+        self.router.server_line(encode({"method": "item/completed", "params": {"threadId": "t", "item": {
+            "type": "agentMessage", "text": "Plan: primero preparo el siguiente paso y después revisamos el resultado."
+        }}}))
+        self.assertEqual(self.router.threads["t"]["task_floor"], "complex")
+        restarted = Router(self.path, Path(self.tmp.name) / "state")
+        self.assertEqual(restarted.thread_categories["t"]["task_floor"], "complex")
+
+    def test_new_task_clears_persisted_capability_floor(self):
+        self.router.threads["t"].update(task_floor="complex", tier="complex", seen_turn=True)
+        self.router.client_line(encode(self.request("Nueva tarea: traduce hola al inglés")))
+        self.assertNotIn("task_floor", self.router.threads["t"])
+        restarted = Router(self.path, Path(self.tmp.name) / "state")
+        self.assertNotIn("task_floor", restarted.thread_categories.get("t", {}))
 
 
 if __name__ == "__main__":

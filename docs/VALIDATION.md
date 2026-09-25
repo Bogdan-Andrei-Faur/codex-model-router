@@ -1,5 +1,77 @@
 # Validation and integration notes
 
+## Estado actual — 0.3.0, 24/09/2026
+
+La referencia actual es [AUDIT-REMEDIATION.md](AUDIT-REMEDIATION.md): cubre G01–G20,
+activación, contratos persistentes, límites de evidencia, claves por proveedor,
+ZIP probado y comandos reproducibles. Las secciones antiguas de este documento
+son evidencia histórica; sus cifras, reglas y límites no describen 0.3.0.
+`Siempre` ya no recorta a 20.000 eventos. Las fases se extraen de acciones y no
+se confirma inferencia por mera coincidencia de modelo. Falta validación nativa
+Mac; esta entrega no reinicia Desktop ni publica cambios en GitHub.
+
+
+## Pending-work follow-up correction — 0.2.4, 2026-09-24
+
+- Reproduced in `Agatha Vision`: Jev selected Luna/low for a continuation after
+  the agent had identified remaining points. The previous summary saw tests but
+  did not classify the outstanding work, leaving no route floor.
+- The response summary now recognizes pending points, remaining work, next steps
+  and multi-service integrations. It derives a normal, complex or critical floor
+  from safe labels. The local fallback and JEV candidates both enforce it, even
+  when the last selected model was Luna.
+- 93 tests pass with 3 platform skips, including direct and block message items,
+  no persistence of response text, planned continuation and rejection of a
+  Luna/low JEV proposal for pending complex work.
+
+## Previous-response context — 0.2.3, 2026-09-24
+
+- Completed assistant items are classified into ephemeral booleans: plan,
+  implementation pending, tests, deployment and risk. Brief confirmations use
+  that summary instead of relying on their few words alone.
+- The summary is not written to history and response text is not sent to JEV.
+- Handles direct text fields and text blocks. The 91-test suite covers planned
+  `Adelante`, ordinary continuation, lightweight acknowledgement and privacy.
+
+## JEV continuity and effort correction — 0.2.2, 2026-09-24
+
+- Regression reproduced: a result confirmation inherited Astra/Max from the
+  previous turn. JEV returned `continue`; the bridge forced the previous pair,
+  and an ambiguous local classification also excluded Luna/Terra candidates.
+- Continuity now describes the task; the selected pair is applied independently.
+  Quality floors come from actual workload signals or instructions to resume
+  known work, never from the visual identity/title or ambiguous fallback tier.
+  Whole-message acknowledgements and bounded counter/status checks admit only
+  Luna/Terra at low/medium; mixed messages and attachments do not get this cap.
+  Max requires high risk plus exceptional scope, or failure after xhigh/max.
+  A normal work continuation may retain capacity but does not inherit Max.
+- `python -m unittest discover -s tests`: 89 tests, 86 passed and 3 POSIX skips.
+  Includes changed effort during continuation, expensive malformed proposals,
+  rate-limit fallback, attachments, complex work, explicit/manual selections,
+  privacy-safe history and minimums independent of an inherited audit identity.
+- `python tests/smoke_jev.py --live` used synthetic requests with configured
+  Vercel JEV (`vmc/jev`), not Codex inference or user tasks. Observed choices:
+
+  | Synthetic case, starting from Astra/Max unless stated | Selection | Strategy |
+  | --- | --- | --- |
+  | Result confirmation | Luna / low | reassess |
+  | Read telemetry counters | Luna / low | reassess |
+  | Proceed with agreed implementation | Astra / high | continue |
+  | Unspecified question | Luna / low | reassess |
+  | Exhaustive high-risk audit, no previous route | Astra / xhigh | reassess |
+  | Failed attempt after Astra/xhigh | Astra / max | continue |
+
+- The audit received one HTTP 429 during the initial sequence; one targeted
+  repeat with `--live --case high_risk` succeeded. These are individual classifier
+  observations, not measured output quality or a general accuracy benchmark.
+  No prompts, raw responses or credentials were persisted in production history.
+- Windows build and WPF self-test passed. Generated the local standalone ZIP
+  `Codex-automatico-0.2.2-windows.zip`; checked its version and eight files, with
+  no history or keys. This is a local package, not a signed/published installer.
+- Already-running Desktop still uses its loaded policy until the user restarts
+  it. Native macOS validation remains a MacBook task. Automatic phase switching
+  remains disabled; permissions and active turns are untouched.
+
 ## Desktop telemetry correction — 0.2.1, 2026-09-24
 
 - Reproduced on Desktop 26.917.9434.0 / backend 0.155.0-alpha.16.4:

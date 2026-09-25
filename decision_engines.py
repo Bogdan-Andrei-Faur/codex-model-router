@@ -14,8 +14,12 @@ import socket
 import subprocess
 import sys
 import time
+import queue
+import threading
 import urllib.error
 import urllib.request
+
+from routing import EFFORTS, TIERS
 
 
 ENGINE_RULES = "rules"
@@ -23,6 +27,7 @@ ENGINE_JEV = "jev"
 ENGINES = (ENGINE_RULES, ENGINE_JEV)
 _KEYCHAIN_TIMEOUT_SECONDS = 45
 _KEYCHAIN_CACHE = {}
+_EXTERNAL_SLOTS = threading.BoundedSemaphore(4)
 
 
 def attachment_summary(items):
@@ -39,7 +44,7 @@ def attachment_summary(items):
             "types": sorted({item["type"] for item in attachments})}
 
 
-def candidate_routes(routes, catalog):
+def candidate_routes(routes, catalog, policy=None):
     """Create the valid model/effort pairs that a classifier may select."""
     preferences = {
         "simple": ("low", "medium"),
@@ -54,16 +59,37 @@ def candidate_routes(routes, catalog):
         "complex": "ingeniería compleja con alcance definido",
         "critical": "UX, auditoría, adjuntos o trabajo de gran alcance",
     }
+    effort_descriptions = {
+        "low": "Razonamiento ligero: respuesta breve o acción mecánica, sin análisis profundo.",
+        "medium": "Razonamiento medio: comprobación acotada o cambio verificable con pocas dependencias.",
+        "high": "Razonamiento alto: investigación o implementación compleja con alcance definido.",
+        "xhigh": "Razonamiento muy alto: análisis profundo, varios subsistemas o revisión rigurosa.",
+        "max": "Razonamiento máximo: riesgo importante y alcance excepcional juntos, o un intento fallido tras usar muy alto. No basta continuar la tarea.",
+    }
+    policy = policy or {}
+    floor = policy.get("quality_floor")
+    lightweight = policy.get("request_kind") in ("acknowledgement", "status_check", "bounded")
     choices = {}
     for tier, route in routes.items():
+        if floor in TIERS and TIERS.index(tier) < TIERS.index(floor):
+            continue
+        if lightweight and TIERS.index(tier) > TIERS.index("normal"):
+            continue
         model = route.get("model")
         available = catalog.get(model, set())
         for effort in preferences.get(tier, (route.get("effort", "medium"),)):
+            minimum = policy.get("min_effort", "low")
+            if minimum in EFFORTS and EFFORTS.index(effort) < EFFORTS.index(minimum):
+                continue
+            if effort == "max" and not policy.get("max_effort_allowed"):
+                continue
+            if lightweight and EFFORTS.index(effort) > EFFORTS.index("medium"):
+                continue
             if effort in available:
                 key = "%s_%s" % (tier, effort)
                 choices[key] = {"model": model, "effort": effort, "tier": tier,
                                 "label": "%s · %s" % (names.get(tier, tier.title()), effort),
-                                "description": descriptions.get(tier, "tarea de Codex")}
+                                "description": descriptions.get(tier, "tarea de Codex") + ". " + effort_descriptions.get(effort, "")}
     return choices
 
 
@@ -83,7 +109,10 @@ def _post_json(url, payload, headers=None, timeout=4.0):
     request = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                                      headers={"Content-Type": "application/json", **(headers or {})}, method="POST")
     with urllib.request.urlopen(request, timeout=timeout) as response:
-        return json.loads(response.read().decode("utf-8"))
+        raw = response.read(512 * 1024 + 1)
+        if len(raw) > 512 * 1024:
+            raise ValueError("response_too_large")
+        return json.loads(raw.decode("utf-8"))
 
 
 def token_count(value):
@@ -150,7 +179,7 @@ def _unprotect_windows(data):
 
 def _keychain_key(state_dir, key_id):
     """Read and cache an authorized classifier key; never log its value."""
-    if sys.platform != "darwin" or key_id != "jev":
+    if sys.platform != "darwin" or key_id not in ("jev-typesafe", "jev-vercel"):
         return None
     state = Path(state_dir).resolve()
     root = str(state.parent)
@@ -179,20 +208,46 @@ def _keychain_key(state_dir, key_id):
 
 def jev_key(state_dir, connection="typesafe"):
     """Environment variables are useful for development; production key stays DPAPI-protected."""
-    value = os.environ.get("PERSONAL_CODEX_JEV_API_KEY")
-    if not value:
-        value = os.environ.get("AI_GATEWAY_API_KEY") if connection == "vercel" else os.environ.get("TYPESAFE_API_KEY")
+    if connection not in ("typesafe", "vercel"):
+        return None
+    value = os.environ.get("AI_GATEWAY_API_KEY") if connection == "vercel" else os.environ.get("TYPESAFE_API_KEY")
     if value:
         return value.strip()
     if sys.platform == "darwin":
-        return _keychain_key(state_dir, "jev")
+        return _keychain_key(state_dir, "jev-" + connection)
     try:
-        return _unprotect_windows((Path(state_dir) / "jev.secret").read_bytes())
+        return _unprotect_windows((Path(state_dir) / ("jev-" + connection + ".secret")).read_bytes())
     except OSError:
         return None
 
 
 def run_jev(config, state_dir, state, candidates):
+    """Total deadline includes credential access, DNS and response decoding."""
+    started = time.perf_counter()
+    try:
+        budget = min(8.0, max(.1, float((config.get("jev") or {}).get("timeout_seconds", 4))))
+    except (TypeError, ValueError):
+        budget = 4.0
+    if not _EXTERNAL_SLOTS.acquire(blocking=False):
+        return {"engine": ENGINE_JEV, "status": "unavailable", "engine_failure": "busy", "latency_ms": 0}
+    result = queue.Queue(1)
+    def work():
+        try:
+            result.put(_run_jev(config, state_dir, state, candidates))
+        except Exception:
+            result.put({"engine": ENGINE_JEV, "status": "invalid", "engine_failure": "invalid_response"})
+        finally:
+            _EXTERNAL_SLOTS.release()
+    threading.Thread(target=work, daemon=True).start()
+    try:
+        value = result.get(timeout=budget)
+    except queue.Empty:
+        value = {"engine": ENGINE_JEV, "status": "unavailable", "engine_failure": "timeout"}
+    value["latency_ms"] = round((time.perf_counter() - started) * 1000)
+    return value
+
+
+def _run_jev(config, state_dir, state, candidates):
     started = time.perf_counter()
     settings = config.get("jev") or {}
     connection = settings.get("connection", "typesafe")
@@ -211,27 +266,35 @@ def run_jev(config, state_dir, state, candidates):
     criteria = {name: "%s: %s" % (item["label"], item["description"]) for name, item in candidates.items()}
     has_previous_route = bool(state.get("previous_model") and state.get("previous_effort"))
     strategy_criteria = {
-        "reassess": "La petición introduce un objetivo, alcance o complejidad que exige volver a elegir modelo y razonamiento.",
+        "reassess": "La petición introduce otro objetivo o cambia el trabajo necesario, incluida una confirmación de resultado o una consulta breve de estado.",
     }
     if has_previous_route:
-        strategy_criteria["continue"] = "La petición es una continuación directa y la combinación anterior conserva calidad suficiente.",
+        strategy_criteria["continue"] = "La petición pide proseguir el trabajo pendiente. Elige igualmente en route el modelo y esfuerzo necesarios ahora; continuar no obliga a conservar los anteriores."
     payload = {
         "model": model,
         "state": state,
         "questions": {
             "strategy": {"type": "choice", "instructions":
-                "Decide si esta petición debe conservar la configuración anterior o volver a evaluarse. "
-                "Continuar solo aplica a seguimientos directos sin un nuevo objetivo material.", "criteria": strategy_criteria},
+                "Decide si continúa el trabajo pendiente o cambia lo que hay que hacer. "
+                "Esta respuesta describe la continuidad de la tarea, nunca fija modelo ni esfuerzo.", "criteria": strategy_criteria},
             "route": {"type": "choice", "instructions":
-                "Elige la combinación de modelo Codex y razonamiento que mantenga buena calidad. "
-                "No reduzcas capacidad por coste cuando haya UI/UX, auditoría, investigación, arquitectura, adjuntos o varios pasos. "
-                "Las opciones ya respetan el mínimo de calidad local cuando existe.", "criteria": criteria},
+                "Elige la combinación suficiente para resolver bien el trabajo solicitado en ESTE mensaje. "
+                "Reevalúa modelo y esfuerzo incluso cuando strategy sea continue. "
+                "La configuración anterior aporta contexto, no es un mínimo. Una confirmación o consulta de estado "
+                "no hereda la complejidad de la tarea anterior; 'adelante, impleméntalo' sí continúa ese trabajo. "
+                "Respeta las necesidades reales de UI/UX, auditoría, investigación, arquitectura y adjuntos. "
+                "No subas esfuerzo solo por ambigüedad ni por mencionar estos temas. Usa Máx. únicamente cuando "
+                "sus criterios específicos se cumplan. Las opciones ya respetan los límites de calidad locales.", "criteria": criteria},
         },
     }
     try:
         response = _post_json(endpoint, payload,
-                              {"Authorization": "Bearer " + key}, float(settings.get("timeout_seconds", 4)))
+                              {"Authorization": "Bearer " + key}, min(8.0, max(.1, float(settings.get("timeout_seconds", 4)))))
+        if not isinstance(response, dict):
+            raise ValueError("invalid_response_shape")
         answers = response.get("answers") or response.get("questions") or {}
+        if not isinstance(answers, dict):
+            raise ValueError("invalid_answer_shape")
         answer = (answers.get("route")
                   or response.get("route") or {})
         choice = answer.get("choice") if isinstance(answer, dict) else answer

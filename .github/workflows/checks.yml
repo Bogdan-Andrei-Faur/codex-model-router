@@ -1,0 +1,29 @@
+name: Router checks
+on: [push, pull_request]
+jobs:
+  python:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+        python: ['3.9', '3.14']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m unittest discover -s tests -p "test_*.py"
+      - run: python tests/evaluate_routing.py
+  monitor:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npx playwright install chromium
+      - run: npm test
+      - run: npm run test:layout
+        env:
+          ROUTER_TEST_BROWSER: chromium

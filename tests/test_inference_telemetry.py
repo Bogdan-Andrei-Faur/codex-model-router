@@ -33,7 +33,7 @@ class InferenceTelemetryTests(unittest.TestCase):
         collector = LocalInferenceTelemetry(events.append)
         try:
             request = Request(collector.endpoint, data=json.dumps(payload()).encode(), method="POST",
-                              headers={"Content-Type": "application/json"})
+                              headers={"Content-Type": "application/json", "Authorization": "Bearer " + collector.token})
             with urlopen(request, timeout=3) as response:
                 self.assertEqual(response.status, 200)
             self.assertEqual(events, [{"event_name": "codex.sse_event", "event_kind": "response.completed",
@@ -52,13 +52,13 @@ class InferenceTelemetryTests(unittest.TestCase):
             config.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES}), encoding="utf-8")
             router = Router(config, root / "state")
             router.threads["one"] = {"decision_id": "d1", "status": "inProgress", "phase_status": "active",
-                "phase_model": "gpt-5.6-terra", "phase_effort": "medium", "phase_pipeline": []}
+                "phase_model": "gpt-5.6-terra", "phase_effort": "medium", "phase_pipeline": [], "turn_id": "turn-one"}
             router.current_decisions["one"] = "d1"
-            router.observe_inference({"event_kind": "response.completed", "model": "gpt-5.6-terra", "effort": "medium"})
+            router.observe_inference({"event_kind": "response.completed", "model": "gpt-5.6-terra", "effort": "medium", "thread_id": "one", "turn_id": "turn-one"})
             self.assertEqual(router.threads["one"]["observed_model"], "gpt-5.6-terra")
             self.assertEqual(router.stats["telemetry_confirmed"], 1)
-            router.threads["one"].update(phase_status="completed", updated=time.time())
-            router.observe_inference({"event_kind": "response.completed", "model": "gpt-5.6-terra", "effort": "medium"})
+            router.threads["one"].update(phase_status="completed", completed_at=time.time())
+            router.observe_inference({"event_kind": "response.completed", "model": "gpt-5.6-terra", "effort": "medium", "thread_id": "one", "turn_id": "turn-one"})
             self.assertEqual(router.stats["telemetry_confirmed"], 2)
             router.threads["two"] = dict(router.threads["one"], decision_id="d2")
             router.observe_inference({"event_kind": "response.completed", "model": "gpt-5.6-terra", "effort": "medium"})

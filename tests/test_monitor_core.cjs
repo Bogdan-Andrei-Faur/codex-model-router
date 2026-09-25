@@ -2,6 +2,16 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../monitor-ui/core.js');
 
+test('shadow response never overwrites active continuity, latency or classifier identity',()=>{
+  const rows=C.decisions([
+    {event:'decision_created',decision_id:'x',time:1,product_version:'0.3.0',build_id:'first'},
+    {event:'decision_routed',decision_id:'x',time:2,routing_engine:'jev',continuity_strategy:'continue',engine_latency_ms:50},
+    {event:'engine_comparison',decision_id:'x',time:3,routing_engine:'rules',engine_active:false,continuity_strategy:'reassess',engine_latency_ms:0,build_id:'later'}
+  ]);
+  assert.equal(rows[0].routing_engine,'jev');assert.equal(rows[0].continuity_strategy,'continue');
+  assert.equal(rows[0].engine_latency_ms,50);assert.equal(rows[0].build_id,'first');
+});
+
 test('resumed tasks do not create history; recovered decisions merge without duplication',()=>{
   assert.equal(C.decisions([], {task:{name:'Old task',status:'idle'}}).length,0);
   const events=[{event:'decision_created',decision_id:'a',thread:'t',time:10},{event:'decision_accepted',decision_id:'a',time:11},{event:'decision_recovered',decision_id:'b',time:5},{event:'decision_recovered',decision_id:'b',time:5}];

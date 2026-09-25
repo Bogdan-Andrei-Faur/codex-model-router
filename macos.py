@@ -73,9 +73,13 @@ def setup(app_path=None):
     shutil.copyfile(ROOT / "assets" / "codex-ui-1024.png", ui / "codex.png")
     os.replace(staged_monitor, MONITOR)
     with (MONITOR.parent.parent / "Info.plist").open("wb") as stream:
+        from build_identity import identity
         plistlib.dump({"CFBundleExecutable": MONITOR.name, "CFBundleIdentifier": "local.codex-model-router.monitor",
                       "CFBundleName": "Monitor de Codex", "CFBundlePackageType": "APPL",
-                      "CFBundleVersion": "2", "LSMinimumSystemVersion": "12.0", "LSUIElement": True}, stream)
+                      "CFBundleVersion": (ROOT / "VERSION").read_text().strip(),
+                      "CFBundleShortVersionString": (ROOT / "VERSION").read_text().strip(),
+                      "RouterBuildId": identity(ROOT)[1],
+                      "LSMinimumSystemVersion": "12.0", "LSUIElement": True}, stream)
     save_config(config)
     wrapper(DIST / "codex-router", [sys.executable, ROOT / "router.py"])
     # The config path is fixed even when Desktop launches from another cwd.

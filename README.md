@@ -2,7 +2,7 @@
 
 ## Versión
 
-El producto usa versiones semánticas. La versión funcional actual es **0.2.1**:
+El producto usa versiones semánticas. La versión funcional actual es **0.3.0**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en la esquina inferior derecha del
 panel procede del archivo común `VERSION`.
@@ -37,6 +37,18 @@ no demuestra que la app abierta ya la esté usando: compruébalo en Ajustes.
 Instalación, diagnóstico, recuperación y límites:
 [Conexión con Desktop](docs/DESKTOP-INTEGRATION.md).
 
+## Entrega 0.3.0
+
+La auditoría general, correcciones, pruebas y límites están en
+[AUDIT-REMEDIATION.md](docs/AUDIT-REMEDIATION.md). El pie del monitor distingue su
+versión de un puente abierto que todavía use otra. Los eventos nuevos incluyen
+build y versión de política; el historial anterior no recibe versiones inventadas.
+
+El ZIP Windows es autocontenido e incluye sus iconos. Extraer siempre en la misma
+carpeta permanente para actualizar: conserva `state/` y `config.local.json` porque
+el ZIP solo distribuye configuración de ejemplo. El checkout de desarrollo sí
+requiere Python; el paquete compilado no.
+
 ## Uso diario
 
 1. Con la integración instalada, abre **ChatGPT Desktop** desde su acceso habitual.
@@ -58,11 +70,11 @@ La cabecera y las pestañas permanecen visibles mientras el contenido se desplaz
 
 El enrutamiento sigue decidiendo al inicio de cada turno. La prueba aislada de
 [continuidad por fases](docs/PHASE-PROBE.md) no activa cambios automáticos en las tareas.
-El panel genera un plan breve y variable según el tipo de tarea: una traducción
-puede mostrar solo «Responder», mientras una interfaz muestra «Revisar interfaz»,
-«Implementar» y «Comprobar». Distingue pasos **planificados** de la única
-**ejecución en Codex** que el puente observa. No deduce etapas internas del texto
-ni afirma que haya cambiado el modelo durante la tarea.
+El panel extrae acciones de la petición y del plan pendiente: cantidad y orden
+pueden cambiar. No usa tres etapas fijas por categoría. Sin acciones detectadas
+muestra una etapa genérica. Los pasos siguen marcados como **planificados**; solo
+el ciclo de ejecución de Codex tiene evidencia nativa. Esto no activa cambios
+automáticos de modelo dentro del turno.
 
 Modelo y razonamiento aparecen como etiquetas. Luna es azul, Terra verde, Sol
 ámbar y Astra violeta; el texto permite identificarlos sin depender del color.
@@ -169,12 +181,27 @@ proveedor adicional. **Jev** usa el clasificador estructurado de TypeSafe y
 permite elegir entre TypeSafe directo y Vercel AI Gateway. En Vercel utiliza el
 modelo virtual `vmc/jev`; la conexión directa conserva `jev-latest`. Requiere una
 clave introducida desde Ajustes. En Windows se cifra con DPAPI dentro de
-`state/`; en macOS se guarda en el llavero.
+`state/`; en macOS se guarda en el llavero. Cada conexión tiene su propia clave.
+Las claves anteriores sin proveedor deben introducirse una vez en la conexión
+correspondiente; no se reasignan al cambiar entre TypeSafe y Vercel.
 
 En todos los casos siguen mandando las instrucciones explícitas, el catálogo de
 Codex y los límites para auditorías, UI/UX y adjuntos. Si Jev no está configurado,
 no responde a tiempo o devuelve un formato no válido, se aplica
 la política local sin interrumpir el mensaje.
+Desde 0.2.2, continuar una tarea no fija su modelo ni su esfuerzo: Jev elige
+ambos de nuevo. Las confirmaciones y consultas acotadas de estado permiten
+opciones ligeras aunque antes se usara Astra. Pedir que se ejecute el trabajo
+acordado conserva su mínimo de capacidad. La ambigüedad o el título del agente
+no establecen por sí solos un mínimo. Máx. automático solo está disponible
+ante riesgo y alcance excepcional juntos, o tras un intento fallido con muy
+alto/máximo; las instrucciones explícitas y el modo manual prevalecen.
+Desde 0.2.3, una confirmación breve puede usar un resumen efímero de la
+respuesta anterior de la IA: plan, implementación, pruebas, despliegue y riesgo.
+Solo se conservan esas etiquetas; no se guarda ni se envía el texto completo.
+La versión 0.2.4 reconoce además listas de puntos pendientes, trabajo restante,
+siguientes pasos e integraciones entre servicios, y no permite que ese contexto
+caiga a Luna cuando la continuación necesita más capacidad.
 El clasificador devuelve una única selección JSON. Si un modelo mezcla razonamiento
 con la respuesta final mediante `</think>`, se valida solo la respuesta posterior;
 no se deduce una elección de las alternativas mencionadas durante el razonamiento.

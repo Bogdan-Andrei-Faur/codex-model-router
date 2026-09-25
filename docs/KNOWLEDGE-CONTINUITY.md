@@ -1,5 +1,16 @@
 # Continuidad del proyecto: fases automáticas y validación multiplataforma
 
+## Estado actual — 0.3.0, 24/09/2026
+
+La referencia actual es [AUDIT-REMEDIATION.md](AUDIT-REMEDIATION.md): cubre G01–G20,
+activación, contratos persistentes, límites de evidencia, claves por proveedor,
+ZIP probado y comandos reproducibles. Las secciones antiguas de este documento
+son evidencia histórica; sus cifras, reglas y límites no describen 0.3.0.
+`Siempre` ya no recorta a 20.000 eventos. Las fases se extraen de acciones y no
+se confirma inferencia por mera coincidencia de modelo. Falta validación nativa
+Mac; esta entrega no reinicia Desktop ni publica cambios en GitHub.
+
+
 ## Propósito
 
 Este documento permite que otro agente continúe el trabajo aunque esta conversación deje de estar disponible. El proyecto es personal, independiente de Grimaldi, y su repositorio privado es:
@@ -14,6 +25,33 @@ Ver [VALIDATION.md](VALIDATION.md) para reproducción, prueba nativa y límites.
 No confundir un receptor escuchando con recepción ni configuración aceptada con
 inferencia. Tras instalar 0.2.1, validar recepción real después del reinicio
 controlado por el usuario; no interrumpir Desktop ni tareas para forzarlo.
+
+Corrección `0.2.2`: separar continuidad de tarea y selección de modelo/esfuerzo.
+El caso «Parece que ahora sí está funcionando» heredaba Astra Máx. y el mínimo
+local ambiguo impedía ofrecer Luna/Terra. `Decision` ahora expone el mínimo real,
+el tipo de petición y si Máx. es elegible; la categoría visual no fija mínimos.
+Una confirmación/consulta de contadores puede bajar de capacidad, mientras que
+«adelante, impleméntalo» conserva el mínimo del trabajo pendiente y permite
+reelegir esfuerzo. No se hereda Máx. sin nueva evidencia. Manual y selecciones
+explícitas se mantienen. Historial guarda `routing_policy_version: 2` y estas
+señales sin el texto. No se añadió un umbral arbitrario de confianza de Jev.
+Prueba repetible: `python tests/smoke_jev.py` muestra opciones sin red;
+`--live` consulta seis peticiones sintéticas con la conexión configurada y
+consume cuota del clasificador, sin invocar Codex ni tocar tareas reales.
+`--case` permite repetir únicamente un caso. Véase [VALIDATION.md](VALIDATION.md).
+Corrección `0.2.3`: las respuestas completadas del agente se resumen en memoria
+solo con etiquetas de plan, implementación pendiente, pruebas, despliegue y
+riesgo. Una respuesta «adelante» puede usar ese resumen sin que el texto completo
+entre en JEV ni en el historial. También se aceptan mensajes entregados como
+bloques de texto.
+Corrección `0.2.4`: el caso real `Agatha Vision` mostró que el resumen detectaba
+pruebas pero no “puntos pendientes”, permitiendo Luna/ligero. El resumen ahora
+deriva un mínimo normal/complejo/crítico de trabajo restante, siguientes pasos e
+integraciones. Ese mínimo eleva también el respaldo local cuando el modelo previo
+era Luna y limita las opciones de Jev. La prueba usa un centinela privado y
+verifica que no se persiste texto de la respuesta.
+El puente abierto carga Python una vez: necesita reinicio de Desktop por el
+usuario para activar 0.2.2. Cambiar `VERSION` en disco no demuestra activación.
 
 ## Decisión actual
 

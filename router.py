@@ -1,8 +1,9 @@
 """Transparent JSONL bridge to the installed Codex app-server on Windows/macOS.
 
 Only model/effort in eligible turn/start requests are changed. All other bytes
-and server output are forwarded. No credential loading, network gateway, prompt
-replay, transcript editing, or additional model requests are involved.
+and server output are forwarded. Optional JEV classification receives a transient
+request and content-free context; it has a bounded local fallback. No transcript
+editing or additional Codex inference is performed.
 """
 import copy
 import json
@@ -15,7 +16,7 @@ import threading
 import time
 import uuid
 
-from routing import DEFAULT_ROUTES, EFFORTS, classify_agent_identity, select_route_details, has_attachments, user_text
+from routing import DEFAULT_ROUTES, EFFORTS, classify_agent_identity, select_route_details, has_attachments, user_text, summarize_response_context
 from decision_engines import ENGINES, ENGINE_JEV, ENGINE_RULES, attachment_summary, build_state, candidate_routes, run_jev
 from thread_inventory import ThreadInventory
 from platform_support import backend_path, creation_flags, uses_stdio, stop_backend, input_lines, with_loopback_telemetry
@@ -23,9 +24,15 @@ from desktop_runtime import discover
 from task_modes import read_mode
 from phase_tracking import phase_update, proposed_phase
 from inference_telemetry import LocalInferenceTelemetry
+from workload import effective_context, merge_contract, plan_steps
+from state_store import recover_tasks, persist_task, append_record, compact_history
+from build_identity import identity, POLICY_VERSION
+from request_dispatch import Dispatcher
 
 ROOT = Path(os.environ.get("PERSONAL_CODEX_ROUTER_ROOT", Path(__file__).resolve().parent)).resolve()
 PRODUCT_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+BUILD = identity(ROOT)
+SHADOW_SLOTS = threading.BoundedSemaphore(2)
 
 
 def read_config(path):
@@ -56,26 +63,26 @@ class Router:
         self.client_name = "unknown"
         self.handshake_complete = False
         self.telemetry = None
+        self.inference_ids = set()
 
     def set_telemetry(self, collector):
         self.telemetry = collector
 
     def load_thread_categories(self):
-        """Recover only safe identity metadata, never prompt content, after restart."""
-        categories = {}
-        try:
-            history = self.state_dir / "history.jsonl"
-            if not history.exists():
-                return categories
-            for line in history.read_text(encoding="utf-8").splitlines()[-20000:]:
-                record = json.loads(line)
-                thread, category = record.get("thread"), record.get("agent_category")
-                if thread and category:
-                    categories[thread] = {"agent_category": category,
-                                          "agent_confidence": record.get("agent_confidence", "heredada")}
-        except (OSError, ValueError, TypeError, json.JSONDecodeError):
-            pass
+        """Recover only safe identity/workload metadata, never prompt content, after restart."""
+        categories = recover_tasks(self.state_dir)
+        for thread, row in categories.items():
+            try:
+                persist_task(self.state_dir, thread, row, only_if_missing=True)
+            except OSError:
+                pass
         return categories
+
+    def save_task(self, tid, row):
+        try:
+            persist_task(self.state_dir, tid, row)
+        except OSError:
+            self.log({"event": "task_state_unavailable", "thread": tid})
 
     def record_history(self, event, **fields):
         """Append privacy-safe decision metadata; never prompts, outputs or tool data."""
@@ -87,16 +94,17 @@ class Router:
                    "continuity_strategy", "phase_name", "phase_status", "phase_model", "phase_effort",
                    "phase_transition", "observed_model", "observed_effort", "configured_model", "configured_effort",
                    "accepted_model", "accepted_effort", "pipeline_mode", "phase_pipeline", "inference_source",
-                   "model_quality", "effort_quality"}
-        record = {"schema": 2, "time": time.time(), "time_iso":
+                   "model_quality", "effort_quality", "routing_policy_version", "request_kind", "quality_floor", "max_effort_allowed",
+                   "task_floor", "min_effort", "evidence_confidence"}
+        record = {"schema": 3, "product_version": BUILD[0], "build_id": BUILD[1],
+                  "routing_policy_version": POLICY_VERSION, "time": time.time(), "time_iso":
                   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event,
                   "session": str(os.getpid())}
         record.update({key: value for key, value in fields.items() if key in allowed and value is not None})
         try:
             self.state_dir.mkdir(parents=True, exist_ok=True)
             history = self.state_dir / "history.jsonl"
-            with history.open("a", encoding="utf-8", newline="\n") as stream:
-                stream.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n")
+            append_record(self.state_dir, record)
             self.history_writes += 1
             if self.history_writes % 100 == 0 and history.stat().st_size > 5 * 1024 * 1024:
                 self.prune_history(history)
@@ -106,23 +114,12 @@ class Router:
     def prune_history(self, history):
         try:
             days = int(read_config(self.config_path).get("history_days", 90))
-            cutoff = 0 if days <= 0 else time.time() - days * 86400
-            lines = history.read_text(encoding="utf-8").splitlines()
-            kept = []
-            for line in lines[-20000:]:
-                try:
-                    if float(json.loads(line).get("time", 0)) >= cutoff:
-                        kept.append(line)
-                except (ValueError, TypeError, json.JSONDecodeError):
-                    continue
-            temp = history.with_suffix(".tmp")
-            temp.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
-            os.replace(temp, history)
+            compact_history(self.state_dir, days)
         except (OSError, ValueError, KeyError):
             pass
 
     def new_decision(self, tid, model, effort, model_reason, effort_reason, source, previous_model=None, signal=None,
-                     agent_category=None, agent_confidence=None, continuity_strategy=None):
+                     agent_category=None, agent_confidence=None, continuity_strategy=None, routing_policy=None):
         previous_decision = self.current_decisions.get(tid)
         if previous_decision and signal == "retry":
             self.record_history("decision_signal", decision_id=previous_decision, thread=tid, signal="retry")
@@ -132,15 +129,21 @@ class Router:
         title = self.threads.get(tid, {}).get("name") or (tid[:8] if tid else "Sin título")
         self.current_decisions[tid] = decision_id
         if agent_category:
-            self.thread_categories[tid] = {"agent_category": agent_category,
-                                           "agent_confidence": agent_confidence or "baja"}
-        self.threads.setdefault(tid, {}).pop("tokens", None)
+            self.thread_categories.setdefault(tid, {}).update(agent_category=agent_category,
+                                                             agent_confidence=agent_confidence or "baja")
+        row = self.threads.setdefault(tid, {})
+        for field in ("tokens", "observed_model", "observed_effort", "inference_source", "evidence_confidence",
+                      "accepted_model", "accepted_effort", "completed_at", "turn_id"):
+            row.pop(field, None)
+        row["decision_started_at"] = time.time()
+        self.save_task(tid, {"agent_category": agent_category,
+                             "agent_confidence": agent_confidence, **row})
         self.record_history("decision_created", decision_id=decision_id, thread=tid, title=title,
                             model=model, effort=effort, previous_model=previous_model,
                             model_reason=model_reason, effort_reason=effort_reason, source=source,
                             agent_category=agent_category, agent_confidence=agent_confidence, status="pending",
                             task_mode="manual" if source == "manual" else "agent" if source == "agent" else "automatic",
-                            continuity_strategy=continuity_strategy)
+                            continuity_strategy=continuity_strategy, **(routing_policy or {}))
         return decision_id
 
     def log(self, event):
@@ -153,7 +156,8 @@ class Router:
             self.state_dir.mkdir(parents=True, exist_ok=True)
             target = self.state_dir / ("status-%s.json" % os.getpid())
             temp = target.with_suffix(".tmp")
-            temp.write_text(json.dumps({"version": 2, "product_version": PRODUCT_VERSION, "pid": os.getpid(), "events": self.events,
+            temp.write_text(json.dumps({"version": 3, "storage_schema": 3, "product_version": BUILD[0], "build_id": BUILD[1],
+                                       "routing_policy_version": POLICY_VERSION, "pid": os.getpid(), "events": self.events,
                                        "heartbeat": time.time(), "threads": self.inventory.visible(self.threads),
                                        "client_name": self.client_name, "handshake_complete": self.handshake_complete,
                                        "inventory_synced_at": self.inventory.synced_at,
@@ -174,6 +178,13 @@ class Router:
             return
         with self.lock:
             now = time.time()
+            event_id = record.get("event_id")
+            if event_id and event_id in self.inference_ids:
+                return
+            if event_id:
+                self.inference_ids.add(event_id)
+                if len(self.inference_ids) > 8192:
+                    self.inference_ids = {event_id}
             self.stats["telemetry_events"] += 1
             candidates = []
             for tid, row in self.threads.items():
@@ -185,13 +196,19 @@ class Router:
                 # old history to be attributed to a new inference.
                 if status == "completed":
                     try:
-                        recent_completion = now - float(row.get("updated", 0)) <= 15
+                        recent_completion = now - float(row.get("completed_at", 0)) <= 15
                     except (TypeError, ValueError):
                         recent_completion = False
                     if not recent_completion:
                         continue
                 expected_model = row.get("phase_model") or row.get("accepted_model") or row.get("model")
                 expected_effort = row.get("phase_effort") or row.get("accepted_effort") or row.get("effort")
+                if record.get("thread_id") and record["thread_id"] != tid:
+                    continue
+                if record.get("turn_id") and record["turn_id"] != row.get("turn_id"):
+                    continue
+                if record.get("timestamp") and record["timestamp"] < row.get("decision_started_at", 0):
+                    continue
                 if model == expected_model and (not effort or not expected_effort or effort == expected_effort):
                     candidates.append((tid, row))
             if len(candidates) != 1:
@@ -199,12 +216,21 @@ class Router:
                 self.log({"event": "inference_unattributed", "model": model, "effort": effort})
                 return
             tid, row = candidates[0]
+            confirmed = bool(record.get("turn_id") and record.get("thread_id"))
+            if not confirmed:
+                # A model match is useful health evidence, never proof of the
+                # inference used by this decision. Do not populate observed_*.
+                self.stats["telemetry_probable"] = self.stats.get("telemetry_probable", 0) + 1
+                self.record_history("inference_probable", decision_id=self.current_decisions.get(tid),
+                                    thread=tid, evidence_confidence="probable", inference_source="otlp_loopback")
+                return
             row.update(observed_model=model, observed_effort=effort,
-                       inference_source="otlp_loopback", updated=time.time())
+                       inference_source="otlp_loopback", evidence_confidence="confirmed")
             self.stats["telemetry_confirmed"] += 1
             self.record_history("inference_observed", decision_id=self.current_decisions.get(tid), thread=tid,
                                 title=row.get("name"), status=row.get("status"), observed_model=model,
                                 observed_effort=effort, inference_source="otlp_loopback",
+                                evidence_confidence="confirmed",
                                 phase_status=row.get("phase_status"), phase_name=row.get("phase_name"),
                                 phase_pipeline=row.get("phase_pipeline"), pipeline_mode="observation")
             self.log({"event": "inference_observed", "thread": tid, "model": model, "effort": effort})
@@ -281,6 +307,7 @@ class Router:
                             row = self.threads.setdefault(tid, {})
                             row.update({**accepted, "confirmation": "Aceptado por Codex", "status": "inProgress",
                                         "updated": time.time(),
+                                        "turn_id": (result.get("turn") or {}).get("id") or row.get("turn_id"),
                                         "accepted_model": accepted.get("model"), "accepted_effort": accepted.get("effort"),
                                         **phase_update(row, "accepted", model=accepted.get("model"), effort=accepted.get("effort"))})
                             self.stats["accepted"] += 1
@@ -310,7 +337,7 @@ class Router:
                 if method == "turn/started":
                     self.active.add(tid)
                     row = self.threads.setdefault(tid, {})
-                    row.update(status="inProgress", updated=time.time(), **phase_update(row, "active"))
+                    row.update(status="inProgress", turn_id=(params.get("turn") or {}).get("id"), updated=time.time(), **phase_update(row, "active"))
                     self.record_history("phase_started", decision_id=self.current_decisions.get(tid), thread=tid,
                                         **phase_update(row, "active"))
                 elif method == "turn/completed":
@@ -319,7 +346,7 @@ class Router:
                     status = params.get("turn", {}).get("status", "completed")
                     row = self.threads.setdefault(tid, {})
                     phase_status = "completed" if status == "completed" else "failed"
-                    row.update(status=status, updated=time.time(), **phase_update(row, phase_status))
+                    row.update(status=status, completed_at=time.time(), updated=time.time(), **phase_update(row, phase_status))
                     self.log({"event": "turn_completed", "thread": tid})
                     row = self.threads.get(tid, {})
                     tokens = row.get("tokens") or {}
@@ -356,6 +383,34 @@ class Router:
                             row.setdefault("confirmation", "Configurado; sin envío observado")
                 elif method in ("item/started", "item/completed"):
                     item = params.get("item", {})
+                    if method == "item/completed" and item.get("type") in ("agentMessage", "assistantMessage", "message"):
+                        text = item.get("text") or item.get("content") or ""
+                        if isinstance(text, list):
+                            text = "\n".join(part.get("text", "") for part in text if isinstance(part, dict))
+                        if isinstance(text, str):
+                            context = summarize_response_context(text)
+                            if context:
+                                # A progress item can report completion of a
+                                # substep without closing the whole task.
+                                if (item.get("phase") or item.get("channel")) in ("commentary", "analysis"):
+                                    context["completed"] = False
+                                    context["response_kind"] = "progress"
+                                row = self.threads.setdefault(tid, {})
+                                row["response_context"] = context
+                                contract = merge_contract(row.get("task_contract") or {"floor": row.get("task_floor")}, context)
+                                row["task_contract"] = contract
+                                row["task_floor"] = contract.get("floor") if contract.get("status") == "pending" else None
+                                self.save_task(tid, row)
+                                self.record_history("task_context", thread=tid, title=row.get("name"),
+                                                    task_floor=row.get("task_floor") or "cleared")
+                                if context.get("has_plan") and context.get("plan_steps"):
+                                    planned = proposed_phase(row.get("model"), row.get("model"), row.get("effort"),
+                                                             row.get("agent_category"), context["plan_steps"])
+                                    row["phase_pipeline"] = planned["phase_pipeline"]
+                                    row.update(**phase_update(row, row.get("phase_status", "active")))
+                                    self.record_history("phase_plan_updated", thread=tid, decision_id=self.current_decisions.get(tid),
+                                                        phase_pipeline=row["phase_pipeline"], pipeline_mode="plan_and_observation")
+                                row["updated"] = time.time()
                     if item.get("type") == "collabAgentToolCall":
                         for receiver in item.get("receiverThreadIds", []):
                             row = self.threads.setdefault(receiver, {})
@@ -406,7 +461,7 @@ class Router:
             result, self.outbound = self.outbound, []
             return result
 
-    def client_line(self, raw):
+    def client_line(self, raw, mode_at_submission=None):
         try:
             message = json.loads(raw)
             if not isinstance(message, dict):
@@ -438,9 +493,10 @@ class Router:
                     self.log({"event": "preserved", "reason": "active_turn", "thread": tid})
                     return raw
                 self.pending.add(tid)
-                mode_at_submission = read_mode(self.state_dir, tid)
-                routed = self.route_turn(message, raw, mode_at_submission)
-                if routed == raw and "id" in message:
+                mode_at_submission = mode_at_submission or read_mode(self.state_dir, tid)
+            routed = self.route_turn(message, raw, mode_at_submission)
+            with self.lock:
+                if routed == raw and "id" in message and message["id"] not in self.accepted_routes:
                     self.observe_preserved(message, mode_at_submission)
                 return routed
         except (ValueError, KeyError, TypeError, AttributeError, OSError) as error:
@@ -471,7 +527,29 @@ class Router:
                 "model_reason": model_reason, "effort_reason": effort_reason, "source": source,
                 "agent_category": category, "agent_confidence": confidence, "decision_id": decision_id}
 
+    def cancel_prepared(self, message):
+        with self.lock:
+            tid, request = message["params"].get("threadId"), message.get("id")
+            self.pending.discard(tid)
+            self.requests.pop(request, None)
+            self.accepted_routes.pop(request, None)
+            self.sync_after_ack.pop(request, None)
+            row = self.threads.get(tid, {})
+            row.update(status="interrupted", completed_at=time.time(), **phase_update(row, "failed"))
+            self.record_history("decision_completed", decision_id=self.current_decisions.get(tid), thread=tid, status="interrupted")
+
+    def classify_external(self, config, state, candidates):
+        self.lock.release()
+        try:
+            return run_jev(config, self.state_dir, state, candidates)
+        finally:
+            self.lock.acquire()
+
     def route_turn(self, message, raw, mode_at_submission=None):
+        with self.lock:
+            return self._route_turn_locked(message, raw, mode_at_submission)
+
+    def _route_turn_locked(self, message, raw, mode_at_submission=None):
         params = message["params"]
         tid = params.get("threadId")
         if (mode_at_submission or read_mode(self.state_dir, tid)) == "manual":
@@ -504,54 +582,64 @@ class Router:
             # A fresh thread's default Astra isn't evidence of a complex task.
             if not state.get("seen_turn"):
                 previous = None
-        route, reasons = select_route_details(text, routes, previous, state.get("effort"), has_attachments(items))
+        response_context = effective_context(state)
+        route, reasons = select_route_details(text, routes, previous, state.get("effort"), has_attachments(items), response_context)
+        if reasons.get("new_task"):
+            state.pop("task_floor", None)
+            state.pop("response_context", None)
+            state.pop("task_contract", None)
+            for key in ("task_floor", "task_contract"):
+                self.thread_categories.get(tid, {}).pop(key, None)
+            self.save_task(tid, state)
+            self.record_history("task_context", thread=tid, title=state.get("name"), task_floor="cleared")
         baseline_route, baseline_reasons = dict(route), dict(reasons)
+        if reasons.get("quality_floor") in ("normal", "complex", "critical"):
+            contract = merge_contract(state.get("task_contract"), {
+                "implementation_pending": True, "work_floor": reasons["quality_floor"],
+                "plan_steps": plan_steps(text), "awaiting_approval": False})
+            state["task_contract"], state["task_floor"] = contract, contract.get("floor")
+            self.save_task(tid, state)
+        steps = plan_steps(text) or (state.get("task_contract") or {}).get("plan_steps")
         category, confidence = classify_agent_identity(text, state.get("name", ""), has_attachments(items),
                                                        baseline_reasons["model"], state.get("agent_category"))
         engine_name = config.get("routing_engine", ENGINE_RULES)
         if engine_name not in ENGINES:
             engine_name = ENGINE_RULES
-        candidates = candidate_routes(routes, self.catalog)
-        tiers = ("simple", "normal", "complex", "critical")
-        baseline_tier = next((tier for tier, item in routes.items() if item["model"] == baseline_route["model"]), "simple")
-        quality_sensitive = category in ("interface", "audit", "research", "architecture") or baseline_tier in ("complex", "critical")
-        if quality_sensitive:
-            floor = tiers.index(baseline_tier)
-            candidates = {key: item for key, item in candidates.items() if tiers.index(item["tier"]) >= floor}
-        # JEV must decide whether a follow-up keeps its route. The previous
-        # local continuation shortcut is retained only for engines that do not
-        # expose an explicit strategy answer.
+        # Identity/title and an ambiguous fallback tier are not quality evidence.
+        # Only current workload signals or an instruction to resume known work
+        # establish a floor. Continuity is independent of the proposed route.
+        routing_policy = {key: reasons[key] for key in ("request_kind", "quality_floor", "max_effort_allowed", "min_effort")}
+        routing_policy["routing_policy_version"] = POLICY_VERSION
+        candidates = candidate_routes(routes, self.catalog, routing_policy)
         external_allowed = reasons.get("source") == "automatic" and bool(candidates)
         state_for_engine = build_state(text, attachment_summary(items), current, state.get("effort"), reasons.get("signal") == "retry")
-        state_for_engine["quality_floor"] = baseline_tier if quality_sensitive else None
+        state_for_engine.update(routing_policy)
+        if response_context:
+            state_for_engine["previous_response_context"] = response_context
         engine_result = {"engine": ENGINE_RULES, "status": "ok", "latency_ms": 0,
                          "route": {"model": route["model"], "effort": route["effort"]}, "engine_model": "local-policy"}
         if external_allowed and engine_name == ENGINE_JEV:
-            engine_result = run_jev(config, self.state_dir, state_for_engine, candidates)
+            engine_result = self.classify_external(config, state_for_engine, candidates)
         engine_applied = False
         if engine_result.get("engine") != ENGINE_RULES and engine_result.get("status") == "ok" and engine_result.get("route"):
             proposed = engine_result["route"]
-            # JEV may optimize within the candidate set, but never below a
-            # local quality floor for UI, audit, research and complex work.
-            strict = quality_sensitive
             continuity_strategy = engine_result.get("continuity_strategy")
             chosen_route = {"model": proposed["model"], "effort": proposed["effort"]}
-            if (engine_name == ENGINE_JEV and continuity_strategy == "continue" and current and state.get("effort")
-                    and current in self.catalog and state.get("effort") in self.catalog[current]):
-                chosen_route = {"model": current, "effort": state["effort"]}
-            chosen_tier = next((tier for tier, item in routes.items() if item["model"] == chosen_route["model"]), "simple")
-            if not strict or tiers.index(chosen_tier) >= tiers.index(baseline_tier):
+            if any(item["model"] == chosen_route["model"] and item["effort"] == chosen_route["effort"] for item in candidates.values()):
                 route = chosen_route
                 engine_applied = True
                 label = "Jev"
                 if engine_name == ENGINE_JEV and continuity_strategy == "continue":
-                    reasons["model"] = "Jev decidió continuar con el modelo actual"
-                    reasons["effort"] = "Jev decidió conservar el nivel de razonamiento actual"
+                    reasons["model"] = "Jev continuó la tarea y eligió %s" % proposed.get("label", route["model"])
+                    reasons["effort"] = "Jev reevaluó el razonamiento necesario para este seguimiento"
                 else:
                     reasons["model"] = "%s reconsideró la petición y eligió %s" % (label, proposed.get("label", route["model"]))
                     reasons["effort"] = "%s propuso este nivel de razonamiento para la complejidad observada" % label
             else:
                 engine_result["status"] = "guardrail"
+                engine_result["engine_failure"] = "route_outside_policy"
+                reasons["model"] = "Jev propuso una combinación fuera de los límites de la petición; " + baseline_reasons["model"]
+                reasons["effort"] = "respaldo local: " + baseline_reasons["effort"]
         elif engine_name != ENGINE_RULES and external_allowed:
             label = "Jev"
             failure = {"invalid": "respondió sin una elección única válida",
@@ -566,8 +654,15 @@ class Router:
             effort = "max"
             reasons["effort"] += "; Ultra no está disponible para este modelo, se utiliza Máx."
         if effort not in self.catalog.get(model, set()):
-            self.log({"event": "preserved", "thread": tid, "reason": "catalog_unavailable"})
-            return raw
+            if reasons.get("source") == "automatic" and candidates:
+                alternative = next(iter(candidates.values()))
+                model, effort = alternative["model"], alternative["effort"]
+                reasons["model"] = "combinación disponible que cumple los mínimos de la tarea"
+                reasons["effort"] = "mínimo compatible con el catálogo de esta instalación"
+                effective_engine, engine_applied = ENGINE_RULES, False
+            else:
+                self.log({"event": "preserved", "thread": tid, "reason": "catalog_unavailable"})
+                return raw
         changed = copy.deepcopy(message)
         changed["params"]["model"] = model
         changed["params"]["effort"] = effort
@@ -577,12 +672,12 @@ class Router:
         tier = next(t for t, r in routes.items() if r["model"] == model)
         continuity_strategy = engine_result.get("continuity_strategy") if engine_applied and engine_name == ENGINE_JEV else None
         decision_id = self.new_decision(tid, model, effort, reasons["model"], reasons["effort"], reasons["source"],
-                                        current, reasons.get("signal"), category, confidence, continuity_strategy)
+                                        current, reasons.get("signal"), category, confidence, continuity_strategy, routing_policy)
         self.record_engine_comparisons(config, decision_id, tid, candidates, state_for_engine, engine_name,
                                        engine_result, baseline_route, external_allowed)
         self.record_history("decision_routed", decision_id=decision_id, thread=tid, model=model, effort=effort,
                             routing_engine=effective_engine, engine_applied=engine_applied,
-                            continuity_strategy=continuity_strategy, **proposed_phase(current, model, effort, category))
+                            continuity_strategy=continuity_strategy, **proposed_phase(current, model, effort, category, steps))
         decision = {"model": model, "effort": effort, "reason": reasons["model"],
                     "model_reason": reasons["model"], "effort_reason": reasons["effort"],
                     "source": reasons["source"], "agent_category": category,
@@ -591,7 +686,7 @@ class Router:
                     "engine_status": engine_result.get("status"), "engine_confidence": engine_result.get("confidence"),
                     "engine_latency_ms": engine_result.get("latency_ms"), "engine_applied": engine_applied,
                     "continuity_strategy": continuity_strategy}
-        decision.update(proposed_phase(current, model, effort, category))
+        decision.update(proposed_phase(current, model, effort, category, steps))
         self.threads.setdefault(tid, {}).update(tier=tier, seen_turn=True, requested_model=model,
                                               requested_effort=effort, status="pending", updated=time.time(), **decision)
         if "id" in message:
@@ -605,7 +700,16 @@ class Router:
 
     def record_engine_comparisons(self, config, decision_id, tid, candidates, state, active_engine, active_result, baseline_route, allowed):
         """Record comparable, content-free engine choices. Shadow engines never affect Codex."""
-        results = [active_result]
+        def record(result, active):
+            proposed = result.get("route") or {}
+            self.record_history("engine_comparison", decision_id=decision_id, thread=tid, routing_engine=result.get("engine", ENGINE_RULES),
+                                engine_active=active, engine_model=result.get("engine_model"), engine_status=result.get("status"),
+                                engine_confidence=result.get("confidence"), engine_latency_ms=result.get("latency_ms"),
+                                engine_failure=result.get("engine_failure"), engine_input_tokens=result.get("engine_input_tokens"),
+                                engine_output_tokens=result.get("engine_output_tokens"), engine_cached_tokens=result.get("engine_cached_tokens"),
+                                proposed_model=proposed.get("model"), proposed_effort=proposed.get("effort"),
+                                continuity_strategy=result.get("continuity_strategy"))
+        record(active_result, True)
         shadows = config.get("comparison_engines") or []
         seen = {active_result.get("engine", ENGINE_RULES), active_engine}
         if allowed:
@@ -614,19 +718,18 @@ class Router:
                     continue
                 seen.add(name)
                 if name == ENGINE_RULES:
-                    results.append({"engine": ENGINE_RULES, "status": "ok", "latency_ms": 0,
-                                    "route": baseline_route, "engine_model": "local-policy"})
+                    record({"engine": ENGINE_RULES, "status": "ok", "latency_ms": 0,
+                            "route": baseline_route, "engine_model": "local-policy"}, False)
                 elif name == ENGINE_JEV:
-                    results.append(run_jev(config, self.state_dir, state, candidates))
-        for index, result in enumerate(results):
-            proposed = result.get("route") or baseline_route
-            self.record_history("engine_comparison", decision_id=decision_id, thread=tid, routing_engine=result.get("engine", ENGINE_RULES),
-                                engine_active=index == 0, engine_model=result.get("engine_model"), engine_status=result.get("status"),
-                                engine_confidence=result.get("confidence"), engine_latency_ms=result.get("latency_ms"),
-                                engine_failure=result.get("engine_failure"), engine_input_tokens=result.get("engine_input_tokens"),
-                                engine_output_tokens=result.get("engine_output_tokens"), engine_cached_tokens=result.get("engine_cached_tokens"),
-                                proposed_model=proposed.get("model"), proposed_effort=proposed.get("effort"),
-                                continuity_strategy=result.get("continuity_strategy"))
+                    if SHADOW_SLOTS.acquire(blocking=False):
+                        def compare():
+                            try:
+                                record(run_jev(config, self.state_dir, state, candidates), False)
+                            finally:
+                                SHADOW_SLOTS.release()
+                        threading.Thread(target=compare, daemon=True).start()
+                    else:
+                        record({"engine": ENGINE_JEV, "status": "skipped", "engine_failure": "busy"}, False)
 
 
 def copy_bytes(source, target):
@@ -674,7 +777,7 @@ def main():
         try:
             telemetry = LocalInferenceTelemetry(router.observe_inference)
             router.set_telemetry(telemetry)
-            args = with_loopback_telemetry(args, telemetry.endpoint)
+            args = with_loopback_telemetry(args, telemetry.endpoint, telemetry.token)
         except OSError:
             telemetry = None
     try:
@@ -695,6 +798,12 @@ def main():
                 "inference_telemetry": bool(telemetry)})
     heartbeat_stop = threading.Event()
     write_lock = threading.Lock()
+    output_lock = threading.Lock()
+
+    def write_client(data):
+        with output_lock:
+            sys.stdout.buffer.write(data)
+            sys.stdout.buffer.flush()
 
     def write_native(data):
         with write_lock:
@@ -718,13 +827,16 @@ def main():
                     return
     threading.Thread(target=heartbeat_worker, daemon=True).start()
 
+    dispatcher = Dispatcher(router, write_native, write_client)
+
     def input_worker():
         try:
             for line in input_lines(sys.stdin.buffer, heartbeat_stop):
-                write_native(router.client_line(line))
+                dispatcher.submit(line)
         except (ValueError, BrokenPipeError, OSError):
             pass
         finally:
+            dispatcher.close()
             try:
                 with write_lock:
                     proc.stdin.close()
@@ -739,8 +851,7 @@ def main():
         for line in proc.stdout:
             forward = router.server_line(line)
             if forward is not False:
-                sys.stdout.buffer.write(line)
-                sys.stdout.buffer.flush()
+                write_client(line)
             for command in router.drain_outbound():
                 try:
                     write_native((json.dumps(command) + "\n").encode())

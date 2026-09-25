@@ -3,7 +3,8 @@ import unittest
 import urllib.error
 from unittest.mock import patch
 
-from decision_engines import engine_failure, engine_usage, run_jev
+from decision_engines import candidate_routes, engine_failure, engine_usage, run_jev
+from routing import DEFAULT_ROUTES, EFFORTS, select_route_details
 
 
 class DecisionEngineTests(unittest.TestCase):
@@ -11,6 +12,28 @@ class DecisionEngineTests(unittest.TestCase):
         "simple_low": {"model": "gpt-5.6-luna", "effort": "low", "label": "Luna · low", "description": "Traducción breve"},
         "critical_high": {"model": "gpt-6-astra", "effort": "high", "label": "Astra · high", "description": "Revisión visual"},
     }
+
+    def test_candidates_require_evidence_for_maximum_and_keep_real_quality_floors(self):
+        catalog = {route["model"]: set(EFFORTS) for route in DEFAULT_ROUTES.values()}
+        cases = [
+            ("Parece que ahora si esta funcionando", "critical", "max", False, {"simple", "normal"}),
+            ("Ok, perfecto", "critical", "max", False, {"simple", "normal"}),
+            ("Adelante, impleméntalo", "critical", "max", False, {"critical"}),
+            ("Investiga una condición de carrera entre servicios", None, None, False, {"complex", "critical"}),
+            ("Audita de forma exhaustiva la autenticación", None, None, True, {"critical"}),
+            ("Sigue fallando", "critical", "xhigh", True, {"critical"}),
+            ("Sigue fallando", "critical", "high", False, {"critical"}),
+            ("Tengo una duda sobre esto", "critical", "max", False, {"simple", "normal", "complex", "critical"}),
+        ]
+        for prompt, previous, effort, allow_max, tiers in cases:
+            with self.subTest(prompt=prompt, effort=effort):
+                _, policy = select_route_details(prompt, DEFAULT_ROUTES, previous, effort)
+                choices = candidate_routes(DEFAULT_ROUTES, catalog, policy)
+                self.assertEqual("critical_max" in choices, allow_max)
+                self.assertEqual({item["tier"] for item in choices.values()}, tiers)
+        choices = candidate_routes(DEFAULT_ROUTES, catalog, {"max_effort_allowed": True})
+        descriptions = [choices["critical_" + effort]["description"] for effort in ("high", "xhigh", "max")]
+        self.assertEqual(len(set(descriptions)), 3)
 
     def test_safe_usage_and_failure_classes_do_not_contain_provider_content(self):
         self.assertEqual(engine_usage({"usage": {"input_tokens": 8, "output_tokens": 2, "cached_input_tokens": 1}}),

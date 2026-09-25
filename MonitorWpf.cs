@@ -26,6 +26,7 @@ internal sealed partial class ModernRouterMonitor : Window
     const string WindowTitle = "Codex automático · Monitor";
     static readonly string Root = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".."));
     static readonly string ProductVersion = ReadProductVersion();
+    static readonly string ProductBuildId = ReadProductBuildId();
     static readonly string StateFolder = Path.Combine(Root, "state");
     static readonly string UiStatePath = Path.Combine(StateFolder, "monitor-ui.json");
     static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = 8 * 1024 * 1024 };
@@ -333,7 +334,7 @@ internal sealed partial class ModernRouterMonitor : Window
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         Grid.SetColumn(pauseButton, 0); footer.Children.Add(pauseButton);
-        var version = Txt("v" + ProductVersion, 10, Muted);
+        var version = versionLabel;
         version.ToolTip = "Versión de Codex automático";
         Grid.SetColumn(version, 2); footer.Children.Add(version);
         Grid.SetRow(footer, 5); expandedView.Children.Add(footer);
@@ -349,10 +350,19 @@ internal sealed partial class ModernRouterMonitor : Window
     {
         try
         {
-            var value = File.ReadAllText(Path.Combine(Root, "VERSION")).Trim();
+            var info = (System.Reflection.AssemblyInformationalVersionAttribute)Attribute.GetCustomAttribute(
+                System.Reflection.Assembly.GetExecutingAssembly(), typeof(System.Reflection.AssemblyInformationalVersionAttribute));
+            var value = info != null ? info.InformationalVersion.Split('+')[0] : "sin identificar";
             return value.Length > 0 && value.Length <= 20 ? value : "0.1.0";
         }
         catch { return "0.1.0"; }
+    }
+
+    static string ReadProductBuildId()
+    {
+        var info = (System.Reflection.AssemblyInformationalVersionAttribute)Attribute.GetCustomAttribute(
+            System.Reflection.Assembly.GetExecutingAssembly(), typeof(System.Reflection.AssemblyInformationalVersionAttribute));
+        return info != null && info.InformationalVersion.Contains("+") ? info.InformationalVersion.Split('+')[1] : "";
     }
 
     void BuildTray(string iconPath)
@@ -598,16 +608,20 @@ internal sealed partial class ModernRouterMonitor : Window
             var telemetry = new Dictionary<string, double>();
             bool telemetryAvailable = false;
             int connected = 0, modern = 0;
+            var bridgeVersions = new HashSet<string>();
+            bool bridgeBuildMismatch = false;
             foreach (var file in Directory.GetFiles(StateFolder, "status-*.json").OrderBy(File.GetLastWriteTimeUtc))
             {
                 Dictionary<string, object> data;
                 try
                 {
                     data = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(file));
+                    if (String(data, "client_name") == "other") continue;
                     int pid = Convert.ToInt32(data["pid"]);
                     using (var process = Process.GetProcessById(pid))
                     {
-                        if (process.HasExited || !process.ProcessName.StartsWith("python", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (process.HasExited || !(process.ProcessName.StartsWith("python", StringComparison.OrdinalIgnoreCase) ||
+                            process.ProcessName.Equals("codex-router-core", StringComparison.OrdinalIgnoreCase))) continue;
                         // A Windows PID may be reused long after an old snapshot was written.
                         if (process.StartTime.ToUniversalTime() > File.GetLastWriteTimeUtc(file).AddSeconds(5)) continue;
                     }
@@ -615,6 +629,8 @@ internal sealed partial class ModernRouterMonitor : Window
                 }
                 catch { continue; }
                 connected++;
+                bridgeVersions.Add(String(data, "product_version", "desconocida"));
+                if (ProductBuildId != "" && String(data, "build_id") != "" && String(data, "build_id") != ProductBuildId) bridgeBuildMismatch = true;
                 if (data.ContainsKey("telemetry"))
                 {
                     var health = Dict(data["telemetry"]);
@@ -622,7 +638,7 @@ internal sealed partial class ModernRouterMonitor : Window
                     foreach (var key in new[] { "requests", "records_scanned", "eligible_records", "events_without_model", "unrecognized_records", "invalid_requests", "unexpected_path" })
                         telemetry[key] = telemetry.ContainsKey(key) ? telemetry[key] + Number(health, key) : Number(health, key);
                     var stats = Dict(data.ContainsKey("stats") ? data["stats"] : null);
-                    foreach (var key in new[] { "telemetry_events", "telemetry_confirmed", "telemetry_unattributed" })
+                    foreach (var key in new[] { "telemetry_events", "telemetry_confirmed", "telemetry_probable", "telemetry_unattributed" })
                         telemetry[key] = telemetry.ContainsKey(key) ? telemetry[key] + Number(stats, key) : Number(stats, key);
                 }
                 if (data.ContainsKey("threads"))
@@ -643,6 +659,10 @@ internal sealed partial class ModernRouterMonitor : Window
                     }
                 }
             }
+            versionLabel.Text = "v" + ProductVersion + (bridgeVersions.Any(v => v != ProductVersion) ? " · puente " + System.String.Join(", ", bridgeVersions) : bridgeBuildMismatch ? " · reinicio pendiente" : "");
+            versionLabel.Foreground = bridgeBuildMismatch || bridgeVersions.Any(v => v != ProductVersion) ? Warning : Muted;
+            versionLabel.ToolTip = "Monitor " + ProductVersion + ". Puentes activos: " + System.String.Join(", ", bridgeVersions) +
+                (bridgeBuildMismatch || bridgeVersions.Any(v => v != ProductVersion) ? ". Reinicia Desktop y el monitor al terminar tus tareas para cargar la versión instalada." : ".") + " Build del monitor: " + ProductBuildId;
             var ordered = rows.OrderByDescending(x => Active(String(x.Value, "status"))).ThenByDescending(x => Number(x.Value, "updated")).ToList();
             var focus = ordered.FirstOrDefault();
             int active = ordered.Count(x => Active(String(x.Value, "status")));

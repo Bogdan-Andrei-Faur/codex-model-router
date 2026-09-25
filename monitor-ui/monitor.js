@@ -121,7 +121,7 @@ function openHistory(id) {
   showTab('history');
 }
 function explanation(parent,label,value,kind='') {const box=el('div','reason-card'+(kind?' '+kind:''));box.append(el('h3','',label),el('p','',value || 'Registro anterior sin explicación separada.'));parent.append(box);}
-function continuity(value) {return value==='continue'?'Jev consideró que es un seguimiento directo y conservó la configuración anterior.':value==='reassess'?'Jev consideró que esta petición debía evaluarse de nuevo antes de elegir modelo y razonamiento.':'';}
+function continuity(value) {return value==='continue'?'Jev identificó trabajo pendiente y reevaluó el modelo y el razonamiento para continuarlo.':value==='reassess'?'Jev consideró que esta petición debía evaluarse de nuevo antes de elegir modelo y razonamiento.':'';}
 function phaseStatus(value) {return ({proposed:'Fase propuesta',accepted:'Aceptada por Codex',active:'Fase activa',observed:'Modelo observado',completed:'Fase completada',blocked:'Cambio bloqueado',failed:'Fase con incidencia'}[value] || 'Fase sin confirmar');}
 function pipeline(parent,row) {
   const phases=Array.isArray(row.phase_pipeline)?row.phase_pipeline:[];
@@ -136,7 +136,7 @@ function executionEvidence(parent,row) {
   if(row.model)lines.push('Propuesto por el selector · '+C.model(row.model)+' · '+(C.efforts[row.effort]||'Sin confirmar'));
   if(row.accepted_model)lines.push('Aceptado por Codex · '+C.model(row.accepted_model)+' · '+(C.efforts[row.accepted_effort]||'Sin confirmar'));
   if(row.configured_model)lines.push('Configuración publicada · '+C.model(row.configured_model)+' · '+(C.efforts[row.configured_effort]||'Sin confirmar'));
-  if(row.observed_model)lines.push('Inferencia confirmada localmente · '+C.model(row.observed_model)+' · '+(C.efforts[row.observed_effort]||'Sin confirmar'));
+  if(row.observed_model)lines.push((row.evidence_confidence==='confirmed'?'Inferencia confirmada localmente · ':'Observación anterior sin correlación · ')+C.model(row.observed_model)+' · '+(C.efforts[row.observed_effort]||'Sin confirmar'));
   else lines.push('Inferencia real · sin confirmación disponible todavía');
   explanation(parent,'EVIDENCIA DEL MODELO',lines.join('\n'),'phase');
 }
@@ -180,7 +180,9 @@ function activity() {
 const fmt = n => Number(n||0).toLocaleString('es-ES');
 const when = n => n ? new Date(n*1000).toLocaleString('es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Fecha sin confirmar';
 const engines = {rules:'Reglas',jev:'Jev',provider:'Proveedor retirado'};
+let historyQuery='',historyOffset=0;
 function renderHistory() {
+  const searchFocus=document.activeElement?.id==='history-search',searchPosition=document.activeElement?.selectionStart;
   const page=$('history'),previousScroll=page.querySelector('.history-list')?.scrollTop || 0;
   const previousDetail=page.querySelector('.history-detail'),detailScroll=previousDetail?.scrollTop || 0,previousId=previousDetail?.dataset.decision;
   page.replaceChildren();
@@ -209,11 +211,19 @@ function renderHistory() {
     if(chosen.signal)explanation(detail,'SEÑAL DE RESULTADO',chosen.signal==='retry'?'La siguiente petición indicó que el resultado no había resuelto la tarea.':chosen.signal);
   }
   list.append(el('h3','section-title','DECISIONES RECIENTES'));
-  for(const record of history.slice(0,80)) {
+  const filtered=history.filter(d=>[d.title,C.model(d.model),C.efforts[d.effort],engines[d.routing_engine],C.status(d.status)].join(' ').toLocaleLowerCase().includes(historyQuery.toLocaleLowerCase()));
+  historyOffset=Math.min(historyOffset,Math.max(0,Math.floor((filtered.length-1)/40)*40));
+  for(const record of filtered.slice(historyOffset,historyOffset+40)) {
     const row=button('',()=>{selectedDecision=record.id;selectedThread=record.thread;renderHistory();},'history-row'+(record.id===selectedDecision?' selected':''));
     const copy=el('div','history-copy'),title=el('div','task-title',record.title || 'Tarea');title.title=record.title || 'Tarea';copy.append(title,el('div','small'+(record.error_type?' warning':''),when(record.time)+' · '+C.status(record.status)));row.append(copy,tags(record,true));list.append(row);
   }
-  detail.dataset.decision=chosen?.id || '';page.append(detail,el('div','rule'),list);list.scrollTop=previousScroll;
+  const search=el('input','history-search');search.id='history-search';search.type='search';search.placeholder='Buscar por tarea, modelo, motor o estado';search.setAttribute('aria-label',search.placeholder);search.value=historyQuery;
+  search.oninput=()=>{historyQuery=search.value;historyOffset=0;renderHistory();};
+  const pagination=el('div','choices');if(historyOffset)pagination.append(button('Anterior',()=>{historyOffset-=40;renderHistory();},'choice'));
+  pagination.append(el('span','small',filtered.length?`${historyOffset+1}–${Math.min(historyOffset+40,filtered.length)} de ${filtered.length}`:'Sin coincidencias'));
+  if(historyOffset+40<filtered.length)pagination.append(button('Siguiente',()=>{historyOffset+=40;renderHistory();},'choice'));list.append(pagination);
+  detail.dataset.decision=chosen?.id || '';page.append(detail,el('div','rule'),search,list);list.scrollTop=previousScroll;
+  if(searchFocus){search.focus();if(searchPosition!==null)search.setSelectionRange(searchPosition,searchPosition);}
   if(previousId===chosen?.id)detail.scrollTop=detailScroll;
 }
 function metric(parent,label,value,ratio=1,color='var(--accent)') {
@@ -229,6 +239,13 @@ function breakdown(parent,label,items,getKey,colors={}) {
 function statistics() {
   const page=$('statistics'),scroll=page.scrollTop,content=el('div','section');page.replaceChildren(content);
   content.append(el('h2','','Resumen de decisiones'),el('p','','Historial acumulado · se conserva entre sesiones'));
+  heading(content,'VERSIONES Y CALIDAD');
+  for(const version of [...new Set(history.map(d=>d.product_version || 'Anterior'))]){
+    const sample=history.filter(d=>(d.product_version || 'Anterior')===version),rated=sample.filter(d=>d.quality),good=rated.filter(d=>d.quality==='adequate');
+    metric(content,version+' · decisiones',sample.length+' · '+rated.length+' valoradas',sample.length/(history.length||1));
+    if(rated.length)metric(content,version+' · adecuadas',good.length+' / '+rated.length,good.length/rated.length,'var(--good)');
+  }
+  content.append(el('p','small','Valoraciones subjetivas con su muestra; disponibilidad y acuerdo entre motores no prueban calidad. Los registros anteriores no confirman una versión.'));
   const total=history.length,accepted=history.filter(d=>d.accepted).length,errors=history.filter(d=>d.error_type||['error','failed'].includes(d.status)).length,retries=history.filter(d=>d.signal==='retry').length;
   metric(content,'Decisiones con historial',fmt(total),total?1:0);metric(content,'Envíos aceptados · acumulado',fmt(accepted),accepted/(total||1));
   metric(content,'Incidencias registradas',fmt(errors),errors/(total||1),errors?'var(--warning)':'var(--good)');metric(content,'Reintentos registrados',fmt(retries),retries/(total||1),'var(--good)');
@@ -237,9 +254,10 @@ function statistics() {
   const phaseRows=history.filter(d=>d.phase_status);
   if(!phaseRows.length)content.append(el('p','','Todavía no hay estados de fase registrados'));
   else for(const [key,label] of Object.entries(phaseLabels)){const count=phaseRows.filter(d=>d.phase_status===key).length;if(count)metric(content,label,fmt(count),count/phaseRows.length,key==='blocked'||key==='failed'?'var(--warning)':'var(--accent)');}
-  const configured=history.filter(d=>d.configured_model).length,observed=history.filter(d=>d.observed_model).length;
+  const configured=history.filter(d=>d.configured_model).length,observed=history.filter(d=>d.observed_model&&d.evidence_confidence==='confirmed').length;
   metric(content,'Configuraciones publicadas',fmt(configured),configured/(total||1),'var(--good)');
   metric(content,'Inferencias confirmadas localmente',fmt(observed),observed/(total||1),observed?'var(--good)':'var(--muted)');
+  metric(content,'Coincidencias sin ID de turno',fmt(state.telemetry?.telemetry_probable || 0),1,'var(--muted)');
   heading(content,'TELEMETRÍA LOCAL');const telemetry=state.telemetry||{};
   if(!state.config.inference_telemetry)content.append(el('p','','Desactivada en Ajustes.'));
   else if(!telemetry.enabled)content.append(el('p','warning','Pendiente de reiniciar Desktop para abrir el receptor local.'));
@@ -264,6 +282,7 @@ function statistics() {
     const rows=attempts.filter(x=>x.routing_engine===key),valid=rows.filter(x=>['ok','guardrail'].includes(x.engine_status)).length,label=engines[key]||key;
     metric(content,label+' · respuestas válidas',valid+' / '+rows.length,valid/rows.length);
     const latency=rows.filter(x=>x.engine_latency_ms>0);if(latency.length)metric(content,label+' · demora media',Math.round(latency.reduce((n,x)=>n+x.engine_latency_ms,0)/latency.length)+' ms');
+    if(latency.length){const values=latency.map(x=>x.engine_latency_ms).sort((a,b)=>a-b);metric(content,label+' · latencia p50 / p95',Math.round(values[Math.ceil(values.length*.5)-1])+' / '+Math.round(values[Math.ceil(values.length*.95)-1])+' ms · n='+values.length);}
     const tokens=rows.reduce((n,x)=>n+(x.engine_input_tokens||0)+(x.engine_output_tokens||0),0);if(tokens)metric(content,label+' · tokens de clasificación',fmt(tokens));
     const confidence=rows.filter(x=>x.engine_confidence>0);if(confidence.length){const average=confidence.reduce((n,x)=>n+x.engine_confidence,0)/confidence.length;metric(content,label+' · confianza media',Math.round(average*100)+'%',average,'var(--good)');}
     const fallbacks=rows.filter(x=>x.engine_active&&x.engine_status!=='ok').length;if(fallbacks)metric(content,label+' · respaldo local',fmt(fallbacks),fallbacks/rows.length,'var(--warning)');
@@ -316,7 +335,8 @@ function settings() {
     const jev=config.jev||{},connection=jev.connection||'typesafe';heading(box,'CONEXIÓN DE JEV');
     choices(box,[['vercel','Vercel AI Gateway'],['typesafe','TypeSafe directo']],connection,v=>configure('jev.connection',v));
     box.append(el('p','small',connection==='vercel'?'Usa el modelo virtual vmc/jev de Vercel durante las pruebas.':'Conecta directamente con api.typesafe.ai usando jev-latest.'));
-    keySettings(box,'jev',connection==='vercel'?'Vercel AI Gateway':'TypeSafe');
+    keySettings(box,'jev-'+connection,connection==='vercel'?'Vercel AI Gateway':'TypeSafe');
+    if(!state.keys?.['jev-'+connection])box.append(el('p','small','Cada conexión necesita su propia clave. Si guardaste una clave en una versión anterior, introdúcela aquí una vez para vincularla a este proveedor.'));
   }
   heading(box,'POLÍTICA ACTUAL');for(const [tier,description] of [['simple','Tareas delimitadas'],['normal','Cambios concretos'],['complex','Ingeniería compleja'],['critical','UX, auditorías y gran alcance']]){const route=config.routes?.[tier];if(route){const row=el('div','policy');row.append(badge(route.model),el('span','',description),badge(route.effort,true));box.append(row);}}
   heading(box,'PRIVACIDAD');box.append(el('p','small','El historial guarda tareas, ajustes, motivos, estados y contadores. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales. Las claves se almacenan en el llavero de macOS.'));
@@ -332,7 +352,9 @@ window.receive = incoming => {
   const active=Object.values(state.threads).filter(row=>C.active(row.status)).length;
   $('connection').classList.toggle('disconnected',!state.connections);$('connection').querySelector('span').textContent=state.preview?'Vista previa · datos simulados':state.connections?`${active} ${active===1?'tarea activa':'tareas activas'}`:'Sin conexión';$('connection').querySelector('i').classList.toggle('working',active>0);
   $('pause').textContent=state.config.enabled?'Ⅱ  Pausar selección':'▶  Activar selección';
-  $('product-version').textContent='v'+(state.productVersion || '—');
+  const bridgeMismatch=(state.bridgeVersions||[]).filter(v=>v!==state.productVersion);
+  $('product-version').textContent='v'+(state.productVersion || '—')+(bridgeMismatch.length?' · puente '+bridgeMismatch.join(', '):state.bridgeBuildMismatch?' · reinicio pendiente':'');
+  $('product-version').title=(bridgeMismatch.length||state.bridgeBuildMismatch)?'Reinicia Desktop al terminar tus tareas para cargar la versión instalada.':'Versión de Codex automático';
   capsule();
   const signature=JSON.stringify([state.threads,state.history,state.connections,state.taskModes,state.telemetry]);
   const settingsChanged=oldConfig!==JSON.stringify(state.config) || oldUi!==JSON.stringify(state.ui);

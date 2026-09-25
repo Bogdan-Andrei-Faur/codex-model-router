@@ -28,23 +28,23 @@ class PlatformTests(unittest.TestCase):
             decision_engines._KEYCHAIN_CACHE.clear()
             result = subprocess.CompletedProcess([], 0, b'synthetic-test-key\n', b'')
             with patch.object(decision_engines.sys, 'platform', 'darwin'), patch.object(decision_engines.subprocess, 'run', return_value=result) as run:
-                self.assertEqual(decision_engines._keychain_key(state,'jev'), 'synthetic-test-key')
-                self.assertEqual(decision_engines._keychain_key(state,'jev'), 'synthetic-test-key')
+                self.assertEqual(decision_engines._keychain_key(state,'jev-typesafe'), 'synthetic-test-key')
+                self.assertEqual(decision_engines._keychain_key(state,'jev-typesafe'), 'synthetic-test-key')
                 self.assertEqual(run.call_count, 1)
                 args = run.call_args.args[0]
                 self.assertNotIn('synthetic-test-key', args)
-                self.assertEqual(args[-3:], ['-a','jev','-w'])
+                self.assertEqual(args[-3:], ['-a','jev-typesafe','-w'])
                 self.assertTrue(args[3].startswith('local.codex-model-router.'))
                 self.assertEqual(run.call_args.kwargs['timeout'], 45)
                 self.assertIsNone(decision_engines._keychain_key(state,'unknown'))
-            (state / 'keychain-revision.json').write_text(json.dumps({'jev':'new'}), encoding='utf-8')
+            (state / 'keychain-revision.json').write_text(json.dumps({'jev-typesafe':'new'}), encoding='utf-8')
             updated = subprocess.CompletedProcess([], 0, b'updated-test-key\n', b'')
             with patch.object(decision_engines.sys, 'platform', 'darwin'), patch.object(decision_engines.subprocess, 'run', return_value=updated) as run:
-                self.assertEqual(decision_engines._keychain_key(state,'jev'), 'updated-test-key')
+                self.assertEqual(decision_engines._keychain_key(state,'jev-typesafe'), 'updated-test-key')
                 self.assertEqual(run.call_count, 1)
             decision_engines._KEYCHAIN_CACHE.clear()
             with patch.object(decision_engines.sys, 'platform', 'darwin'), patch.object(decision_engines.subprocess, 'run', side_effect=subprocess.TimeoutExpired('security',45)):
-                self.assertIsNone(decision_engines._keychain_key(state,'jev'))
+                self.assertIsNone(decision_engines._keychain_key(state,'jev-typesafe'))
 
     def test_real_desktop_global_config_invocation(self):
         self.assertTrue(uses_stdio(["-c", "model=\"gpt-6-astra\"", "app-server", "--analytics-default-enabled", "-c", "model_reasoning_effort=\"high\""]))

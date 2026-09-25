@@ -510,7 +510,23 @@ internal sealed partial class ModernRouterMonitor
                 "Native statistics omitted phase evidence");
             results.Add("PASS: native phase pipeline, history provenance and statistics preserve unknown inference evidence");
             Check(ContainsText(expandedView, "v" + ProductVersion), "Product version is not visible in the monitor footer");
-            results.Add("PASS: product version is read from the shared VERSION file and visible in the footer");
+            results.Add("PASS: product version is embedded at build time and visible in the footer");
+            foreach (int count in new[] { 1000, 10000 })
+            {
+                string benchmark = Path.Combine(StateFolder, "review-benchmark.jsonl");
+                using (var writer = new StreamWriter(benchmark, false, new System.Text.UTF8Encoding(false)))
+                    for (int i = 0; i < count; i++) writer.WriteLine(Json.Serialize(new Dictionary<string, object> {
+                        {"event", "decision_created"}, {"decision_id", "benchmark-" + i}, {"thread", "synthetic-" + i},
+                        {"title", "Synthetic task " + i}, {"time", 1000 + i}, {"model", "gpt-5.6-terra"},
+                        {"effort", "medium"}, {"product_version", "0.3.0"}, {"routing_policy_version", 3}}));
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+                RefreshAnalytics(new List<KeyValuePair<string, Dictionary<string, object>>>(), benchmark);
+                clock.Stop();
+                Check(decisions.Count == count, "Large history lost decisions");
+                Check(historyList.Children.Count <= 43, "History rendering exceeded one page");
+                Check(clock.ElapsedMilliseconds < 5000, "Large history projection is unexpectedly slow");
+                results.Add("PASS: " + count + " decisions projected in " + clock.ElapsedMilliseconds + " ms; history rows bounded to 40");
+            }
             File.WriteAllLines(report, results); quitting = true; Close(); return 0;
         }
         catch (Exception exception)

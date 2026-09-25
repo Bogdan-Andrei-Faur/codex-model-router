@@ -24,6 +24,13 @@ internal static class Launcher
             // Recovery must work even if Python or config.local.json is broken.
             if (args.Length == 1 && (args[0] == "--remove-integration" || args[0] == "--remove-integration-json"))
                 return Disconnect(args[0].EndsWith("-json"));
+            // Release archives contain defaults only. An upgrade never replaces
+            // the user's existing configuration or state directory.
+            if (!File.Exists(ConfigPath))
+            {
+                try { File.Copy(Path.Combine(Root, "config.example.json"), ConfigPath, false); }
+                catch (IOException) { if (!File.Exists(ConfigPath)) throw; }
+            }
             var config = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(ConfigPath));
             if (args.Length == 1 && args[0] == "--open") return Manage(config, "open", true);
             if (args.Length == 1 && args[0] == "--doctor") return Manage(config, "doctor", true);

@@ -6,3 +6,7 @@ config.local.json
 *.lnk
 .DS_Store
 release/
+BUILD.json
+build_stamp.py
+node_modules/
+test-results/

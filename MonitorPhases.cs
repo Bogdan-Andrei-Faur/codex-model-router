@@ -13,7 +13,7 @@ internal sealed partial class ModernRouterMonitor
     static void CopyPhaseEvidence(Dictionary<string, object> target, Dictionary<string, object> source)
     {
         foreach (string key in new[] { "phase_status", "phase_transition", "pipeline_mode", "phase_pipeline",
-            "accepted_model", "accepted_effort", "configured_model", "configured_effort", "observed_model", "observed_effort" })
+            "accepted_model", "accepted_effort", "configured_model", "configured_effort", "observed_model", "observed_effort", "evidence_confidence" })
             if (source.ContainsKey(key)) target[key] = source[key];
     }
 
@@ -78,7 +78,7 @@ internal sealed partial class ModernRouterMonitor
         var lines = new List<string>();
         lines.Add((source == "manual" || source == "preserved" || source == "agent" ? "Solicitado" : "Propuesto") + " · " + model + " · " + effort);
         foreach (var entry in new[] { new[] { "accepted", "Aceptado por Codex" }, new[] { "configured", "Configuración publicada" },
-            new[] { "observed", "Inferencia confirmada localmente" } })
+            new[] { "observed", String(data, "evidence_confidence") == "confirmed" ? "Inferencia confirmada localmente" : "Observación anterior sin correlación" } })
         {
             string selected = String(data, entry[0] + "_model");
             if (selected != "") lines.Add(entry[1] + " · " + Model(selected) + " · " + Effort(String(data, entry[0] + "_effort")));

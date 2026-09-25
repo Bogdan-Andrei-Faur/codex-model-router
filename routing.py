@@ -1,9 +1,11 @@
 """Quality-first ES/EN policy: model and reasoning are separate choices.
 Workload mappings are personal policy, not measured superiority claims.
 """
-from dataclasses import dataclass
+from __future__ import annotations
+from dataclasses import dataclass, replace
 import re
 import unicodedata
+from workload import response_summary, starts_new_task, intent_text
 
 TIERS = ("simple", "normal", "complex", "critical")
 EFFORTS = ("low", "medium", "high", "xhigh", "max", "ultra")
@@ -21,6 +23,9 @@ class Decision:
     tier: str
     reason: str
     effort: str = "medium"
+    quality_floor: str | None = None
+    request_kind: str = "task"
+    max_effort_allowed: bool = False
 
 def normalize(text):
     return "".join(c for c in unicodedata.normalize("NFKD", text.lower()) if not unicodedata.combining(c))
@@ -62,9 +67,43 @@ def classify_agent_identity(text, title="", attachments=False, model_reason="", 
         return previous, "heredada"
     return "general", "baja"
 
-def classify(text, previous=None, attachments=False, previous_effort=None):
+def lightweight_request(intent):
+    """Recognize whole, bounded messages, never just a short prefix or length."""
+    sentence = re.sub(r"[¿?¡!.,;:]+", " ", intent)
+    sentence = re.sub(r"\s+", " ", sentence).strip()
+    acknowledgement = (
+        r"(?:(?:ok|vale|perfecto|genial|gracias|thanks|thank you|great)[ ]*)+|"
+        r"(?:parece que |looks like |it looks like )?(?:ahora |ya |now )?(?:si |it )?"
+        r"(?:esta funcionando|funciona|funciona bien|funciona correctamente|works|is working|works now|is working now)"
+    )
+    if re.fullmatch(acknowledgement, sentence):
+        return "acknowledgement"
+    status_check = (
+        r"(?:(?:ok|vale|ahora|por favor) )*"
+        r"(?:comprueba|consulta|mira|dime|verifica) "
+        r"(?:(?:cuantas|cuantos) (?:solicitudes|eventos|inferencias|registros) "
+        r"(?:de telemetria )?han llegado|(?:el estado|los contadores) (?:de la telemetria|del receptor))|"
+        r"(?:please )?(?:check|show|tell me) (?:the )?(?:telemetry counters|receiver status|"
+        r"how many (?:telemetry )?(?:requests|events|inferences) (?:have arrived|were received))"
+    )
+    if re.fullmatch(status_check, sentence):
+        return "status_check"
+    return None
+
+
+def summarize_response_context(text):
+    return response_summary(text)
+
+
+def classify(text, previous=None, attachments=False, previous_effort=None, response_context=None):
     t = normalize(text).strip()
-    intent = re.sub(r"```[\s\S]*?```", " [code] ", t)
+    intent = intent_text(text)
+    new_task = starts_new_task(text)
+    if new_task:
+        response_context = None
+        previous = None
+    if response_context and response_context.get("completed"):
+        previous = None
     previous = previous if previous in TIERS else None
     prior_effort = previous_effort if previous_effort in EFFORTS else DEFAULT_ROUTES.get(previous, {}).get("effort", "medium")
     failure = has(r"\b(sigue fallando|no funciona|mismo error|still fails|still broken|did not work|no lo has solucionado)\b", intent)
@@ -78,32 +117,79 @@ def classify(text, previous=None, attachments=False, previous_effort=None):
     investigation = has(r"\b(investiga\w*|investigate|diagnostica\w*|diagnos\w*|causa raiz|root cause|optimiza\w*|optimize|rendimiento|performance|compara\w*|trade.off)\b", intent)
     edit = has(r"\b(implement\w*|crea\w*|anade\w*|agrega\w*|construye|build|create|add|arregla\w*|corrige\w*|fix|cambia\w*|change|modifica\w*|modify|borra\w*|delete|ejecuta\w*|execute|run|configura\w*|configure|despliega\w*|deploy|instala\w*|install)\b", intent)
     simple = has(r"\b(traduce|traducir|translate|translation|resume|resumen|summarize|summary|ortografia|spelling|explica|explain|que significa|what does|que es|what is|cuanto es|how much|saluda|hola|hello|reformula|rephrase|formatea|format|titulo|title)\b", intent)
-    if risk or audit:
-        result = Decision("critical", "auditoría, revisión rigurosa o consecuencias importantes", "max" if hard and risk else "xhigh")
+    testing = has(r"\b(prueb\w*|test\w*|valid\w*|verific\w*|comprobar\w*|check\w*|smoke|e2e|regresi\w*)\b", intent)
+    broad_testing = testing and has(r"\b(tod\w*|todas|todo lo que haga falta|que haga falta|necesari\w*|exhaustiv\w*|complet\w*|integral\w*)\b", intent)
+    lightweight = lightweight_request(intent) if not attachments else None
+    prior_plan = response_context and response_context.get("implementation_pending")
+    context_floor = response_context.get("work_floor") if isinstance(response_context, dict) else None
+    bounded_transform = has(r"^(?:(?:nueva tarea|new task)\s*:\s*)?(?:traduce|traducir|translate|reformula|rephrase|formatea|format)\b", intent)
+    if bounded_transform and not attachments:
+        result = Decision("simple", "transformación delimitada del texto aportado", "low", request_kind="bounded")
+    elif risk or audit:
+        result = Decision("critical", "auditoría, revisión rigurosa o consecuencias importantes", "max" if hard and risk else "xhigh",
+                          quality_floor="critical", max_effort_allowed=bool(hard and risk))
     elif visual and (design or attachments) and not mechanical:
-        result = Decision("critical", "diseño de interfaces, UX o evaluación visual", "xhigh" if hard or has(r"redisen|redesign|ux|figma", intent) else "high")
+        result = Decision("critical", "diseño de interfaces, UX o evaluación visual", "xhigh" if hard or has(r"redisen|redesign|ux|figma", intent) else "high", quality_floor="critical")
     elif attachments and not mechanical:
-        result = Decision("critical", "interpretación de adjuntos y referencias visuales", "high")
+        result = Decision("critical", "interpretación de adjuntos y referencias visuales", "high", quality_floor="critical")
     elif (architecture and hard) or (investigation and hard) or len(t) > 10000:
-        result = Decision("critical", "trabajo amplio que requiere la máxima capacidad", "xhigh")
+        result = Decision("critical", "trabajo amplio que requiere la máxima capacidad", "xhigh", quality_floor="critical")
     elif architecture or investigation or len(t) > 4000:
-        result = Decision("complex", "ingeniería compleja con alcance definido", "xhigh" if failure else "high")
+        result = Decision("complex", "ingeniería compleja con alcance definido", "xhigh" if failure else "high", quality_floor="complex")
+    elif testing:
+        result = Decision("complex" if broad_testing else "normal",
+                          "validación técnica y pruebas de la tarea" if not broad_testing else "validación amplia con todas las pruebas necesarias",
+                          "high" if broad_testing else "medium",
+                          quality_floor="complex" if broad_testing else "normal")
+    elif lightweight:
+        if prior_plan and response_context.get("awaiting_approval") and lightweight == "acknowledgement" and not has(r"\b(gracias|thanks|thank you)\b", intent):
+            result = Decision(context_floor or "normal", "confirmación de trabajo pendiente en la respuesta anterior", "medium",
+                              quality_floor=context_floor or "normal", request_kind="planned_followup")
+        else:
+            result = Decision("simple" if lightweight == "acknowledgement" else "normal",
+                          "confirmación de resultado" if lightweight == "acknowledgement" else "consulta acotada de estado o contadores",
+                          "low" if lightweight == "acknowledgement" else "medium", request_kind=lightweight)
     elif edit:
         result = Decision("normal", "cambio concreto y comprobable", "low" if mechanical else "medium")
     elif simple and len(t) < 1800:
-        result = Decision("simple", "consulta o transformación delimitada", "medium" if has(r"explica|explain|resume|summary", intent) else "low")
+        result = Decision("simple", "consulta o transformación delimitada", "medium" if has(r"explica|explain|resume|summary", intent) else "low", request_kind="bounded")
     else:
-        result = Decision("complex", "petición ambigua: conservar capacidad", "medium")
+        result = Decision("complex", "petición ambigua: conservar capacidad", "medium", request_kind="ambiguous")
+    # The preceding assistant response is the useful context for short or
+    # elliptical follow-ups. While it reports unfinished implementation work,
+    # preserve its capability floor for every substantive continuation, not
+    # only messages beginning with a small list of acknowledgement words.
+    if (prior_plan and context_floor in TIERS and
+            result.request_kind not in ("acknowledgement", "status_check", "bounded") and
+            (result.quality_floor is None or TIERS.index(result.quality_floor) < TIERS.index(context_floor))):
+        minimum_effort = DEFAULT_ROUTES.get(context_floor, {}).get("effort", result.effort)
+        result = Decision(context_floor, "trabajo técnico pendiente en la respuesta anterior",
+                          max(result.effort, minimum_effort, key=EFFORTS.index),
+                          quality_floor=context_floor, request_kind="planned_followup")
     if failure and previous:
         index = min(TIERS.index(previous) + 1, 3)
         if index >= TIERS.index(result.tier):
             effort = "max" if previous == "critical" and prior_effort in ("xhigh", "max") else "xhigh" if index == 3 else "high"
-            result = Decision(TIERS[index], "el intento anterior no resolvió la tarea", effort)
-    new_task = has(r"\b(nueva tarea|otra tarea|cambio de tema|new task|new topic)\b", intent)
+            result = Decision(TIERS[index], "el intento anterior no resolvió la tarea", effort,
+                              quality_floor=TIERS[index], request_kind="retry", max_effort_allowed=effort == "max")
     continuation = has(r"^(si\b|yes\b|continua\b|sigue\b|adelante\b|continue\b|proceed\b|hazlo\b|do it\b|ok\b|vale\b|y ahora\b|and now\b|eso\b|lo mismo\b|that\b|ahora\b|[¿?]*por que\b|[¿?]*why\b|[¿?]*que (modelo|numero)\b)", intent)
-    if previous and continuation and not new_task and not failure:
-        if not (risk or audit or visual or architecture or investigation or edit) or TIERS.index(result.tier) <= TIERS.index(previous):
-            result = Decision(previous, "continuación: conservar modelo y razonamiento", prior_effort)
+    if previous and continuation and not new_task and not failure and result.request_kind not in ("acknowledgement", "status_check", "bounded"):
+        if result.quality_floor is None or TIERS.index(result.quality_floor) <= TIERS.index(previous):
+            # A request to carry out the agreed work needs its existing capacity.
+            # A generic follow-up is only a fallback preference, not a hard floor.
+            execute_previous = has(r"\b(continua|continue|sigue|adelante|proceed|hazlo|do it|implementalo|implementa|implement|arreglalo|ejecutalo|compruebalo)\b", intent)
+            floors = [tier for tier in (previous if execute_previous else None, result.quality_floor, context_floor) if tier in TIERS]
+            floor = max(floors, key=TIERS.index) if floors else None
+            minimum_effort = DEFAULT_ROUTES.get(floor, {}).get("effort", result.effort)
+            effort = max(prior_effort, result.effort, minimum_effort, key=EFFORTS.index) if floor else prior_effort
+            if not result.max_effort_allowed:
+                effort = min(effort, "xhigh", key=EFFORTS.index)
+            followup_kind = "planned_followup" if prior_plan and execute_previous else "work_followup" if execute_previous else "context_followup"
+            result = Decision(floor or previous, "continuación: conservar capacidad y reevaluar razonamiento", effort,
+                              quality_floor=floor, request_kind=followup_kind,
+                              max_effort_allowed=result.max_effort_allowed)
+    if result.quality_floor in ("complex", "critical") and EFFORTS.index(result.effort) < EFFORTS.index("high"):
+        result = replace(result, effort="high")
     return result
 
 def explicit_model(text, routes):
@@ -115,8 +201,8 @@ def select_route(text, routes, previous=None, previous_effort=None, attachments=
     route, reasons = select_route_details(text, routes, previous, previous_effort, attachments)
     return route, reasons["model"]
 
-def select_route_details(text, routes, previous=None, previous_effort=None, attachments=False):
-    decision = classify(text, previous, attachments, previous_effort)
+def select_route_details(text, routes, previous=None, previous_effort=None, attachments=False, response_context=None):
+    decision = classify(text, previous, attachments, previous_effort, response_context)
     explicit = explicit_model(text, routes)
     route = explicit or {"model": routes[decision.tier]["model"], "effort": decision.effort}
     t = normalize(text).split("```", 1)[0]
@@ -136,7 +222,7 @@ def select_route_details(text, routes, previous=None, previous_effort=None, atta
     if m:
         effort_reason = "nivel de razonamiento indicado explícitamente"
     elif decision.reason.startswith("continuación"):
-        effort_reason = "continuación: conservar el nivel de razonamiento anterior"
+        effort_reason = "continuación de trabajo; Máx. requiere nuevas señales de riesgo o de fallo"
     elif decision.reason.startswith("el intento anterior"):
         effort_reason = "mayor profundidad tras un intento que no resolvió la tarea"
     else:
@@ -151,7 +237,10 @@ def select_route_details(text, routes, previous=None, previous_effort=None, atta
     source = "explicit" if explicit or m else "automatic"
     retry = has(r"\b(sigue fallando|no funciona|mismo error|still fails|still broken|did not work|no lo has solucionado)\b", normalize(text))
     return route, {"model": model_reason, "effort": effort_reason, "source": source,
-                   "signal": "retry" if retry else None}
+                   "signal": "retry" if retry else None, "quality_floor": decision.quality_floor,
+                   "min_effort": ("high" if decision.quality_floor in ("complex", "critical") else "medium" if decision.quality_floor == "normal" and decision.effort != "low" else "low"),
+                   "request_kind": decision.request_kind, "max_effort_allowed": decision.max_effort_allowed,
+                   "new_task": starts_new_task(text)}
 
 def user_text(items):
     return "\n".join(x.get("text", "") for x in items if isinstance(x, dict) and x.get("type") == "text")

@@ -25,11 +25,11 @@ class PhaseTrackingTests(unittest.TestCase):
         self.assertTrue(can_switch_within_turn("gpt-5.6-terra", "gpt-5.6-sol"))
 
     def test_dynamic_plan_varies_without_claiming_internal_completion(self):
-        interface = dynamic_pipeline("interface")
-        text = dynamic_pipeline("text")
-        self.assertEqual([item["label"] for item in interface], ["Revisar interfaz", "Implementar", "Comprobar", "Ejecución en Codex"])
-        self.assertEqual([item["label"] for item in text], ["Responder", "Ejecución en Codex"])
-        self.assertEqual(interface[0]["state"], "selected")
+        interface = dynamic_pipeline("interface", steps=["design", "implement", "verify"])
+        text = dynamic_pipeline("text", steps=["document"])
+        self.assertEqual([item["label"] for item in interface], ["Diseñar", "Implementar", "Validar", "Ejecución en Codex"])
+        self.assertEqual([item["label"] for item in text], ["Documentar", "Ejecución en Codex"])
+        self.assertEqual(interface[0]["state"], "planned")
         self.assertTrue(all(item["evidence"] == "plan" for item in interface[:-1]))
         active = phase_update({"agent_category": "correction"}, "active")["phase_pipeline"]
         self.assertEqual(active[-1]["state"], "active")

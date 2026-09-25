@@ -13,7 +13,7 @@ using System.Windows.Media;
 internal sealed class DecisionRecord
 {
     public string Id, Thread, Title, Model, Effort, ModelReason, EffortReason, ContinuityStrategy, Source, Status, Signal, Error, Quality, ModelQuality, EffortQuality;
-    public string RoutingEngine, EngineModel, EngineStatus;
+    public string RoutingEngine, EngineModel, EngineStatus, ProductVersion, BuildId, PolicyVersion;
     public double EngineConfidence, EngineLatencyMs;
     public double Time, StartedTime, FinishedTime;
     public bool Accepted;
@@ -39,10 +39,15 @@ internal sealed partial class ModernRouterMonitor
     readonly List<UIElement> activityElements = new List<UIElement>();
     readonly List<DecisionRecord> decisions = new List<DecisionRecord>();
     string analyticsSignature, requestedHistoryThread;
+    bool analyticsBusy;
+    readonly Dictionary<string, Tuple<string, List<Dictionary<string, object>>>> journalCache = new Dictionary<string, Tuple<string, List<Dictionary<string, object>>>>();
     int selectedMonitorTab;
     bool analyticsConnected;
     string selectedDecisionId;
+    int historyOffset;
+    string historyQuery = "";
     readonly TextBlock analyticsFreshness = Txt("", 11, Muted);
+    readonly TextBlock versionLabel = Txt("v" + ProductVersion, 10, Muted);
 
     UIElement BuildTabBar()
     {
@@ -78,6 +83,8 @@ internal sealed partial class ModernRouterMonitor
             monitorTabs[i].Foreground = i == index ? Accent : Muted;
             monitorTabs[i].FontWeight = i == index ? FontWeights.SemiBold : FontWeights.Medium;
         }
+        if (index == 1) RebuildHistory();
+        if (index == 2) RebuildStatistics();
         if (index == 3) RefreshSettings();
     }
 
@@ -85,6 +92,7 @@ internal sealed partial class ModernRouterMonitor
     {
         historyPage.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         historyPage.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1) });
+        historyPage.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         historyPage.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         var detailScroll = new ScrollViewer { MaxHeight = 300, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Content = historyDetail, Margin = new Thickness(18, 7, 12, 10) };
@@ -93,7 +101,15 @@ internal sealed partial class ModernRouterMonitor
         Grid.SetRow(rule, 1); historyPage.Children.Add(rule);
         var listScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = historyList };
-        Grid.SetRow(listScroll, 2); historyPage.Children.Add(listScroll);
+        var search = new TextBox { Background = TransparentBrush, Foreground = Ink, BorderThickness = new Thickness(0),
+            Padding = new Thickness(10, 7, 10, 7), FontSize = 12, ToolTip = "Buscar por tarea, modelo, motor o estado" };
+        System.Windows.Automation.AutomationProperties.SetName(search, "Buscar en historial");
+        var filters = new StackPanel { Margin = new Thickness(18, 7, 18, 4) };
+        filters.Children.Add(Txt("Buscar por tarea, modelo, motor o estado", 11, Muted));
+        filters.Children.Add(new Border { Background = Panel2, CornerRadius = new CornerRadius(12), Margin = new Thickness(0, 4, 0, 0), Child = search });
+        search.TextChanged += delegate { historyQuery = search.Text; historyOffset = 0; RebuildHistory(); };
+        Grid.SetRow(filters, 2); historyPage.Children.Add(filters);
+        Grid.SetRow(listScroll, 3); historyPage.Children.Add(listScroll);
     }
 
     void BuildStatisticsPage()
@@ -132,6 +148,8 @@ internal sealed partial class ModernRouterMonitor
 
     void RefreshAnalytics(List<KeyValuePair<string, Dictionary<string, object>>> liveRows, string historyPath = null)
     {
+        bool synchronous = preview || historyPath != null;
+        if (analyticsBusy) return;
         historyPath = historyPath ?? Path.Combine(StateFolder, "history.jsonl");
         var historyPaths = new[] { historyPath, Path.ChangeExtension(historyPath, ".recovered.jsonl") };
         string signature = System.String.Join("|", historyPaths.Select(path => File.Exists(path)
@@ -141,21 +159,33 @@ internal sealed partial class ModernRouterMonitor
         signature += ":" + analyticsConnected;
         signature += ":" + telemetryReceiverAvailable + ":" + Json.Serialize(telemetryHealth) + ":" + ReadConfigBool("inference_telemetry", false);
         if (signature == analyticsSignature) return;
-        decisions.Clear();
+        analyticsBusy = true;
+        Action load = delegate {
+        try {
+        var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
         var indexed = new Dictionary<string, DecisionRecord>();
         foreach (string path in historyPaths.Where(File.Exists))
         {
-            foreach (string line in File.ReadLines(path))
+            string stamp = File.GetLastWriteTimeUtc(path).Ticks + ":" + new FileInfo(path).Length;
+            Tuple<string, List<Dictionary<string, object>>> cached;
+            if (!journalCache.TryGetValue(path, out cached) || cached.Item1 != stamp)
             {
-                try
+                var records = new List<Dictionary<string, object>>();
+                using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+                using (var reader = new StreamReader(stream, Encoding.UTF8))
                 {
-                    var data = Json.Deserialize<Dictionary<string, object>>(line);
-                    string id = String(data, "decision_id"); if (id == "") continue;
-                    DecisionRecord item;
-                    if (!indexed.TryGetValue(id, out item)) indexed[id] = item = new DecisionRecord { Id = id };
-                    ApplyHistoryEvent(item, data);
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
+                        try { var data = serializer.Deserialize<Dictionary<string, object>>(line); if (data != null) records.Add(data); } catch { }
                 }
-                catch { }
+                cached = Tuple.Create(stamp, records); journalCache[path] = cached;
+            }
+            foreach (var data in cached.Item2)
+            {
+                string id = String(data, "decision_id"); if (id == "") continue;
+                DecisionRecord item;
+                if (!indexed.TryGetValue(id, out item)) indexed[id] = item = new DecisionRecord { Id = id };
+                ApplyHistoryEvent(item, data);
             }
         }
         foreach (var pair in liveRows)
@@ -178,8 +208,17 @@ internal sealed partial class ModernRouterMonitor
                 item.CachedTokens = Int(tokens, "cachedInputTokens"); item.ReasoningTokens = Int(tokens, "reasoningOutputTokens");
             }
         }
-        decisions.AddRange(indexed.Values.OrderByDescending(item => item.Time));
-        RebuildHistory(); RebuildStatistics(); analyticsSignature = signature;
+        var projected = indexed.Values.OrderByDescending(item => item.Time).ToList();
+        Action display = delegate {
+            decisions.Clear(); decisions.AddRange(projected);
+            if (synchronous || selectedMonitorTab == 1) RebuildHistory();
+            if (synchronous || selectedMonitorTab == 2) RebuildStatistics();
+            analyticsSignature = signature; analyticsBusy = false;
+        };
+        if (synchronous) display(); else Dispatcher.BeginInvoke(display);
+        } catch { Dispatcher.BeginInvoke((Action)delegate { analyticsBusy = false; analyticsSignature = null; }); }
+        };
+        if (synchronous) load(); else System.Threading.ThreadPool.QueueUserWorkItem(delegate { load(); });
     }
 
     static void ApplyHistoryEvent(DecisionRecord item, Dictionary<string, object> data)
@@ -189,6 +228,11 @@ internal sealed partial class ModernRouterMonitor
         // A later user rating must not make an old execution look newly run.
         if (eventName != "decision_quality") item.Time = Math.Max(item.Time, Number(data, "time"));
         if (eventName == "decision_created") item.StartedTime = Number(data, "time");
+        if (eventName == "decision_created")
+        {
+            item.ProductVersion = String(data, "product_version", "Anterior");
+            item.BuildId = String(data, "build_id", ""); item.PolicyVersion = String(data, "routing_policy_version", "");
+        }
         if (eventName == "decision_accepted" || eventName == "decision_recovered") item.Accepted = true;
         if (eventName == "decision_completed" || eventName == "decision_rejected" || eventName == "decision_error")
             item.FinishedTime = Number(data, "time");
@@ -196,7 +240,7 @@ internal sealed partial class ModernRouterMonitor
         if (data.ContainsKey("model")) item.Model = Model(String(data, "model"));
         if (data.ContainsKey("effort")) item.Effort = Effort(String(data, "effort"));
         item.ModelReason = String(data, "model_reason", item.ModelReason); item.EffortReason = String(data, "effort_reason", item.EffortReason);
-        item.ContinuityStrategy = String(data, "continuity_strategy", item.ContinuityStrategy);
+        if (eventName != "engine_comparison") item.ContinuityStrategy = String(data, "continuity_strategy", item.ContinuityStrategy);
         item.Source = String(data, "source", item.Source); item.Status = String(data, "status", item.Status);
         item.Signal = String(data, "signal", item.Signal);
         item.Error = String(data, "error_type", item.Error);
@@ -236,7 +280,7 @@ internal sealed partial class ModernRouterMonitor
         if (requestedHistoryThread != null && !decisions.Any(item => item.Thread == requestedHistoryThread))
         {
             ShowUnrecordedThread(requestedHistoryThread);
-            foreach (var item in decisions.Take(80)) historyList.Children.Add(HistoryRow(item));
+            RenderHistoryRows();
             return;
         }
         if (decisions.Count == 0)
@@ -246,10 +290,23 @@ internal sealed partial class ModernRouterMonitor
             note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 7, 0, 0); historyDetail.Children.Add(note); return;
         }
         historyList.Children.Add(Section("DECISIONES RECIENTES"));
-        foreach (var decision in decisions.Take(80)) historyList.Children.Add(HistoryRow(decision));
+        RenderHistoryRows();
         DecisionRecord selected = decisions.FirstOrDefault(item => item.Id == selectedDecisionId);
         if (requestedHistoryThread != null) selected = decisions.FirstOrDefault(item => item.Thread == requestedHistoryThread);
         ShowDecision(selected ?? decisions[0]); requestedHistoryThread = null;
+    }
+
+    void RenderHistoryRows()
+    {
+        var filtered = decisions.Where(d => (d.Title + " " + d.Model + " " + d.Effort + " " + FriendlyEngine(d.RoutingEngine) + " " + FriendlyStatus(d.Status))
+            .IndexOf(historyQuery, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
+        historyOffset = Math.Min(historyOffset, Math.Max(0, ((filtered.Count - 1) / 40) * 40));
+        foreach (var decision in filtered.Skip(historyOffset).Take(40)) historyList.Children.Add(HistoryRow(decision));
+        var pages = new WrapPanel { Margin = new Thickness(18, 8, 18, 10) };
+        if (historyOffset > 0) pages.Children.Add(Btn("Anterior", delegate { historyOffset -= 40; RebuildHistory(); }, false));
+        pages.Children.Add(Txt(filtered.Count == 0 ? "Sin coincidencias" : (historyOffset + 1) + "–" + Math.Min(historyOffset + 40, filtered.Count) + " de " + filtered.Count, 11, Muted));
+        if (historyOffset + 40 < filtered.Count) pages.Children.Add(Btn("Siguiente", delegate { historyOffset += 40; RebuildHistory(); }, false));
+        historyList.Children.Add(pages);
     }
 
     UIElement HistoryRow(DecisionRecord decision)
@@ -429,8 +486,24 @@ internal sealed partial class ModernRouterMonitor
                 { "schema", 2 }, { "time", DateTimeOffset.UtcNow.ToUnixTimeSeconds() }, { "time_iso", DateTime.UtcNow.ToString("o") },
                 { "event", "decision_quality" }, { "decision_id", decision.Id }, { "thread", decision.Thread ?? "" }, { field, quality }
             };
-            using (var stream = new FileStream(Path.Combine(StateFolder, "history.jsonl"), FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
-            using (var writer = new StreamWriter(stream, new UTF8Encoding(false))) writer.WriteLine(Json.Serialize(entry));
+            using (var gate = new FileStream(Path.Combine(StateFolder, "history.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite))
+            {
+                if (gate.Length == 0) { gate.WriteByte(0); gate.Flush(); }
+                bool held = false;
+                for (int retry = 0; retry < 50 && !held; retry++)
+                    try { gate.Lock(0, 1); held = true; } catch (IOException) { System.Threading.Thread.Sleep(20); }
+                if (!held) throw new IOException("History is busy");
+                try
+                {
+                    using (var stream = new FileStream(Path.Combine(StateFolder, "history.jsonl"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite))
+                    {
+                        if (stream.Length > 0) { stream.Position = stream.Length - 1; if (stream.ReadByte() != 10) stream.WriteByte(10); }
+                        stream.Position = stream.Length;
+                        using (var writer = new StreamWriter(stream, new UTF8Encoding(false))) writer.WriteLine(Json.Serialize(entry));
+                    }
+                }
+                finally { gate.Unlock(0, 1); }
+            }
             if (field == "model_quality") decision.ModelQuality = quality;
             else if (field == "effort_quality") decision.EffortQuality = quality;
             else decision.Quality = quality;
@@ -457,7 +530,7 @@ internal sealed partial class ModernRouterMonitor
 
     static string FriendlyContinuityStrategy(string value)
     {
-        return value == "continue" ? "Jev consideró que es un seguimiento directo y conservó la configuración anterior." :
+        return value == "continue" ? "Jev identificó trabajo pendiente y reevaluó el modelo y el razonamiento para continuarlo." :
             value == "reassess" ? "Jev consideró que esta petición debía evaluarse de nuevo antes de elegir modelo y razonamiento." : value;
     }
 
@@ -466,6 +539,16 @@ internal sealed partial class ModernRouterMonitor
         statisticsContent.Children.Clear();
         statisticsContent.Children.Add(Txt("Resumen de decisiones", 17, Ink, FontWeights.SemiBold));
         var note = Txt("Historial acumulado · se conserva entre sesiones", 12, Muted);
+        statisticsContent.Children.Add(AnalyticsHeading("VERSIONES Y CALIDAD"));
+        foreach (var cohort in decisions.GroupBy(d => d.ProductVersion ?? "Anterior"))
+        {
+            var ratedCohort = cohort.Where(d => !System.String.IsNullOrEmpty(d.Quality)).ToList();
+            AddMetric(cohort.Key + " · decisiones", cohort.Count() + " · " + ratedCohort.Count + " valoradas", cohort.Count() * 1.0 / Math.Max(1, decisions.Count), Accent);
+            if (ratedCohort.Count > 0) AddMetric(cohort.Key + " · adecuadas", ratedCohort.Count(d => d.Quality == "adequate") + " / " + ratedCohort.Count,
+                ratedCohort.Count(d => d.Quality == "adequate") * 1.0 / ratedCohort.Count, Good);
+        }
+        var caveat = Txt("Valoraciones con su muestra. Disponibilidad y acuerdo entre motores no prueban calidad. Los registros anteriores no confirman una versión.", 11, Muted);
+        caveat.TextWrapping = TextWrapping.Wrap; statisticsContent.Children.Add(caveat);
         note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 5, 0, 14); statisticsContent.Children.Add(note);
         statisticsContent.Children.Add(analyticsFreshness);
         int total = decisions.Count, accepted = decisions.Count(item => item.Accepted);
@@ -480,7 +563,7 @@ internal sealed partial class ModernRouterMonitor
             .GroupBy(item => String(item.PhaseEvidence, "phase_status")))
             AddMetric(PhaseStatus(group.Key), group.Count().ToString(), group.Count() * 1.0 / Math.Max(1, total), Accent);
         int published = decisions.Count(item => !System.String.IsNullOrEmpty(String(item.PhaseEvidence, "configured_model")));
-        int inferred = decisions.Count(item => !System.String.IsNullOrEmpty(String(item.PhaseEvidence, "observed_model")));
+        int inferred = decisions.Count(item => !System.String.IsNullOrEmpty(String(item.PhaseEvidence, "observed_model")) && String(item.PhaseEvidence, "evidence_confidence") == "confirmed");
         AddMetric("Configuraciones publicadas", published.ToString(), published * 1.0 / Math.Max(1, total), Good);
         AddMetric("Inferencias confirmadas localmente", inferred.ToString(), inferred * 1.0 / Math.Max(1, total), Muted);
         statisticsContent.Children.Add(AnalyticsHeading("TELEMETRÍA LOCAL"));
@@ -496,6 +579,7 @@ internal sealed partial class ModernRouterMonitor
             AddMetric("Registros con modelo", Telemetry("eligible_records").ToString("N0"), Math.Min(1, Telemetry("eligible_records") / Math.Max(1, Telemetry("records_scanned"))), Accent);
             AddMetric("Finalizaciones recibidas", Telemetry("telemetry_events").ToString("N0"), Math.Min(1, Telemetry("telemetry_events") / Math.Max(1, Telemetry("eligible_records"))), Accent);
             AddMetric("Inferencias asociadas", Telemetry("telemetry_confirmed").ToString("N0"), Math.Min(1, Telemetry("telemetry_confirmed") / Math.Max(1, Telemetry("telemetry_events"))), Good);
+            AddMetric("Coincidencias sin ID de turno", Telemetry("telemetry_probable").ToString("N0"), Math.Min(1, Telemetry("telemetry_probable") / Math.Max(1, Telemetry("telemetry_events"))), Muted);
             string telemetryNote = !receiving ? "El receptor está abierto, pero no recibe eventos. Esto no significa que no haya agentes trabajando." :
                 Telemetry("eligible_records") == 0 ? "Se recibieron eventos sin modelo utilizable; no se conserva su contenido." : null;
             if (telemetryNote != null)
@@ -612,13 +696,16 @@ internal sealed partial class ModernRouterMonitor
             try
             {
                 var cfg = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(Path.Combine(Root, "config.local.json")));
-                var start = new System.Diagnostics.ProcessStartInfo((string)cfg["python"])
+                bool packaged = cfg.ContainsKey("desktop_runtime");
+                var start = new System.Diagnostics.ProcessStartInfo(packaged ? Path.Combine(Root, (string)cfg["desktop_runtime"]) : (string)cfg["python"])
                 {
-                    Arguments = "\"" + Path.Combine(Root, "desktop.py") + "\" " + action,
+                    Arguments = (packaged ? "" : "\"" + Path.Combine(Root, "desktop.py") + "\" ") + action,
                     UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true,
                     RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
                 };
                 start.EnvironmentVariables["PYTHONUTF8"] = "1";
+                start.EnvironmentVariables["PERSONAL_CODEX_ROUTER_ROOT"] = Root;
+                start.EnvironmentVariables["PERSONAL_CODEX_ROUTER_CONFIG"] = Path.Combine(Root, "config.local.json");
                 using (var process = System.Diagnostics.Process.Start(start))
                 {
                     var errors = process.StandardError.ReadToEndAsync();
@@ -656,6 +743,12 @@ internal sealed partial class ModernRouterMonitor
             int fallback = rows.Count(item => item.Active && item.Status != "ok");
             if (fallback > 0) AddMetric(group.Key + " · respaldo local", fallback.ToString(), fallback * 1.0 / rows.Count, Warning);
             var timed = rows.Where(item => item.LatencyMs > 0).ToList();
+            if (timed.Count > 0)
+            {
+                var values = timed.Select(item => item.LatencyMs).OrderBy(value => value).ToList();
+                AddMetric(group.Key + " · latencia p50 / p95", Math.Round(values[(int)Math.Ceiling(values.Count * .5) - 1]) + " / " +
+                    Math.Round(values[(int)Math.Ceiling(values.Count * .95) - 1]) + " ms · n=" + values.Count, 1, Accent);
+            }
             if (timed.Count > 0) AddMetric(group.Key + " · demora media", Math.Round(timed.Average(item => item.LatencyMs)) + " ms",
                 Math.Min(1, timed.Average(item => item.LatencyMs) / 6000), Accent);
             long input = rows.Sum(item => (long)item.InputTokens), output = rows.Sum(item => (long)item.OutputTokens);
@@ -739,10 +832,11 @@ internal sealed partial class ModernRouterMonitor
         settingsContent.Children.Add(connections);
         AddSettingsNote(connection == "vercel" ? "Usa el modelo virtual vmc/jev mediante Vercel AI Gateway." :
             "Conecta directamente con TypeSafe usando jev-latest.");
-        bool keyReady = File.Exists(Path.Combine(StateFolder, "jev.secret")) ||
-            !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable("PERSONAL_CODEX_JEV_API_KEY")) ||
+        bool keyReady = File.Exists(Path.Combine(StateFolder, "jev-" + connection + ".secret")) ||
             !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable(connection == "vercel" ? "AI_GATEWAY_API_KEY" : "TYPESAFE_API_KEY"));
-        settingsContent.Children.Add(InlineKeySettings("jev", connection == "vercel" ? "Vercel AI Gateway" : "TypeSafe", keyReady));
+        settingsContent.Children.Add(InlineKeySettings("jev-" + connection, connection == "vercel" ? "Vercel AI Gateway" : "TypeSafe", keyReady));
+        if (!keyReady && File.Exists(Path.Combine(StateFolder, "jev.secret")))
+            AddSettingsNote("La clave anterior no identifica su proveedor. Introduce la clave de esta conexión una vez para vincularla de forma segura.");
     }
 
     static Button ChoiceButton(string label, bool selected, RoutedEventHandler click, bool multiple = false)
