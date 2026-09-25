@@ -3,6 +3,27 @@ import time
 import uuid
 
 
+def thread_metadata(thread, previous=None, request=None, method=None):
+    """Separate explicit user side chats from internal ephemeral forks.
+
+    forkedFromId is ancestry, not evidence that a fork is user-facing: Desktop
+    also forks conversations to generate titles. Never inspect instructions.
+    Sparse notifications must not erase metadata captured from the fork ACK.
+    """
+    previous, request = previous or {}, request or {}
+    def identifier(value):
+        return value if isinstance(value, str) and value else None
+    parent = identifier(thread.get("parentThreadId")) or previous.get("parent")
+    fork = (identifier(thread.get("forkedFromId")) or
+            (identifier(request.get("threadId")) if method == "thread/fork" else None) or
+            previous.get("forked_from"))
+    source = thread.get("threadSource") or request.get("threadSource") or previous.get("thread_source")
+    source = "user" if source == "user" else "internal" if source else None
+    ephemeral = thread.get("ephemeral", request.get("ephemeral", previous.get("ephemeral", False))) is True
+    return {"parent": parent, "forked_from": fork, "thread_source": source,
+            "ephemeral": ephemeral, "side_chat": bool(ephemeral and fork and source == "user")}
+
+
 class ThreadInventory:
     INTERVAL = 15
     TIMEOUT = 30
@@ -103,9 +124,9 @@ class ThreadInventory:
             if row.get("ephemeral"):
                 # Codex also creates in-memory root forks for internal work such
                 # as title generation. They are not user conversations. Real
-                # collaboration agents acquire a parent and remain visible only
-                # while they are actually working.
-                if not row.get("parent") or not working:
+                # collaboration agents acquire a parent. Explicit user forks
+                # are side chats. Both are visible only while working.
+                if not (row.get("parent") or row.get("side_chat")) or not working:
                     continue
             if self.catalog is not None and tid not in self.catalog and tid in self.catalog_observed:
                 # Ephemeral agents have no persistent catalog entry while working.
@@ -114,4 +135,8 @@ class ThreadInventory:
             rows[tid] = {**row}
             if tid in self.names:
                 rows[tid]["name"] = self.names[tid]
+            if row.get("side_chat"):
+                # Status files are persistent; never put a temporary chat title
+                # in them, even if Desktop sends thread/name/updated later.
+                rows[tid]["name"] = "Chat lateral"
         return rows

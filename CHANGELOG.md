@@ -1,5 +1,16 @@
 # Cambios
 
+## 0.3.1 — 2026-09-25
+
+- Los chats laterales locales se enrutan con Reglas o JEV y aparecen mientras
+  trabajan. Se distinguen de los forks internos mediante `threadSource: user`.
+- Se procesa `thread/fork`, incluida su respuesta con proveedor/modelo, sin
+  modificar la conversación principal ni sus permisos.
+- Los chats laterales no guardan títulos, decisiones ni contratos en el historial
+  permanente. Al cerrarlos desaparecen del monitor, incluso ante eventos tardíos.
+- Pruebas de protocolo para ambos órdenes de notificación, privacidad, JEV,
+  modo manual y procesos internos. Ver docs/SIDE-CHATS.md.
+
 ## 0.3.0 — 2026-09-24
 
 - Contratos persistentes de trabajo con cierre explícito, mínimos de modelo y

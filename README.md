@@ -2,7 +2,7 @@
 
 ## Versión
 
-El producto usa versiones semánticas. La versión funcional actual es **0.3.0**:
+El producto usa versiones semánticas. La versión funcional actual es **0.3.1**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en la esquina inferior derecha del
 panel procede del archivo común `VERSION`.
@@ -10,6 +10,11 @@ panel procede del archivo común `VERSION`.
 Elige modelo y razonamiento antes de cada nuevo mensaje enviado a Codex. Sigue
 usando la app y la suscripción actuales. Puede decidir mediante reglas locales
 o Jev.
+
+Los chats laterales locales de Codex también usan el selector. Se muestran como
+«Chat lateral» mientras trabajan; sus decisiones y contexto no se guardan en el
+historial permanente del selector. Los procesos internos de Desktop, como generar
+títulos, conservan su modelo original. Véase [el alcance y las pruebas](docs/SIDE-CHATS.md).
 
 ## macOS
 

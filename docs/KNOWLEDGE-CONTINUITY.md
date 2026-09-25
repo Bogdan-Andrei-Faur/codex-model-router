@@ -1,6 +1,20 @@
 # Continuidad del proyecto: fases automáticas y validación multiplataforma
 
-## Estado actual — 0.3.0, 24/09/2026
+## Estado actual — 0.3.1, 25/09/2026
+
+Corrección de los chats laterales locales: [SIDE-CHATS.md](SIDE-CHATS.md).
+Procesa `thread/fork`, distingue el origen `user` de generadores internos y
+mantiene la actividad lateral temporal sin historial de decisiones o contratos.
+Validación local: 124 pruebas Python, 121 superadas y tres omitidas por plataforma.
+Falta probar un lateral real después de reiniciar Desktop; no reiniciar tareas
+activas para activarlo. La integración nativa del MacBook sigue pendiente.
+
+La base 0.3.0 se publicó como `c129beb` y pasó las cinco comprobaciones de
+[CI Windows/macOS](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/36113819551).
+Ese resultado corresponde a 0.3.0, no valida retrospectivamente este cambio.
+Atlas no está disponible mediante herramientas en esta sesión.
+
+## Base de la auditoría — 0.3.0, 24/09/2026
 
 La referencia actual es [AUDIT-REMEDIATION.md](AUDIT-REMEDIATION.md): cubre G01–G20,
 activación, contratos persistentes, límites de evidencia, claves por proveedor,

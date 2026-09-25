@@ -18,7 +18,7 @@ import uuid
 
 from routing import DEFAULT_ROUTES, EFFORTS, classify_agent_identity, select_route_details, has_attachments, user_text, summarize_response_context
 from decision_engines import ENGINES, ENGINE_JEV, ENGINE_RULES, attachment_summary, build_state, candidate_routes, run_jev
-from thread_inventory import ThreadInventory
+from thread_inventory import ThreadInventory, thread_metadata
 from platform_support import backend_path, creation_flags, uses_stdio, stop_backend, input_lines, with_loopback_telemetry
 from desktop_runtime import discover
 from task_modes import read_mode
@@ -55,6 +55,7 @@ class Router:
         self.outbound = []
         self.accepted_routes = {}
         self.current_decisions = {}
+        self.temporary_threads = set()
         self.thread_categories = self.load_thread_categories()
         self.history_writes = 0
         self.stats = {"accepted": 0, "non_astra": 0, "telemetry_events": 0,
@@ -79,6 +80,8 @@ class Router:
         return categories
 
     def save_task(self, tid, row):
+        if tid in self.temporary_threads:
+            return
         try:
             persist_task(self.state_dir, tid, row)
         except OSError:
@@ -86,6 +89,8 @@ class Router:
 
     def record_history(self, event, **fields):
         """Append privacy-safe decision metadata; never prompts, outputs or tool data."""
+        if fields.get("thread") in self.temporary_threads:
+            return
         allowed = {"decision_id", "thread", "title", "model", "effort", "previous_model",
                    "model_reason", "effort_reason", "agent_category", "agent_confidence", "source", "status", "signal", "error_type", "error_code",
                    "inputTokens", "outputTokens", "cachedInputTokens", "reasoningOutputTokens", "routing_engine", "engine_model",
@@ -270,21 +275,23 @@ class Router:
                         for model in result.get("data", []):
                             self.catalog[model["model"]] = {
                                 e["reasoningEffort"] for e in model.get("supportedReasoningEfforts", [])}
-                    elif method in ("thread/start", "thread/resume", "thread/read"):
+                    elif method in ("thread/start", "thread/fork", "thread/resume", "thread/read"):
                         thread = result.get("thread") or {}
                         tid = thread.get("id")
                         if tid:
                             old = {**self.thread_categories.get(tid, {}), **self.threads.get(tid, {})}
+                            metadata = thread_metadata(thread, old, params, method)
+                            if metadata["side_chat"]:
+                                self.temporary_threads.add(tid)
                             self.threads[tid] = {**old,
                                 "provider": result.get("modelProvider", thread.get("modelProvider", old.get("provider"))),
                                 "model": old.get("model") if old.get("confirmation") == "Aceptado por Codex" else result.get("model", thread.get("model", old.get("model"))),
                                 "name": thread.get("name") or thread.get("agentNickname") or old.get("name") or tid[:8],
-                                "parent": thread.get("parentThreadId"),
-                                "ephemeral": thread.get("ephemeral", False),
+                                **metadata,
                                 "effort": old.get("effort") if old.get("confirmation") == "Aceptado por Codex" else result.get("reasoningEffort") or thread.get("reasoningEffort") or old.get("effort"),
                                 "status": thread.get("status", {}).get("type", "unknown"),
                                 "confirmation": old.get("confirmation", "Configurado; sin envío observado"),
-                                "seen_turn": old.get("seen_turn", method != "thread/start")}
+                                "seen_turn": old.get("seen_turn", method not in ("thread/start", "thread/fork"))}
                             if thread.get("status", {}).get("type") == "active":
                                 self.active.add(tid)
                     elif method == "turn/start":
@@ -356,6 +363,14 @@ class Router:
                                         phase_model=row.get("phase_model"), phase_effort=row.get("phase_effort"),
                                         phase_transition=row.get("phase_transition"), pipeline_mode="observation",
                                         phase_pipeline=row.get("phase_pipeline"))
+                elif method == "thread/closed" and tid in self.temporary_threads:
+                    self.active.discard(tid)
+                    self.pending.discard(tid)
+                    self.current_decisions.pop(tid, None)
+                    self.thread_categories.pop(tid, None)
+                    self.inventory.hidden.add(tid)
+                    self.threads[tid] = {"ephemeral": True, "side_chat": True,
+                                         "name": "Chat lateral", "status": "closed"}
                 elif method == "thread/name/updated":
                     self.threads.setdefault(tid, {})["name"] = params.get("threadName", params.get("name", tid))
                 elif method == "thread/status/changed":
@@ -374,9 +389,11 @@ class Router:
                     thread = params.get("thread", {})
                     if thread.get("id"):
                         row = self.threads.setdefault(thread["id"], {})
+                        metadata = thread_metadata(thread, row)
+                        if metadata["side_chat"]:
+                            self.temporary_threads.add(thread["id"])
                         row.update(name=thread.get("name") or thread.get("agentNickname") or row.get("name") or thread["id"][:8],
-                                   ephemeral=thread.get("ephemeral", False),
-                                   parent=thread.get("parentThreadId"), updated=time.time())
+                                   **metadata, updated=time.time())
                         if thread.get("model"):
                             row.setdefault("model", thread["model"])
                             row.setdefault("effort", thread.get("reasoningEffort"))
@@ -477,13 +494,13 @@ class Router:
                 if method == "initialized":
                     self.inventory.ready = True
                 if "id" in message and method in (
-                        "initialize", "model/list", "thread/start", "thread/resume", "thread/read", "turn/start"):
+                        "initialize", "model/list", "thread/start", "thread/fork", "thread/resume", "thread/read", "turn/start"):
                     self.requests[message["id"]] = (method, params)
                 if method != "turn/start":
                     return raw
                 tid = params.get("threadId")
                 state = self.threads.get(tid, {})
-                if state.get("ephemeral") and not state.get("parent"):
+                if state.get("ephemeral") and not (state.get("parent") or state.get("side_chat")):
                     # Internal in-memory roots (for example automatic title
                     # helpers) are not user tasks and must keep Codex's native
                     # cheap configuration. Do not create decision telemetry.

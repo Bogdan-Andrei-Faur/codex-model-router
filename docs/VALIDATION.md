@@ -1,6 +1,13 @@
 # Validation and integration notes
 
-## Estado actual — 0.3.0, 24/09/2026
+## Estado actual — 0.3.1, 25/09/2026
+
+Chats laterales: [alcance, pruebas y activación](SIDE-CHATS.md). Suite local:
+124 pruebas Python (121 superadas, tres omisiones de plataforma), incluidas ocho
+regresiones nuevas. La sonda nativa sin inferencia no permite bifurcar una
+conversación vacía; queda pendiente la validación real en Desktop tras reinicio.
+
+## Base de la auditoría — 0.3.0, 24/09/2026
 
 La referencia actual es [AUDIT-REMEDIATION.md](AUDIT-REMEDIATION.md): cubre G01–G20,
 activación, contratos persistentes, límites de evidencia, claves por proveedor,
