@@ -88,6 +88,19 @@ class RoutingPolicyTests(unittest.TestCase):
         self.assertEqual(result.request_kind, "ambiguous")
         self.assertIsNone(result.quality_floor)
 
+    def test_independent_requests_do_not_inherit_pending_critical_work(self):
+        context = {"implementation_pending": True, "work_floor": "critical"}
+        for prompt in ("Cambia solo el color del texto", "Ok, implementa un formulario para contactos",
+                       "Ahora añade una columna al listado", "Explica esta función", "¿Por qué ocurre?"):
+            with self.subTest(prompt=prompt):
+                result = classify(prompt, "critical", previous_effort="xhigh", response_context=context)
+                self.assertIsNone(result.quality_floor)
+                self.assertNotIn(result.request_kind, ("planned_followup", "work_followup"))
+        for prompt in ("Implementa lo acordado", "Sigue con lo que falta", "Ahora compruébalo", "Ok, hazlo"):
+            with self.subTest(prompt=prompt):
+                self.assertEqual(classify(prompt, "normal", response_context=context).quality_floor, "critical")
+        self.assertEqual(classify("Ahora arregla la autenticación", "normal", response_context=context).quality_floor, "critical")
+
     def test_previous_response_summary_turns_confirmation_into_planned_followup(self):
         context = summarize_response_context("He preparado el plan de implementación en tres pasos. Cuando digas adelante, implemento el cambio y ejecuto las pruebas.")
         self.assertEqual(context["response_kind"], "plan")
@@ -232,7 +245,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertIsNone(policy["quality_floor"])
         self.assertTrue(all(r["tier"] in ("simple", "normal") and r["effort"] in ("low", "medium") for r in candidates.values()))
         records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
-        self.assertEqual(records[0]["routing_policy_version"], 3)
+        self.assertEqual(records[0]["routing_policy_version"], 4)
         self.assertEqual(records[0]["request_kind"], "acknowledgement")
         self.assertNotIn("Parece que ahora", str(records))
 

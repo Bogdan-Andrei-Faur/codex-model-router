@@ -19,7 +19,7 @@ python (Join-Path $routerRoot 'build_identity.py')
 if ($LASTEXITCODE -ne 0) { throw 'Build identity failed' }
 $routerBuild = Get-Content -LiteralPath (Join-Path $routerRoot 'BUILD.json') -Raw | ConvertFrom-Json
 $routerAssembly = Join-Path $routerOutput 'BuildInfo.cs'
-$routerAttribute = '[assembly: System.Reflection.AssemblyInformationalVersion("' + $routerBuild.product_version + '+' + $routerBuild.build_id + '")]'
+$routerAttribute = '[assembly: System.Reflection.AssemblyInformationalVersion("' + $routerBuild.product_version + '+' + $routerBuild.build_id + '+' + $routerBuild.router_build_id + '")]'
 [IO.File]::WriteAllText($routerAssembly, $routerAttribute)
 
 & $routerCompiler /nologo /target:winexe /optimize+ /r:System.Windows.Forms.dll /r:System.Web.Extensions.dll "/win32icon:$routerIcon" "/out:$routerOutput\codex-router-v19.exe" "$routerRoot\Launcher.cs"

@@ -27,6 +27,7 @@ internal sealed partial class ModernRouterMonitor : Window
     static readonly string Root = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".."));
     static readonly string ProductVersion = ReadProductVersion();
     static readonly string ProductBuildId = ReadProductBuildId();
+    static readonly string RouterBuildId = ReadProductBuildId(2);
     static readonly string StateFolder = Path.Combine(Root, "state");
     static readonly string UiStatePath = Path.Combine(StateFolder, "monitor-ui.json");
     static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = 8 * 1024 * 1024 };
@@ -49,6 +50,9 @@ internal sealed partial class ModernRouterMonitor : Window
     readonly TextBlock mainTask = Txt("Sin tarea seleccionada", 17, Ink, FontWeights.SemiBold);
     readonly Border taskModeHost = new Border();
     string taskModeSignature;
+    string featuredSelection;
+    DateTime featuredUntil;
+    Button featuredRelease;
     readonly TextBlock confirmation = Txt("Sin confirmación", 12, Muted);
     readonly TextBlock reason = Txt("Todavía no hay una decisión del selector.", 13, Muted);
     readonly TextBlock effortReason = Txt("Todavía no hay una decisión de razonamiento.", 13, Muted);
@@ -288,6 +292,13 @@ internal sealed partial class ModernRouterMonitor : Window
 
         var main = new StackPanel { Margin = new Thickness(18, 7, 18, 17) };
         main.Children.Add(Label("TAREA DESTACADA"));
+        featuredRelease = Btn("Fijada 1 min · Volver al más reciente", delegate {
+            featuredSelection = null; RefreshData();
+        }, false);
+        featuredRelease.Foreground = Accent; featuredRelease.FontSize = 11;
+        featuredRelease.HorizontalAlignment = HorizontalAlignment.Left;
+        featuredRelease.Visibility = Visibility.Collapsed;
+        main.Children.Add(featuredRelease);
         var featuredRow = new Grid { Margin = new Thickness(0, 9, 0, 0) };
         featuredRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(56) });
         featuredRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -298,6 +309,11 @@ internal sealed partial class ModernRouterMonitor : Window
         mainTask.ToolTip = mainTask.Text;
         featuredCopy.Children.Add(mainTags); Grid.SetColumn(featuredCopy, 1); featuredRow.Children.Add(featuredCopy);
         main.Children.Add(featuredRow);
+        var featuredHistory = Btn("Ver historial", delegate {
+            if (featuredAvatar != null) OpenHistoryForThread(featuredAvatar.Id);
+        }, false);
+        featuredHistory.Foreground = Accent; featuredHistory.HorizontalAlignment = HorizontalAlignment.Left;
+        main.Children.Add(featuredHistory);
         main.Children.Add(taskModeHost);
         confirmation.Margin = new Thickness(0, 9, 0, 0); main.Children.Add(confirmation);
         var why = Btn("¿Por qué esta elección?", delegate
@@ -358,11 +374,11 @@ internal sealed partial class ModernRouterMonitor : Window
         catch { return "0.1.0"; }
     }
 
-    static string ReadProductBuildId()
+    static string ReadProductBuildId(int part = 1)
     {
         var info = (System.Reflection.AssemblyInformationalVersionAttribute)Attribute.GetCustomAttribute(
             System.Reflection.Assembly.GetExecutingAssembly(), typeof(System.Reflection.AssemblyInformationalVersionAttribute));
-        return info != null && info.InformationalVersion.Contains("+") ? info.InformationalVersion.Split('+')[1] : "";
+        return info != null && info.InformationalVersion.Split('+').Length > part ? info.InformationalVersion.Split('+')[part] : "";
     }
 
     void BuildTray(string iconPath)
@@ -610,6 +626,7 @@ internal sealed partial class ModernRouterMonitor : Window
             int connected = 0, modern = 0;
             var bridgeVersions = new HashSet<string>();
             bool bridgeBuildMismatch = false;
+            bool bridgeBuildUnknown = false;
             foreach (var file in Directory.GetFiles(StateFolder, "status-*.json").OrderBy(File.GetLastWriteTimeUtc))
             {
                 Dictionary<string, object> data;
@@ -630,7 +647,8 @@ internal sealed partial class ModernRouterMonitor : Window
                 catch { continue; }
                 connected++;
                 bridgeVersions.Add(String(data, "product_version", "desconocida"));
-                if (ProductBuildId != "" && String(data, "build_id") != "" && String(data, "build_id") != ProductBuildId) bridgeBuildMismatch = true;
+                if (RouterBuildId == "" || String(data, "router_build_id") == "") bridgeBuildUnknown = true;
+                else if (String(data, "router_build_id") != RouterBuildId) bridgeBuildMismatch = true;
                 if (data.ContainsKey("telemetry"))
                 {
                     var health = Dict(data["telemetry"]);
@@ -659,12 +677,16 @@ internal sealed partial class ModernRouterMonitor : Window
                     }
                 }
             }
-            versionLabel.Text = "v" + ProductVersion + (bridgeVersions.Any(v => v != ProductVersion) ? " · puente " + System.String.Join(", ", bridgeVersions) : bridgeBuildMismatch ? " · reinicio pendiente" : "");
+            versionLabel.Text = "v" + ProductVersion + (bridgeVersions.Any(v => v != ProductVersion) ? " · puente " + System.String.Join(", ", bridgeVersions) : bridgeBuildMismatch ? " · reinicio del router pendiente" : bridgeBuildUnknown ? " · puente sin verificar" : "");
             versionLabel.Foreground = bridgeBuildMismatch || bridgeVersions.Any(v => v != ProductVersion) ? Warning : Muted;
             versionLabel.ToolTip = "Monitor " + ProductVersion + ". Puentes activos: " + System.String.Join(", ", bridgeVersions) +
-                (bridgeBuildMismatch || bridgeVersions.Any(v => v != ProductVersion) ? ". Reinicia Desktop y el monitor al terminar tus tareas para cargar la versión instalada." : ".") + " Build del monitor: " + ProductBuildId;
+                (bridgeBuildMismatch || bridgeVersions.Any(v => v != ProductVersion) ? ". La versión del router activo difiere de la incluida con este monitor. Reinicia Desktop al terminar tus tareas para cargar la versión instalada." : bridgeBuildUnknown ? ". El puente activo no informa su versión de componente. No se puede determinar si necesita reinicio; el próximo inicio de Desktop permitirá comprobarlo." : ".") + " Build del monitor: " + ProductBuildId;
             var ordered = rows.OrderByDescending(x => Active(String(x.Value, "status"))).ThenByDescending(x => Number(x.Value, "updated")).ToList();
-            var focus = ordered.FirstOrDefault();
+            var focus = ordered.OrderByDescending(x => Number(x.Value, "updated")).ThenBy(x => x.Key, StringComparer.Ordinal).FirstOrDefault();
+            if (featuredSelection != null && DateTime.UtcNow < featuredUntil && rows.ContainsKey(featuredSelection))
+                focus = new KeyValuePair<string, Dictionary<string, object>>(featuredSelection, rows[featuredSelection]);
+            else featuredSelection = null;
+            featuredRelease.Visibility = featuredSelection == null ? Visibility.Collapsed : Visibility.Visible;
             int active = ordered.Count(x => Active(String(x.Value, "status")));
             connection.Text = connected == 0 ? "Sin conexión" : modern == 0 ? "Conectado · versión anterior" :
                 active + (active == 1 ? " tarea activa" : " tareas activas");
@@ -672,12 +694,13 @@ internal sealed partial class ModernRouterMonitor : Window
             UpdateActivitySummary(active, connected > 0);
             if (focus.Key != null) ApplyFocus(focus.Key, focus.Value, active);
             else ApplyEmpty();
-            var signature = Json.Serialize(ordered.Skip(1).ToArray());
+            var activityRows = ordered.Where(x => x.Key != focus.Key).ToList();
+            var signature = Json.Serialize(activityRows.ToArray());
             if (signature != activitySignature)
             {
                 activitySignature = signature;
                 taskList.Children.Clear(); taskList.Children.Add(Section("ACTIVIDAD"));
-                foreach (var pair in ordered.Skip(1)) taskList.Children.Add(TaskRow(pair.Key, pair.Value));
+                foreach (var pair in activityRows) taskList.Children.Add(TaskRow(pair.Key, pair.Value));
                 if (ordered.Count <= 1) taskList.Children.Add(EmptyRow("No hay otras tareas observables"));
             }
             RefreshAgentCapsule(ordered);
@@ -688,6 +711,13 @@ internal sealed partial class ModernRouterMonitor : Window
             UpdateTray();
         }
         catch { connection.Text = "Esperando un estado válido"; connection.Foreground = Warning; }
+    }
+
+    void SelectFeatured(string id)
+    {
+        featuredSelection = id; featuredUntil = DateTime.UtcNow.AddMinutes(1);
+        reasonOpen = false; reasonBox.Visibility = Visibility.Collapsed;
+        RefreshData(); activityScroll.ScrollToTop();
     }
 
     void ApplyFocus(string id, Dictionary<string, object> row, int active)
@@ -836,10 +866,13 @@ internal sealed partial class ModernRouterMonitor : Window
         Grid.SetColumn(tags, 2); grid.Children.Add(tags);
         var card = new Border { Margin = new Thickness(12, 3, 12, 3), Padding = new Thickness(8, 7, 8, 7),
             CornerRadius = new CornerRadius(16), Background = TransparentBrush, Cursor = Cursors.Hand,
-            ToolTip = "Consultar cómo se tomó esta decisión", Child = grid };
+            ToolTip = "Mostrar en Tarea destacada durante 1 minuto", Child = grid, Focusable = true };
         card.MouseEnter += delegate { card.Background = Panel2; };
         card.MouseLeave += delegate { card.Background = TransparentBrush; };
-        card.MouseLeftButtonUp += delegate { OpenHistoryForThread(id); };
+        card.MouseLeftButtonUp += delegate { SelectFeatured(id); };
+        card.KeyDown += delegate(object sender, KeyEventArgs e) {
+            if (e.Key == Key.Enter || e.Key == Key.Space) { SelectFeatured(id); e.Handled = true; }
+        };
         return card;
     }
 

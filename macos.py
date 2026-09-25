@@ -46,6 +46,7 @@ def wrapper(path, command):
 
 def setup(app_path=None):
     app, desktop, binary = discover_app(app_path)
+    version = (ROOT / "VERSION").read_text().strip()
     if CONFIG.exists():
         config = json.loads(CONFIG.read_text(encoding="utf-8-sig"))
         # A copied Windows config may enable external classification. Do not
@@ -73,12 +74,13 @@ def setup(app_path=None):
     shutil.copyfile(ROOT / "assets" / "codex-ui-1024.png", ui / "codex.png")
     os.replace(staged_monitor, MONITOR)
     with (MONITOR.parent.parent / "Info.plist").open("wb") as stream:
-        from build_identity import identity
+        from build_identity import identity, router_identity
         plistlib.dump({"CFBundleExecutable": MONITOR.name, "CFBundleIdentifier": "local.codex-model-router.monitor",
                       "CFBundleName": "Monitor de Codex", "CFBundlePackageType": "APPL",
-                      "CFBundleVersion": (ROOT / "VERSION").read_text().strip(),
-                      "CFBundleShortVersionString": (ROOT / "VERSION").read_text().strip(),
+                      "CFBundleVersion": version,
+                      "CFBundleShortVersionString": version,
                       "RouterBuildId": identity(ROOT)[1],
+                      "RouterEngineBuildId": router_identity(ROOT),
                       "LSMinimumSystemVersion": "12.0", "LSUIElement": True}, stream)
     save_config(config)
     wrapper(DIST / "codex-router", [sys.executable, ROOT / "router.py"])
@@ -93,7 +95,8 @@ def setup(app_path=None):
     with (contents / "Info.plist").open("wb") as stream:
         plistlib.dump({"CFBundleExecutable": "launcher", "CFBundleIdentifier": "local.codex-model-router.launcher",
                       "CFBundleName": "Codex automático", "CFBundlePackageType": "APPL",
-                      "CFBundleVersion": "1", "LSUIElement": True}, stream)
+                      "CFBundleVersion": version, "CFBundleShortVersionString": version,
+                      "LSUIElement": True}, stream)
     wrapper(contents / "MacOS/launcher", [sys.executable, ROOT / "macos.py", "open"])
     print("Preparado: " + str(bundle))
     print("Motor: " + str(binary))

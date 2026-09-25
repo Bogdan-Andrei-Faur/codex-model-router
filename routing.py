@@ -95,6 +95,19 @@ def summarize_response_context(text):
     return response_summary(text)
 
 
+def resumes_previous_work(intent):
+    """Recognize instructions to resume work, not courtesy before a new request."""
+    intent = re.sub(r"^(?:(?:si|yes|ok|vale|perfecto|please|por favor)\b[\s,.:;!]*)+", "", intent)
+    return has(
+        r"^(?:continua|continue|sigue|proceed|adelante|hazlo|do it|implementalo|"
+        r"arreglalo|ejecutalo|compruebalo)\b|"
+        r"^(?:ahora\s+)?(?:implementa|implement|haz|ejecuta|termina|completa|finish|do)\s+"
+        r"(?:lo\s+(?:que\s+)?(?:acordamos|acordado|pendiente|falta)|el\s+plan|"
+        r"los\s+(?:pasos|puntos)\s+pendientes|the\s+(?:plan|remaining\s+work))\b|"
+        r"^ahora\s+(?:hazlo|implementalo|arreglalo|ejecutalo|compruebalo)\b|"
+        r"^haz\s+lo\s+que\s+(?:consideres|creas)\s+necesario(?:\s+para\s+dejarlo\s+bien)?[.!\s]*$", intent)
+
+
 def classify(text, previous=None, attachments=False, previous_effort=None, response_context=None):
     t = normalize(text).strip()
     intent = intent_text(text)
@@ -122,6 +135,7 @@ def classify(text, previous=None, attachments=False, previous_effort=None, respo
     lightweight = lightweight_request(intent) if not attachments else None
     prior_plan = response_context and response_context.get("implementation_pending")
     context_floor = response_context.get("work_floor") if isinstance(response_context, dict) else None
+    execute_previous = resumes_previous_work(intent) and not new_task
     bounded_transform = has(r"^(?:(?:nueva tarea|new task)\s*:\s*)?(?:traduce|traducir|translate|reformula|rephrase|formatea|format)\b", intent)
     if bounded_transform and not attachments:
         result = Decision("simple", "transformación delimitada del texto aportado", "low", request_kind="bounded")
@@ -155,11 +169,9 @@ def classify(text, previous=None, attachments=False, previous_effort=None, respo
         result = Decision("simple", "consulta o transformación delimitada", "medium" if has(r"explica|explain|resume|summary", intent) else "low", request_kind="bounded")
     else:
         result = Decision("complex", "petición ambigua: conservar capacidad", "medium", request_kind="ambiguous")
-    # The preceding assistant response is the useful context for short or
-    # elliptical follow-ups. While it reports unfinished implementation work,
-    # preserve its capability floor for every substantive continuation, not
-    # only messages beginning with a small list of acknowledgement words.
-    if (prior_plan and context_floor in TIERS and
+    # Persisted unfinished work constrains requests that actually resume it.
+    # Independent requests are evaluated on their own current risk signals.
+    if (execute_previous and prior_plan and context_floor in TIERS and
             result.request_kind not in ("acknowledgement", "status_check", "bounded") and
             (result.quality_floor is None or TIERS.index(result.quality_floor) < TIERS.index(context_floor))):
         minimum_effort = DEFAULT_ROUTES.get(context_floor, {}).get("effort", result.effort)
@@ -173,12 +185,11 @@ def classify(text, previous=None, attachments=False, previous_effort=None, respo
             result = Decision(TIERS[index], "el intento anterior no resolvió la tarea", effort,
                               quality_floor=TIERS[index], request_kind="retry", max_effort_allowed=effort == "max")
     continuation = has(r"^(si\b|yes\b|continua\b|sigue\b|adelante\b|continue\b|proceed\b|hazlo\b|do it\b|ok\b|vale\b|y ahora\b|and now\b|eso\b|lo mismo\b|that\b|ahora\b|[¿?]*por que\b|[¿?]*why\b|[¿?]*que (modelo|numero)\b)", intent)
-    if previous and continuation and not new_task and not failure and result.request_kind not in ("acknowledgement", "status_check", "bounded"):
+    if previous and (execute_previous or (continuation and result.request_kind == "ambiguous")) and not new_task and not failure and result.request_kind not in ("acknowledgement", "status_check", "bounded"):
         if result.quality_floor is None or TIERS.index(result.quality_floor) <= TIERS.index(previous):
             # A request to carry out the agreed work needs its existing capacity.
             # A generic follow-up is only a fallback preference, not a hard floor.
-            execute_previous = has(r"\b(continua|continue|sigue|adelante|proceed|hazlo|do it|implementalo|implementa|implement|arreglalo|ejecutalo|compruebalo)\b", intent)
-            floors = [tier for tier in (previous if execute_previous else None, result.quality_floor, context_floor) if tier in TIERS]
+            floors = [tier for tier in (previous if execute_previous else None, result.quality_floor, context_floor if execute_previous else None) if tier in TIERS]
             floor = max(floors, key=TIERS.index) if floors else None
             minimum_effort = DEFAULT_ROUTES.get(floor, {}).get("effort", result.effort)
             effort = max(prior_effort, result.effort, minimum_effort, key=EFFORTS.index) if floor else prior_effort

@@ -86,6 +86,15 @@ def config_overrides(args):
     return result
 
 
+def with_server_overrides(args, overrides):
+    """Preserve native root/subcommand precedence when adding local settings."""
+    index = app_server_index(args)
+    if index is None:
+        return list(args)
+    inherited = [] if config_overrides(args[index + 1:]) else config_overrides(args[:index])
+    return [*args, *inherited, *overrides]
+
+
 def with_loopback_telemetry(args, endpoint, token=None):
     """Append process-local OTel settings to the app-server's own overrides."""
     index = app_server_index(args)

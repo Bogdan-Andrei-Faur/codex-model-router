@@ -21,10 +21,11 @@ WRAPPER = ROOT / "dist" / ("codex-router-v19.exe" if os.name == "nt" else "codex
 
 
 class Client:
-    def __init__(self, command=None):
+    def __init__(self, command=None, env_overrides=None):
         self.temp = tempfile.TemporaryDirectory(prefix="router-smoke-")
         self.state = Path(self.temp.name)
         env = dict(os.environ, PERSONAL_CODEX_ROUTER_STATE=str(self.state))
+        env.update(env_overrides or {})
         self.started_at = time.time()
         self.p = subprocess.Popen(command or [str(WRAPPER), "-c", "model_reasoning_effort=\"high\"", "app-server", "--analytics-default-enabled"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,

@@ -15,12 +15,20 @@ import macos
 import decision_engines
 import desktop
 from desktop_runtime import Installation
-from platform_support import backend_path, uses_stdio, with_loopback_telemetry
+from platform_support import backend_path, uses_stdio, with_loopback_telemetry, with_server_overrides
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class PlatformTests(unittest.TestCase):
+    def test_phase_flag_uses_effective_native_config_list(self):
+        flag = ["-c", "features.step_model_switching=true"]
+        root = ["-c", "features.code_mode_host=true", "app-server"]
+        self.assertEqual(with_server_overrides(root, flag), root + root[:2] + flag)
+        desktop = root + ["-c", "bundled.mcp_servers.codex_app.enabled=true"]
+        self.assertEqual(with_server_overrides(desktop, flag), desktop + flag)
+        self.assertEqual(with_server_overrides(["--version"], flag), ["--version"])
+
     def test_keychain_lookup_keeps_secret_out_of_command_and_uses_exact_scope(self):
         with tempfile.TemporaryDirectory() as folder:
             state = Path(folder) / 'state'

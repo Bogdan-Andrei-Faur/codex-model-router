@@ -3,6 +3,18 @@ const C = MonitorCore, $ = id => document.getElementById(id);
 let state = {threads:{},history:[],config:{enabled:true},ui:{mode:'Compact',topmost:true},connections:0};
 let currentTab = 'activity', order = [], selectedDecision = null, selectedThread = null, peekId = null, peekTimer, reasonOpen = false;
 let dataSignature = '', history = [], avatars = new Map(), orbitSequence = 0;
+let featuredSelection = null, featuredTimer;
+function releaseFeatured() {
+  clearTimeout(featuredTimer);featuredSelection=null;
+  if(currentTab==='activity')activity();
+}
+function selectFeatured(id) {
+  if(!state.threads[id])return;
+  clearTimeout(featuredTimer);
+  featuredSelection={id,until:performance.now()+60000};
+  featuredTimer=setTimeout(releaseFeatured,60000);
+  reasonOpen=false;activity();$('activity').scrollTop=0;
+}
 const native = message => window.webkit?.messageHandlers?.monitor?.postMessage(message);
 const heightGrip = $('height-grip');
 let heightDrag = null;
@@ -150,22 +162,31 @@ function taskModeControls(parent,id) {
 function activity() {
   const page=$('activity'),scroll=page.scrollTop;page.replaceChildren();
   const rows=Object.entries(state.threads).sort((a,b)=>Number(C.active(b[1].status))-Number(C.active(a[1].status))+(C.active(a[1].status)===C.active(b[1].status)?((b[1].updated||0)-(a[1].updated||0)):0));
+  if(featuredSelection && (performance.now()>=featuredSelection.until || !state.threads[featuredSelection.id])) {
+    clearTimeout(featuredTimer);featuredSelection=null;
+  }
+  const featuredId=C.featuredThread(state.threads,featuredSelection,performance.now());
   const featured=el('div','section');featured.append(el('h3','','TAREA DESTACADA'));
+  if(featuredSelection){
+    const hold=el('div','featured-hold');hold.append(el('span','small','Fijada durante 1 min'),button('Volver al más reciente',releaseFeatured,'featured-release'));featured.append(hold);
+  }
   if(!rows.length) {
     featured.append(el('h2','',state.connections?'Todo en calma':'Esperando conexión'),el('p','',state.connections?'Las tareas aparecerán cuando se observe actividad.':'Comprueba la conexión en Ajustes. Si está instalada, vuelve a abrir Desktop desde su acceso habitual cuando terminen tus tareas.'));
   } else {
-    const [id,row]=rows[0],line=el('div','featured-row'),copy=el('div','featured-copy');
+    const id=featuredId,row=state.threads[id],line=el('div','featured-row'),copy=el('div','featured-copy');
     const title=el('div','featured-title',row.name || id);title.title=row.name || id;
-    copy.append(title,tags(row));line.append(avatar(id,row,()=>openHistory(id)),copy);featured.append(line);
+    copy.append(title,tags(row));line.append(avatar(id,row,()=>selectFeatured(id)),copy);featured.append(line);
     taskModeControls(featured,id);
     featured.append(el('div','confirmation',row.phase_status?phaseStatus(row.phase_status):(row.status==='pending'?'Selección pendiente de confirmar':row.confirmation || 'Sin confirmar')));
     featured.append(button('¿Por qué esta elección?',()=>{reasonOpen=!reasonOpen;activity();},'why'));
     if(reasonOpen){const detail=el('div','explanation');detail.append(el('h3','','POR QUÉ EL MODELO'),el('p','',row.model_reason || row.reason || 'Sin explicación registrada.'),el('h3','','POR QUÉ EL RAZONAMIENTO'),el('p','',row.effort_reason || 'Sin explicación registrada.'));if(row.continuity_strategy)detail.append(el('h3','','DECISIÓN DE CONTINUIDAD'),el('p','',continuity(row.continuity_strategy)));featured.append(detail);}
     pipeline(featured,row);
+    featured.append(button('Ver historial',()=>openHistory(id),'why'));
   }
   page.append(featured,el('div','rule'),el('h3','section-title','ACTIVIDAD'));
-  for(const [id,row] of rows.slice(1)) {
-    const card=button('',()=>openHistory(id),'task-row'),copy=el('div');copy.style.minWidth='0';
+  for(const [id,row] of rows.filter(([id])=>id!==featuredId)) {
+    const card=button('',()=>selectFeatured(id),'task-row'),copy=el('div');copy.style.minWidth='0';
+    card.title='Mostrar en Tarea destacada durante 1 minuto';
     const title=el('div','task-title',row.name || id);title.title=row.name || id;
     copy.append(title,el('div','task-status',C.status(row.status)+(row.phase_status?' · '+phaseStatus(row.phase_status):'')));
     const art=avatar(id,row,()=>{});art.tabIndex=-1;
@@ -353,8 +374,8 @@ window.receive = incoming => {
   $('connection').classList.toggle('disconnected',!state.connections);$('connection').querySelector('span').textContent=state.preview?'Vista previa · datos simulados':state.connections?`${active} ${active===1?'tarea activa':'tareas activas'}`:'Sin conexión';$('connection').querySelector('i').classList.toggle('working',active>0);
   $('pause').textContent=state.config.enabled?'Ⅱ  Pausar selección':'▶  Activar selección';
   const bridgeMismatch=(state.bridgeVersions||[]).filter(v=>v!==state.productVersion);
-  $('product-version').textContent='v'+(state.productVersion || '—')+(bridgeMismatch.length?' · puente '+bridgeMismatch.join(', '):state.bridgeBuildMismatch?' · reinicio pendiente':'');
-  $('product-version').title=(bridgeMismatch.length||state.bridgeBuildMismatch)?'Reinicia Desktop al terminar tus tareas para cargar la versión instalada.':'Versión de Codex automático';
+  $('product-version').textContent='v'+(state.productVersion || '—')+(bridgeMismatch.length?' · puente '+bridgeMismatch.join(', '):state.bridgeBuildMismatch?' · reinicio del router pendiente':state.bridgeBuildUnknown?' · puente sin verificar':'');
+  $('product-version').title=(bridgeMismatch.length||state.bridgeBuildMismatch)?'La versión del router activo difiere de la incluida con este monitor. Reinicia Desktop al terminar tus tareas para cargar la versión instalada.':state.bridgeBuildUnknown?'El puente activo no informa su versión de componente. No se puede determinar si necesita reinicio; el próximo inicio de Desktop permitirá comprobarlo.':'Versión de Codex automático';
   capsule();
   const signature=JSON.stringify([state.threads,state.history,state.connections,state.taskModes,state.telemetry]);
   const settingsChanged=oldConfig!==JSON.stringify(state.config) || oldUi!==JSON.stringify(state.ui);

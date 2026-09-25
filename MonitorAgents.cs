@@ -158,7 +158,7 @@ internal sealed partial class ModernRouterMonitor
             RenderTransform = new TranslateTransform(), VerticalAlignment = VerticalAlignment.Center };
         visual.Slot.Tag = visual;
         if (activityView)
-            visual.Button.Click += delegate { OpenHistoryForThread(id); };
+            visual.Button.Click += delegate { SelectFeatured(id); };
         else
         {
             visual.Button.MouseEnter += delegate { ShowAgentPeek(id, true); };

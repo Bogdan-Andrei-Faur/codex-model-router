@@ -78,6 +78,28 @@ class AuditRegressions(unittest.TestCase):
         restarted = Router(self.config, self.root / 'state')
         self.assertEqual(restarted.thread_categories['task-audit']['task_contract']['status'], 'completed')
 
+    def test_independent_change_allows_jev_terra_but_keeps_pending_contract(self):
+        self.assistant('Queda pendiente corregir la autenticación y validar las pruebas.')
+        self.router = Router(self.config, self.root / 'state')
+        self.resume(self.router)
+        with patch('router.run_jev', return_value={'engine': 'jev', 'status': 'ok',
+                   'route': {'model': 'gpt-5.6-terra', 'effort': 'medium'}}) as jev:
+            actual = json.loads(self.router.client_line(wire(self.request('Ok, implementa un formulario de contactos'))))
+        self.assertEqual(actual['params']['model'], 'gpt-5.6-terra')
+        state = jev.call_args.args[2]
+        self.assertNotIn('previous_response_context', state)
+        self.assertIsNone(state['quality_floor'])
+        self.assertEqual(self.router.threads['task-audit']['task_contract']['floor'], 'critical')
+        self.router.server_line(wire({'id': 2, 'result': {'turn': {'id': 'turn-independent'}}}))
+        self.router.server_line(wire({'method': 'turn/completed', 'params': {
+            'threadId': 'task-audit', 'turn': {'id': 'turn-independent', 'status': 'completed'}}}))
+        followup = self.request('Sigue con lo que falta', 3)
+        followup['params'].update(model='gpt-5.6-terra', effort='medium')
+        with patch('router.run_jev', return_value={'engine': 'jev', 'status': 'ok',
+                   'route': {'model': 'gpt-5.6-terra', 'effort': 'medium'}}):
+            actual = json.loads(self.router.client_line(wire(followup)))
+        self.assertEqual(actual['params']['model'], 'gpt-6-astra')
+
     def test_progress_completion_does_not_close_whole_task(self):
         self.assistant('Queda pendiente corregir autenticación y validar pruebas.')
         self.router.server_line(wire({'method':'item/completed','params':{'threadId':'task-audit',
@@ -108,7 +130,7 @@ class AuditRegressions(unittest.TestCase):
             self.assertNotIn(key, row)
         record = list(read_records(self.root / 'state/history.jsonl'))[-1]
         self.assertTrue(record['build_id'])
-        self.assertEqual(record['routing_policy_version'], 3)
+        self.assertEqual(record['routing_policy_version'], 4)
 
     def test_identical_routed_wire_is_still_one_automatic_decision(self):
         self.config.write_text(json.dumps({'enabled': True, 'routes': DEFAULT_ROUTES}))

@@ -17,6 +17,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     var configPath: URL { root.appendingPathComponent("config.local.json") }
     let productVersion: String = Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "sin identificar"
     let productBuildId: String = Bundle.main.object(forInfoDictionaryKey:"RouterBuildId") as? String ?? ""
+    let routerBuildId: String = Bundle.main.object(forInfoDictionaryKey:"RouterEngineBuildId") as? String ?? ""
     var uiPath: URL { state.appendingPathComponent("monitor-ui-mac.json") }
     let resources = Bundle.main.resourceURL!.appendingPathComponent("ui")
     var service: String { "local.codex-model-router." + SHA256.hash(data: Data(root.path.utf8)).map { String(format:"%02x",$0) }.joined() }
@@ -256,6 +257,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             var rows=[String:Any](),connections=0
             var bridgeVersions=Set<String>()
             var bridgeBuildMismatch=false
+            var bridgeBuildUnknown=false
             var telemetry=[String:Any](dictionaryLiteral:("enabled",false))
             let files=(try? FileManager.default.contentsOfDirectory(at:self.state,includingPropertiesForKeys:nil)) ?? []
             for file in files.sorted(by:{$0.lastPathComponent<$1.lastPathComponent}) where file.lastPathComponent.hasPrefix("status-") && file.pathExtension=="json" {
@@ -264,7 +266,9 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
                 guard let heartbeat=data["heartbeat"] as? Double,abs(Date().timeIntervalSince1970-heartbeat)<12,let pid=data["pid"] as? Int32,kill(pid,0)==0,let threads=data["threads"] as? [String:[String:Any]] else{continue}
                 connections+=1
                 bridgeVersions.insert(data["product_version"] as? String ?? "desconocida")
-                if let build=data["build_id"] as? String,!self.productBuildId.isEmpty,build != self.productBuildId {bridgeBuildMismatch=true}
+                if let build=data["router_build_id"] as? String,!build.isEmpty,!self.routerBuildId.isEmpty {
+                    if build != self.routerBuildId {bridgeBuildMismatch=true}
+                } else {bridgeBuildUnknown=true}
                 if let health=data["telemetry"] as? [String:Any] {
                     telemetry["enabled"] = (telemetry["enabled"] as? Bool ?? false) || (health["enabled"] as? Bool ?? false)
                     for key in ["requests","records_scanned","eligible_records","events_without_model","unrecognized_records","invalid_requests","unexpected_path"] { telemetry[key]=(telemetry[key] as? Double ?? 0)+(health[key] as? Double ?? 0) }
@@ -286,7 +290,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             DispatchQueue.main.async {
                 self.busy=false;if let records=records{self.journal=records}
                 let safeConfig=config.filter{["enabled","inference_telemetry","history_days","routing_engine","comparison_engines","jev","routes"].contains($0.key)}
-                var payload:[String:Any]=["productVersion":self.productVersion,"bridgeVersions":Array(bridgeVersions).sorted(),"bridgeBuildMismatch":bridgeBuildMismatch,"threads":rows,"connections":connections,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"telemetry":telemetry,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
+                var payload:[String:Any]=["productVersion":self.productVersion,"bridgeVersions":Array(bridgeVersions).sorted(),"bridgeBuildMismatch":bridgeBuildMismatch,"bridgeBuildUnknown":bridgeBuildUnknown,"threads":rows,"connections":connections,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"telemetry":telemetry,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
                 if records != nil {payload["history"]=self.journal}
                 guard let encoded=try? JSONSerialization.data(withJSONObject:payload,options:[.sortedKeys]),encoded != self.lastPayload else{return}
                 self.lastPayload=encoded

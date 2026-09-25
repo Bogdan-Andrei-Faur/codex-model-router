@@ -1,7 +1,8 @@
 """Transparent JSONL bridge to the installed Codex app-server on Windows/macOS.
 
-Only model/effort in eligible turn/start requests are changed. All other bytes
-and server output are forwarded. Optional JEV classification receives a transient
+Model/effort in eligible turn/start requests are changed. The opt-in phase
+controller also owns an isolated dynamic tool and native settings RPCs.
+Optional JEV classification receives a transient
 request and content-free context; it has a bounded local fallback. No transcript
 editing or additional Codex inference is performed.
 """
@@ -19,19 +20,21 @@ import uuid
 from routing import DEFAULT_ROUTES, EFFORTS, classify_agent_identity, select_route_details, has_attachments, user_text, summarize_response_context
 from decision_engines import ENGINES, ENGINE_JEV, ENGINE_RULES, attachment_summary, build_state, candidate_routes, run_jev
 from thread_inventory import ThreadInventory, thread_metadata
-from platform_support import backend_path, creation_flags, uses_stdio, stop_backend, input_lines, with_loopback_telemetry
+from platform_support import backend_path, creation_flags, uses_stdio, stop_backend, input_lines, with_loopback_telemetry, with_server_overrides
 from desktop_runtime import discover
 from task_modes import read_mode
 from phase_tracking import phase_update, proposed_phase
 from inference_telemetry import LocalInferenceTelemetry
 from workload import effective_context, merge_contract, plan_steps
 from state_store import recover_tasks, persist_task, append_record, compact_history
-from build_identity import identity, POLICY_VERSION
+from build_identity import identity, router_identity, POLICY_VERSION
 from request_dispatch import Dispatcher
+from phase_control import PhaseController
 
 ROOT = Path(os.environ.get("PERSONAL_CODEX_ROUTER_ROOT", Path(__file__).resolve().parent)).resolve()
 PRODUCT_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 BUILD = identity(ROOT)
+ROUTER_BUILD = router_identity(ROOT)
 SHADOW_SLOTS = threading.BoundedSemaphore(2)
 
 
@@ -65,6 +68,13 @@ class Router:
         self.handshake_complete = False
         self.telemetry = None
         self.inference_ids = set()
+        self.phases = PhaseController(self, self.phase_config().get("phase_routing") is True)
+
+    def phase_config(self):
+        try:
+            return read_config(self.config_path)
+        except (OSError, ValueError):
+            return {}  # Pausing or damaged configuration must fail closed.
 
     def set_telemetry(self, collector):
         self.telemetry = collector
@@ -101,7 +111,7 @@ class Router:
                    "accepted_model", "accepted_effort", "pipeline_mode", "phase_pipeline", "inference_source",
                    "model_quality", "effort_quality", "routing_policy_version", "request_kind", "quality_floor", "max_effort_allowed",
                    "task_floor", "min_effort", "evidence_confidence"}
-        record = {"schema": 3, "product_version": BUILD[0], "build_id": BUILD[1],
+        record = {"schema": 3, "product_version": BUILD[0], "build_id": BUILD[1], "router_build_id": ROUTER_BUILD,
                   "routing_policy_version": POLICY_VERSION, "time": time.time(), "time_iso":
                   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event,
                   "session": str(os.getpid())}
@@ -161,7 +171,7 @@ class Router:
             self.state_dir.mkdir(parents=True, exist_ok=True)
             target = self.state_dir / ("status-%s.json" % os.getpid())
             temp = target.with_suffix(".tmp")
-            temp.write_text(json.dumps({"version": 3, "storage_schema": 3, "product_version": BUILD[0], "build_id": BUILD[1],
+            temp.write_text(json.dumps({"version": 3, "storage_schema": 3, "product_version": BUILD[0], "build_id": BUILD[1], "router_build_id": ROUTER_BUILD,
                                        "routing_policy_version": POLICY_VERSION, "pid": os.getpid(), "events": self.events,
                                        "heartbeat": time.time(), "threads": self.inventory.visible(self.threads),
                                        "client_name": self.client_name, "handshake_complete": self.handshake_complete,
@@ -246,6 +256,9 @@ class Router:
             if not isinstance(message, dict):
                 return
             with self.lock:
+                phase_config = self.phase_config() if message.get("method") == "item/tool/call" else {}
+                if self.phases.consume(message, phase_config):
+                    return False
                 owned, next_page = self.inventory.consume(message)
                 if owned:
                     if next_page:
@@ -317,6 +330,7 @@ class Router:
                                         "turn_id": (result.get("turn") or {}).get("id") or row.get("turn_id"),
                                         "accepted_model": accepted.get("model"), "accepted_effort": accepted.get("effort"),
                                         **phase_update(row, "accepted", model=accepted.get("model"), effort=accepted.get("effort"))})
+                            self.phases.begin(tid, row.get("turn_id"), accepted)
                             self.stats["accepted"] += 1
                             if accepted["model"] in {"gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"}:
                                 self.stats["non_astra"] += 1
@@ -341,6 +355,8 @@ class Router:
                 params = message.get("params") or {}
                 self.inventory.notification(method, params)
                 tid = params.get("threadId")
+                if method == "thread/closed":
+                    self.phases.end(tid)
                 if method == "turn/started":
                     self.active.add(tid)
                     row = self.threads.setdefault(tid, {})
@@ -348,6 +364,7 @@ class Router:
                     self.record_history("phase_started", decision_id=self.current_decisions.get(tid), thread=tid,
                                         **phase_update(row, "active"))
                 elif method == "turn/completed":
+                    self.phases.end(tid)
                     self.active.discard(tid)
                     self.pending.discard(tid)
                     status = params.get("turn", {}).get("status", "completed")
@@ -377,6 +394,7 @@ class Router:
                     status = params.get("status", {}).get("type", "unknown")
                     self.threads.setdefault(tid, {}).update(status=status, updated=time.time())
                     if status in ("error", "failed", "interrupted"):
+                        self.phases.end(tid)
                         row = self.threads.get(tid, {})
                         row.update(**phase_update(row, "failed"))
                         self.record_history("decision_error", decision_id=self.current_decisions.get(tid),
@@ -475,6 +493,7 @@ class Router:
 
     def drain_outbound(self):
         with self.lock:
+            self.phases.poll()
             result, self.outbound = self.outbound, []
             return result
 
@@ -488,7 +507,16 @@ class Router:
             if not isinstance(params, dict):
                 return raw
             with self.lock:
+                if method == "thread/start":
+                    prepared = self.phases.prepare(message, self.phase_config())
+                    if prepared is not message:
+                        message = prepared
+                        params = message["params"]
+                        raw = (json.dumps(message, ensure_ascii=False) + "\n").encode()
+                if method in ("turn/interrupt", "turn/steer", "thread/settings/update", "turn/settings/update"):
+                    self.phases.disable_turn(params.get("threadId"))
                 if method == "initialize":
+                    self.phases.api_enabled = (params.get("capabilities") or {}).get("experimentalApi") is True
                     name = (params.get("clientInfo") or {}).get("name", "unknown")
                     self.client_name = name if name in ("codex_desktop", "codex_app", "Codex Desktop") else "other"
                 if method == "initialized":
@@ -631,7 +659,7 @@ class Router:
         external_allowed = reasons.get("source") == "automatic" and bool(candidates)
         state_for_engine = build_state(text, attachment_summary(items), current, state.get("effort"), reasons.get("signal") == "retry")
         state_for_engine.update(routing_policy)
-        if response_context:
+        if response_context and reasons.get("request_kind") in ("planned_followup", "work_followup", "context_followup", "retry"):
             state_for_engine["previous_response_context"] = response_context
         engine_result = {"engine": ENGINE_RULES, "status": "ok", "latency_ms": 0,
                          "route": {"model": route["model"], "effort": route["effort"]}, "engine_model": "local-policy"}
@@ -696,6 +724,7 @@ class Router:
                             routing_engine=effective_engine, engine_applied=engine_applied,
                             continuity_strategy=continuity_strategy, **proposed_phase(current, model, effort, category, steps))
         decision = {"model": model, "effort": effort, "reason": reasons["model"],
+                    "quality_floor": routing_policy.get("quality_floor"), "min_effort": routing_policy.get("min_effort"),
                     "model_reason": reasons["model"], "effort_reason": reasons["effort"],
                     "source": reasons["source"], "agent_category": category,
                     "agent_confidence": confidence, "decision_id": decision_id,
@@ -789,6 +818,8 @@ def main():
         return subprocess.call([str(binary), *args], env=env, creationflags=flags,
                                stdin=sys.stdin.buffer, stdout=sys.stdout.buffer, stderr=sys.stderr.buffer)
     router = Router(config_path, os.environ.get("PERSONAL_CODEX_ROUTER_STATE"))
+    if router.phases.enabled:
+        args = with_server_overrides(args, ["-c", "features.step_model_switching=true"])
     telemetry = None
     if config.get("inference_telemetry", False):
         try:

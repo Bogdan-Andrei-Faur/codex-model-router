@@ -71,7 +71,11 @@
     }
     return [...map.values()].sort((a,b)=>b.time-a.time);
   }
-  const api = {models,efforts,effortColors,neutral,identities,active,status,setting,model,identity,stableOrder,decisions};
+  function featuredThread(threads, selection, now) {
+    if(selection && now < selection.until && threads[selection.id])return selection.id;
+    return Object.keys(threads).sort((a,b)=>(Number(threads[b].updated)||0)-(Number(threads[a].updated)||0) || a.localeCompare(b))[0] || null;
+  }
+  const api = {models,efforts,effortColors,neutral,identities,active,status,setting,model,identity,stableOrder,decisions,featuredThread};
   if (typeof module !== 'undefined') module.exports = api;
   else scope.MonitorCore = api;
 })(globalThis);

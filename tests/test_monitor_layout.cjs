@@ -16,6 +16,11 @@ const assert = require('node:assert/strict');
     });
     await page.route('**/codex.png',route=>route.fulfill({path:path.resolve(__dirname,'../assets/codex-official.png')}));
     await page.goto(pathToFileURL(path.resolve(__dirname,'../monitor-ui/index.html')).href);
+    for (const [mismatch,unknown,label] of [[false,false,'v0.3.1'],[false,true,'v0.3.1 · puente sin verificar'],[true,true,'v0.3.1 · reinicio del router pendiente']]) {
+      await page.evaluate(([bridgeBuildMismatch,bridgeBuildUnknown])=>window.receive({productVersion:'0.3.1',bridgeVersions:['0.3.1'],bridgeBuildMismatch,bridgeBuildUnknown}),[mismatch,unknown]);
+      assert.equal(await page.locator('#product-version').innerText(),label);
+    }
+    await page.evaluate(()=>window.receive({bridgeBuildMismatch:false,bridgeBuildUnknown:false}));
     for (const height of [1020,1380,674,460]) {
       await page.setViewportSize({width:432,height});
       const preferred=Math.min(height,Math.max(560,(height+20)*.9));
@@ -40,6 +45,34 @@ const assert = require('node:assert/strict');
     assert.ok(message && Math.abs(message.height-after.height-16)<1,'Native preference not submitted');
     await page.locator('#height-grip').focus();await page.keyboard.press('Home');
     assert.ok(await page.evaluate(()=>window.nativeMessages.some(m=>m.action==='resizeReset')),'Automatic height reset unavailable');
+    await page.clock.install();
+    const activityFixture={older:{name:'Agente anterior',status:'active',updated:10,phase_pipeline:[{label:'Validación inicial',state:'active',evidence:'observed'}]},
+      newer:{name:'Agente reciente',status:'completed',updated:20}};
+    await page.evaluate(threads=>window.receive({threads,connections:1}),activityFixture);
+    assert.equal(await page.locator('.featured-title').innerText(),'Agente reciente','Default must use latest update, not active priority');
+    await page.locator('.task-row').filter({hasText:'Agente anterior'}).click();
+    assert.equal(await page.locator('.featured-title').innerText(),'Agente anterior');
+    assert.equal(await page.locator('[data-tab="activity"]').getAttribute('class'),'selected');
+    activityFixture.newer.updated=30;
+    activityFixture.older.phase_pipeline[0].label='Validación terminada';
+    activityFixture.older.phase_pipeline[0].state='completed';
+    await page.evaluate(threads=>window.receive({threads}),activityFixture);
+    assert.equal(await page.locator('.featured-title').innerText(),'Agente anterior','Snapshot stole selected task');
+    assert.ok((await page.locator('#activity .pipeline').innerText()).includes('Validación terminada'),'Held pipeline stopped refreshing');
+    await page.clock.fastForward(45000);
+    await page.locator('.featured-row .avatar').click();
+    await page.clock.fastForward(20000);
+    assert.equal(await page.locator('.featured-title').innerText(),'Agente anterior','Repeated click did not renew hold');
+    await page.clock.fastForward(40001);
+    assert.equal(await page.locator('.featured-title').innerText(),'Agente reciente','Hold did not expire without incoming snapshots');
+    await page.locator('.task-row').filter({hasText:'Agente anterior'}).focus();await page.keyboard.press('Enter');
+    await page.locator('.featured-release').click();
+    assert.equal(await page.locator('.featured-title').innerText(),'Agente reciente','Explicit release failed');
+    await page.locator('.task-row').filter({hasText:'Agente anterior'}).click();
+    await page.evaluate(threads=>window.receive({threads}),{newer:activityFixture.newer});
+    assert.equal(await page.locator('.featured-title').innerText(),'Agente reciente','Missing task left stale featured data');
+    assert.equal(await page.locator('.featured-release').count(),0);
+    console.log('PASS: latest task, manual one-minute hold, live pipeline, renewal, expiry, keyboard, release and missing task');
     for(const count of [1000,10000]){
       const elapsed=await page.evaluate(count=>{
         const records=Array.from({length:count},(_,i)=>({event:'decision_created',decision_id:'d'+i,thread:'t'+i,time:i+1,
