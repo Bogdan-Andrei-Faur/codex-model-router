@@ -271,7 +271,11 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
                 } else {bridgeBuildUnknown=true}
                 if let health=data["telemetry"] as? [String:Any] {
                     telemetry["enabled"] = (telemetry["enabled"] as? Bool ?? false) || (health["enabled"] as? Bool ?? false)
-                    for key in ["requests","records_scanned","eligible_records","events_without_model","unrecognized_records","invalid_requests","unexpected_path"] { telemetry[key]=(telemetry[key] as? Double ?? 0)+(health[key] as? Double ?? 0) }
+                    for key in ["requests","records_scanned","eligible_records","events_without_model","unrecognized_records","invalid_requests","unexpected_path",
+                                "invalid_size","invalid_wire_size","invalid_decoded_size","invalid_length","invalid_encoding","invalid_payload","invalid_io","unauthorized_requests","rejected_connections","processing_busy",
+                                "completion_records","failure_records","api_request_records","stream_records",
+                                "size_wire_512k","size_wire_1m","size_wire_4m","size_wire_16m","size_wire_over16m",
+                                "size_decoded_512k","size_decoded_1m","size_decoded_4m","size_decoded_16m","size_decoded_over16m"] { telemetry[key]=(telemetry[key] as? Double ?? 0)+(health[key] as? Double ?? 0) }
                     if let stats=data["stats"] as? [String:Any] { for key in ["telemetry_events","telemetry_confirmed","telemetry_probable","telemetry_unattributed"] { telemetry[key]=(telemetry[key] as? Double ?? 0)+(stats[key] as? Double ?? 0) } }
                 }
                 for (id,row) in threads {let old=rows[id] as? [String:Any] ?? [:];if (row["updated"] as? Double ?? 0)>=(old["updated"] as? Double ?? 0){rows[id]=row}}

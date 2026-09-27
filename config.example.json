@@ -3,13 +3,16 @@
   "enabled": true,
   "sync_picker": true,
   "inference_telemetry": false,
+  "prompt_logging": false,
   "phase_routing": false,
   "history_days": 90,
   "routing_engine": "rules",
   "comparison_engines": ["rules"],
   "jev": {
     "connection": "typesafe",
-    "timeout_seconds": 4
+    "timeout_seconds": 4,
+    "circuit_failures": 3,
+    "circuit_seconds": 900
   },
   "python": "C:\\Python314\\python.exe",
   "routes": {

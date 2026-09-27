@@ -17,7 +17,7 @@ import threading
 import time
 import uuid
 
-from routing import DEFAULT_ROUTES, EFFORTS, classify_agent_identity, select_route_details, has_attachments, user_text, summarize_response_context
+from routing import DEFAULT_ROUTES, EFFORTS, TIERS, classify_agent_identity, select_route_details, has_attachments, user_text, summarize_response_context
 from decision_engines import ENGINES, ENGINE_JEV, ENGINE_RULES, attachment_summary, build_state, candidate_routes, run_jev
 from thread_inventory import ThreadInventory, thread_metadata
 from platform_support import backend_path, creation_flags, uses_stdio, stop_backend, input_lines, with_loopback_telemetry, with_server_overrides
@@ -25,11 +25,13 @@ from desktop_runtime import discover
 from task_modes import read_mode
 from phase_tracking import phase_update, proposed_phase
 from inference_telemetry import LocalInferenceTelemetry
-from workload import effective_context, merge_contract, plan_steps
-from state_store import recover_tasks, persist_task, append_record, compact_history
+from workload import effective_context, merge_contract, plan_steps, context_for_engine, resumes_work, cancels_work
+from state_store import (recover_tasks, persist_task, append_record, append_prompt_record,
+                         compact_history, compact_prompt_history)
 from build_identity import identity, router_identity, POLICY_VERSION
 from request_dispatch import Dispatcher
 from phase_control import PhaseController
+from error_diagnostics import DIAGNOSTIC_FIELDS, native_error, rpc_error, clear_error
 
 ROOT = Path(os.environ.get("PERSONAL_CODEX_ROUTER_ROOT", Path(__file__).resolve().parent)).resolve()
 PRODUCT_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
@@ -58,9 +60,12 @@ class Router:
         self.outbound = []
         self.accepted_routes = {}
         self.current_decisions = {}
+        self.native_errors = {}
         self.temporary_threads = set()
         self.thread_categories = self.load_thread_categories()
         self.history_writes = 0
+        self.prompt_writes = 0
+        self.next_retention_check = 0
         self.stats = {"accepted": 0, "non_astra": 0, "telemetry_events": 0,
                       "telemetry_confirmed": 0, "telemetry_unattributed": 0}
         self.inventory = ThreadInventory()
@@ -68,6 +73,7 @@ class Router:
         self.handshake_complete = False
         self.telemetry = None
         self.inference_ids = set()
+        self.metric_buckets = {}
         self.phases = PhaseController(self, self.phase_config().get("phase_routing") is True)
 
     def phase_config(self):
@@ -97,6 +103,13 @@ class Router:
         except OSError:
             self.log({"event": "task_state_unavailable", "thread": tid})
 
+    def clear_pending_phase(self, tid):
+        row = self.threads.get(tid, {})
+        for source in (row, self.thread_categories.get(tid, {})):
+            for key in ("pending_phase_floor", "pending_phase_name", "pending_phase_id"):
+                source.pop(key, None)
+        self.save_task(tid, row)
+
     def record_history(self, event, **fields):
         """Append privacy-safe decision metadata; never prompts, outputs or tool data."""
         if fields.get("thread") in self.temporary_threads:
@@ -109,8 +122,14 @@ class Router:
                    "continuity_strategy", "phase_name", "phase_status", "phase_model", "phase_effort",
                    "phase_transition", "observed_model", "observed_effort", "configured_model", "configured_effort",
                    "accepted_model", "accepted_effort", "pipeline_mode", "phase_pipeline", "inference_source",
-                   "model_quality", "effort_quality", "routing_policy_version", "request_kind", "quality_floor", "max_effort_allowed",
-                   "task_floor", "min_effort", "evidence_confidence"}
+                   "model_quality", "effort_quality", "routing_policy_version", "request_kind", "quality_floor", "quality_ceiling", "max_effort_allowed",
+                   "task_floor", "min_effort", "evidence_confidence", "turn_id", "error_http_status", "error_source", "will_retry"}
+        allowed.update({"inference_input_tokens", "inference_output_tokens", "inference_cached_tokens",
+                        "inference_cache_write_tokens", "inference_reasoning_tokens", "inference_tool_tokens",
+                        "inference_duration_ms", "inference_ttft_ms", "inference_attempt",
+                        "inference_http_status", "inference_success", "observed_candidate_model", "observed_candidate_effort"})
+        allowed.update({"phase_id", "phase_source_model", "inference_event_name", "inference_event_kind", "inference_event_id"})
+        allowed.update({"inference_sample_count", "inference_failure_count"})
         record = {"schema": 3, "product_version": BUILD[0], "build_id": BUILD[1], "router_build_id": ROUTER_BUILD,
                   "routing_policy_version": POLICY_VERSION, "time": time.time(), "time_iso":
                   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event,
@@ -133,6 +152,46 @@ class Router:
         except (OSError, ValueError, KeyError):
             pass
 
+    def record_prompt(self, config, decision_id, tid, prompt, **fields):
+        """Persist exact user text only under the owner's explicit local opt-in."""
+        if config.get("prompt_logging") is not True or tid in self.temporary_threads:
+            return
+        if not isinstance(prompt, str) or not prompt.strip():
+            return
+        allowed = {"model", "effort", "previous_model", "source", "model_reason", "effort_reason",
+                   "agent_category", "agent_confidence", "routing_engine", "engine_model", "engine_status",
+                   "engine_applied", "continuity_strategy", "request_kind", "quality_floor", "quality_ceiling",
+                   "max_effort_allowed", "task_floor", "min_effort", "has_attachments", "task_mode"}
+        record = {"schema": 1, "product_version": BUILD[0], "build_id": BUILD[1],
+                  "router_build_id": ROUTER_BUILD, "routing_policy_version": POLICY_VERSION,
+                  "time": time.time(), "time_iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                  "session": str(os.getpid()), "decision_id": decision_id, "thread": tid,
+                  "prompt": prompt}
+        record.update({key: value for key, value in fields.items() if key in allowed and value is not None})
+        try:
+            append_prompt_record(self.state_dir, record)
+            self.prompt_writes += 1
+            self.maintain_retention(config)
+        except (OSError, ValueError, TypeError):
+            pass
+
+    def maintain_retention(self, config=None, now=None):
+        """Enforce configured retention hourly, including quiet/small datasets."""
+        now = time.time() if now is None else now
+        if now < self.next_retention_check:
+            return
+        self.next_retention_check = now + 3600
+        config = self.phase_config() if config is None else config
+        try:
+            history_days = max(0, int(config.get("history_days", 90)))
+            prompt_days = max(0, int(config.get("prompt_history_days", history_days)))
+            if (self.state_dir / "history.jsonl").exists():
+                compact_history(self.state_dir, history_days, now=now)
+            if (self.state_dir / "prompts.jsonl").exists():
+                compact_prompt_history(self.state_dir, prompt_days, now=now)
+        except (OSError, ValueError, TypeError):
+            self.next_retention_check = now + 60
+
     def new_decision(self, tid, model, effort, model_reason, effort_reason, source, previous_model=None, signal=None,
                      agent_category=None, agent_confidence=None, continuity_strategy=None, routing_policy=None):
         previous_decision = self.current_decisions.get(tid)
@@ -147,8 +206,10 @@ class Router:
             self.thread_categories.setdefault(tid, {}).update(agent_category=agent_category,
                                                              agent_confidence=agent_confidence or "baja")
         row = self.threads.setdefault(tid, {})
+        clear_error(row)
+        self.native_errors.pop(tid, None)
         for field in ("tokens", "observed_model", "observed_effort", "inference_source", "evidence_confidence",
-                      "accepted_model", "accepted_effort", "completed_at", "turn_id"):
+                      "accepted_model", "accepted_effort", "completed_at", "turn_id", "phase_id", "phase_accepted_at"):
             row.pop(field, None)
         row["decision_started_at"] = time.time()
         self.save_task(tid, {"agent_category": agent_category,
@@ -186,11 +247,15 @@ class Router:
 
     def observe_inference(self, record):
         """Associate a completed local OTel event only when it is unambiguous."""
-        if record.get("event_kind") != "response.completed":
-            return
+        completion = record.get("event_kind") == "response.completed"
         model, effort = record.get("model"), record.get("effort")
         if not model:
             return
+        metric_names = ("inference_input_tokens", "inference_output_tokens", "inference_cached_tokens",
+                        "inference_cache_write_tokens", "inference_reasoning_tokens", "inference_tool_tokens",
+                        "inference_duration_ms", "inference_ttft_ms", "inference_attempt",
+                        "inference_http_status", "inference_success")
+        metrics = {name: record[name] for name in metric_names if name in record}
         with self.lock:
             now = time.time()
             event_id = record.get("event_id")
@@ -200,7 +265,8 @@ class Router:
                 self.inference_ids.add(event_id)
                 if len(self.inference_ids) > 8192:
                     self.inference_ids = {event_id}
-            self.stats["telemetry_events"] += 1
+            if completion:
+                self.stats["telemetry_events"] += 1
             candidates = []
             for tid, row in self.threads.items():
                 status = row.get("phase_status")
@@ -224,20 +290,40 @@ class Router:
                     continue
                 if record.get("timestamp") and record["timestamp"] < row.get("decision_started_at", 0):
                     continue
+                if record.get("timestamp") and record["timestamp"] < row.get("phase_accepted_at", 0):
+                    continue
                 if model == expected_model and (not effort or not expected_effort or effort == expected_effort):
                     candidates.append((tid, row))
             if len(candidates) != 1:
-                self.stats["telemetry_unattributed"] += 1
-                self.log({"event": "inference_unattributed", "model": model, "effort": effort})
+                if completion:
+                    self.stats["telemetry_unattributed"] += 1
+                    self.log({"event": "inference_unattributed", "model": model, "effort": effort})
                 return
             tid, row = candidates[0]
-            confirmed = bool(record.get("turn_id") and record.get("thread_id"))
+            confirmed = bool(record.get("turn_id") and record.get("thread_id") and
+                             (not row.get("phase_accepted_at") or record.get("timestamp")))
+            metrics.update(inference_event_name=record.get("event_name"),
+                           inference_event_kind=record.get("event_kind"), inference_event_id=event_id,
+                           phase_id=row.get("phase_id"))
+            if not completion:
+                key = (tid, self.current_decisions.get(tid), row.get('phase_id'), record.get('event_name'), record.get('event_kind'))
+                bucket = self.metric_buckets.setdefault(key, {'count': 0, 'failures': 0, 'flushed_at': now - 30})
+                bucket['count'] += 1
+                bucket['failures'] += int(record.get('event_kind') == 'response.failed' or record.get('inference_http_status', 0) >= 400)
+                bucket['fields'] = dict(decision_id=self.current_decisions.get(tid), thread=tid, turn_id=row.get('turn_id'), phase_name=row.get('phase_name'),
+                    evidence_confidence='correlated' if confirmed else 'probable',
+                    observed_candidate_model=model, observed_candidate_effort=effort, **metrics)
+                self.flush_metrics(now=now)
+                return
             if not confirmed:
                 # A model match is useful health evidence, never proof of the
                 # inference used by this decision. Do not populate observed_*.
                 self.stats["telemetry_probable"] = self.stats.get("telemetry_probable", 0) + 1
                 self.record_history("inference_probable", decision_id=self.current_decisions.get(tid),
-                                    thread=tid, evidence_confidence="probable", inference_source="otlp_loopback")
+                                    thread=tid, turn_id=row.get("turn_id"), evidence_confidence="probable", inference_source="otlp_loopback",
+                                    phase_name=row.get('phase_name'),
+                                    observed_candidate_model=model, observed_candidate_effort=effort,
+                                    **metrics)
                 return
             row.update(observed_model=model, observed_effort=effort,
                        inference_source="otlp_loopback", evidence_confidence="confirmed")
@@ -247,8 +333,23 @@ class Router:
                                 observed_effort=effort, inference_source="otlp_loopback",
                                 evidence_confidence="confirmed",
                                 phase_status=row.get("phase_status"), phase_name=row.get("phase_name"),
-                                phase_pipeline=row.get("phase_pipeline"), pipeline_mode="observation")
+                                phase_pipeline=row.get("phase_pipeline"), pipeline_mode="observation", **metrics)
             self.log({"event": "inference_observed", "thread": tid, "model": model, "effort": effort})
+
+    def flush_metrics(self, thread=None, now=None):
+        """Persist bounded class samples, not a row for every stream packet."""
+        now = time.time() if now is None else now
+        for key, bucket in list(self.metric_buckets.items()):
+            if thread is not None and key[0] != thread:
+                continue
+            if bucket['count'] and (thread is not None or now - bucket['flushed_at'] >= 30):
+                self.record_history('inference_metric', **bucket['fields'],
+                                    inference_sample_count=bucket['count'], inference_failure_count=bucket['failures'])
+                bucket.update(count=0, failures=0, flushed_at=now)
+            if thread is not None:
+                self.metric_buckets.pop(key, None)
+            elif not bucket['count'] and now - bucket['flushed_at'] >= 60:
+                self.metric_buckets.pop(key, None)
 
     def server_line(self, raw):
         try:
@@ -314,17 +415,20 @@ class Router:
                         accepted = self.accepted_routes.pop(message.get("id"), None)
                         if "error" in message:
                             row = self.threads.setdefault(tid, {})
+                            diagnostic = rpc_error(message.get("error"))
                             row.update({**(accepted or {}), "status": "error", "confirmation": "Rechazado",
+                                        **diagnostic,
                                         **phase_update(row, "blocked", transition=(accepted or {}).get("phase_transition"))})
                             self.log({"event": "turn_rejected", "thread": tid})
                             if accepted:
-                                error = message.get("error") or {}
                                 self.record_history("decision_rejected", decision_id=accepted.get("decision_id"),
-                                                    thread=tid, status="error", error_type="turn_rejected",
-                                                    error_code=error.get("code"), phase_status="blocked",
+                                                    thread=tid, status="error", **diagnostic, phase_status="blocked",
                                                     phase_transition=accepted.get("phase_transition"))
                         elif accepted:
                             row = self.threads.setdefault(tid, {})
+                            consumed = accepted.pop("consume_pending_phase", None)
+                            if consumed and consumed == row.get("pending_phase_id", "legacy"):
+                                self.clear_pending_phase(tid)
                             row.update({**accepted, "confirmation": "Aceptado por Codex", "status": "inProgress",
                                         "updated": time.time(),
                                         "turn_id": (result.get("turn") or {}).get("id") or row.get("turn_id"),
@@ -363,19 +467,50 @@ class Router:
                     row.update(status="inProgress", turn_id=(params.get("turn") or {}).get("id"), updated=time.time(), **phase_update(row, "active"))
                     self.record_history("phase_started", decision_id=self.current_decisions.get(tid), thread=tid,
                                         **phase_update(row, "active"))
+                elif method == "error":
+                    row = self.threads.get(tid, {})
+                    turn_id = params.get("turnId")
+                    # Retries are incidents, not completed decisions. Late errors
+                    # must never be attached to a newer turn on the same task.
+                    if (turn_id and turn_id == row.get("turn_id") and
+                            self.current_decisions.get(tid) and not row.get("completed_at")):
+                        diagnostic = native_error(params.get("error"))
+                        retry = params.get("willRetry")
+                        if retry is False:
+                            self.native_errors[tid] = (turn_id, diagnostic)
+                        else:
+                            self.native_errors.pop(tid, None)
+                        self.record_history("native_turn_error", decision_id=self.current_decisions[tid],
+                                            thread=tid, turn_id=turn_id, **diagnostic,
+                                            will_retry=retry if type(retry) is bool else None)
                 elif method == "turn/completed":
+                    row = self.threads.setdefault(tid, {})
+                    turn = params.get("turn") or {}
+                    turn_id = turn.get("id")
+                    if turn_id and self.current_decisions.get(tid) and turn_id != row.get("turn_id"):
+                        return True  # Forward unchanged, but do not alter current evidence.
+                    self.flush_metrics(thread=tid)
                     self.phases.end(tid)
                     self.active.discard(tid)
                     self.pending.discard(tid)
-                    status = params.get("turn", {}).get("status", "completed")
-                    row = self.threads.setdefault(tid, {})
+                    status = turn.get("status", "completed")
+                    if status == "interrupted":
+                        self.clear_pending_phase(tid)
+                    pending_error = self.native_errors.pop(tid, None)
+                    clear_error(row)
+                    diagnostic = {}
+                    if status == "failed":
+                        diagnostic = native_error(turn.get("error"))
+                        if (diagnostic["error_type"] == "unknown" and pending_error and
+                                pending_error[0] == turn_id):
+                            diagnostic = pending_error[1]
                     phase_status = "completed" if status == "completed" else "failed"
-                    row.update(status=status, completed_at=time.time(), updated=time.time(), **phase_update(row, phase_status))
+                    row.update(status=status, completed_at=time.time(), updated=time.time(), **diagnostic, **phase_update(row, phase_status))
                     self.log({"event": "turn_completed", "thread": tid})
                     row = self.threads.get(tid, {})
                     tokens = row.get("tokens") or {}
                     self.record_history("decision_completed", decision_id=self.current_decisions.get(tid),
-                                        thread=tid, title=row.get("name"), status=row.get("status"), **tokens,
+                                        thread=tid, title=row.get("name"), status=row.get("status"), **tokens, **diagnostic,
                                         phase_status=row.get("phase_status"), phase_name=row.get("phase_name"),
                                         phase_model=row.get("phase_model"), phase_effort=row.get("phase_effort"),
                                         phase_transition=row.get("phase_transition"), pipeline_mode="observation",
@@ -399,7 +534,8 @@ class Router:
                         row.update(**phase_update(row, "failed"))
                         self.record_history("decision_error", decision_id=self.current_decisions.get(tid),
                                             thread=tid, title=self.threads.get(tid, {}).get("name"),
-                                            status=status, error_type="thread_" + status,
+                                            status=status, **({k: row[k] for k in DIAGNOSTIC_FIELDS if k in row}
+                                                              if row.get("error_type") else {"error_type": "thread_" + status}),
                                             phase_status="failed", phase_name=row.get("phase_name", "execution"),
                                             phase_model=row.get("phase_model"), phase_effort=row.get("phase_effort"),
                                             phase_transition=row.get("phase_transition"))
@@ -435,6 +571,8 @@ class Router:
                                 contract = merge_contract(row.get("task_contract") or {"floor": row.get("task_floor")}, context)
                                 row["task_contract"] = contract
                                 row["task_floor"] = contract.get("floor") if contract.get("status") == "pending" else None
+                                if context.get("completed"):
+                                    self.clear_pending_phase(tid)
                                 self.save_task(tid, row)
                                 self.record_history("task_context", thread=tid, title=row.get("name"),
                                                     task_floor=row.get("task_floor") or "cleared")
@@ -492,7 +630,9 @@ class Router:
         return True
 
     def drain_outbound(self):
+        self.maintain_retention()
         with self.lock:
+            self.flush_metrics()
             self.phases.poll()
             result, self.outbound = self.outbound, []
             return result
@@ -560,7 +700,10 @@ class Router:
         if model:
             tid = params.get("threadId")
             items = params.get("input") if isinstance(params.get("input"), list) else []
-            category, confidence = classify_agent_identity(user_text(items), row.get("name", ""), has_attachments(items),
+            text = user_text(items)
+            if cancels_work(text):
+                self.clear_pending_phase(tid)
+            category, confidence = classify_agent_identity(text, row.get("name", ""), has_attachments(items),
                                                            previous=row.get("agent_category"))
             manual = (mode_at_submission or read_mode(self.state_dir, params.get("threadId"))) == "manual"
             model_reason = "modo manual de esta tarea; se respeta el modelo elegido en Codex" if manual else "configuración original; sin intervención del selector"
@@ -568,9 +711,15 @@ class Router:
             source = "manual" if manual else "preserved"
             decision_id = self.new_decision(tid, model, effort, model_reason, effort_reason, source,
                                             row.get("model"), agent_category=category, agent_confidence=confidence)
+            self.record_prompt(self.phase_config(), decision_id, tid, text, model=model, effort=effort,
+                               previous_model=row.get("model"), source=source, model_reason=model_reason,
+                               effort_reason=effort_reason, agent_category=category, agent_confidence=confidence,
+                               has_attachments=has_attachments(items), task_mode="manual" if manual else "automatic")
             self.accepted_routes[message["id"]] = {"model": model, "effort": effort, "reason": model_reason,
                 "model_reason": model_reason, "effort_reason": effort_reason, "source": source,
                 "agent_category": category, "agent_confidence": confidence, "decision_id": decision_id}
+            if row.get('pending_phase_floor') and resumes_work(text):
+                self.accepted_routes[message['id']]['consume_pending_phase'] = row.get('pending_phase_id', 'legacy')
 
     def cancel_prepared(self, message):
         with self.lock:
@@ -621,6 +770,8 @@ class Router:
         if not text.strip():
             self.log({"event": "preserved", "thread": tid, "reason": "no_text"})
             return raw
+        if cancels_work(text):
+            self.clear_pending_phase(tid)
         previous = state.get("tier")
         if previous is None:
             previous = next((t for t, r in routes.items() if r["model"] == current), None)
@@ -633,15 +784,28 @@ class Router:
             state.pop("task_floor", None)
             state.pop("response_context", None)
             state.pop("task_contract", None)
+            state.pop("pending_phase_floor", None)
+            state.pop("pending_phase_name", None)
+            self.clear_pending_phase(tid)
             for key in ("task_floor", "task_contract"):
                 self.thread_categories.get(tid, {}).pop(key, None)
             self.save_task(tid, state)
             self.record_history("task_context", thread=tid, title=state.get("name"), task_floor="cleared")
+        pending_phase_floor = state.get("pending_phase_floor")
+        resumes_boundary = (pending_phase_floor in TIERS and not reasons.get("new_task") and resumes_work(text))
+        if resumes_boundary and reasons.get("source") == "automatic":
+            route = dict(routes[pending_phase_floor])
+            reasons.update(quality_floor=pending_phase_floor, quality_ceiling=pending_phase_floor,
+                           min_effort=route["effort"], max_effort_allowed=False,
+                           model="continuación autorizada de una fase que requiere Astra en un turno nuevo",
+                           effort="mínimo de razonamiento de la fase pendiente", request_kind="phase_continuation")
         baseline_route, baseline_reasons = dict(route), dict(reasons)
-        if reasons.get("quality_floor") in ("normal", "complex", "critical"):
+        if (reasons.get("quality_floor") in ("normal", "complex", "critical") and
+                reasons.get("source") == "automatic" and reasons.get("request_kind") in ("task", "project_review")):
             contract = merge_contract(state.get("task_contract"), {
                 "implementation_pending": True, "work_floor": reasons["quality_floor"],
-                "plan_steps": plan_steps(text), "awaiting_approval": False})
+                "plan_steps": plan_steps(text), "awaiting_approval": False,
+                "response_kind": "progress", "contract_version": 2})
             state["task_contract"], state["task_floor"] = contract, contract.get("floor")
             self.save_task(tid, state)
         steps = plan_steps(text) or (state.get("task_contract") or {}).get("plan_steps")
@@ -653,14 +817,17 @@ class Router:
         # Identity/title and an ambiguous fallback tier are not quality evidence.
         # Only current workload signals or an instruction to resume known work
         # establish a floor. Continuity is independent of the proposed route.
-        routing_policy = {key: reasons[key] for key in ("request_kind", "quality_floor", "max_effort_allowed", "min_effort")}
+        routing_policy = {key: reasons[key] for key in ("request_kind", "quality_floor", "quality_ceiling", "max_effort_allowed", "min_effort")}
         routing_policy["routing_policy_version"] = POLICY_VERSION
         candidates = candidate_routes(routes, self.catalog, routing_policy)
         external_allowed = reasons.get("source") == "automatic" and bool(candidates)
         state_for_engine = build_state(text, attachment_summary(items), current, state.get("effort"), reasons.get("signal") == "retry")
         state_for_engine.update(routing_policy)
-        if response_context and reasons.get("request_kind") in ("planned_followup", "work_followup", "context_followup", "retry"):
-            state_for_engine["previous_response_context"] = response_context
+        safe_context = context_for_engine(response_context) if not reasons.get("new_task") else None
+        if safe_context and reasons.get("request_kind") not in ("acknowledgement", "status_check", "bounded", "mechanical"):
+            state_for_engine["work_context"] = safe_context
+            if reasons.get("request_kind") in ("planned_followup", "work_followup", "context_followup", "ambiguous", "retry"):
+                state_for_engine["previous_response_context"] = safe_context
         engine_result = {"engine": ENGINE_RULES, "status": "ok", "latency_ms": 0,
                          "route": {"model": route["model"], "effort": route["effort"]}, "engine_model": "local-policy"}
         if external_allowed and engine_name == ENGINE_JEV:
@@ -718,6 +885,12 @@ class Router:
         continuity_strategy = engine_result.get("continuity_strategy") if engine_applied and engine_name == ENGINE_JEV else None
         decision_id = self.new_decision(tid, model, effort, reasons["model"], reasons["effort"], reasons["source"],
                                         current, reasons.get("signal"), category, confidence, continuity_strategy, routing_policy)
+        self.record_prompt(config, decision_id, tid, text, model=model, effort=effort, previous_model=current,
+                           source=reasons["source"], model_reason=reasons["model"], effort_reason=reasons["effort"],
+                           agent_category=category, agent_confidence=confidence, routing_engine=effective_engine,
+                           engine_model=engine_result.get("engine_model"), engine_status=engine_result.get("status"),
+                           engine_applied=engine_applied, continuity_strategy=continuity_strategy,
+                           has_attachments=has_attachments(items), task_mode="automatic", **routing_policy)
         self.record_engine_comparisons(config, decision_id, tid, candidates, state_for_engine, engine_name,
                                        engine_result, baseline_route, external_allowed)
         self.record_history("decision_routed", decision_id=decision_id, thread=tid, model=model, effort=effort,
@@ -725,6 +898,7 @@ class Router:
                             continuity_strategy=continuity_strategy, **proposed_phase(current, model, effort, category, steps))
         decision = {"model": model, "effort": effort, "reason": reasons["model"],
                     "quality_floor": routing_policy.get("quality_floor"), "min_effort": routing_policy.get("min_effort"),
+                    "quality_ceiling": routing_policy.get("quality_ceiling"),
                     "model_reason": reasons["model"], "effort_reason": reasons["effort"],
                     "source": reasons["source"], "agent_category": category,
                     "agent_confidence": confidence, "decision_id": decision_id,
@@ -732,6 +906,8 @@ class Router:
                     "engine_status": engine_result.get("status"), "engine_confidence": engine_result.get("confidence"),
                     "engine_latency_ms": engine_result.get("latency_ms"), "engine_applied": engine_applied,
                     "continuity_strategy": continuity_strategy}
+        if resumes_boundary:
+            decision["consume_pending_phase"] = state.get("pending_phase_id", "legacy")
         decision.update(proposed_phase(current, model, effort, category, steps))
         self.threads.setdefault(tid, {}).update(tier=tier, seen_turn=True, requested_model=model,
                                               requested_effort=effort, status="pending", updated=time.time(), **decision)
@@ -843,7 +1019,8 @@ def main():
         signal.signal(signal.SIGTERM, interrupted)
         signal.signal(signal.SIGINT, interrupted)
     router.log({"event": "bridge_started", "backend_pid": proc.pid,
-                "inference_telemetry": bool(telemetry)})
+                "inference_telemetry": bool(telemetry),
+                "prompt_logging": config.get("prompt_logging") is True})
     heartbeat_stop = threading.Event()
     write_lock = threading.Lock()
     output_lock = threading.Lock()

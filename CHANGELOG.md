@@ -1,5 +1,128 @@
 # Cambios
 
+## 0.4.3 — 2026-09-26
+
+### Corrección operativa — 2026-09-27
+
+- Recepción OTLP ampliada de 512 KiB a 4 MiB recibidos y 16 MiB descomprimidos.
+  Análisis serializado, conexiones/plazo acotados, HTTP 413 para exceso y
+  contadores separados de tamaño recibido, expansión, longitud HTTP y carga de
+  procesamiento. Histogramas por rangos sin contenido privado.
+- Corregida la agregación nativa de contadores de telemetría hacia ambos
+  monitores: varios campos visibles antes no se trasladaban desde el receptor.
+
+La revisión posterior y su corrección están en
+[el informe](docs/REVIEW-2026-09-27.md). Se corrigieron las órdenes naturales de
+modelo, prioridad explícita, consumo de fronteras tras ACK, concurrencia del
+circuito, replay por fase y métricas de extremo a extremo. Se añadió retención
+horaria configurable y evaluación de cobertura sin inferir calidad del cierre.
+Jev usa el identificador público `typesafe-ai/jev` y diagnostica la restricción
+de acceso del plan gratuito de Vercel. 212 pruebas Python y 14 JS correctas.
+La activación de esa corrección y la selección explícita en Automático se
+verificaron después del reinicio. La ampliación OTLP posterior pasa 220 pruebas
+Python, 14 JS y layout; su nuevo bundle y los límites externos siguen pendientes
+de aceptación Desktop.
+
+- Jev aplica un circuito local persistente y acotado tras fallos repetidos de
+  autenticación, autorización, límite, red o tiempo. Durante la pausa el router
+  conserva la política local y registra `circuit_open`, sin reintentar una
+  petición externa en cada turno. Una respuesta correcta restablece la salud.
+- Cada checkpoint guarda su decisión y turno de origen. El monitor ya proyecta
+  su ciclo completo y diferencia cambios compatibles de modelo de ajustes con
+  el mismo modelo. Una escalada hacia Astra se guarda como necesidad pendiente
+  y se aplica únicamente en una continuación autorizada de otro turno.
+- Un resumen puede rebajar la ruta después de completar la fase sustantiva;
+  las demás fases conservan su mínimo. Las auditorías acotadas pasan a Sol y
+  Astra queda reservado para alcance de repositorio, seguridad, vulnerabilidad
+  o consecuencias concretas.
+- El receptor OTLP separa rechazos de tamaño, codificación, carga y E/S, cuenta
+  finalizaciones exportadas y mantiene modelo/esfuerzo candidatos en evidencia
+  probable sin presentarlos como confirmación. El monitor muestra su salud.
+- La sonda de aprobación exige el comando exacto y la cancelación espera una
+  ejecución de comando antes de interrumpirla.
+
+Validación adicional: 190 pruebas Python, corpus 27/27, seis casos Jev sin
+llamadas externas, 13 pruebas de núcleo de interfaz y layout superados. No se
+reinició Desktop ni se hizo una nueva inferencia de suscripción.
+
+- Política 7: el trabajo con mínimo normal queda acotado a Terra, incluido el
+  contexto normal pendiente. Jev ya no puede elevarlo a Sol ni a razonamiento
+  muy alto. Un reintento con evidencia de fallo y las peticiones complejas o
+  críticas conservan sus bandas superiores; Manual y las órdenes explícitas no
+  cambian.
+- El contrato de `router_phase_checkpoint` pasa a ser obligatorio entre fases
+  sustantivas y define con más precisión cuándo la fase restante es compleja.
+  El cambio sigue esperando la confirmación nativa, conserva la frontera de
+  Astra y no modifica instrucciones, permisos ni aprobaciones de Codex.
+- La sonda del puente admite un modo natural que no ordena llamar al checkpoint.
+  En la pasada final el agente lo invocó por el contrato registrado y se observó
+  Terra/Medio → Sol/Alto en inferencias posteriores del mismo turno.
+- La captura local de prompts es una opción separada. `prompt_logging: true`
+  guarda el texto de `turn/start` en `state/prompts.jsonl`, unido al `decision_id`
+  y a la decisión de modelo/esfuerzo. El cuerpo OTLP, adjuntos, respuestas y
+  resultados de herramientas siguen excluidos.
+- Una sonda sintética del esquema OTLP confirmó que la carga completa incluye
+  identidad de cuenta/equipo, endpoint y errores libres, sin aportar `turn_id` o
+  `response_id`. Sus métricas útiles de tokens, duración, primer token, intento,
+  éxito y estado HTTP se incorporan mediante una lista blanca tipada y acotada.
+
+Validación: 187 pruebas Python, corpus sintético 27/27, seis casos de Jev sin
+llamadas externas, 12 pruebas de interfaz y comprobaciones de diseño superadas.
+La sonda natural aislada terminó con código 0, archivó su tarea sintética y no
+registró errores de telemetría. Las primeras calibraciones invocaron correctamente
+el checkpoint pero conservaron Terra al declarar normal la fase restante; esto
+confirma que la transición depende de una evaluación de complejidad real, no de
+cambiar de modelo en cada fase. Activación en Desktop requiere reinicio y una
+tarea nueva; la aceptación con tareas cotidianas y Windows sigue pendiente.
+
+## 0.4.2 — 2026-09-26
+
+- Política 6: Luna se limita a trabajo claramente pequeño. Los cambios concretos
+  permiten Terra/Sol, y las revisiones o seguimientos inciertos usan Sol/Alto como
+  mínimo. Los límites de modelo se aplican también a Jev; un historial con Astra
+  no permite por sí solo volver a elegirlo.
+- Autenticación y autorización ordinarias dejan de forzar Astra. Se mantienen
+  las señales de auditoría, vulnerabilidad, consecuencias importantes y diseño
+  visual amplio; una interfaz concreta no implica por sí sola trabajo crítico.
+- El respaldo local deja de heredar Luna de una selección previa. Jev recibe
+  contexto estructurado del trabajo pendiente sin transcripciones ni títulos.
+- Contratos de trabajo versión 2: los antiguos sin justificación crítica se
+  reevalúan en Sol. Un cierre final que acota lo restante puede rebajar el contrato;
+  un progreso genérico no borra trabajo crítico conocido. Manual y órdenes
+  explícitas conservan prioridad.
+
+Validación: 179 pruebas Python, corpus sintético 27/27 y seis casos de candidatos
+de Jev sin llamadas externas; 12 pruebas de interfaz, diseño/interacción y
+compilación nativa macOS superadas. Monitor 0.4.2 abierto y verificado.
+Los casos reproducen los tipos de decisión observados;
+no reconstruyen prompts privados ni miden calidad de los modelos o ahorro de cuota.
+La política es compartida por Windows/macOS. Activación pendiente de reiniciar
+Desktop; publicación y compilación nativa Windows no incluidas.
+
+## 0.4.1 — 2026-09-26
+
+- Política 5: las revisiones abiertas del proyecto o de su funcionamiento tienen
+  un mínimo Sol/Alto en Reglas y Jev. Se conservan las rutas ligeras para consultas
+  delimitadas, traducciones y cambios concretos, y la prioridad del modo manual.
+- «Dale» vuelve a reconocer el trabajo pendiente y conserva su mínimo de capacidad.
+- Los fallos nativos guardan categorías conocidas y códigos HTTP/RPC acotados.
+  No se almacenan mensajes, detalles libres ni instrucciones del error. Los
+  reintentos se registran aparte y no terminan la decisión ni cuentan como fallos.
+  Las incidencias tardías de otro turno no contaminan una decisión nueva.
+- El historial de macOS y Windows muestra la categoría, los códigos disponibles
+  y el número de reintentos nativos. Los errores antiguos sin causa no se inventan.
+
+Validación local: 165 pruebas Python, 12 de núcleo de interfaz, 21 casos del corpus
+de enrutamiento y pruebas de diseño/interacción, incluidos los nuevos diagnósticos.
+Monitor macOS compilado y abierto como 0.4.1; se conserva el backend activo.
+No se hicieron llamadas adicionales a proveedores para estas pruebas.
+
+Activación verificada después del reinicio del usuario: puente 0.4.1/política 5.
+Sigue pendiente comprobar un cambio real de modelo dentro de
+un turno de Desktop; el único checkpoint observado conservó Sol/Alto. La evidencia
+aislada previa no sustituye esta aceptación. La compilación WPF sigue pendiente
+en Windows. Esta preparación local no publica commits, etiquetas ni paquetes.
+
 ## 0.4.0 — 2026-09-25
 
 - Cambio opcional de modelo y esfuerzo dentro del turno mediante

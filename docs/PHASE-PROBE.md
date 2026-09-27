@@ -177,9 +177,26 @@ These consume four and three short subscription turns respectively. Reports:
 `state/model-compatibility-reverse-probe.json`. The probe temporarily configures
 its own native subprocess to export logs to a random loopback-only HTTP port.
 It disables prompt logging and retains only allowlisted model/effort/event fields;
-raw logs, resource identity, credentials, prompts and tool results are discarded.
+bounded correlation and numeric performance fields may also be retained. Raw
+logs, resource identity, credentials, prompts, free-form errors and tool results
+are discarded.
 No production telemetry configuration is changed. A missing telemetry event is
 a failed verification, never interpreted as a successful model switch.
+
+Production prompt collection is a separate explicit path. When
+`prompt_logging: true`, the router records the exact user text it already receives
+in `turn/start` to the private ignored file `state/prompts.jsonl` and correlates it
+with the routing `decision_id`. The OTel collector still discards its raw body:
+that body can mix the useful inference fields with resource attributes, tool data,
+headers and other content that is unrelated to routing.
+
+A 2026-09-27 isolated schema probe enabled native prompt telemetry for one
+synthetic ephemeral turn and kept the payload only in process memory. The batch
+contained the synthetic prompt plus account email/id, host name, endpoint and
+free-form error fields. Its only correlation candidate was `conversation.id`;
+there was no turn or response identifier. It also exposed useful bounded metrics:
+input/output/cache/reasoning/tool tokens, duration, first-token latency, attempt,
+success and HTTP status. Those metrics are now allowlisted; the raw batch is not.
 
 ## Remaining product validation
 
@@ -241,11 +258,74 @@ independent server attestation. Early runs accepted and executed the checkpoint
 but correctly failed telemetry assertions because of probe configuration and
 flush timing; they are not counted as passing model-switch evidence.
 
+### Natural checkpoint acceptance (macOS, 2026-09-26)
+
+Version 0.4.3 makes the dynamic-tool contract imperative at substantive phase
+boundaries. It does not inject or replace `baseInstructions` or
+`developerInstructions`. The installed experimental schema exposes
+`dynamicTools` on `thread/start` and `turn/settings/update`; existing tasks still
+cannot be enrolled retroactively through the supported resume request.
+
+`python3.11 tests/smoke_phase_bridge.py --live --natural` creates the same
+isolated archived task, but neither its thread instructions nor its prompt order
+the model to call `router_phase_checkpoint`. The prompt describes two phases and
+marks the remaining verification as complex. On ChatGPT Desktop
+**26.924.22138**, the final run passed:
+
+- Initial route **Terra/medium**.
+- The model invoked the checkpoint from the registered tool contract.
+- Lifecycle **requested → applied**.
+- Later native `response.completed` telemetry identified **Sol/high**.
+- Non-empty final response, zero telemetry errors, archived synthetic task and
+  subprocess exit code 0.
+
+Two calibration runs invoked the checkpoint but declared the remaining phase
+normal, so the controller correctly retained Terra/medium. A third run produced
+the verified transition but failed an unrelated exact-output assertion. The
+final probe checks the controlled boundary and continuation rather than requiring
+the model to echo a test marker. This evidence establishes natural invocation
+and one compatible same-turn transition in isolation. It does not prove that
+every real task will need or select a different model at every boundary.
+
+### Real Desktop task enrollment (macOS, 2026-09-26)
+
+After restarting Desktop with product 0.4.3 and policy 7, a newly created project
+chat exposed `router_phase_checkpoint` in its active tool contract. During ordinary
+repository work, the agent reached a genuine investigate-to-implement boundary and
+invoked the checkpoint from that contract. The initial routing decision was
+complex, Sol/high. Checkpoints before implementation and verification both returned
+`unchanged` with `same_model`, Sol/high, so this real turn did not contain a
+`requested → applied` cycle. The live status retained Sol/high as configured and
+accepted. Inference telemetry was disabled and recorded zero observed events, so
+the accepted settings cannot be presented as evidence of a subsequent inference.
+This establishes real enrollment and invocation while preserving that distinction.
+
+### Real Desktop transition and native control boundaries (macOS, 2026-09-27)
+
+A follow-up in the same post-restart Desktop chat began at **Terra/high**. At
+the explicitly complex verification boundary the owned checkpoint completed
+`requested → applied`, with transition `compatible_group`, and the live bridge
+retained **Sol/high** as the accepted phase settings. A later
+`response.completed` record was associated with that decision as probable
+inference evidence. Native OTLP still supplies no turn or response identifier,
+so this is intentionally not described as independently confirmed model identity.
+
+`python3.11 tests/smoke_control_boundaries.py --live` then exercised the current
+router source against Desktop backend **26.924.22138** in two isolated ephemeral
+threads. The first received a native command-approval request under `on-request`,
+accepted only the expected temporary marker command, completed it, and removed
+the marker. The second sent `turn/interrupt` after a reasoning item started and
+ended with native status `interrupted`. The isolated bridge exited 0; its private
+OTLP collector received 12 requests with zero errors. This validates real native
+approval and cancellation callbacks without mutating Desktop conversations or
+configuration. It does not claim visual review of Desktop's approval surface.
+
 ### Before general activation
 
-1. Exercise the implemented broad-phase checkpoint in Desktop with realistic
-   tool/approval configurations. The synthetic compatibility matrix is established,
-   but it is not a guarantee for every permission profile or child agent.
+1. Continue sampling the implemented broad-phase checkpoint across additional
+   permission profiles and child agents. One real Desktop Terra→Sol transition
+   and isolated native approval/cancellation callbacks are established, but they
+   are not a guarantee for every profile or child agent.
 2. The production bridge now records conservative phase lifecycle metadata
    (`proposed`, `accepted`, `active`, `settings_published`, `completed`,
    `blocked`/`failed`) and the monitor displays it. Its opt-in loopback OTel
@@ -254,15 +334,14 @@ flush timing; they are not counted as passing model-switch evidence.
    selector/settings notification as an observed inference. El monitor convierte
    esa evidencia en un plan dinámico con pasos planificados y una ejecución
    observada; esos nombres no activan cambios automáticos de modelo ni esfuerzo.
-3. Validate Desktop's presentation, cancellation, approvals and new user input
-   when phases use successive native turns. This probe does not establish a
-   seamless single-response experience in Desktop.
-4. Validate native restart/resume recovery for the checkpoint controller. Local
-   ownership recovery is unit-tested; native macOS protocol compatibility is
-   verified above. Recovery of persisted native dynamic tools and real Desktop
-   controls has not yet been exercised across a full application restart.
+3. Visually review Desktop's presentation when phases use successive native
+   turns. Native approval and cancellation callbacks are verified above; this
+   protocol probe does not judge the UI surface.
+4. Continue regression coverage for restart/resume. The post-restart Desktop
+   chat retained checkpoint ownership and completed a later Terra→Sol transition;
+   local ownership recovery remains unit-tested as well.
 
-Until these are established, expose no automatic phase-switching toggle. The
-observation pipeline must show review and closure as pending evidence, rather
+Keep these follow-up checks as regression coverage. The observation pipeline must
+show review and closure as pending evidence, rather
 than invented internal activity. A future pipeline should distinguish planned,
 active, completed, interrupted and blocked stages, with model/effort provenance.

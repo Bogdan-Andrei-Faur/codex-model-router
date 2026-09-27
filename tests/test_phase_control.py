@@ -79,6 +79,18 @@ class PhaseControlTests(unittest.TestCase):
         self.checkpoint(arguments={"phase": "verify", "complexity": "complex"})
         self.assertEqual(self.status(self.router.drain_outbound()[0]), "preserved")
 
+    def test_approval_request_and_reply_remain_native_during_pending_change(self):
+        self.checkpoint()
+        update, = self.router.drain_outbound()
+        approval = wire({'id':'approval','method':'item/commandExecution/requestApproval',
+                         'params':{'threadId':'t','turnId':'turn','command':'synthetic'}})
+        self.assertTrue(self.router.server_line(approval))
+        self.assertEqual(self.router.drain_outbound(), [])
+        reply = wire({'id':'approval','result':{'decision':'decline'}})
+        self.assertEqual(self.router.client_line(reply), reply)
+        self.router.server_line(wire({'id':update['id'],'result':{'status':'applied'}}))
+        self.assertEqual(self.status(self.router.drain_outbound()[0]), 'applied')
+
     def test_timeout_is_uncertain_and_late_reply_is_swallowed(self):
         now = [0]
         self.router.phases.clock = lambda: now[0]
@@ -119,10 +131,10 @@ class PhaseControlTests(unittest.TestCase):
         self.checkpoint()
         self.assertEqual(self.status(self.router.drain_outbound()[0]), "preserved")
 
-    def test_quality_floor_is_not_lowered_by_agent(self):
+    def test_summary_can_lower_a_completed_phase(self):
         self.begin(floor="complex")
         self.checkpoint(arguments={"phase": "summarize", "complexity": "simple"})
-        self.assertEqual(self.router.drain_outbound()[0]["params"]["model"], "gpt-5.6-sol")
+        self.assertEqual(self.router.drain_outbound()[0]["params"]["model"], "gpt-5.6-luna")
 
     def test_astra_boundary_unknown_models_and_missing_catalog_preserve(self):
         for model in ("gpt-6-astra", "unknown"):
@@ -148,6 +160,24 @@ class PhaseControlTests(unittest.TestCase):
         self.assertEqual(self.status(reply), "requires_new_turn")
         self.assertIn("Stop this phase", reply["result"]["contentItems"][0]["text"])
 
+    def test_phase_history_is_correlated_and_astra_resumes_next_turn(self):
+        self.router.current_decisions["t"] = "decision-1"
+        self.begin()
+        self.checkpoint(arguments={"phase": "verify", "complexity": "critical"})
+        self.assertEqual(self.status(self.router.drain_outbound()[0]), "requires_new_turn")
+        rows = [json.loads(line) for line in (self.root / "state" / "history.jsonl").read_text().splitlines()]
+        record = rows[-1]
+        self.assertEqual((record["decision_id"], record["turn_id"], record["phase_status"]),
+                         ("decision-1", "turn", "requires_new_turn"))
+        self.assertEqual(self.router.threads["t"]["pending_phase_floor"], "critical")
+        raw = wire({"id": 8, "method": "turn/start", "params": {"threadId": "t", "model": "gpt-5.6-terra",
+            "effort": "medium", "input": [{"type": "text", "text": "Continúa la fase pendiente"}]}})
+        routed = json.loads(self.router.client_line(raw))
+        self.assertEqual((routed["params"]["model"], routed["params"]["effort"]), ("gpt-6-astra", "xhigh"))
+        self.assertIn("pending_phase_floor", self.router.threads["t"])
+        self.router.server_line(wire({"id": 8, "result": {"turn": {"id": "next-turn"}}}))
+        self.assertNotIn("pending_phase_floor", self.router.threads["t"])
+
     def test_late_ack_does_not_revive_completed_task(self):
         self.checkpoint()
         request, = self.router.drain_outbound()
@@ -168,6 +198,14 @@ class PhaseControlTests(unittest.TestCase):
         self.router.phases.api_enabled = False
         raw = wire({"id": 12, "method": "thread/start", "params": {}})
         self.assertEqual(self.router.client_line(raw), raw)
+
+    def test_tool_contract_requires_a_serial_checkpoint_between_real_phases(self):
+        description = SPEC["description"]
+        self.assertIn("MUST call", description)
+        self.assertIn("before any reasoning or tool call for the next phase", description)
+        self.assertIn("never call it in parallel", description)
+        self.assertIn("contradictory constraints or adversarial verification", description)
+        self.assertIn("grants no permission", description)
 
     def test_foreign_tool_requests_are_forwarded_exactly(self):
         self.assertTrue(self.checkpoint(threadId="foreign"))

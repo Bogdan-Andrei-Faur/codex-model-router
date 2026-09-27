@@ -134,7 +134,7 @@ function openHistory(id) {
 }
 function explanation(parent,label,value,kind='') {const box=el('div','reason-card'+(kind?' '+kind:''));box.append(el('h3','',label),el('p','',value || 'Registro anterior sin explicación separada.'));parent.append(box);}
 function continuity(value) {return value==='continue'?'Jev identificó trabajo pendiente y reevaluó el modelo y el razonamiento para continuarlo.':value==='reassess'?'Jev consideró que esta petición debía evaluarse de nuevo antes de elegir modelo y razonamiento.':'';}
-function phaseStatus(value) {return ({proposed:'Fase propuesta',accepted:'Aceptada por Codex',active:'Fase activa',observed:'Modelo observado',completed:'Fase completada',blocked:'Cambio bloqueado',failed:'Fase con incidencia'}[value] || 'Fase sin confirmar');}
+function phaseStatus(value) {return ({proposed:'Fase propuesta',requested:'Cambio solicitado',applied:'Cambio aceptado',rejected:'Cambio rechazado',preserved:'Selección conservada',unchanged:'Sin cambio',requires_new_turn:'Requiere otro turno',unknown_after_timeout:'Cambio sin confirmar',checkpoint_limit:'Límite de fases',cancelled:'Cancelado',accepted:'Aceptada por Codex',active:'Fase activa',observed:'Modelo observado',completed:'Fase completada',blocked:'Cambio bloqueado',failed:'Fase con incidencia'}[value] || 'Fase sin confirmar');}
 function pipeline(parent,row) {
   const phases=Array.isArray(row.phase_pipeline)?row.phase_pipeline:[];
   if(!phases.length)return;
@@ -145,12 +145,22 @@ function pipeline(parent,row) {
 function executionEvidence(parent,row) {
   if(!row.model && !row.accepted_model && !row.configured_model && !row.observed_model)return;
   const lines=[];
+  if(row.status==='interrupted')lines.push('Turno interrumpido; esto no acredita la terminación de todos los procesos de sus herramientas.');
   if(row.model)lines.push('Propuesto por el selector · '+C.model(row.model)+' · '+(C.efforts[row.effort]||'Sin confirmar'));
   if(row.accepted_model)lines.push('Aceptado por Codex · '+C.model(row.accepted_model)+' · '+(C.efforts[row.accepted_effort]||'Sin confirmar'));
   if(row.configured_model)lines.push('Configuración publicada · '+C.model(row.configured_model)+' · '+(C.efforts[row.configured_effort]||'Sin confirmar'));
   if(row.observed_model)lines.push((row.evidence_confidence==='confirmed'?'Inferencia confirmada localmente · ':'Observación anterior sin correlación · ')+C.model(row.observed_model)+' · '+(C.efforts[row.observed_effort]||'Sin confirmar'));
   else lines.push('Inferencia real · sin confirmación disponible todavía');
+  if(row.observed_candidate_model)lines.push('Coincidencia probable · '+C.model(row.observed_candidate_model)+' · '+(C.efforts[row.observed_candidate_effort]||'Sin confirmar'));
   explanation(parent,'EVIDENCIA DEL MODELO',lines.join('\n'),'phase');
+  if(row.phase_events?.length)explanation(parent,'CAMBIOS DE FASE',row.phase_events.map(p=>`${p.phase_name} · ${phaseStatus(p.phase_status)} · ${C.model(p.phase_model)} · ${C.efforts[p.phase_effort]||'Sin confirmar'}`).join('\n'));
+  if(row.prior_inferences?.length)explanation(parent,'INFERENCIAS DE FASES ANTERIORES',row.prior_inferences.map(p=>`${C.model(p.model)} · ${C.efforts[p.effort]||'Sin confirmar'} · ${p.confidence||'sin correlación'}`).join('\n'));
+  const samples=Object.values(row.inference_samples||{});
+  if(samples.length)explanation(parent,'MÉTRICAS RECIBIDAS',samples.map(s=>{
+    const values=[`${s.phase_name||'inicio'} · ${s.inference_event_name||'evento'} / ${s.inference_event_kind||'petición'} · ${s.count} registros · ${s.failures||0} fallos · ${s.evidence_confidence||'sin correlación'}`];
+    for(const [k,label] of [['inference_input_tokens','tokens entrada'],['inference_output_tokens','tokens salida'],['inference_ttft_ms','TTFT ms'],['inference_duration_ms','duración del evento ms'],['inference_http_status','HTTP']])if(s[k]!==undefined)values.push(`${label}: ${s[k]}`);
+    return values.join(' · ');
+  }).join('\n')+'\nValores del último registro de cada clase; las duraciones no se suman como latencia de inferencia.');
 }
 function taskModeControls(parent,id) {
   if(!id)return;
@@ -224,11 +234,13 @@ function renderHistory() {
     const comparisons=Object.values(chosen.comparisons);
     if(comparisons.length)explanation(detail,'MOTORES OBSERVADOS',comparisons.map(comparison=>{
       const role=comparison.engine_active?(comparison.routing_engine===chosen.routing_engine?'aplicado':'intento'):'comparación';
-      const result=comparison.engine_status==='ok'?Math.round(comparison.engine_latency_ms || 0)+' ms':comparison.engine_status || 'Sin confirmar';
+      const failure=comparison.engine_failure==='account_access_restricted'?'Vercel restringe el acceso del plan gratuito; requiere créditos':comparison.engine_failure==='circuit_open'?'En pausa por fallos; se usan reglas locales':comparison.engine_failure;
+      const result=comparison.engine_status==='ok'?Math.round(comparison.engine_latency_ms || 0)+' ms':[comparison.engine_status,failure].filter(Boolean).join(' · ') || 'Sin confirmar';
       return `${engines[comparison.routing_engine] || comparison.routing_engine} · ${role} → ${C.model(comparison.proposed_model)} · ${C.efforts[comparison.proposed_effort] || '—'} · ${result}`;
     }).join('\n'));
     if(chosen.inputTokens!==undefined||chosen.outputTokens!==undefined)explanation(detail,'USO OBSERVADO',`Última llamada · ${fmt(chosen.inputTokens)} entrada · ${fmt(chosen.outputTokens)} salida · ${fmt(chosen.cachedInputTokens)} en caché`);
-    if(chosen.error_type)explanation(detail,'INCIDENCIA',chosen.error_type);
+    if(chosen.error_type)explanation(detail,'INCIDENCIA',C.errorLabel(chosen));
+    if(chosen.native_retries)explanation(detail,'REINTENTOS NATIVOS',String(chosen.native_retries));
     if(chosen.signal)explanation(detail,'SEÑAL DE RESULTADO',chosen.signal==='retry'?'La siguiente petición indicó que el resultado no había resuelto la tarea.':chosen.signal);
   }
   list.append(el('h3','section-title','DECISIONES RECIENTES'));
@@ -285,10 +297,22 @@ function statistics() {
   else {
     const receiving=(telemetry.requests||0)>0;
     metric(content,'Receptor local',receiving?'Recibiendo':'Abierto · sin datos',receiving?1:0,receiving?'var(--good)':'var(--warning)');
-    metric(content,'Solicitudes recibidas',fmt(telemetry.requests),Math.min(1,(telemetry.requests||0)/(total||1)));
+    metric(content,'Solicitudes procesadas',fmt(telemetry.requests),Math.min(1,(telemetry.requests||0)/(total||1)));
     metric(content,'Registros con modelo',fmt(telemetry.eligible_records),Math.min(1,(telemetry.eligible_records||0)/Math.max(1,telemetry.records_scanned||0)));
+    metric(content,'Finalizaciones exportadas',fmt(telemetry.completion_records),Math.min(1,(telemetry.completion_records||0)/Math.max(1,telemetry.eligible_records||0)));
     metric(content,'Finalizaciones recibidas',fmt(telemetry.telemetry_events),Math.min(1,(telemetry.telemetry_events||0)/Math.max(1,telemetry.eligible_records||0)));
     metric(content,'Inferencias asociadas',fmt(telemetry.telemetry_confirmed),Math.min(1,(telemetry.telemetry_confirmed||0)/Math.max(1,telemetry.telemetry_events||0)),'var(--good)');
+    const invalid=telemetry.invalid_requests||0;
+    metric(content,'Incidencias del receptor',fmt(invalid),invalid?1:0,invalid?'var(--warning)':'var(--good)');
+    if(invalid)content.append(el('p','warning',`Tamaño ${fmt(telemetry.invalid_size)} · codificación ${fmt(telemetry.invalid_encoding)} · carga ${fmt(telemetry.invalid_payload)} · E/S ${fmt(telemetry.invalid_io)}.`));
+    if(telemetry.invalid_size)content.append(el('p','warning',`Lotes rechazados por tamaño: recibido ${fmt(telemetry.invalid_wire_size)} · descomprimido ${fmt(telemetry.invalid_decoded_size)}. La captura está incompleta.`));
+    if(telemetry.invalid_length)content.append(el('p','warning',`Longitud o formato HTTP no admitido: ${fmt(telemetry.invalid_length)}.`));
+    if(telemetry.processing_busy)content.append(el('p','warning',`Lotes rechazados por procesamiento ocupado: ${fmt(telemetry.processing_busy)}.`));
+    for(const [stage,label] of [['wire','Tamaño recibido'],['decoded','Tamaño descomprimido']]) {
+      if(['512k','1m','4m','16m','over16m'].some(bin=>telemetry[`size_${stage}_${bin}`]))
+        content.append(el('p','',`${label} · ≤512 KiB: ${fmt(telemetry[`size_${stage}_512k`])} · 512 KiB–1 MiB: ${fmt(telemetry[`size_${stage}_1m`])} · 1–4 MiB: ${fmt(telemetry[`size_${stage}_4m`])} · 4–16 MiB: ${fmt(telemetry[`size_${stage}_16m`])} · >16 MiB: ${fmt(telemetry[`size_${stage}_over16m`])}.`));
+    }
+    if(telemetry.rejected_connections)content.append(el('p','warning',`Conexiones rechazadas por capacidad: ${fmt(telemetry.rejected_connections)}.`));
     if(!receiving)content.append(el('p','warning','El receptor está abierto, pero no recibe eventos. Esto no significa que no haya agentes trabajando.'));
     else if(!(telemetry.eligible_records||0))content.append(el('p','warning','Se recibieron eventos sin modelo utilizable; no se conserva su contenido.'));
   }
@@ -355,7 +379,7 @@ function settings() {
   if(engine==='jev'){
     const jev=config.jev||{},connection=jev.connection||'typesafe';heading(box,'CONEXIÓN DE JEV');
     choices(box,[['vercel','Vercel AI Gateway'],['typesafe','TypeSafe directo']],connection,v=>configure('jev.connection',v));
-    box.append(el('p','small',connection==='vercel'?'Usa el modelo virtual vmc/jev de Vercel durante las pruebas.':'Conecta directamente con api.typesafe.ai usando jev-latest.'));
+    box.append(el('p','small',connection==='vercel'?'Usa typesafe-ai/jev mediante Vercel AI Gateway. El acceso puede requerir créditos del proveedor.':'Conecta directamente con api.typesafe.ai usando jev-latest.'));
     keySettings(box,'jev-'+connection,connection==='vercel'?'Vercel AI Gateway':'TypeSafe');
     if(!state.keys?.['jev-'+connection])box.append(el('p','small','Cada conexión necesita su propia clave. Si guardaste una clave en una versión anterior, introdúcela aquí una vez para vincularla a este proveedor.'));
   }

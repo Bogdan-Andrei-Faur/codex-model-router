@@ -2,6 +2,45 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../monitor-ui/core.js');
 
+test('phase replay updates acceptance, separates old inference and retains metrics by class',()=>{
+  const events=[{event:'decision_created',decision_id:'d',model:'gpt-5.6-terra',time:1},
+    {event:'decision_accepted',decision_id:'d',accepted_model:'gpt-5.6-terra',time:2},
+    {event:'inference_observed',decision_id:'d',observed_model:'gpt-5.6-terra',evidence_confidence:'confirmed',inference_input_tokens:120,inference_ttft_ms:35,time:3},
+    {event:'phase_checkpoint',decision_id:'d',phase_id:'p',phase_status:'applied',phase_model:'gpt-5.6-sol',phase_effort:'high',time:4},
+    {event:'inference_metric',decision_id:'d',inference_event_name:'codex.api_request',inference_http_status:503,evidence_confidence:'probable',time:5}];
+  const row=C.decisions(events)[0];
+  assert.equal(row.accepted_model,'gpt-5.6-sol');
+  assert.equal(row.observed_model,undefined);
+  assert.equal(row.evidence_confidence,undefined);
+  assert.equal(row.prior_inferences[0].model,'gpt-5.6-terra');
+  assert.equal(row.inference_input_tokens,120);
+  assert.equal(row.inference_ttft_ms,35);
+  assert.equal(row.inference_samples['codex.api_request:unknown'].inference_http_status,503);
+  assert.equal(row.phase_events.length,1);
+});
+
+test('native retries do not finish or fail a decision and successful completion clears stale error',()=>{
+  const events=[{event:'decision_created',decision_id:'r',time:1},
+    {event:'decision_accepted',decision_id:'r',time:2,status:'inProgress'},
+    {event:'native_turn_error',decision_id:'r',time:3,error_type:'responseStreamDisconnected',error_http_status:502,will_retry:true}];
+  let row=C.decisions(events)[0];
+  assert.equal(row.native_retries,1);assert.equal(row.error_type,undefined);assert.equal(row.finished,undefined);
+  assert.equal(row.status,'inProgress');
+  events.push({event:'decision_error',decision_id:'r',time:4,error_type:'thread_error'});
+  events.push({event:'decision_completed',decision_id:'r',time:5,status:'completed'});
+  row=C.decisions(events)[0];assert.equal(row.error_type,undefined);assert.equal(row.status,'completed');assert.equal(row.finished,5);
+});
+
+test('native failure category and bounded codes are available in history details',()=>{
+  const row=C.decisions([{event:'decision_created',decision_id:'e',time:1},
+    {event:'native_turn_error',decision_id:'e',time:2,error_type:'responseStreamDisconnected',will_retry:false},
+    {event:'decision_completed',decision_id:'e',time:3,status:'failed',error_type:'httpConnectionFailed',error_http_status:503,error_source:'native'}])[0];
+  assert.equal(row.native_retries,undefined);assert.equal(row.error_source,'native');
+  assert.equal(C.errorLabel(row),'httpConnectionFailed · HTTP 503');
+  assert.equal(C.errorLabel({error_type:'turn_rejected',error_code:-32603}),'turn_rejected · RPC -32603');
+  assert.equal(C.errorLabel({error_type:'unknown'}),'Causa no proporcionada por Codex');
+});
+
 test('shadow response never overwrites active continuity, latency or classifier identity',()=>{
   const rows=C.decisions([
     {event:'decision_created',decision_id:'x',time:1,product_version:'0.3.0',build_id:'first'},
@@ -45,6 +84,12 @@ test('phase lifecycle metadata is retained without changing the decision model',
   const events=[{event:'decision_created',decision_id:'p',thread:'t',model:'gpt-5.6-terra',effort:'medium',time:1},{event:'decision_accepted',decision_id:'p',phase_status:'accepted',phase_transition:'compatible_group',accepted_model:'gpt-5.6-terra',phase_pipeline:plan,time:2},{event:'phase_settings_published',decision_id:'p',phase_status:'accepted',phase_model:'gpt-5.6-terra',phase_effort:'medium',configured_model:'gpt-5.6-terra',configured_effort:'medium',time:3}];
   const row=C.decisions(events)[0];assert.equal(row.model,'gpt-5.6-terra');assert.equal(row.phase_status,'accepted');assert.equal(row.phase_transition,'compatible_group');assert.equal(row.phase_model,'gpt-5.6-terra');
   assert.equal(row.accepted_model,'gpt-5.6-terra');assert.equal(row.configured_model,'gpt-5.6-terra');assert.deepEqual(row.phase_pipeline,plan);assert.equal(row.observed_model,undefined);
+});
+test('correlated checkpoint lifecycle updates its originating decision',()=>{
+  const events=[{event:'decision_created',decision_id:'p',thread:'t',model:'gpt-5.6-terra',effort:'medium',time:1},
+    {event:'phase_checkpoint',decision_id:'p',thread:'t',turn_id:'turn',phase_status:'applied',phase_transition:'compatible_group',phase_model:'gpt-5.6-sol',phase_effort:'high',time:2}];
+  const row=C.decisions(events)[0];
+  assert.equal(row.phase_status,'applied');assert.equal(row.phase_model,'gpt-5.6-sol');assert.equal(row.model,'gpt-5.6-terra');
 });
 test('active agent ordering remains stable through refresh and reactivation',()=>{
   const rows={b:{status:'active'},a:{status:'running'},c:{status:'idle'}};

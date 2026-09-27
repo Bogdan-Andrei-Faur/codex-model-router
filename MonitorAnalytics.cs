@@ -17,6 +17,8 @@ internal sealed class DecisionRecord
     public double EngineConfidence, EngineLatencyMs;
     public double Time, StartedTime, FinishedTime;
     public bool Accepted;
+    public int NativeRetries;
+    public string ErrorCode, ErrorHttpStatus;
     public readonly Dictionary<string, object> PhaseEvidence = new Dictionary<string, object>();
     public int InputTokens, OutputTokens, CachedTokens, ReasoningTokens;
     public readonly Dictionary<string, EngineComparison> Comparisons = new Dictionary<string, EngineComparison>();
@@ -224,6 +226,26 @@ internal sealed partial class ModernRouterMonitor
     static void ApplyHistoryEvent(DecisionRecord item, Dictionary<string, object> data)
     {
         string eventName = String(data, "event");
+        if (eventName == "phase_checkpoint")
+        {
+            if (!item.PhaseEvidence.ContainsKey("phase_events")) item.PhaseEvidence["phase_events"] = new List<Dictionary<string, object>>();
+            ((List<Dictionary<string, object>>)item.PhaseEvidence["phase_events"]).Add(new Dictionary<string, object>(data));
+        }
+        if (eventName == "inference_metric" || eventName == "inference_observed" || eventName == "inference_probable")
+        {
+            if (!item.PhaseEvidence.ContainsKey("inference_samples")) item.PhaseEvidence["inference_samples"] = new Dictionary<string, Dictionary<string, object>>();
+            var samples = (Dictionary<string, Dictionary<string, object>>)item.PhaseEvidence["inference_samples"];
+            string kind = String(data, "phase_id") + ":" + String(data, "inference_event_name") + ":" + String(data, "inference_event_kind");
+            double count = samples.ContainsKey(kind) ? Number(samples[kind], "count") : 0;
+            samples[kind] = new Dictionary<string, object>(data); samples[kind]["count"] = count + (data.ContainsKey("inference_sample_count") ? Number(data, "inference_sample_count") : 1);
+            if (eventName == "inference_metric") return;
+        }
+        if (eventName == "native_turn_error")
+        {
+            if (data.ContainsKey("will_retry") && data["will_retry"] is bool && (bool)data["will_retry"]) item.NativeRetries++;
+            return;
+        }
+        if (eventName == "decision_completed") { item.Error = null; item.ErrorCode = null; item.ErrorHttpStatus = null; }
         CopyPhaseEvidence(item.PhaseEvidence, data);
         // A later user rating must not make an old execution look newly run.
         if (eventName != "decision_quality") item.Time = Math.Max(item.Time, Number(data, "time"));
@@ -244,6 +266,8 @@ internal sealed partial class ModernRouterMonitor
         item.Source = String(data, "source", item.Source); item.Status = String(data, "status", item.Status);
         item.Signal = String(data, "signal", item.Signal);
         item.Error = String(data, "error_type", item.Error);
+        item.ErrorCode = String(data, "error_code", item.ErrorCode);
+        item.ErrorHttpStatus = String(data, "error_http_status", item.ErrorHttpStatus);
         item.Quality = String(data, "quality", item.Quality);
         item.ModelQuality = String(data, "model_quality", item.ModelQuality);
         item.EffortQuality = String(data, "effort_quality", item.EffortQuality);
@@ -400,7 +424,11 @@ internal sealed partial class ModernRouterMonitor
         if (decision.Signal != null) AddExplanation(historyDetail, "SEÑAL DE RESULTADO",
             decision.Signal == "retry" ? "La siguiente petición indicó que el resultado no había resuelto la tarea." :
             "La siguiente petición cambió el modelo explícitamente.");
-        if (decision.Error != null) AddExplanation(historyDetail, "INCIDENCIA", decision.Error);
+        if (decision.Error != null) AddExplanation(historyDetail, "INCIDENCIA",
+            (decision.Error == "unknown" ? "Causa no proporcionada por Codex" : decision.Error) +
+            (decision.ErrorHttpStatus != null ? " · HTTP " + decision.ErrorHttpStatus : "") +
+            (decision.ErrorCode != null ? " · RPC " + decision.ErrorCode : ""));
+        if (decision.NativeRetries > 0) AddExplanation(historyDetail, "REINTENTOS NATIVOS", decision.NativeRetries.ToString());
     }
 
     string TaskModeFile(string id)
@@ -575,13 +603,39 @@ internal sealed partial class ModernRouterMonitor
         {
             bool receiving = Telemetry("requests") > 0;
             AddMetric("Receptor local", receiving ? "Recibiendo" : "Abierto · sin datos", receiving ? 1 : 0, receiving ? Good : Warning);
-            AddMetric("Solicitudes recibidas", Telemetry("requests").ToString("N0"), Math.Min(1, Telemetry("requests") / Math.Max(1, total)), Accent);
+            AddMetric("Solicitudes procesadas", Telemetry("requests").ToString("N0"), Math.Min(1, Telemetry("requests") / Math.Max(1, total)), Accent);
             AddMetric("Registros con modelo", Telemetry("eligible_records").ToString("N0"), Math.Min(1, Telemetry("eligible_records") / Math.Max(1, Telemetry("records_scanned"))), Accent);
+            AddMetric("Finalizaciones exportadas", Telemetry("completion_records").ToString("N0"), Math.Min(1, Telemetry("completion_records") / Math.Max(1, Telemetry("eligible_records"))), Accent);
             AddMetric("Finalizaciones recibidas", Telemetry("telemetry_events").ToString("N0"), Math.Min(1, Telemetry("telemetry_events") / Math.Max(1, Telemetry("eligible_records"))), Accent);
             AddMetric("Inferencias asociadas", Telemetry("telemetry_confirmed").ToString("N0"), Math.Min(1, Telemetry("telemetry_confirmed") / Math.Max(1, Telemetry("telemetry_events"))), Good);
             AddMetric("Coincidencias sin ID de turno", Telemetry("telemetry_probable").ToString("N0"), Math.Min(1, Telemetry("telemetry_probable") / Math.Max(1, Telemetry("telemetry_events"))), Muted);
+            double invalidRequests = Telemetry("invalid_requests");
+            AddMetric("Conexiones rechazadas por capacidad", Telemetry("rejected_connections").ToString("N0"), Telemetry("rejected_connections") > 0 ? 1 : 0, Warning);
+            AddMetric("Incidencias del receptor", invalidRequests.ToString("N0"), invalidRequests > 0 ? 1 : 0, invalidRequests > 0 ? Warning : Good);
+            foreach (var stage in new[] { "wire", "decoded" })
+            {
+                if (new[] { "512k", "1m", "4m", "16m", "over16m" }.Any(bin => Telemetry("size_" + stage + "_" + bin) > 0))
+                {
+                    var sizes = Txt((stage == "wire" ? "Tamaño recibido" : "Tamaño descomprimido") +
+                        " · ≤512 KiB: " + Telemetry("size_" + stage + "_512k").ToString("N0") +
+                        " · 512 KiB–1 MiB: " + Telemetry("size_" + stage + "_1m").ToString("N0") +
+                        " · 1–4 MiB: " + Telemetry("size_" + stage + "_4m").ToString("N0") +
+                        " · 4–16 MiB: " + Telemetry("size_" + stage + "_16m").ToString("N0") +
+                        " · >16 MiB: " + Telemetry("size_" + stage + "_over16m").ToString("N0") + ".", 12, Muted);
+                    sizes.TextWrapping = TextWrapping.Wrap; statisticsContent.Children.Add(sizes);
+                }
+            }
+            if (Telemetry("invalid_size") + Telemetry("invalid_length") + Telemetry("processing_busy") > 0)
+            {
+                var rejection = Txt("Captura incompleta. Tamaño recibido: " + Telemetry("invalid_wire_size").ToString("N0") +
+                    " · descomprimido: " + Telemetry("invalid_decoded_size").ToString("N0") +
+                    " · longitud/formato HTTP: " + Telemetry("invalid_length").ToString("N0") +
+                    " · procesamiento ocupado: " + Telemetry("processing_busy").ToString("N0") + ".", 12, Warning);
+                rejection.TextWrapping = TextWrapping.Wrap; statisticsContent.Children.Add(rejection);
+            }
             string telemetryNote = !receiving ? "El receptor está abierto, pero no recibe eventos. Esto no significa que no haya agentes trabajando." :
-                Telemetry("eligible_records") == 0 ? "Se recibieron eventos sin modelo utilizable; no se conserva su contenido." : null;
+                Telemetry("eligible_records") == 0 ? "Se recibieron eventos sin modelo utilizable; no se conserva su contenido." :
+                invalidRequests > 0 ? "Incidencias: tamaño " + Telemetry("invalid_size").ToString("N0") + " · codificación " + Telemetry("invalid_encoding").ToString("N0") + " · carga " + Telemetry("invalid_payload").ToString("N0") + " · E/S " + Telemetry("invalid_io").ToString("N0") + "." : null;
             if (telemetryNote != null)
             {
                 var notice = Txt(telemetryNote, 12, Warning); notice.TextWrapping = TextWrapping.Wrap;
@@ -830,7 +884,7 @@ internal sealed partial class ModernRouterMonitor
             }));
         }
         settingsContent.Children.Add(connections);
-        AddSettingsNote(connection == "vercel" ? "Usa el modelo virtual vmc/jev mediante Vercel AI Gateway." :
+        AddSettingsNote(connection == "vercel" ? "Usa typesafe-ai/jev mediante Vercel AI Gateway; el acceso puede requerir créditos." :
             "Conecta directamente con TypeSafe usando jev-latest.");
         bool keyReady = File.Exists(Path.Combine(StateFolder, "jev-" + connection + ".secret")) ||
             !System.String.IsNullOrEmpty(Environment.GetEnvironmentVariable(connection == "vercel" ? "AI_GATEWAY_API_KEY" : "TYPESAFE_API_KEY"));
@@ -1030,6 +1084,8 @@ internal sealed partial class ModernRouterMonitor
     static string FriendlyEngineFailure(string failure)
     {
         switch (failure) { case "invalid_response": return "formato de respuesta"; case "timeout": return "tiempo agotado";
+            case "account_access_restricted": return "Vercel restringe el plan gratuito; requiere créditos";
+            case "circuit_open": return "En pausa por fallos; se usan reglas locales";
             case "network": return "red local"; case "authentication": return "credenciales"; case "rate_limited": return "límite de uso";
             case "missing_api_key": return "falta clave API"; case "unsupported_provider": return "proveedor no disponible";
             default: return failure ?? "incidencia desconocida"; }

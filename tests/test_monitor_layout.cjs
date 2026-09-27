@@ -94,6 +94,28 @@ const assert = require('node:assert/strict');
     assert.equal(await page.locator('#history-search').inputValue(),'Synthetic task');
     assert.equal(await page.locator('.history-row').count(),40);
     assert.ok((await page.locator('#product-version').innerText()).includes('puente 0.2.7'));
+    await page.locator('#history-search').fill('');
+    await page.evaluate(()=>window.receive({history:[
+      {event:'decision_created',decision_id:'error-demo',thread:'demo',time:1,title:'Diagnóstico sintético'},
+      {event:'native_turn_error',decision_id:'error-demo',time:2,error_type:'responseStreamDisconnected',will_retry:true},
+      {event:'decision_completed',decision_id:'error-demo',time:3,status:'failed',error_type:'httpConnectionFailed',error_http_status:503}
+    ]}));
+    await page.locator('.history-row').click();
+    const diagnosticText=await page.locator('.history-detail').innerText();
+    assert.ok(diagnosticText.includes('httpConnectionFailed · HTTP 503'));
+    assert.ok(diagnosticText.includes('REINTENTOS NATIVOS'));
+    assert.equal(await page.locator('.history-detail').evaluate(el=>el.scrollWidth<=el.clientWidth),true,'Diagnostics overflow detail');
+    console.log('PASS: native error codes and separate retry count in history details');
+    await page.evaluate(()=>window.receive({config:{enabled:true,inference_telemetry:true},telemetry:{enabled:true,requests:20,invalid_requests:3,invalid_size:2,invalid_wire_size:1,invalid_decoded_size:1,invalid_length:1,size_wire_512k:10,size_wire_1m:8,size_wire_16m:1,size_decoded_512k:10,size_decoded_4m:8,size_decoded_over16m:1}}));
+    await page.locator('[data-tab="statistics"]').click();
+    const telemetryText=await page.locator('#statistics').innerText();
+    assert.ok(telemetryText.includes('recibido 1 · descomprimido 1'));
+    assert.ok(telemetryText.includes('La captura está incompleta'));
+    assert.ok(telemetryText.includes('Longitud o formato HTTP no admitido: 1'));
+    assert.ok(telemetryText.includes('Tamaño recibido · ≤512 KiB: 10'));
+    assert.ok(telemetryText.includes('Tamaño descomprimido · ≤512 KiB: 10'));
+    assert.equal(await page.locator('#statistics').evaluate(el=>el.scrollWidth<=el.clientWidth),true,'Telemetry size diagnostics overflow');
+    console.log('PASS: telemetry size bins and distinct receiver rejections');
     if(process.env.ROUTER_LAYOUT_SCREENSHOT)await page.screenshot({path:process.env.ROUTER_LAYOUT_SCREENSHOT});
     assert.deepEqual(errors,[]);
     console.log('PASS: responsive height, fixed chrome, bottom anchor, drag persistence message and keyboard reset');

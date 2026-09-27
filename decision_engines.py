@@ -20,6 +20,7 @@ import urllib.error
 import urllib.request
 
 from routing import EFFORTS, TIERS
+from state_store import atomic_json, file_lock
 
 
 ENGINE_RULES = "rules"
@@ -28,6 +29,7 @@ ENGINES = (ENGINE_RULES, ENGINE_JEV)
 _KEYCHAIN_TIMEOUT_SECONDS = 45
 _KEYCHAIN_CACHE = {}
 _EXTERNAL_SLOTS = threading.BoundedSemaphore(4)
+_CIRCUIT_FAILURES = frozenset(("authentication", "forbidden", "account_access_restricted", "rate_limited", "timeout", "network", "transport"))
 
 
 def attachment_summary(items):
@@ -54,10 +56,10 @@ def candidate_routes(routes, catalog, policy=None):
     }
     names = {"simple": "Luna", "normal": "Terra", "complex": "Sol", "critical": "Astra"}
     descriptions = {
-        "simple": "transformación o consulta breve y delimitada",
+        "simple": "transformación de texto, confirmación o acción mecánica explícitamente pequeña; no investigación ni seguimiento técnico incierto",
         "normal": "cambio concreto y comprobable",
         "complex": "ingeniería compleja con alcance definido",
-        "critical": "UX, auditoría, adjuntos o trabajo de gran alcance",
+        "critical": "riesgo concreto, auditoría explícita, diseño visual amplio o trabajo crítico pendiente verificado",
     }
     effort_descriptions = {
         "low": "Razonamiento ligero: respuesta breve o acción mecánica, sin análisis profundo.",
@@ -68,10 +70,13 @@ def candidate_routes(routes, catalog, policy=None):
     }
     policy = policy or {}
     floor = policy.get("quality_floor")
-    lightweight = policy.get("request_kind") in ("acknowledgement", "status_check", "bounded")
+    ceiling = policy.get("quality_ceiling")
+    lightweight = policy.get("request_kind") in ("acknowledgement", "status_check", "bounded", "mechanical")
     choices = {}
     for tier, route in routes.items():
         if floor in TIERS and TIERS.index(tier) < TIERS.index(floor):
+            continue
+        if ceiling in TIERS and TIERS.index(tier) > TIERS.index(ceiling):
             continue
         if lightweight and TIERS.index(tier) > TIERS.index("normal"):
             continue
@@ -108,11 +113,19 @@ def build_state(text, attachments, previous_model, previous_effort, failure):
 def _post_json(url, payload, headers=None, timeout=4.0):
     request = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                                      headers={"Content-Type": "application/json", **(headers or {})}, method="POST")
-    with urllib.request.urlopen(request, timeout=timeout) as response:
-        raw = response.read(512 * 1024 + 1)
-        if len(raw) > 512 * 1024:
-            raise ValueError("response_too_large")
-        return json.loads(raw.decode("utf-8"))
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw = response.read(512 * 1024 + 1)
+            if len(raw) > 512 * 1024:
+                raise ValueError("response_too_large")
+            return json.loads(raw.decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        if error.code == 403:
+            # Inspect a bounded error transiently, retaining only this enum.
+            body = error.read(32768).lower()
+            if b'free tier' in body and b'access' in body and b'credit' in body:
+                error.gateway_reason = 'account_access_restricted'
+        raise
 
 
 def token_count(value):
@@ -142,7 +155,7 @@ def engine_failure(error):
         if error.code == 401:
             return "authentication"
         if error.code == 403:
-            return "forbidden"
+            return "account_access_restricted" if vars(error).get('gateway_reason') == 'account_access_restricted' else "forbidden"
         if error.code == 429:
             return "rate_limited"
         if error.code in (408, 504):
@@ -154,6 +167,99 @@ def engine_failure(error):
         reason = getattr(error, "reason", None)
         return "timeout" if isinstance(reason, (socket.timeout, TimeoutError)) else "network"
     return "transport"
+
+
+def _circuit_path(state_dir):
+    return (Path(state_dir) / "jev-health.json") if state_dir else None
+
+
+def _circuit_settings(config):
+    settings = config.get("jev") or {}
+    try:
+        failures = min(10, max(1, int(settings.get("circuit_failures", 3))))
+    except (TypeError, ValueError):
+        failures = 3
+    try:
+        seconds = min(3600, max(30, int(settings.get("circuit_seconds", 900))))
+    except (TypeError, ValueError):
+        seconds = 900
+    return failures, seconds
+
+
+def _read_circuit(state_dir):
+    path = _circuit_path(state_dir)
+    if path is None:
+        return {}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) and value.get("schema") == 1 else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def _write_circuit(state_dir, value):
+    path = _circuit_path(state_dir)
+    if path is None:
+        return
+    try:
+        atomic_json(path, {"schema": 1, **value})
+    except OSError:
+        pass
+
+
+def _circuit_open(config, state_dir, now=None):
+    if not state_dir:
+        return 0
+    with file_lock(Path(state_dir) / "jev-health.lock"):
+        return _claim_circuit(config, state_dir, now)
+
+
+def _claim_circuit(config, state_dir, now=None):
+    now = time.time() if now is None else now
+    value = _read_circuit(state_dir)
+    try:
+        until = max(float(value.get("open_until", 0)), float(value.get("probe_until", 0)))
+    except (TypeError, ValueError):
+        until = 0
+    if until > now:
+        return max(1, int(until - now))
+    if until:
+        # Only one caller probes recovery. A crashed caller releases its lease
+        # by time; normal completion releases it in the same locked transition.
+        value["probe_until"] = now + 15
+        _write_circuit(state_dir, value)
+    return 0
+
+
+def _record_circuit_result(config, state_dir, result, now=None):
+    """Persist only bounded failure state; never provider messages or credentials."""
+    if not state_dir:
+        return
+    with file_lock(Path(state_dir) / "jev-health.lock"):
+        _update_circuit(config, state_dir, result, now)
+
+
+def _update_circuit(config, state_dir, result, now=None):
+    now = time.time() if now is None else now
+    if result.get("status") == "ok":
+        _write_circuit(state_dir, {})
+        return
+    failure = result.get("engine_failure")
+    if failure not in _CIRCUIT_FAILURES:
+        previous = _read_circuit(state_dir)
+        previous.pop("probe_until", None)
+        _write_circuit(state_dir, previous)
+        return
+    threshold, seconds = _circuit_settings(config)
+    previous = _read_circuit(state_dir)
+    try:
+        failures = min(100, max(0, int(previous.get("failures", 0)))) + 1
+    except (TypeError, ValueError):
+        failures = 1
+    value = {"failures": failures, "last_failure": failure}
+    if failures >= threshold:
+        value["open_until"] = now + seconds
+    _write_circuit(state_dir, value)
 
 
 def _unprotect_windows(data):
@@ -224,6 +330,10 @@ def jev_key(state_dir, connection="typesafe"):
 def run_jev(config, state_dir, state, candidates):
     """Total deadline includes credential access, DNS and response decoding."""
     started = time.perf_counter()
+    retry_after = _circuit_open(config, state_dir)
+    if retry_after:
+        return {"engine": ENGINE_JEV, "status": "unavailable", "engine_failure": "circuit_open",
+                "latency_ms": 0, "engine_retry_after_seconds": retry_after}
     try:
         budget = min(8.0, max(.1, float((config.get("jev") or {}).get("timeout_seconds", 4))))
     except (TypeError, ValueError):
@@ -244,6 +354,7 @@ def run_jev(config, state_dir, state, candidates):
     except queue.Empty:
         value = {"engine": ENGINE_JEV, "status": "unavailable", "engine_failure": "timeout"}
     value["latency_ms"] = round((time.perf_counter() - started) * 1000)
+    _record_circuit_result(config, state_dir, value)
     return value
 
 
@@ -253,7 +364,7 @@ def _run_jev(config, state_dir, state, candidates):
     connection = settings.get("connection", "typesafe")
     if connection == "vercel":
         endpoint = "https://ai-gateway.vercel.sh/v1/evaluate"
-        model = "vmc/jev"
+        model = "typesafe-ai/jev"
     elif connection == "typesafe":
         endpoint = "https://api.typesafe.ai/v1/systemone"
         model = "jev-latest"
@@ -283,7 +394,13 @@ def _run_jev(config, state_dir, state, candidates):
                 "La configuración anterior aporta contexto, no es un mínimo. Una confirmación o consulta de estado "
                 "no hereda la complejidad de la tarea anterior; 'adelante, impleméntalo' sí continúa ese trabajo. "
                 "Respeta las necesidades reales de UI/UX, auditoría, investigación, arquitectura y adjuntos. "
-                "No subas esfuerzo solo por ambigüedad ni por mencionar estos temas. Usa Máx. únicamente cuando "
+                "Una revisión abierta del proyecto o de cómo está funcionando exige inspección y análisis, "
+                "aunque el mensaje sea breve; no equivale a consultar un contador de estado. "
+                "work_context resume acciones y alcance pendientes, sin texto de la conversación: úsalo para "
+                "interpretar referencias, pero no como mínimo de una petición independiente. "
+                "La ambigüedad requiere Sol para aclarar e investigar; Luna exige trabajo claramente delimitado. "
+                "Terra cubre cambios concretos y Sol ingeniería e integración; Astra requiere señales actuales "
+                "de riesgo o alcance crítico. La mera mención de autenticación no basta. Usa Máx. únicamente cuando "
                 "sus criterios específicos se cumplan. Las opciones ya respetan los límites de calidad locales.", "criteria": criteria},
         },
     }

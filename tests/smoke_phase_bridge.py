@@ -21,6 +21,8 @@ from probe_model_compatibility import Collector
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true")
+    parser.add_argument("--natural", action="store_true",
+                        help="Rely on the registered tool contract instead of explicitly ordering a checkpoint")
     args = parser.parse_args()
     if not args.live:
         parser.error("--live is required: one synthetic subscription turn")
@@ -55,13 +57,21 @@ def main():
             client.send({"method": "initialized", "params": {}})
             assert (client.call("account/read", {"refreshToken": False}).get("account") or {}).get("type") == "chatgpt"
             client.call("model/list", {"limit": 100})
-            created = client.call("thread/start", {"cwd": folder, "model": "gpt-5.6-terra",
-                "modelProvider": "openai", "sandbox": "read-only", "approvalPolicy": "never",
-                "baseInstructions": "Synthetic protocol test, not project work. Use only router_phase_checkpoint when requested. Await it alone. In code mode use text(await tools.router_phase_checkpoint({phase:'verify',complexity:'complex'})). No other tools, files, shell or network. Return exactly the requested checkpoint and the status returned by the tool.",
-                "developerInstructions": "Isolated synthetic test. Do not perform project work."})
+            start = {"cwd": folder, "model": "gpt-5.6-terra", "modelProvider": "openai",
+                     "sandbox": "read-only", "approvalPolicy": "never"}
+            if not args.natural:
+                start.update(baseInstructions="Synthetic protocol test, not project work. Use only router_phase_checkpoint when requested. Await it alone. In code mode use text(await tools.router_phase_checkpoint({phase:'verify',complexity:'complex'})). No other tools, files, shell or network. Return exactly the requested checkpoint and the status returned by the tool.",
+                             developerInstructions="Isolated synthetic test. Do not perform project work.")
+            created = client.call("thread/start", start)
             tid = created["thread"]["id"]
             client.call("thread/name/set", {"threadId": tid, "name": "Synthetic router phase bridge probe"})
-            output = client.turn(tid, "Remember CODE-37. Call router_phase_checkpoint once using the arguments prescribed in the test instructions. Then reply exactly CODE-37 followed by a space and the status returned by the tool.")
+            prompt = ("Create a compact dependency table for A→B, A→C, B→D and C→D. "
+                      "Then, as a separate substantive verification phase, reconcile it with the contradictory constraint D→A and determine whether a valid ordering remains. "
+                      "The remaining verification phase is complex. "
+                      "Finish with PHASE-NATURAL followed by the checkpoint status."
+                      if args.natural else
+                      "Remember CODE-37. Call router_phase_checkpoint once using the arguments prescribed in the test instructions. Then reply exactly CODE-37 followed by a space and the status returned by the tool.")
+            output = client.turn(tid, prompt)
             history = client.state / "history.jsonl"
             records = [json.loads(line) for line in history.read_text().splitlines()] if history.exists() else []
             checkpoints = [r for r in records if r.get("event") == "phase_checkpoint"]
@@ -70,7 +80,10 @@ def main():
             report["initial_model"] = accepted["model"]
             report["initial_effort"] = accepted["effort"]
             report["evidence_scope"] = "single synthetic turn in isolated backend; native telemetry without guaranteed turn identifiers"
-            report["output_matches"] = output.strip().strip(".") == "CODE-37 applied"
+            expected_marker = "PHASE-NATURAL" if args.natural else "CODE-37"
+            report["natural_invocation"] = args.natural
+            report["output_matches"] = (bool(output.strip()) if args.natural else
+                                        expected_marker in output and "applied" in output.lower())
             assert report["checkpoint_statuses"] == ["requested", "applied"], report
             assert report["output_matches"], "Unexpected synthetic output"
             assert client.tool_calls == 0, "Owned tool leaked to hosting client"

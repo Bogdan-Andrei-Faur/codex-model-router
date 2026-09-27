@@ -1,4 +1,5 @@
 import socket
+import tempfile
 import unittest
 import urllib.error
 from unittest.mock import patch
@@ -18,12 +19,12 @@ class DecisionEngineTests(unittest.TestCase):
         cases = [
             ("Parece que ahora si esta funcionando", "critical", "max", False, {"simple", "normal"}),
             ("Ok, perfecto", "critical", "max", False, {"simple", "normal"}),
-            ("Adelante, impleméntalo", "critical", "max", False, {"critical"}),
-            ("Investiga una condición de carrera entre servicios", None, None, False, {"complex", "critical"}),
+            ("Adelante, impleméntalo", "critical", "max", False, {"complex"}),
+            ("Investiga una condición de carrera entre servicios", None, None, False, {"complex"}),
             ("Audita de forma exhaustiva la autenticación", None, None, True, {"critical"}),
             ("Sigue fallando", "critical", "xhigh", True, {"critical"}),
             ("Sigue fallando", "critical", "high", False, {"critical"}),
-            ("Tengo una duda sobre esto", "critical", "max", False, {"simple", "normal", "complex", "critical"}),
+            ("Tengo una duda sobre esto", "critical", "max", False, {"complex"}),
         ]
         for prompt, previous, effort, allow_max, tiers in cases:
             with self.subTest(prompt=prompt, effort=effort):
@@ -44,16 +45,36 @@ class DecisionEngineTests(unittest.TestCase):
 
     @patch("decision_engines.jev_key", return_value="synthetic-key")
     @patch("decision_engines._post_json")
-    def test_jev_uses_vercel_evaluate_with_virtual_model(self, post, key):
+    def test_repeated_provider_failure_opens_a_bounded_circuit_and_success_resets_it(self, post, key):
+        post.side_effect = urllib.error.HTTPError('', 403, '', {}, None)
+        with tempfile.TemporaryDirectory() as folder:
+            config = {"jev": {"circuit_failures": 2, "circuit_seconds": 30}}
+            first = run_jev(config, folder, {"task": "PRIVATE"}, self.candidates)
+            second = run_jev(config, folder, {"task": "PRIVATE"}, self.candidates)
+            third = run_jev(config, folder, {"task": "PRIVATE"}, self.candidates)
+            self.assertEqual((first["engine_failure"], second["engine_failure"], third["engine_failure"]),
+                             ("forbidden", "forbidden", "circuit_open"))
+            self.assertEqual(post.call_count, 2)
+            post.side_effect = None
+            post.return_value = {"answers": {"route": {"choice": "simple_low"}}}
+            from decision_engines import _read_circuit
+            deadline = _read_circuit(folder)['open_until']
+            with patch('decision_engines.time.time', return_value=deadline + 1):
+                recovered = run_jev(config, folder, {"task": "PRIVATE"}, self.candidates)
+            self.assertEqual(recovered["status"], "ok")
+
+    @patch("decision_engines.jev_key", return_value="synthetic-key")
+    @patch("decision_engines._post_json")
+    def test_jev_uses_vercel_evaluate_with_public_model(self, post, key):
         post.return_value = {"answers": {"strategy": {"choice": "reassess"},
                                           "route": {"choice": "simple_low", "confidence": 0.9}},
                              "usage": {"inputTokens": 12, "outputTokens": 2}}
         result = run_jev({"jev": {"connection": "vercel"}}, "", {"task": "PRIVATE_SENTINEL"}, self.candidates)
         self.assertEqual(result["status"], "ok")
-        self.assertEqual(result["engine_model"], "vmc/jev")
+        self.assertEqual(result["engine_model"], "typesafe-ai/jev")
         self.assertEqual((result["engine_input_tokens"], result["engine_output_tokens"]), (12, 2))
         self.assertEqual(post.call_args.args[0], "https://ai-gateway.vercel.sh/v1/evaluate")
-        self.assertEqual(post.call_args.args[1]["model"], "vmc/jev")
+        self.assertEqual(post.call_args.args[1]["model"], "typesafe-ai/jev")
         self.assertEqual(post.call_args.args[2], {"Authorization": "Bearer synthetic-key"})
         self.assertEqual(result["continuity_strategy"], "reassess")
         self.assertIn("strategy", post.call_args.args[1]["questions"])
@@ -75,9 +96,9 @@ class DecisionEngineTests(unittest.TestCase):
         result = run_jev({"jev": {"connection": "vercel", "endpoint": "https://api.typesafe.ai/v1/systemone",
                                   "model": "jev-latest"}}, "", {"task": "PRIVATE_SENTINEL"}, self.candidates)
         self.assertEqual(result["status"], "ok")
-        self.assertEqual(result["engine_model"], "vmc/jev")
+        self.assertEqual(result["engine_model"], "typesafe-ai/jev")
         self.assertEqual(post.call_args.args[0], "https://ai-gateway.vercel.sh/v1/evaluate")
-        self.assertEqual(post.call_args.args[1]["model"], "vmc/jev")
+        self.assertEqual(post.call_args.args[1]["model"], "typesafe-ai/jev")
 
     @patch("decision_engines.jev_key", return_value="synthetic-key")
     @patch("decision_engines._post_json")

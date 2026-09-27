@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import sys
 
-POLICY_VERSION = 4
+POLICY_VERSION = 7
 
 
 def identity(root):

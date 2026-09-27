@@ -2,7 +2,7 @@
 
 ## Versión
 
-El producto usa versiones semánticas. La versión actual es **0.4.0**:
+El producto usa versiones semánticas. La versión actual es **0.4.3**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en la esquina inferior derecha del
 panel procede del archivo común `VERSION`. Cada entrega se registra en
@@ -45,17 +45,26 @@ no demuestra que la app abierta ya la esté usando: compruébalo en Ajustes.
 Instalación, diagnóstico, recuperación y límites:
 [Conexión con Desktop](docs/DESKTOP-INTEGRATION.md).
 
-## Entrega 0.4.0
+## Entrega 0.4.3
 
 Incluye cambios de modelo mediante checkpoints de fase, selección temporal de
 la tarea destacada y reevaluación de peticiones independientes sin heredar por
 defecto el nivel crítico del historial. Los avisos de actualización comparan el
 router por separado de la interfaz.
 
-El cambio dentro de un turno es **opcional y está desactivado por defecto**.
-Las pruebas aisladas de macOS no sustituyen a la aceptación completa en Desktop;
-la compilación y validación nativa de estos cambios en Windows siguen pendientes.
-Consulta [los límites y pruebas de esta entrega](CHANGELOG.md#040--2026-09-25).
+La política 7 acota las opciones de Jev por petición: Luna/Terra para trabajo
+claramente pequeño, Terra para trabajo normal, Sol para revisiones, ingeniería
+compleja y seguimientos inciertos, y Astra ante señales críticas actuales. Los
+reintentos pueden subir de banda cuando existe evidencia de fallo. El respaldo
+local usa los mismos límites y no hereda Luna del turno anterior. Los fallos
+nativos conservan categorías y códigos seguros, sin guardar mensajes del error.
+
+El cambio dentro de un turno es **opcional y está desactivado por defecto**. Al
+activarlo, el checkpoint es obligatorio entre fases sustantivas de las tareas
+nuevas. Una prueba natural de macOS observó Terra/Medio → Sol/Alto sin ordenar
+explícitamente invocar la herramienta. La evaluación real en tareas cotidianas y
+la validación nativa de estos cambios en Windows siguen pendientes. Consulta
+[los límites y pruebas de esta entrega](CHANGELOG.md#043--2026-09-26).
 
 ## Distribución y base 0.3.0
 
@@ -120,10 +129,37 @@ muestra «Sin confirmar».
 La telemetría de inferencia es opcional. Al activarla desde **Ajustes**, el
 puente crea un receptor temporal que escucha exclusivamente en el propio equipo
 (`127.0.0.1`) durante esa conexión de Codex. Solo conserva modelo,
-razonamiento y el tipo de evento completado; no conserva el mensaje, respuesta,
-adjuntos, herramientas, credenciales ni los datos brutos de telemetría. Si hay
+razonamiento, tipo de evento, identificadores técnicos acotados y métricas
+numéricas de tokens, duración, primer token, intentos y estado HTTP; no conserva
+el mensaje, respuesta, adjuntos, herramientas, credenciales, errores libres ni
+los datos brutos de telemetría. Si hay
 dos tareas que podrían coincidir, deja el evento sin atribuir en vez de asignarlo
 incorrectamente. Se aplica al reiniciar Desktop.
+
+El receptor admite lotes de hasta 4 MiB recibidos y 16 MiB descomprimidos, con
+ocho conexiones como máximo y una sola descompresión/análisis JSON simultánea.
+Mantiene un plazo de dos segundos por conexión. Estadísticas muestra rangos de
+tamaño y diferencia excesos del cuerpo recibido/descomprimido, longitud HTTP
+inválida y procesamiento ocupado. Los rechazos por tamaño devuelven HTTP 413;
+no se guarda el lote rechazado. Los contadores son por proceso y se reinician
+con el puente. Un contador de rechazo implica captura incompleta: ampliar los
+límites no recupera eventos ya descartados.
+
+La captura de prompts es otra opción independiente y está desactivada por
+defecto. Con `prompt_logging: true`, el puente guarda el texto exacto recibido en
+`turn/start` dentro de `state/prompts.jsonl`, con permisos privados y unido al
+mismo `decision_id`, modelo, esfuerzo y límites de política del historial. Incluye
+turnos conservados y manuales, pero no copia adjuntos, respuestas, resultados de
+herramientas, instrucciones internas, cabeceras ni la carga OTLP completa. Usa la
+misma retención de `history_days`. Ese archivo contiene mensajes del usuario y
+debe tratarse como datos privados.
+
+Una sonda sintética del esquema OTLP confirmó por qué no se conserva la carga
+completa: incluye el prompt, correo e identificador de cuenta, nombre del equipo,
+endpoint y mensajes de error. Para correlación solo expuso `conversation.id`, ya
+incluido en la lista blanca; no emitió identificadores de turno o respuesta. Las
+métricas numéricas útiles descubiertas por la sonda sí se incorporaron a la lista
+blanca con tipos y límites estrictos.
 
 ## Panel e historial
 
@@ -172,10 +208,10 @@ comprobar lo aceptado. No se han modificado archivos de la app instalada.
 
 | Modelo | Uso de esta política personal |
 | --- | --- |
-| Luna | Traducciones, formato, resúmenes y explicaciones breves delimitadas. |
-| Terra | Correcciones concretas, validaciones y cambios con un resultado comprobable. |
-| Sol | Ingeniería compleja de alcance definido: refactorización, diagnóstico, arquitectura y comparación técnica. También peticiones ambiguas. |
-| Astra | Diseño y revisión de UI/UX, referencias visuales, auditorías, arquitectura amplia, investigación exigente y consecuencias importantes. |
+| Luna | Traducciones, formato, resúmenes de un texto aportado, confirmaciones, contadores y cambios mecánicos explícitamente pequeños. |
+| Terra | Cambios concretos, validaciones acotadas y explicaciones que necesitan contexto; Jev puede subir a Sol. |
+| Sol | Diagnóstico, arquitectura, autenticación ordinaria, revisión abierta y seguimientos de alcance incierto; Alto como mínimo. |
+| Astra | Auditorías explícitas, vulnerabilidades, consecuencias importantes, diseño visual amplio, adjuntos y continuación de trabajo crítico acreditado. |
 
 Astra no queda restringido a emergencias. Un cambio mecánico como «cambia solo el
 color de este texto» puede ir a Terra aunque sea frontend. «Rediseña la UX de
@@ -206,7 +242,7 @@ criterios y sus límites.
 **Reglas locales** es el modo inicial: decide sin enviar el mensaje a ningún
 proveedor adicional. **Jev** usa el clasificador estructurado de TypeSafe y
 permite elegir entre TypeSafe directo y Vercel AI Gateway. En Vercel utiliza el
-modelo virtual `vmc/jev`; la conexión directa conserva `jev-latest`. Requiere una
+modelo público `typesafe-ai/jev`; la conexión directa conserva `jev-latest`. Requiere una
 clave introducida desde Ajustes. En Windows se cifra con DPAPI dentro de
 `state/`; en macOS se guarda en el llavero. Cada conexión tiene su propia clave.
 Las claves anteriores sin proveedor deben introducirse una vez en la conexión
@@ -219,15 +255,41 @@ la política local sin interrumpir el mensaje.
 Desde 0.2.2, continuar una tarea no fija su modelo ni su esfuerzo: Jev elige
 ambos de nuevo. Las confirmaciones y consultas acotadas de estado permiten
 opciones ligeras aunque antes se usara Astra. Pedir que se ejecute el trabajo
-acordado conserva su mínimo de capacidad. La ambigüedad o el título del agente
-no establecen por sí solos un mínimo. Máx. automático solo está disponible
+acordado conserva su mínimo de capacidad. Desde la política 6, la ambigüedad
+requiere Sol/Alto para analizar el contexto; el título del agente no impone Astra.
+Máx. automático solo está disponible
 ante riesgo y alcance excepcional juntos, o tras un intento fallido con muy
 alto/máximo; las instrucciones explícitas y el modo manual prevalecen.
-La política 4 reevalúa cada petición independiente: un cambio concreto no hereda
+La política 6 conserva la reevaluación de cada petición independiente: un cambio concreto no hereda
 el nivel crítico del trabajo pendiente solo por pertenecer a la misma tarea.
 «Continúa con lo pendiente» conserva ese mínimo; las señales de riesgo de la
 petición actual también se siguen aplicando. El contrato pendiente se conserva
 para poder retomarlo después.
+Pedir una revisión abierta —por ejemplo, «Haz una revisión de cómo está yendo»—
+requiere al menos Sol/Alto tanto en Reglas como en las opciones de Jev. Las
+traducciones y consultas delimitadas de contadores siguen permitiendo rutas ligeras.
+
+Jev recibe `work_context` con etiquetas acotadas del trabajo pendiente: acciones,
+estado, alcance y si el contrato procede de una versión antigua. No contiene
+transcripciones ni títulos. Este contexto ayuda a interpretar un seguimiento;
+no convierte una petición independiente en crítica. `quality_floor` y
+`quality_ceiling` registran los límites usados por el selector.
+
+Los contratos nuevos distinguen autenticación ordinaria de riesgo concreto.
+Un contrato crítico antiguo sin versión se reevalúa como alcance incierto en Sol;
+no se puede recuperar su justificación porque nunca se guardó. Las señales
+críticas del mensaje actual siguen prevaleciendo. Los mensajes de progreso no
+rebajan un contrato conocido; un cierre final explícito («Solo queda documentar…»)
+puede reducirlo al trabajo restante. No se modifican decisiones históricas.
+
+En el historial, `native_turn_error` registra incidentes con su categoría nativa,
+el código HTTP cuando existe y si Codex anunció un reintento. No termina la
+decisión ni se cuenta como fallo. `decision_completed` conserva la causa del
+fallo definitivo; si no hay causa disponible se indica como desconocida. Solo
+se aceptan categorías conocidas y códigos numéricos acotados: no se guardan
+`message`, `additionalDetails` ni explicaciones o instrucciones de bloqueo.
+La notificación original continúa llegando a Desktop sin cambios. Los errores
+antiguos sin causa no se rellenan con conjeturas.
 El monitor compara la huella del router por separado de los estilos y la interfaz.
 «Puente sin verificar» identifica un puente anterior que no publica esa huella;
 no equivale a un reinicio pendiente confirmado.

@@ -42,12 +42,37 @@
       const id = event.decision_id;
       if (typeof id !== 'string' || !id) continue;
       const item = map.get(id) || {id,time:0,accepted:false,comparisons:{}};
+      if (event.event === 'phase_checkpoint') {
+        (item.phase_events ||= []).push({...event});
+        if (event.phase_status === 'applied') {
+          if (item.observed_model) (item.prior_inferences ||= []).push({model:item.observed_model,effort:item.observed_effort,phase_id:item.phase_id,confidence:item.evidence_confidence});
+          for (const key of ['observed_model','observed_effort','observed_candidate_model','observed_candidate_effort','evidence_confidence','inference_source']) delete item[key];
+          item.accepted_model=event.accepted_model || event.phase_model;
+          item.accepted_effort=event.accepted_effort || event.phase_effort;
+        }
+      }
+      if (['inference_metric','inference_observed','inference_probable'].includes(event.event)) {
+        const kind=(event.phase_id ? event.phase_id+':' : '')+(event.inference_event_name || 'unknown')+':'+(event.inference_event_kind || 'unknown');
+        const samples=item.inference_samples ||= {};
+        const previous=samples[kind] || {count:0};
+        samples[kind]={...event,count:previous.count+(event.inference_sample_count||1),failures:(previous.failures||0)+(event.inference_failure_count||0)};
+        for (const [key,value] of Object.entries(event)) if(key.startsWith('inference_'))item[key]=value;
+        // Request/stream metrics never replace inference identity evidence.
+        if(event.event==='inference_metric'){map.set(id,item);continue;}
+      }
+      if (event.event === 'native_turn_error') {
+        if (event.will_retry === true) item.native_retries = (item.native_retries || 0) + 1;
+        map.set(id,item);
+        continue;
+      }
+      if (event.event === 'decision_completed') for (const key of ['error_type','error_code','error_http_status','error_source']) delete item[key];
+      if(event.phase_id && (event.event!=='phase_checkpoint' || event.phase_status==='applied'))item.phase_id=event.phase_id;
       if (event.event !== 'decision_quality') item.time = Math.max(item.time, Number(event.time)||0);
       if (event.event === 'decision_created') item.started = Number(event.time)||0;
       if (event.event === 'decision_created') for (const key of ['product_version','build_id','routing_policy_version','request_kind','quality_floor','min_effort']) item[key]=event[key];
       if (['decision_accepted','decision_recovered'].includes(event.event)) item.accepted = true;
       if (['decision_completed','decision_rejected','decision_error'].includes(event.event)) item.finished = Number(event.time)||0;
-      for (const key of ['thread','title','model','effort','model_reason','effort_reason','continuity_strategy','source','status','signal','error_type','quality','model_quality','effort_quality','routing_engine','engine_model','engine_status','engine_confidence','engine_latency_ms','inputTokens','outputTokens','cachedInputTokens','reasoningOutputTokens','phase_name','phase_status','phase_model','phase_effort','phase_transition','observed_model','observed_effort','configured_model','configured_effort','accepted_model','accepted_effort','pipeline_mode','phase_pipeline','inference_source','evidence_confidence']) {
+      for (const key of ['thread','title','model','effort','model_reason','effort_reason','continuity_strategy','source','status','signal','error_type','quality','model_quality','effort_quality','routing_engine','engine_model','engine_status','engine_confidence','engine_latency_ms','inputTokens','outputTokens','cachedInputTokens','reasoningOutputTokens','phase_name','phase_status','phase_model','phase_effort','phase_transition','observed_model','observed_effort','observed_candidate_model','observed_candidate_effort','configured_model','configured_effort','accepted_model','accepted_effort','pipeline_mode','phase_pipeline','inference_source','evidence_confidence']) {
         if (event.event === 'engine_comparison' && (key.startsWith('engine_') || key === 'routing_engine' || key === 'continuity_strategy')) continue;
         if (Object.prototype.hasOwnProperty.call(event,key)) item[key] = event[key];
       }
@@ -58,11 +83,14 @@
         else item.routing_engine = event.engine_active === undefined && event.engine_status === 'ok' ? event.routing_engine : 'rules';
       }
       if (event.event === 'decision_routed') item.appliedEngine = item.routing_engine;
+      for (const key of ['error_code','error_http_status','error_source']) if (Object.prototype.hasOwnProperty.call(event,key)) item[key] = event[key];
       map.set(id,item);
     }
     for (const [id,row] of Object.entries(live)) {
       const item = map.get(row.decision_id);
       if (!item) continue; // Resuming a task is not a new decision.
+      if(row.phase_id && row.phase_id!==item.phase_id)for(const key of ['observed_model','observed_effort','evidence_confidence','inference_source'])delete item[key];
+      if(row.phase_id)item.phase_id=row.phase_id;
       item.thread = id; item.title = row.name || item.title; item.status = row.status || item.status;
       for (const key of ['model','effort']) { const value = setting(row,key); if (value) item[key]=value; }
       for (const key of ['model_reason','effort_reason']) if (row[key]) item[key] = row[key];
@@ -75,7 +103,12 @@
     if(selection && now < selection.until && threads[selection.id])return selection.id;
     return Object.keys(threads).sort((a,b)=>(Number(threads[b].updated)||0)-(Number(threads[a].updated)||0) || a.localeCompare(b))[0] || null;
   }
-  const api = {models,efforts,effortColors,neutral,identities,active,status,setting,model,identity,stableOrder,decisions,featuredThread};
+  function errorLabel(row) {
+    const type = row.error_type === 'unknown' ? 'Causa no proporcionada por Codex' : row.error_type;
+    return (type || '') + (row.error_http_status !== undefined ? ' · HTTP '+row.error_http_status : '') +
+      (row.error_code !== undefined ? ' · RPC '+row.error_code : '');
+  }
+  const api = {models,efforts,effortColors,neutral,identities,active,status,setting,model,identity,stableOrder,decisions,featuredThread,errorLabel};
   if (typeof module !== 'undefined') module.exports = api;
   else scope.MonitorCore = api;
 })(globalThis);

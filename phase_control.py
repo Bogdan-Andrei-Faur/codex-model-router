@@ -18,7 +18,7 @@ TOOL = "router_phase_checkpoint"
 TIERS = ("simple", "normal", "complex", "critical")
 PHASES = ("investigate", "implement", "verify", "summarize")
 SPEC = {"type": "function", "name": TOOL,
-    "description": "For multi-step tasks, call once before a distinct next phase, after finishing all previous tool calls. Await this checkpoint alone, never in parallel with other tools. Assess the complexity of the remaining work: simple (routine), normal (implementation), complex (deep reasoning), critical (security or production risk). The router may keep the current model. Do not call for trivial tasks, repeat a checkpoint, or interpret this tool as permission to perform work. User instructions and approvals remain unchanged.",
+    "description": "Mandatory phase boundary for this routed thread. If a turn has two or more substantive phases, you MUST call this tool after completing the current phase and before any reasoning or tool call for the next phase. Typical boundaries are investigate→implement, implement→verify, and verify→summarize. Finish every outstanding tool call first, then await this checkpoint alone; never call it in parallel. Classify only the remaining phase: simple for routine summaries, normal for straightforward implementation or checks, complex for debugging, cross-system analysis, contradictory constraints or adversarial verification, and critical for security or production risk. The router may keep the current model. Do not call before the first phase, after the final phase, for trivial single-phase work, or twice for the same phase. This checkpoint grants no permission: all user instructions, approvals, and safety requirements remain unchanged.",
     "inputSchema": {"type": "object", "properties": {
         "phase": {"type": "string", "enum": list(PHASES)},
         "complexity": {"type": "string", "enum": list(TIERS)}},
@@ -67,7 +67,7 @@ class PhaseController:
         if self.owns(tid) and turn:
             self.turns[tid] = {"id": turn, "allowed": decision.get("source") == "automatic",
                 "floor": decision.get("quality_floor"), "min_effort": decision.get("min_effort"),
-                "seen": set(), "count": 0}
+                "decision_id": decision.get("decision_id"), "seen": set(), "count": 0}
 
     def end(self, tid):
         self.turns.pop(tid, None)
@@ -90,10 +90,13 @@ class PhaseController:
                 "instruction": instruction})}]}})
 
     def record(self, job, status):
-        self.router.record_history("phase_checkpoint", thread=job["thread"],
+        accepted = {"accepted_model": job["model"], "accepted_effort": job["effort"]} if status == "applied" else {}
+        self.router.record_history("phase_checkpoint", decision_id=job.get("decision_id"), thread=job["thread"],
+            turn_id=job.get("turn_id"),
+            phase_id=job.get("phase_id"), phase_source_model=job.get("source_model"),
             phase_name=job["phase"], phase_status=status,
             phase_model=job["model"], phase_effort=job["effort"],
-            phase_transition=job["transition"], source="phase_policy")
+            phase_transition=job["transition"], **accepted)
 
     def consume(self, message, config):
         rid, method = message.get("id"), message.get("method")
@@ -115,6 +118,7 @@ class PhaseController:
                 if status == "applied":
                     row = self.router.threads.get(job["thread"], {})
                     row.update(phase_name=job["phase"], phase_status="accepted",
+                        phase_id=job["phase_id"], phase_accepted_at=time.time(),
                         phase_model=job["model"], phase_effort=job["effort"],
                         phase_transition=job["transition"], tier=job["tier"],
                         accepted_model=job["model"], accepted_effort=job["effort"],
@@ -122,7 +126,8 @@ class PhaseController:
                         confirmation="Aceptado por Codex")
                     # Previous-phase inference evidence must not label the new
                     # accepted settings as already observed.
-                    for key in ("observed_model", "observed_effort", "inference_source", "evidence_confidence"):
+                    for key in ("observed_model", "observed_effort", "inference_source", "evidence_confidence",
+                                "observed_candidate_model", "observed_candidate_effort"):
                         row.pop(key, None)
                 else:
                     self.disable_turn(job["thread"])
@@ -158,17 +163,25 @@ class PhaseController:
             return True
         turn["seen"].add(args["phase"])
         turn["count"] += 1
-        tier = max(TIERS.index(args["complexity"]), TIERS.index(turn["floor"]) if turn["floor"] in TIERS else 0)
+        # A summary follows completed substantive work. It may use the ordinary
+        # summary route; other phases retain the turn's established minimum.
+        tier = TIERS.index(args["complexity"])
+        if args["phase"] != "summarize" and turn["floor"] in TIERS:
+            tier = max(tier, TIERS.index(turn["floor"]))
         route = config.get("routes", DEFAULT_ROUTES).get(TIERS[tier], {})
         model, effort = route.get("model"), route.get("effort")
-        minimum = turn["min_effort"]
+        minimum = turn["min_effort"] if args["phase"] != "summarize" else None
         if minimum in EFFORTS and effort in EFFORTS and EFFORTS.index(effort) < EFFORTS.index(minimum):
             effort = minimum
         row = self.router.threads.get(tid, {})
         source = row.get("accepted_model") or row.get("model")
-        job = {"call": rid, "thread": tid, "phase": args["phase"], "model": model,
+        job = {"call": rid, "phase_id": uuid.uuid4().hex, "source_model": source, "thread": tid, "turn_id": turn["id"], "decision_id": turn.get("decision_id") or self.router.current_decisions.get(tid), "phase": args["phase"], "model": model,
             "effort": effort, "tier": TIERS[tier], "transition": transition_kind(source, model), "deadline": self.clock() + 10}
         if model == ASTRA and source != ASTRA:
+            row["pending_phase_floor"] = "critical"
+            row["pending_phase_name"] = args["phase"]
+            row["pending_phase_id"] = uuid.uuid4().hex
+            self.router.save_task(tid, row)
             self.disable_turn(tid)
             self.record(job, "requires_new_turn")
             self.reply(rid, "requires_new_turn")

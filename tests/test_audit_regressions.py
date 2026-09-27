@@ -18,9 +18,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from router import Router
 from routing import DEFAULT_ROUTES, EFFORTS, select_route_details
 from decision_engines import candidate_routes, jev_key, run_jev
-from inference_telemetry import LocalInferenceTelemetry, MAX_BYTES
+from inference_telemetry import LocalInferenceTelemetry, MAX_DECODED_BYTES
 from request_dispatch import Dispatcher
-from state_store import append_record, compact_history, read_records
+from state_store import append_prompt_record, append_record, compact_history, compact_prompt_history, read_records
 from workload import response_summary
 from test_inference_telemetry import payload
 
@@ -54,7 +54,7 @@ class AuditRegressions(unittest.TestCase):
             'item': {'type': 'agentMessage', 'text': text}}}))
 
     def test_resume_after_restart_keeps_strong_contract_past_neutral_and_weaker_updates(self):
-        self.assistant('Queda pendiente corregir la autenticación y validar las pruebas.')
+        self.assistant('Queda pendiente corregir una vulnerabilidad de autenticación y validar las pruebas.')
         self.assistant('Falta investigar la integración y ejecutar pruebas.')
         self.assistant('He comprobado el primer archivo.')
         with (self.root / 'state' / 'history.jsonl').open('a') as stream:
@@ -79,7 +79,7 @@ class AuditRegressions(unittest.TestCase):
         self.assertEqual(restarted.thread_categories['task-audit']['task_contract']['status'], 'completed')
 
     def test_independent_change_allows_jev_terra_but_keeps_pending_contract(self):
-        self.assistant('Queda pendiente corregir la autenticación y validar las pruebas.')
+        self.assistant('Queda pendiente corregir una vulnerabilidad de autenticación y validar las pruebas.')
         self.router = Router(self.config, self.root / 'state')
         self.resume(self.router)
         with patch('router.run_jev', return_value={'engine': 'jev', 'status': 'ok',
@@ -88,7 +88,7 @@ class AuditRegressions(unittest.TestCase):
         self.assertEqual(actual['params']['model'], 'gpt-5.6-terra')
         state = jev.call_args.args[2]
         self.assertNotIn('previous_response_context', state)
-        self.assertIsNone(state['quality_floor'])
+        self.assertEqual(state['quality_floor'], 'normal')
         self.assertEqual(self.router.threads['task-audit']['task_contract']['floor'], 'critical')
         self.router.server_line(wire({'id': 2, 'result': {'turn': {'id': 'turn-independent'}}}))
         self.router.server_line(wire({'method': 'turn/completed', 'params': {
@@ -101,7 +101,7 @@ class AuditRegressions(unittest.TestCase):
         self.assertEqual(actual['params']['model'], 'gpt-6-astra')
 
     def test_progress_completion_does_not_close_whole_task(self):
-        self.assistant('Queda pendiente corregir autenticación y validar pruebas.')
+        self.assistant('Queda pendiente corregir una vulnerabilidad y validar pruebas.')
         self.router.server_line(wire({'method':'item/completed','params':{'threadId':'task-audit',
             'item':{'type':'agentMessage','phase':'commentary','text':'Todo terminado.'}}}))
         self.assertEqual(self.router.threads['task-audit']['task_contract']['status'], 'pending')
@@ -130,7 +130,7 @@ class AuditRegressions(unittest.TestCase):
             self.assertNotIn(key, row)
         record = list(read_records(self.root / 'state/history.jsonl'))[-1]
         self.assertTrue(record['build_id'])
-        self.assertEqual(record['routing_policy_version'], 4)
+        self.assertEqual(record['routing_policy_version'], 7)
 
     def test_identical_routed_wire_is_still_one_automatic_decision(self):
         self.config.write_text(json.dumps({'enabled': True, 'routes': DEFAULT_ROUTES}))
@@ -221,6 +221,15 @@ class AuditRegressions(unittest.TestCase):
         values = [r for r in read_records(history) if r['event'] == 'parallel']
         self.assertEqual(len({(r['writer'], r['i']) for r in values}), 120)
 
+    def test_prompt_history_uses_the_configured_retention_window(self):
+        state = self.root / 'prompt-journal'
+        now = 200 * 86400
+        append_prompt_record(state, {'time': now - 91 * 86400, 'prompt': 'old'})
+        append_prompt_record(state, {'time': now - 89 * 86400, 'prompt': 'recent'})
+        compact_prompt_history(state, 90, now=now)
+        self.assertEqual(list(read_records(state / 'prompts.jsonl')),
+                         [{'time': now - 89 * 86400, 'prompt': 'recent'}])
+
     def test_credentials_are_bound_to_connection_and_legacy_is_not_reused(self):
         (self.root / 'jev.secret').write_bytes(b'legacy')
         (self.root / 'jev-typesafe.secret').write_bytes(b'typesafe')
@@ -255,8 +264,8 @@ class CollectorBoundaryTests(unittest.TestCase):
         self.addCleanup(collector.close)
         raw = json.dumps(payload()).encode()
         for token, body, encoding, code in [('', raw, None, 401), ('wrong', raw, None, 401),
-            (collector.token, gzip.compress(b' '*(MAX_BYTES+1)), 'gzip', 400),
-            (collector.token, gzip.compress(b' '*MAX_BYTES)+gzip.compress(b' '), 'gzip', 400),
+            (collector.token, gzip.compress(b' '*(MAX_DECODED_BYTES+1)), 'gzip', 413),
+            (collector.token, gzip.compress(b' '*MAX_DECODED_BYTES)+gzip.compress(b' '), 'gzip', 413),
             (collector.token, gzip.compress(raw)[:-7], 'gzip', 400),
             (collector.token, b'[]', None, 400)]:
             headers = {'Authorization': 'Bearer '+token}

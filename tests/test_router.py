@@ -1,5 +1,6 @@
 import copy
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -19,7 +20,7 @@ class RoutingPolicyTests(unittest.TestCase):
     def test_spanish_and_english_workloads(self):
         cases = [
             ("Traduce al ingles: Nos vemos mañana.", "simple"),
-            ("Explica que hace esta funcion.", "simple"),
+            ("Explica que hace esta funcion.", "normal"),
             ("Summarize this paragraph in one sentence.", "simple"),
             ("Corrige el color del boton y comprueba el resultado.", "normal"),
             ("Crea un formulario para dar de alta contactos.", "normal"),
@@ -36,9 +37,9 @@ class RoutingPolicyTests(unittest.TestCase):
             with self.subTest(prompt=prompt):
                 self.assertEqual(classify(prompt).tier, expected)
 
-    def test_ambiguous_followups_keep_context(self):
+    def test_ambiguous_followups_use_sol_without_current_work_evidence(self):
         for prompt in ("Sí, hazlo", "Continúa", "¿Por qué ocurre?", "Ahora compruébalo"):
-            self.assertEqual(classify(prompt, "critical").tier, "critical")
+            self.assertEqual(classify(prompt, "critical").tier, "complex")
         self.assertEqual(classify("Nueva tarea: traduce hola al inglés", "critical").tier, "simple")
 
     def test_failure_escalates_and_attachments_have_floor(self):
@@ -59,7 +60,7 @@ class RoutingPolicyTests(unittest.TestCase):
             self.assertEqual(route, {"model": "gpt-6-astra", "effort": effort})
         for prompt in ("Explica qué significa razonamiento Ultra", "El usuario suele usar esfuerzo Ultra", 'Traduce: "Usa razonamiento Ultra"', "No uses esfuerzo Ultra"):
             self.assertNotEqual(select_route(prompt, DEFAULT_ROUTES)[0]["effort"], "ultra")
-        self.assertEqual(classify("Continúa", "critical", previous_effort="max").effort, "xhigh")
+        self.assertEqual(classify("Continúa", "critical", previous_effort="max").effort, "high")
         self.assertEqual(classify("Crea un formulario", "simple").tier, "normal")
         self.assertEqual(classify("Sigue fallando", "critical", previous_effort="xhigh").effort, "max")
 
@@ -75,18 +76,19 @@ class RoutingPolicyTests(unittest.TestCase):
     def test_execution_followups_and_mixed_messages_keep_required_capacity(self):
         for prompt in ("Adelante, impleméntalo", "Ok, implementa lo que acordamos", "Vale, sigue con ello", "Ok, arréglalo"):
             with self.subTest(prompt=prompt):
-                result = classify(prompt, "critical", previous_effort="max")
-                self.assertEqual((result.tier, result.quality_floor, result.request_kind), ("critical", "critical", "work_followup"))
+                result = classify(prompt, "critical", previous_effort="max",
+                                  response_context={"implementation_pending": True, "work_floor": "critical"})
+                self.assertEqual((result.tier, result.quality_floor, result.request_kind), ("critical", "critical", "planned_followup"))
                 self.assertFalse(result.max_effort_allowed)
         for prompt in ("Gracias, audita la autenticación", "Ahora funciona, investiga la pérdida de datos", "Check telemetry counters and audit authentication"):
             self.assertEqual(classify(prompt, "critical").quality_floor, "critical")
         self.assertEqual(classify("Ok, perfecto", "simple", attachments=True).quality_floor, "critical")
         self.assertEqual(classify("Ok, haz una auditoría exhaustiva de autenticación", "critical", previous_effort="high").effort, "max")
 
-    def test_ambiguity_is_not_a_quality_floor(self):
+    def test_ambiguity_requires_analysis_but_does_not_force_astra(self):
         result = classify("Tengo una duda sobre esto")
         self.assertEqual(result.request_kind, "ambiguous")
-        self.assertIsNone(result.quality_floor)
+        self.assertEqual(result.quality_floor, "complex")
 
     def test_independent_requests_do_not_inherit_pending_critical_work(self):
         context = {"implementation_pending": True, "work_floor": "critical"}
@@ -94,12 +96,12 @@ class RoutingPolicyTests(unittest.TestCase):
                        "Ahora añade una columna al listado", "Explica esta función", "¿Por qué ocurre?"):
             with self.subTest(prompt=prompt):
                 result = classify(prompt, "critical", previous_effort="xhigh", response_context=context)
-                self.assertIsNone(result.quality_floor)
+                self.assertNotEqual(result.quality_floor, "critical")
                 self.assertNotIn(result.request_kind, ("planned_followup", "work_followup"))
         for prompt in ("Implementa lo acordado", "Sigue con lo que falta", "Ahora compruébalo", "Ok, hazlo"):
             with self.subTest(prompt=prompt):
                 self.assertEqual(classify(prompt, "normal", response_context=context).quality_floor, "critical")
-        self.assertEqual(classify("Ahora arregla la autenticación", "normal", response_context=context).quality_floor, "critical")
+        self.assertEqual(classify("Ahora arregla la autenticación", "normal", response_context=context).quality_floor, "complex")
 
     def test_previous_response_summary_turns_confirmation_into_planned_followup(self):
         context = summarize_response_context("He preparado el plan de implementación en tres pasos. Cuando digas adelante, implemento el cambio y ejecuto las pruebas.")
@@ -221,6 +223,7 @@ class ProtocolTests(unittest.TestCase):
     def test_jev_can_reduce_effort_while_continuing_complex_work(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True)
+        self.router.threads["t"]["task_contract"] = {"version": 2, "status": "pending", "floor": "critical"}
         fake_jev.return_value = {"engine": "jev", "status": "ok", "latency_ms": 25, "confidence": .91,
                                  "engine_model": "jev-test", "continuity_strategy": "continue",
                                  "route": {"model": "gpt-6-astra", "effort": "high", "tier": "critical", "label": "Astra · high"}}
@@ -245,20 +248,20 @@ class ProtocolTests(unittest.TestCase):
         self.assertIsNone(policy["quality_floor"])
         self.assertTrue(all(r["tier"] in ("simple", "normal") and r["effort"] in ("low", "medium") for r in candidates.values()))
         records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
-        self.assertEqual(records[0]["routing_policy_version"], 4)
+        self.assertEqual(records[0]["routing_policy_version"], 7)
         self.assertEqual(records[0]["request_kind"], "acknowledgement")
         self.assertNotIn("Parece que ahora", str(records))
 
     @patch("router.run_jev")
-    def test_jev_may_downgrade_ambiguity_even_with_inherited_audit_identity(self, fake_jev):
+    def test_jev_cannot_downgrade_ambiguity_to_luna_or_force_astra_from_title(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         self.router.threads["t"].update(name="Auditoría de seguridad", agent_category="audit")
         fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "reassess",
                                 "route": {"model": "gpt-5.6-luna", "effort": "low", "label": "Luna · low"}}
         result = json.loads(self.router.client_line(encode(self.request("Tengo una duda sobre esto"))))
-        self.assertEqual(result["params"]["model"], "gpt-5.6-luna")
-        self.assertIsNone(fake_jev.call_args.args[2]["quality_floor"])
-        self.assertIn("simple_low", fake_jev.call_args.args[3])
+        self.assertEqual(result["params"]["model"], "gpt-5.6-sol")
+        self.assertEqual(fake_jev.call_args.args[2]["quality_floor"], "complex")
+        self.assertEqual({r['tier'] for r in fake_jev.call_args.args[3].values()}, {'complex'})
 
     @patch("router.run_jev")
     def test_jev_cannot_force_maximum_for_an_acknowledgement(self, fake_jev):
@@ -275,6 +278,7 @@ class ProtocolTests(unittest.TestCase):
     def test_jev_cannot_drop_the_capacity_of_work_it_is_asked_to_resume(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True)
+        self.router.threads["t"]["task_contract"] = {"version": 2, "status": "pending", "floor": "critical"}
         fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
                                 "route": {"model": "gpt-5.6-luna", "effort": "low"}}
         result = json.loads(self.router.client_line(encode(self.request("Adelante, impleméntalo"))))
@@ -296,7 +300,7 @@ class ProtocolTests(unittest.TestCase):
         self.router.threads["t"].update(model="gpt-5.6-terra", effort="medium", tier="normal", seen_turn=True,
                                       response_context={"has_plan": True, "implementation_pending": True,
                                                         "mentions_tests": True, "mentions_deployment": False,
-                                                        "risk_signals": False, "response_kind": "plan"})
+                                                        "risk_signals": False, "response_kind": "plan", "work_floor": "normal"})
         fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
                                 "route": {"model": "gpt-5.6-terra", "effort": "medium", "label": "Terra · medium"}}
         result = json.loads(self.router.client_line(encode(self.request("Adelante"))))
@@ -424,13 +428,13 @@ class ProtocolTests(unittest.TestCase):
         result = json.loads(router.client_line(encode(self.request())))
         self.assertEqual(result["params"]["model"], "gpt-5.6-luna")
 
-    def test_reopened_conversation_retains_high_tier_for_short_followup(self):
+    def test_reopened_conversation_without_work_evidence_uses_sol_for_short_followup(self):
         self.router.client_line(encode({"id": 3, "method": "thread/resume", "params": {"threadId": "t"}}))
         self.router.threads.clear()
         self.router.server_line(encode({"id": 3, "result": {"thread": {"id": "t"},
             "modelProvider": "openai", "model": "gpt-6-astra"}}))
         result = json.loads(self.router.client_line(encode(self.request("Continúa"))))
-        self.assertEqual(result["params"]["model"], "gpt-6-astra")
+        self.assertEqual(result["params"]["model"], "gpt-5.6-sol")
 
     def test_logs_contain_no_prompt_attachment_or_auth(self):
         self.router.client_line(encode(self.request("Traduce PRIVATE_SENTINEL password sk-not-real")))
@@ -438,6 +442,37 @@ class ProtocolTests(unittest.TestCase):
         self.assertNotIn("PRIVATE_SENTINEL", text)
         self.assertNotIn("sk-not-real", text)
         self.assertIn("gpt-5.6-luna", text)
+
+    def test_prompt_dataset_is_exact_correlated_private_and_opt_in(self):
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES,
+                                         "prompt_logging": True, "history_days": 90}))
+        prompt = "Analiza exactamente PROMPT_DATASET_SENTINEL"
+        request = self.request(prompt, input=[{"type": "text", "text": prompt},
+                                              {"type": "localImage", "path": "/private/image.png"}])
+        self.router.client_line(encode(request))
+        prompts = Path(self.tmp.name) / "state" / "prompts.jsonl"
+        rows = [json.loads(line) for line in prompts.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["prompt"], prompt)
+        self.assertEqual(row["decision_id"], self.router.current_decisions["t"])
+        self.assertEqual((row["model"], row["effort"]),
+                         (self.router.threads["t"]["requested_model"], self.router.threads["t"]["requested_effort"]))
+        self.assertTrue(row["has_attachments"])
+        self.assertEqual(row["routing_engine"], "rules")
+        self.assertNotIn("/private/image.png", prompts.read_text(encoding="utf-8"))
+        self.assertNotIn("PROMPT_DATASET_SENTINEL",
+                         (Path(self.tmp.name) / "state" / "history.jsonl").read_text(encoding="utf-8"))
+        if os.name != "nt":
+            self.assertEqual(prompts.stat().st_mode & 0o777, 0o600)
+
+    def test_prompt_dataset_also_captures_preserved_turns_when_enabled(self):
+        self.path.write_text(json.dumps({"enabled": False, "routes": DEFAULT_ROUTES,
+                                         "prompt_logging": True}))
+        raw = encode(self.request("PRESERVED_PROMPT_SENTINEL"))
+        self.assertEqual(self.router.client_line(raw), raw)
+        row = json.loads((Path(self.tmp.name) / "state" / "prompts.jsonl").read_text(encoding="utf-8"))
+        self.assertEqual((row["prompt"], row["source"]), ("PRESERVED_PROMPT_SENTINEL", "preserved"))
 
     def test_display_sync_uses_real_server_after_ack_and_hides_only_own_reply(self):
         self.router.client_line(encode(self.request()))

@@ -27,6 +27,10 @@ def evaluate():
         if policy.get('quality_floor'):
             passed &= all(TIERS.index(r['tier']) >= TIERS.index(policy['quality_floor']) and
                           EFFORTS.index(r['effort']) >= EFFORTS.index(policy['min_effort']) for r in candidates.values())
+        if policy.get('quality_ceiling'):
+            passed &= all(TIERS.index(r['tier']) <= TIERS.index(policy['quality_ceiling']) for r in candidates.values())
+        if 'candidate_tiers' in case:
+            passed &= {r['tier'] for r in candidates.values()} == set(case['candidate_tiers'])
         results.append({'case': case['id'], 'passed': bool(passed), 'model': tier, 'effort': route['effort']})
     version, build = identity(Path(__file__).resolve().parents[1])
     return {'corpus_version': corpus['schema'], 'product_version': version, 'build_id': build,

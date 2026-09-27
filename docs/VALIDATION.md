@@ -1,11 +1,198 @@
 # Validation and integration notes
 
-## Estado actual — 0.4.0, 25/09/2026
+## Estado actual — 0.4.3, 26/09/2026
+
+### Lotes OTLP grandes — 27/09/2026
+
+- Corregido localmente el presupuesto único de 512 KiB: 4 MiB en recepción y
+  16 MiB después de descomprimir, ocho conexiones y un análisis JSON simultáneo,
+  manteniendo el plazo de dos segundos por conexión. Los límites siguen siendo
+  finitos; no se garantiza aceptar cualquier lote futuro.
+- Contadores por rangos de tamaño y causas separadas: cuerpo recibido,
+  expansión gzip, longitud/formato HTTP y procesamiento ocupado. Se responde
+  413 ante exceso real. Las cargas malformadas no aumentan registros procesados
+  ni emiten parcialmente eventos. No se persiste contenido OTLP.
+- Corregidas las listas de agregación Swift/WPF que omitían contadores usados
+  por las vistas: completados, incidencias tipadas y capacidad, además de los
+  nuevos tamaños. La prueba de contrato cubre todos los contadores públicos.
+- **220 pruebas Python**, **14 JS**, layout, corpus **27/27** y seis casos Jev
+  offline correctos. Regresión HTTP con 512 eventos por lote por encima del
+  límite anterior, sin comprimir/gzip, límites exactos, expansión excesiva,
+  gzip concatenado, longitud inválida, recuperación y ausencia de contenido
+  privado en métricas. La interfaz muestra tamaños sin desbordamiento.
+- Sonda nativa aislada Desktop 26.924.22138: configuración verificada y un lote
+  recibido con nueve registros, cero rechazos. Sin petición de inferencia;
+  no prueba captura completa bajo carga real. WPF sigue sin compilar en macOS.
+- Bundle preparado: producto `c27e800c17c9b070`, router `7c4707809505675f`.
+  Requiere reinicio normal de Desktop para activarlo y observar sus nuevos
+  contadores durante trabajo ordinario. Los descartes anteriores no se recuperan.
+- El bundle anterior `37a6a37dc66f75e9` / `a27342793d16024a` sí se verificó
+  activo tras el reinicio del propietario, y aceptó Terra/Medio explícito en
+  Automático. Su contador `invalid_size` mezclaba longitud no válida y exceso;
+  las doce incidencias históricas no permiten identificar retrospectivamente
+  la causa exacta. No equivalen a doce inferencias perdidas ni a una tasa de pérdida.
+
+### Corrección operativa — 27/09/2026
+
+**Corrección posterior:** R1–R6 de [REVIEW-2026-09-27.md](REVIEW-2026-09-27.md)
+corregidos y cubiertos por 212 pruebas Python, 14 JS, corpus 27/27 y layout.
+Bundle producto `37a6a37dc66f75e9`, router `a27342793d16024a` preparado;
+handshake/catalog/account y cierre nativos correctos. Activación Desktop verificada
+posteriormente; la actualización de lotes OTLP de arriba es la nueva pendiente.
+Jev/Vercel requiere créditos (403 verificado incluso con `typesafe-ai/jev`).
+Aprobación/rechazo nativos pasan; cancelación termina el turno pero deja procesos
+vivos en la sonda, también sin router. No se declara esa garantía como validada.
+No hay muestra de valoraciones que permita afirmar ahorro o calidad.
+
+- Tras detectar fallos repetidos de Jev, el motor usa un circuito local con
+  umbral y pausa configurables (`circuit_failures`, `circuit_seconds`). El estado
+  sólo retiene contador y caducidad; no guarda respuesta, credencial ni texto
+  del proveedor. Durante la pausa se aplica Reglas y una respuesta correcta
+  elimina el estado de fallo.
+- `phase_checkpoint` ahora incluye `decision_id` y `turn_id`; el monitor puede
+  proyectar `requested`, `applied`, rechazo y límite sobre la decisión correcta.
+  Una frontera de Astra persiste como fase crítica pendiente y sólo se recupera
+  al comenzar una continuación autorizada en otro turno. Un resumen final puede
+  usar una ruta inferior tras terminar trabajo sustantivo; no altera Manual ni
+  permite cruzar Astra dentro del turno.
+- La telemetría local distingue rechazos de tamaño, codificación, carga, E/S y
+  autorización. Cuenta finalizaciones exportadas por separado de los registros
+  con modelo. La evidencia probable conserva modelo/esfuerzo candidatos y sus
+  métricas acotadas, pero sigue marcada como probable si faltan identificadores
+  nativos correlacionables.
+- Las auditorías técnicas acotadas usan Sol/Alto; las de seguridad,
+  vulnerabilidades, repositorio completo o alcance exhaustivo conservan Astra.
+- `python3 -m unittest discover -s tests -p 'test_*.py'`: **190** pruebas.
+  Corpus: 27/27. Seis casos Jev sin llamadas externas. `npm test`: **13**;
+  layout/interacción superados. No se reinició Desktop ni se ejecutó una nueva
+  inferencia de suscripción durante esta corrección.
+
+- Política 7 acota todo mínimo normal a Terra, salvo reintentos con evidencia de
+  fallo. Las pruebas cubren propuestas Jev de Luna, Terra, Sol y Astra, continuidad
+  normal, caída del proveedor, Manual y selección explícita. Las rutas complejas
+  y críticas no cambian.
+- El checkpoint de fase ahora declara obligatoria su invocación serial antes de
+  una fase sustantiva posterior y distingue comprobaciones normales de depuración,
+  contradicciones y verificación adversarial complejas. No se modifican
+  `baseInstructions` ni `developerInstructions`: el esquema experimental instalado
+  registra `dynamicTools` en `thread/start` y conserva la actualización nativa
+  `turn/settings/update`.
+- `python3 -m unittest discover -s tests -p 'test_*.py'`: 187 pruebas.
+  `python3 tests/evaluate_routing.py`: 27/27. `python3 tests/smoke_jev.py`:
+  seis casos sin llamadas externas. `npm test`: 12 pruebas; `npm run test:layout`:
+  diseño e interacción superados.
+- `python3.11 tests/smoke_phase_bridge.py --live --natural` pasó con ChatGPT
+  Desktop 26.924.22138. El agente invocó el checkpoint desde su contrato, se
+  registró `requested → applied` y la telemetría nativa observó Terra/Medio y
+  después Sol/Alto dentro del mismo turno. La tarea sintética se archivó, el
+  proceso terminó con código 0 y no hubo errores de telemetría.
+- Dos calibraciones anteriores también invocaron el checkpoint, pero declararon
+  normal la fase restante y conservaron Terra. Una tercera ya realizó el cambio,
+  aunque falló una aserción de formato de la respuesta final. La pasada definitiva
+  valida checkpoint, continuidad y telemetría en vez de exigir una frase exacta.
+- Un seguimiento real en el mismo chat arrancó en **Terra/Alto** y alcanzó una
+  fase de verificación compleja. El puente registró `requested → applied`,
+  `compatible_group`, y dejó el modelo aceptado en **Sol/Alto**. Después recibió
+  un `response.completed` atribuible de forma probable a esa decisión; la
+  confianza no se eleva a confirmada porque el esquema OTLP nativo sigue sin
+  incluir `turn_id` ni `response_id`. El prompt permanece en el registro privado
+  con modo `0600`. Antes de terminar, otro checkpoint registró también
+  `requested → applied`, `compatible_group`, de **Sol/Alto** a **Terra/Medio**;
+  el turno terminó correctamente en Terra. Esto verifica cambios compatibles en
+  ambos sentidos dentro de un mismo turno, sin cruzar la frontera Astra.
+- `python3.11 tests/smoke_control_boundaries.py --live` pasó contra el backend
+  26.924.22138: observó una solicitud nativa `on-request`, aceptó sólo el comando
+  previsto, comprobó su finalización y limpió su marcador; en otro turno emitió
+  `turn/interrupt` después de comenzar el razonamiento y recibió estado final
+  `interrupted`. El proceso aislado terminó con código 0 y su colector OTLP
+  recibió 12 solicitudes sin errores. Esto valida los callbacks nativos de
+  aprobación y cancelación; la presentación visual de Desktop queda fuera de
+  este probe de protocolo.
+- `phase_routing` está activo y Desktop ya se reinició con 0.4.3/política 7. Un
+  chat nuevo expuso `router_phase_checkpoint` durante trabajo real del repositorio.
+  Su decisión inicial fue compleja, Sol/Alto; los límites hacia implementación y
+  verificación devolvieron `unchanged`, `same_model`, Sol/Alto. Esto verifica
+  inscripción e invocación real. El seguimiento descrito arriba ya cierra el
+  ciclo `requested → applied`, la inferencia posterior conservadora y los
+  callbacks nativos de aprobación/cancelación. La compilación WPF en Windows
+  continúa siendo una validación de plataforma separada.
+- `python3 macos.py setup` preparó los bundles nativos 0.4.3 usando el motor de
+  ChatGPT Desktop. El puente activo validado usa la huella de producto
+  `adcb321c02649db7`, huella del router `efa79f7386121334` y política 7.
+  `python3 macos.py doctor` confirmó app compatible,
+  motor ejecutable, app abierta y configuración local presente; no se reinició
+  la conexión activa de Desktop.
+
+## Estado histórico — 0.4.2, 26/09/2026
+
+- Política 6: `python3 -m unittest discover -s tests -p 'test_*.py'`: 179 pruebas.
+  Incluyen bandas de candidatos, Jev proponiendo Luna o Astra fuera de alcance,
+  caída del proveedor tras Luna, contratos antiguos tras reinicio, contexto sin
+  texto libre, modo manual y prioridades explícitas. El pipeline por fases
+  conserva sus comprobaciones existentes; no se amplía su aceptación real.
+- `python3 tests/evaluate_routing.py`: 27/27. `python3 tests/smoke_jev.py`: seis
+  casos de candidatos sin `--live`; no hubo llamadas adicionales a proveedores.
+- `npm test`: 12 pruebas superadas. `npm run test:layout`: selección temporal,
+  pipeline, teclado, dimensiones, historial y diagnósticos superados.
+- `python3 macos.py setup`: compilación correcta; ambos accesos son 0.4.2.
+  Huella del producto `cf166c092c7f02af` y del router `bbe4daae8bb3cf1f`.
+  Monitor 0.4.2 abierto y verificado en la interfaz; Desktop conserva su puente
+  0.4.1/política 5 (`f7a3627da852dcf5`) para no interrumpir tareas activas.
+- Muestra observada de 0.4.1 entre 10:12:46 y 10:31:41 UTC: nueve decisiones
+  automáticas aceptadas, cuatro Astra, cuatro Luna y una Terra. Los cuatro Astra
+  tenían mínimo crítico. Tres Luna vinieron de Jev sin mínimo; dos discrepaban
+  con Sol/Medio local. El otro Luna fue un respaldo que heredó Luna anterior.
+  Terra/Sol estaban disponibles en el catálogo; su ausencia no era una restricción
+  de plataforma. No hay prompts en el diario para juzgar retrospectivamente cada
+  tarea. Los ejemplos nuevos son sintéticos y no se presentan como reproducción
+  de las conversaciones privadas ni como prueba de suficiencia de cada modelo.
+- La política local y los candidatos de Jev son código Python común a Windows y
+  macOS. La comparación con `d77d1d5` confirma que los mínimos amplios y la memoria
+  acumulativa ya existían; los cambios locales posteriores alteraron la continuidad.
+  No hay una muestra Windows equivalente que permita atribuir causalidad al SO.
+- 0.4.2 queda pendiente de activación en Desktop mediante reinicio del usuario
+  cuando terminen sus tareas. La telemetría de inferencia sigue desactivada:
+  aceptación de modelo no prueba ahorro ni calidad de respuesta. No se fuerza
+  una transición real dentro del turno sobre tareas activas. Compilación WPF pendiente.
+
+## Estado histórico — 0.4.1, 26/09/2026
+
+Actualización posterior: arranque habitual verificado con puente 0.4.1/política 5,
+huella del router `f7a3627da852dcf5` y handshake. La selección de esta conversación
+a Luna fue automática según el diario; la afirmación previa de que seguía en
+Manual no estaba respaldada por esa evidencia.
+
+- `python3 -m unittest discover -s tests -p 'test_*.py'`: 165 pruebas superadas.
+- `npm test`: 12 pruebas superadas; los reintentos no marcan una decisión como
+  fallida, y el cierre correcto limpia incidencias previas de la proyección.
+- `npm run test:layout`: superadas selección durante un minuto, pipeline vivo,
+  teclado, redimensionado, búsqueda/paginación y detalle de errores HTTP/reintentos.
+- `python3 tests/evaluate_routing.py`: 21/21 casos. Incluye la petición original
+  «Haz una revision de como esta iendo», traducciones y consultas delimitadas.
+  Detectó además una regresión anterior con «Dale», corregida en esta entrega.
+- `python3 macos.py setup`: monitor nativo compilado; ambos accesos tienen
+  versión 0.4.1. Huella del producto `7d740495bcc145b3` y del router
+  `f7a3627da852dcf5`. Solo se relanzó el monitor; comprobado visualmente en macOS
+  con tres tareas activas y el pie «v0.4.1 · puente 0.4.0».
+- Diagnósticos contrastados con el esquema generado por el motor instalado
+  `0.155.0-alpha.16.4` y [App Server: errors](https://learn.chatgpt.com/docs/app-server#errors).
+  Se admite únicamente el enum nativo y códigos numéricos acotados, sin mensajes
+  ni detalles libres. Las pruebas cubren rechazo RPC, reintento, fallo final,
+  cancelación, eventos tardíos, limpieza entre decisiones y chats laterales.
+- La implementación mantiene el protocolo original. No se repitieron inferencias
+  pagadas ni llamadas a Jev: todos los casos nuevos usan eventos o respuestas sintéticos.
+- Desktop seguía conectado con 0.4.0/política 4 y tres tareas activas al preparar
+  esta versión. Activar 0.4.1/política 5 requiere reiniciarlo una vez terminen.
+  No se interrumpió el backend. El único checkpoint real observado seguía siendo
+  `summarize`, Sol/Alto, sin cambio; transición real, aprobaciones, cancelación y
+  reanudación nativa en Desktop permanecen pendientes. WPF no se compiló en Mac.
+
+## Estado histórico — 0.4.0, 25/09/2026
 
 148 pruebas Python, 10 de núcleo de interfaz, diseño/interacción y compilación
 del monitor macOS superadas. [Preparación de esta entrega](#040-local-release-preparation--2026-09-25)
 detalla los resultados y lo pendiente. Las secciones anteriores por versión
-conservan evidencia histórica; no sustituyen a la validación de 0.4.0.
+conservan evidencia histórica; no sustituyen a la validación de 0.4.1.
 
 ## Estado histórico — 0.3.1, 25/09/2026
 
@@ -184,6 +371,15 @@ Mac; esta entrega no reinicia Desktop ni publica cambios en GitHub.
   and completed-event kind reach the router. A matching single active task is
   confirmed; ambiguous concurrent tasks remain unattributed. Automatic model
   switching remains disabled.
+- Added an independent `prompt_logging` opt-in. Exact `turn/start` user text is
+  written to private `state/prompts.jsonl` records correlated by `decision_id`;
+  attachment paths and OTel bodies remain excluded. Disabled configurations
+  create no prompt dataset, and prompt retention follows `history_days`.
+- Ran one isolated ephemeral raw-schema probe with a synthetic prompt held only
+  in memory. The OTLP batch exposed prompt/account/host/endpoint/error fields,
+  `conversation.id` as its sole correlation key, and no turn/response id. The
+  collector now retains only bounded token, duration, first-token, attempt,
+  success and HTTP-status metrics in addition to its existing identity fields.
 - After replacement, v21 remained running and its `--render` path consumed the
   current status snapshots: the actual featured task rendered as active with
   the pipeline visible. This is an in-process native render, not a desktop screenshot.

@@ -12,9 +12,21 @@ internal sealed partial class ModernRouterMonitor
 
     static void CopyPhaseEvidence(Dictionary<string, object> target, Dictionary<string, object> source)
     {
-        foreach (string key in new[] { "phase_status", "phase_transition", "pipeline_mode", "phase_pipeline",
-            "accepted_model", "accepted_effort", "configured_model", "configured_effort", "observed_model", "observed_effort", "evidence_confidence" })
-            if (source.ContainsKey(key)) target[key] = source[key];
+        if (String(source, "phase_status") == "applied" ||
+            (source.ContainsKey("phase_id") && String(source, "phase_id") != String(target, "phase_id") && String(source, "phase_status") == "accepted"))
+        {
+            if (target.ContainsKey("observed_model"))
+            {
+                if (!target.ContainsKey("prior_inferences")) target["prior_inferences"] = new List<string>();
+                ((List<string>)target["prior_inferences"]).Add(Model(String(target, "observed_model")) + " · " + Effort(String(target, "observed_effort")) + " · " + String(target, "evidence_confidence"));
+            }
+            foreach (string key in new[] { "observed_model", "observed_effort", "observed_candidate_model", "observed_candidate_effort", "evidence_confidence" }) target.Remove(key);
+            if (source.ContainsKey("phase_model")) target["accepted_model"] = source["phase_model"];
+            if (source.ContainsKey("phase_effort")) target["accepted_effort"] = source["phase_effort"];
+        }
+        foreach (string key in new[] { "status", "phase_id", "phase_name", "phase_model", "phase_effort", "phase_status", "phase_transition", "pipeline_mode", "phase_pipeline",
+            "accepted_model", "accepted_effort", "configured_model", "configured_effort", "observed_model", "observed_effort", "observed_candidate_model", "observed_candidate_effort", "evidence_confidence" })
+            if (source.ContainsKey(key) && !(key == "phase_id" && String(source, "event") == "phase_checkpoint" && String(source, "phase_status") != "applied")) target[key] = source[key];
     }
 
     static string PhaseStatus(string value)
@@ -22,6 +34,15 @@ internal sealed partial class ModernRouterMonitor
         switch (value)
         {
             case "proposed": return "Propuesta";
+            case "requested": return "Cambio solicitado";
+            case "applied": return "Cambio aceptado";
+            case "rejected": return "Cambio rechazado";
+            case "preserved": return "Selección conservada";
+            case "unchanged": return "Sin cambio";
+            case "requires_new_turn": return "Requiere otro turno";
+            case "unknown_after_timeout": return "Cambio sin confirmar";
+            case "checkpoint_limit": return "Límite de fases";
+            case "cancelled": return "Cancelado";
             case "accepted": return "Aceptada por Codex";
             case "active": return "En curso";
             case "completed": return "Completada";
@@ -76,6 +97,7 @@ internal sealed partial class ModernRouterMonitor
     static string ExecutionEvidence(Dictionary<string, object> data, string model, string effort, string source)
     {
         var lines = new List<string>();
+        if (String(data, "status") == "interrupted") lines.Add("Turno interrumpido; no acredita la terminación de todos los procesos de sus herramientas.");
         lines.Add((source == "manual" || source == "preserved" || source == "agent" ? "Solicitado" : "Propuesto") + " · " + model + " · " + effort);
         foreach (var entry in new[] { new[] { "accepted", "Aceptado por Codex" }, new[] { "configured", "Configuración publicada" },
             new[] { "observed", String(data, "evidence_confidence") == "confirmed" ? "Inferencia confirmada localmente" : "Observación anterior sin correlación" } })
@@ -84,6 +106,21 @@ internal sealed partial class ModernRouterMonitor
             if (selected != "") lines.Add(entry[1] + " · " + Model(selected) + " · " + Effort(String(data, entry[0] + "_effort")));
         }
         if (String(data, "observed_model") == "") lines.Add("Inferencia real · sin confirmación disponible");
+        if (String(data, "observed_candidate_model") != "") lines.Add("Coincidencia probable · " + Model(String(data, "observed_candidate_model")) + " · " + Effort(String(data, "observed_candidate_effort")));
+        if (data.ContainsKey("prior_inferences")) foreach (string prior in (List<string>)data["prior_inferences"]) lines.Add("Inferencia de una fase anterior · " + prior);
+        if (data.ContainsKey("phase_events"))
+            foreach (var entry in (List<Dictionary<string, object>>)data["phase_events"])
+                lines.Add("Fase " + String(entry, "phase_name") + " · " + PhaseStatus(String(entry, "phase_status")) + " · " + Model(String(entry, "phase_model")));
+        if (data.ContainsKey("inference_samples"))
+        {
+            foreach (var sample in ((Dictionary<string, Dictionary<string, object>>)data["inference_samples"]).Values)
+            {
+                lines.Add(String(sample, "inference_event_name") + " / " + String(sample, "inference_event_kind") + " · " + String(sample, "evidence_confidence") + " · registros " + Number(sample, "count"));
+                foreach (string key in new[] { "inference_input_tokens", "inference_output_tokens", "inference_ttft_ms", "inference_duration_ms", "inference_http_status" })
+                    if (sample.ContainsKey(key)) lines.Add(key + " · " + Number(sample, key));
+            }
+            lines.Add("Último registro por clase; duración del evento no equivale a latencia total de inferencia.");
+        }
         return System.String.Join("\n", lines);
     }
 

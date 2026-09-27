@@ -55,7 +55,7 @@ def main():
             report["within_policy"] = valid
             failures += result.get("status") != "ok" or not valid
         else:
-            expected_floor = {"continue_work": "critical", "high_risk": "critical", "retry": "critical"}.get(name)
+            expected_floor = {"continue_work": "complex", "ambiguous": "complex", "high_risk": "critical", "retry": "critical"}.get(name)
             valid = policy.get("quality_floor") == expected_floor
             if name in ("confirmation", "status"):
                 valid &= all(item["tier"] in ("simple", "normal") and item["effort"] in ("low", "medium") for item in candidates.values())

@@ -78,10 +78,10 @@ def atomic_json(path, value):
         temporary.unlink(missing_ok=True)
 
 
-def append_record(state, record):
+def _append_jsonl(state, filename, lockname, record):
     state = Path(state)
-    with file_lock(state / "history.lock"):
-        history = state / "history.jsonl"
+    with file_lock(state / lockname):
+        history = state / filename
         # A killed writer can leave a partial final line. Isolate it before the
         # next append so recovery can still read the next valid record.
         with history.open("a+b") as stream:
@@ -94,6 +94,15 @@ def append_record(state, record):
             stream.flush()
         if os.name != "nt":
             history.chmod(0o600)
+
+
+def append_record(state, record):
+    _append_jsonl(state, "history.jsonl", "history.lock", record)
+
+
+def append_prompt_record(state, record):
+    """Append the explicitly enabled private routing dataset."""
+    _append_jsonl(state, "prompts.jsonl", "prompts.lock", record)
 
 
 def compact_history(state, days, now=None):
@@ -128,11 +137,36 @@ def compact_history(state, days, now=None):
             temporary.unlink(missing_ok=True)
 
 
+def compact_prompt_history(state, days, now=None):
+    """Apply the normal history retention window to the private prompt file."""
+    if days <= 0:
+        return
+    state = Path(state)
+    cutoff = (time.time() if now is None else now) - days * 86400
+    prompts = state / "prompts.jsonl"
+    with file_lock(state / "prompts.lock"):
+        rows = [row for row in read_records(prompts)
+                if isinstance(row.get("time"), (int, float)) and row["time"] >= cutoff]
+        temporary = state / ("prompts-" + uuid.uuid4().hex + ".tmp")
+        try:
+            with temporary.open("w", encoding="utf-8", newline="\n") as stream:
+                for row in rows:
+                    stream.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            if os.name != "nt":
+                temporary.chmod(0o600)
+            os.replace(temporary, prompts)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+
 def persist_task(state, thread, row, only_if_missing=False):
     if not thread:
         return
     key = hashlib.sha256(thread.encode()).hexdigest()
-    fields = {k: row[k] for k in ("agent_category", "agent_confidence", "task_contract", "task_floor") if k in row}
+    fields = {k: row[k] for k in ("agent_category", "agent_confidence", "task_contract", "task_floor",
+                                  "pending_phase_floor", "pending_phase_name", "pending_phase_id") if k in row}
     with file_lock(Path(state) / "workloads.lock"):
         path = Path(state) / "workloads" / (key + ".json")
         if only_if_missing and path.exists():

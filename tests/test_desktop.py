@@ -70,6 +70,46 @@ class DiscoveryTests(unittest.TestCase):
             (contents/'Info.plist').write_bytes(plistlib.dumps({'CFBundleExecutable':'../../bad'}))
             with self.assertRaises(runtime.DiscoveryError):runtime.discover_macos(roots=[root])
 
+    def test_mac_upgrade_prefers_packaged_launcher_over_legacy_engine(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve(); app = root / 'ChatGPT.app'; contents = app / 'Contents'
+            (contents / 'MacOS').mkdir(parents=True)
+            (contents / 'Resources').mkdir()
+            (contents / 'Info.plist').write_bytes(plistlib.dumps({
+                'CFBundleExecutable': 'ChatGPT', 'CFBundleShortVersionString': '1'}))
+            for name in ('MacOS/ChatGPT', 'Resources/codex'):
+                (contents / name).write_bytes(b'legacy'); (contents / name).chmod(0o755)
+            self.assertEqual(runtime.discover_macos(roots=[root]).backend, contents / 'Resources/codex')
+            launcher = contents / 'Resources/codex-cli/bin/codex'
+            launcher.parent.mkdir(parents=True)
+            launcher.write_bytes(b'packaged'); launcher.chmod(0o755)
+            (contents / 'Info.plist').write_bytes(plistlib.dumps({
+                'CFBundleExecutable': 'ChatGPT', 'CFBundleShortVersionString': '2'}))
+            for explicit in (None, str(app)):
+                with self.subTest(explicit=explicit):
+                    found = runtime.discover_macos(explicit=explicit, roots=[root])
+                    self.assertEqual(found.backend, launcher)
+                    self.assertEqual(found.version, '2')
+            (contents / 'Resources/codex').unlink()
+            self.assertEqual(runtime.discover_macos(roots=[root]).backend, launcher)
+
+    def test_mac_incomplete_packaged_launcher_does_not_use_legacy_engine(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve(); contents = root / 'ChatGPT.app/Contents'
+            (contents / 'MacOS').mkdir(parents=True)
+            launcher = contents / 'Resources/codex-cli/bin/codex'
+            launcher.parent.mkdir(parents=True)
+            (contents / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleExecutable': 'ChatGPT'}))
+            for name in ('MacOS/ChatGPT', 'Resources/codex'):
+                (contents / name).write_bytes(b'legacy'); (contents / name).chmod(0o755)
+            with self.assertRaises(runtime.DiscoveryError):
+                runtime.discover_macos(roots=[root])
+            launcher.write_bytes(b'packaged'); launcher.chmod(0o644)
+            with self.assertRaises(runtime.DiscoveryError):
+                runtime.discover_macos(roots=[root])
+            launcher.chmod(0o755)
+            self.assertEqual(runtime.discover_macos(roots=[root]).backend, launcher)
+
 
 class IntegrationTests(unittest.TestCase):
     def setUp(self):

@@ -143,7 +143,12 @@ def discover_macos(explicit=None, roots=None):
             if Path(executable).name != executable:
                 continue
             desktop = contents / "MacOS" / executable
-            backend = contents / "Resources/codex"
+            resources = contents / "Resources"
+            # New Desktop bundles package the CLI with its own launcher. Keep
+            # that entry point so companion binaries resolve inside its bundle.
+            # An incomplete packaged CLI must not fall back to a stale engine.
+            packaged = resources / "codex-cli"
+            backend = packaged / "bin/codex" if packaged.exists() else resources / "codex"
             if all(path.is_file() and os.access(path, os.X_OK) for path in (desktop, backend)):
                 return Installation(desktop, backend, str(info.get("CFBundleShortVersionString", "unknown")), "macos-bundle")
         except (OSError, ValueError, KeyError, plistlib.InvalidFileException):

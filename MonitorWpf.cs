@@ -653,7 +653,11 @@ internal sealed partial class ModernRouterMonitor : Window
                 {
                     var health = Dict(data["telemetry"]);
                     telemetryAvailable |= String(health, "enabled") == "True" || String(health, "enabled") == "true";
-                    foreach (var key in new[] { "requests", "records_scanned", "eligible_records", "events_without_model", "unrecognized_records", "invalid_requests", "unexpected_path" })
+                    foreach (var key in new[] { "requests", "records_scanned", "eligible_records", "events_without_model", "unrecognized_records", "invalid_requests", "unexpected_path",
+                        "invalid_size", "invalid_wire_size", "invalid_decoded_size", "invalid_length", "invalid_encoding", "invalid_payload", "invalid_io", "unauthorized_requests", "rejected_connections", "processing_busy",
+                        "completion_records", "failure_records", "api_request_records", "stream_records",
+                        "size_wire_512k", "size_wire_1m", "size_wire_4m", "size_wire_16m", "size_wire_over16m",
+                        "size_decoded_512k", "size_decoded_1m", "size_decoded_4m", "size_decoded_16m", "size_decoded_over16m" })
                         telemetry[key] = telemetry.ContainsKey(key) ? telemetry[key] + Number(health, key) : Number(health, key);
                     var stats = Dict(data.ContainsKey("stats") ? data["stats"] : null);
                     foreach (var key in new[] { "telemetry_events", "telemetry_confirmed", "telemetry_probable", "telemetry_unattributed" })
