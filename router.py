@@ -32,6 +32,7 @@ from build_identity import identity, router_identity, POLICY_VERSION
 from request_dispatch import Dispatcher
 from phase_control import PhaseController
 from error_diagnostics import DIAGNOSTIC_FIELDS, native_error, rpc_error, clear_error
+from process_control import CommandProcesses
 
 ROOT = Path(os.environ.get("PERSONAL_CODEX_ROUTER_ROOT", Path(__file__).resolve().parent)).resolve()
 PRODUCT_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
@@ -75,6 +76,15 @@ class Router:
         self.inference_ids = set()
         self.metric_buckets = {}
         self.phases = PhaseController(self, self.phase_config().get("phase_routing") is True)
+        self.commands = CommandProcesses()
+
+    def stop_commands(self, commands):
+        for command in commands:
+            rid = "personal-router-cancel-" + uuid.uuid4().hex
+            self.internal_requests.add(rid)
+            self.outbound.append({"id": rid,
+                "method": "thread/backgroundTerminals/terminate",
+                "params": {"threadId": command.thread, "processId": command.process_id}})
 
     def phase_config(self):
         try:
@@ -487,6 +497,7 @@ class Router:
                     row = self.threads.setdefault(tid, {})
                     turn = params.get("turn") or {}
                     turn_id = turn.get("id")
+                    self.commands.finish_turn(tid, turn_id)
                     if turn_id and self.current_decisions.get(tid) and turn_id != row.get("turn_id"):
                         return True  # Forward unchanged, but do not alter current evidence.
                     self.flush_metrics(thread=tid)
@@ -554,6 +565,14 @@ class Router:
                             row.setdefault("confirmation", "Configurado; sin envío observado")
                 elif method in ("item/started", "item/completed"):
                     item = params.get("item", {})
+                    if item.get("type") == "commandExecution":
+                        turn_id = params.get("turnId") or self.threads.get(tid, {}).get("turn_id")
+                        item_id = item.get("id")
+                        if method == "item/started":
+                            self.stop_commands(self.commands.register(
+                                tid, turn_id, item_id, item.get("processId")))
+                        else:
+                            self.commands.finish_item(tid, turn_id, item_id)
                     if method == "item/completed" and item.get("type") in ("agentMessage", "assistantMessage", "message"):
                         text = item.get("text") or item.get("content") or ""
                         if isinstance(text, list):
@@ -655,6 +674,9 @@ class Router:
                         raw = (json.dumps(message, ensure_ascii=False) + "\n").encode()
                 if method in ("turn/interrupt", "turn/steer", "thread/settings/update", "turn/settings/update"):
                     self.phases.disable_turn(params.get("threadId"))
+                if method == "turn/interrupt":
+                    self.stop_commands(self.commands.interrupt(
+                        params.get("threadId"), params.get("turnId")))
                 if method == "initialize":
                     self.phases.api_enabled = (params.get("capabilities") or {}).get("experimentalApi") is True
                     name = (params.get("clientInfo") or {}).get("name", "unknown")

@@ -320,6 +320,14 @@ OTLP collector received 12 requests with zero errors. This validates real native
 approval and cancellation callbacks without mutating Desktop conversations or
 configuration. It does not claim visual review of Desktop's approval surface.
 
+A later bridge correction records the opaque `processId` published by each
+`commandExecution` and, on the matching `turn/interrupt`, sends the native
+`thread/backgroundTerminals/terminate` RPC for that exact thread and process.
+The strengthened live probe observed both the synthetic parent and child stop,
+with final state `interrupted`, bridge exit 0, 28 OTLP requests and zero receiver
+errors. The direct-backend baseline remains evidence that this bridge RPC, rather
+than the original `turn/interrupt` alone, provides process termination.
+
 ### Before general activation
 
 1. Continue sampling the implemented broad-phase checkpoint across additional

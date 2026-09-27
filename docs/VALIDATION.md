@@ -2,6 +2,36 @@
 
 ## Estado actual — 0.4.3, 26/09/2026
 
+### Créditos, cancelación y entrega Windows — 27/09/2026
+
+- El panel de Vercel confirma un presupuesto mensual del equipo de **10 USD** y,
+  después de una recarga única de 10 USD autorizada por el propietario, un saldo
+  de **14,99 USD**. La recarga automática permanece desactivada. Una sonda nueva
+  de `typesafe-ai/jev` respondió `ok` en 1.284 ms, con confianza 0,85 y una ruta
+  Sol/Alto incluida en los candidatos permitidos. El resultado correcto limpió
+  el circuito local; no se guardó la respuesta cruda ni la credencial.
+- La cancelación del puente registra únicamente el `processId` lógico que el
+  backend nativo publica para cada `commandExecution`, asociado a su `threadId`,
+  `turnId` e identificador de elemento. Un `turn/interrupt` envía además el RPC
+  nativo `thread/backgroundTerminals/terminate` para esa pareja exacta. No se
+  infieren PID del sistema, no se termina el backend y no se afectan ejecuciones
+  de otros chats. También se cubre la carrera donde la ejecución empieza después
+  de recibir la interrupción.
+- `python3.11 tests/smoke_control_boundaries.py --live` pasó contra Desktop
+  26.924.22138: aprobación y rechazo se conservaron, la cancelación detuvo el
+  proceso padre y su hijo, el turno terminó `interrupted`, el puente salió 0 y
+  el colector recibió 28 solicitudes OTLP sin errores.
+- Después del reinicio, Desktop cargó producto 0.4.3 build
+  `69f121d1e1c42b5e`, router `d5a65f786dac23f8`, política 7 y completó el
+  handshake. La misma sonda volvió a pasar: padre e hijo detenidos, turno
+  `interrupted`, salida 0 y 34 solicitudes OTLP sin errores. El primer turno
+  ordinario posterior usó Jev correctamente en 1.011 ms y Codex aceptó Sol/Alto;
+  aceptación y modelo inferido siguen siendo evidencias distintas.
+- **WPF solo necesita validación si vas a usar Windows.** La entrega exacta para
+  un agente nuevo está en
+  [WINDOWS-WPF-VALIDATION.md](WINDOWS-WPF-VALIDATION.md); exige separar
+  compilación, pruebas automatizadas y aceptación visual sobre Windows real.
+
 ### Lotes OTLP grandes — 27/09/2026
 
 - Corregido localmente el presupuesto único de 512 KiB: 4 MiB en recepción y

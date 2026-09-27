@@ -10,6 +10,16 @@
   procesamiento. Histogramas por rangos sin contenido privado.
 - Corregida la agregación nativa de contadores de telemetría hacia ambos
   monitores: varios campos visibles antes no se trasladaban desde el receptor.
+- La cancelación de un turno termina ahora cada `commandExecution` registrado
+  mediante el RPC nativo de terminal asociado a su chat y turno. No finaliza el
+  backend ni ejecuciones de otros chats; la sonda real confirma la parada del
+  proceso padre y su hijo.
+- Documentada la entrega de validación WPF para un agente nuevo: **WPF solo
+  necesita validación si vas a usar Windows.**
+- Restaurado el acceso de Jev en Vercel después de habilitar créditos con una
+  recarga única acotada. Una sonda sintética respondió correctamente dentro de
+  la política y restableció el circuito local; la recarga automática sigue
+  desactivada.
 
 La revisión posterior y su corrección están en
 [el informe](docs/REVIEW-2026-09-27.md). Se corrigieron las órdenes naturales de

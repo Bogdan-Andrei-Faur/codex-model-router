@@ -23,6 +23,11 @@ títulos, conservan su modelo original. Véase [el alcance y las pruebas](docs/S
 
 El puente de Python funciona en Windows y macOS. En Mac hay un lanzador y un
 monitor nativo AppKit propios. Instrucciones, alcance y límites:
+
+**WPF solo necesita validación si vas a usar Windows.** La guía para realizarla
+desde un equipo Windows y un agente nuevo está en
+[docs/WINDOWS-WPF-VALIDATION.md](docs/WINDOWS-WPF-VALIDATION.md).
+
 [Preparar y usar en macOS](docs/MACOS.md).
 
 ```sh

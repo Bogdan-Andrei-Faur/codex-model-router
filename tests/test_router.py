@@ -352,6 +352,22 @@ class ProtocolTests(unittest.TestCase):
                      b'{"id":7,"result":{"decision":"approved"}}\n', b'not json\n', b'[1,2]\n']:
             self.assertEqual(self.router.client_line(data), data)
 
+    def test_interrupt_terminates_only_native_process_registered_for_exact_turn(self):
+        self.router.server_line(encode({"method": "item/started", "params": {
+            "threadId": "t", "turnId": "q", "item": {
+                "id": "command-q", "type": "commandExecution", "processId": "process-q"}}}))
+        self.router.server_line(encode({"method": "item/started", "params": {
+            "threadId": "t", "turnId": "other", "item": {
+                "id": "command-other", "type": "commandExecution", "processId": "process-other"}}}))
+        raw = encode({"id": 9, "method": "turn/interrupt", "params": {
+            "threadId": "t", "turnId": "q"}})
+        self.assertEqual(self.router.client_line(raw), raw)
+        terminate = self.router.drain_outbound()
+        self.assertEqual(len(terminate), 1)
+        self.assertEqual(terminate[0]["method"], "thread/backgroundTerminals/terminate")
+        self.assertEqual(terminate[0]["params"], {"threadId": "t", "processId": "process-q"})
+        self.assertIn(("t", "other", "command-other"), self.router.commands.running)
+
     def test_active_turn_is_not_replayed_or_rerouted(self):
         self.router.server_line(encode({"method": "turn/started", "params": {"threadId": "t"}}))
         raw = encode(self.request())

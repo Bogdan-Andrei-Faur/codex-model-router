@@ -40,6 +40,8 @@ class ControlClient(Client):
         self.methods = []
         self.process_marker = Path(scratch) / 'running.json'
         self.running_pids = []
+        self.command_metadata = []
+        self.command_topology = []
         super().__init__(command, {"PERSONAL_CODEX_ROUTER_CONFIG": str(config)})
 
     def next(self, timeout=45):
@@ -65,14 +67,23 @@ class ControlClient(Client):
                 self.send({"id": message["id"], "error": {
                     "code": -32601, "message": "Not allowed in isolated control probe"}})
         if message.get("method") == "item/started" and self.mode == "cancellation":
-            item_type = (params.get("item") or {}).get("type")
+            item = params.get("item") or {}
+            item_type = item.get("type")
             if item_type == "commandExecution" and self.cancel_request_id is None:
+                self.command_metadata.append({
+                    "parameter_keys": sorted(params),
+                    "item_keys": sorted(item),
+                    "process_id": item.get("processId"),
+                    "process_id_type": type(item.get("processId")).__name__,
+                })
                 deadline = time.monotonic() + 5
                 while not self.process_marker.exists() and time.monotonic() < deadline:
                     time.sleep(.02)
                 self.running_pids = json.loads(self.process_marker.read_text())
                 assert len(self.running_pids) == 2 and all(type(pid) is int and pid > 1 for pid in self.running_pids)
                 assert all(process_alive(pid) for pid in self.running_pids), "Expected live parent and child"
+                self.command_topology = safe_process_topology(
+                    [*self.running_pids, item.get("processId")])
                 self.work_started = True
                 self.cancelled_item_type = item_type
                 self.sequence += 1
@@ -136,6 +147,30 @@ def process_alive(pid):
 def process_state(pid):
     result = subprocess.run(['ps', '-o', 'stat=', '-p', str(pid)], capture_output=True, text=True, timeout=2)
     return result.stdout.strip()[:1]
+
+
+def safe_process_topology(targets):
+    """Return ephemeral IDs and executable names only; never command arguments."""
+    result = subprocess.run(['ps', '-axo', 'pid=,ppid=,pgid=,comm='],
+                            capture_output=True, text=True, timeout=2)
+    rows = {}
+    for line in result.stdout.splitlines():
+        fields = line.split(None, 3)
+        if len(fields) == 4 and all(field.isdigit() for field in fields[:3]):
+            pid, parent, group = map(int, fields[:3])
+            rows[pid] = {'pid': pid, 'parent': parent, 'group': group,
+                         'executable': Path(fields[3]).name}
+    wanted = {int(value) for value in targets
+              if (type(value) is int and value > 1) or
+              (isinstance(value, str) and value.isascii() and value.isdigit() and int(value) > 1)}
+    frontier = list(wanted)
+    while frontier:
+        pid = frontier.pop()
+        row = rows.get(pid)
+        if row and row['parent'] > 1 and row['parent'] not in wanted:
+            wanted.add(row['parent'])
+            frontier.append(row['parent'])
+    return [rows[pid] for pid in sorted(wanted) if pid in rows]
 
 
 def start_thread(client, cwd, overrides, approval_policy, instructions, sandbox="read-only"):
@@ -223,6 +258,8 @@ def main():
                 time.sleep(.05)
             states = [process_state(pid) for pid in client.running_pids]
             report['cancellation_process_states'] = states
+            report['command_metadata'] = client.command_metadata
+            report['command_topology'] = client.command_topology
             report['cancellation'] = {'work_started': True, 'interrupt_acknowledged': True,
                 'turn_status': status, 'parent_and_child_stopped': all(not process_alive(pid) for pid in client.running_pids)}
             assert all(not process_alive(pid) for pid in client.running_pids), {"cancellation_process_states": states}
