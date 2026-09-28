@@ -1,5 +1,24 @@
 # Validation and integration notes
 
+## Corrección del monitor tras reiniciar Ubuntu — 28/09/2026
+
+- Reproducido el cambio de backend: el acceso del escritorio no heredaba
+  `GDK_BACKEND=x11` de la terminal de validación y elegía `GdkWaylandDisplay`.
+  Ese camino no aplicaba la posición ni la superposición solicitadas.
+- El monitor establece su preferencia `x11,wayland` antes de importar GI,
+  conserva overrides explícitos y reaplica geometría/superposición al mostrarse.
+  Las capacidades publicadas reflejan el backend real.
+- `smoke_linux_window.py`, con `GDK_BACKEND` eliminado del entorno, pasó seis
+  estados en dos arranques independientes: preferencias iniciales de mantener
+  delante activadas y desactivadas. Verificados posición/tamaño, propiedad EWMH
+  ABOVE, desactivar/activar, ocultar, reabrir expandido y volver a cápsula.
+- Fallback sin DISPLAY y override `GDK_BACKEND=wayland`: ambos seleccionan
+  `GdkWaylandDisplay`. 242 pruebas Python correctas.
+- Monitor real reiniciado sin reiniciar Desktop: interfaz conectada, posición
+  `(1478, 42)`, tamaño `432×1077` y `_NET_WM_STATE_ABOVE` confirmado por GNOME.
+  Preferencias locales conservadas. No se ha repetido un reinicio físico del PC
+  ni validado una configuración de varios monitores con esta corrección.
+
 ## Estado actual — 0.5.0 Ubuntu, 28/09/2026
 
 Base `df20bc9` / 0.4.4, rama local `codex/ubuntu-integration`. Ubuntu 24.04,

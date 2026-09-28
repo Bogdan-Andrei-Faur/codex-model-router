@@ -9,6 +9,12 @@ from pathlib import Path
 import subprocess
 import sys
 
+# Set before GI imports: the Gdk override can open the display during import.
+# Native Wayland cannot honor this utility window's placement/keep-above hints.
+# Prefer X11 (XWayland in a Wayland session), with a native Wayland fallback.
+# This affects only the monitor process and preserves explicit user overrides.
+os.environ.setdefault('GDK_BACKEND', 'x11,wayland')
+
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
@@ -69,6 +75,7 @@ class Monitor(Gtk.Application):
         if visual:
             self.window.set_visual(visual)
         self.window.connect('delete-event', self.on_delete)
+        self.window.connect('map-event', self.on_map)
         manager = WebKit2.UserContentManager()
         manager.connect('script-message-received::monitor', self.message)
         manager.register_script_message_handler('monitor')
@@ -154,6 +161,19 @@ class Monitor(Gtk.Application):
         except (ValueError, ImportError):
             # The application launcher reactivates this same instance without a tray.
             pass
+
+    def on_map(self, *_):
+        # Window managers can ignore the initial, pre-map position. Repeat it
+        # after mapping, including when a hidden monitor is shown again.
+        GLib.idle_add(self.restore_window)
+        return False
+
+    def restore_window(self):
+        if self.window.get_mapped():
+            self.position()
+            self.window.set_keep_above(self.topmost)
+            self.refresh()
+        return False
 
     def position(self):
         display = Gdk.Display.get_default()
@@ -314,7 +334,7 @@ class Monitor(Gtk.Application):
         gtk_settings = Gtk.Settings.get_default()
         payload.update(keys=self.keys, ui={'mode': self.mode, 'topmost': self.topmost, 'panelHeight': self.panel_height,
                        'reduced': not gtk_settings.get_property('gtk-enable-animations')},
-                       desktopCapabilities={'positioning': os.environ.get('XDG_SESSION_TYPE') != 'wayland', 'tray': self.tray is not None})
+                       desktopCapabilities={'positioning': Gdk.Display.get_default().__gtype__.name == 'GdkX11Display', 'tray': self.tray is not None})
         encoded = json.dumps(payload, sort_keys=True)
         if encoded != self.last_payload:
             self.emit('receive', payload)

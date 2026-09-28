@@ -89,12 +89,30 @@ no detiene el router. Las preferencias se guardan en
 Los archivos JSON se reemplazan atómicamente; las valoraciones usan el mismo
 bloqueo de historial que el puente.
 
-Wayland decide posición, foco y superposición: «Mantener delante» es una
-solicitud al compositor. La zona transparente deja pasar los clics. El panel
-se adapta al área útil; para mover la ventana pueden usarse los atajos del
-escritorio (por ejemplo Alt+F7 en GNOME). No se requiere desactivar Wayland.
-X11, varios monitores, escalado fraccional y suspensión necesitan aceptación
-adicional en sus respectivos equipos.
+El monitor prefiere X11/XWayland para que GNOME aplique la posición a la derecha
+y «Mantener delante», también al arrancar desde el acceso del escritorio.
+Solo su proceso usa `GDK_BACKEND=x11,wayland` por defecto: la sesión Ubuntu y
+Desktop pueden seguir usando Wayland. Se respeta un `GDK_BACKEND` explícito.
+La posición y la preferencia de superposición se reaplican tras mostrar la
+ventana, también después de ocultarla. La zona transparente deja pasar los clics.
+
+Si no hay X11/XWayland disponible, se usa Wayland nativo y se muestra el aviso
+de sus limitaciones: el compositor decide posición y superposición. Las
+capacidades se calculan según el backend real del monitor, no según el tipo de
+sesión Ubuntu. Varios monitores, escalado fraccional y suspensión necesitan
+aceptación adicional en sus respectivos equipos.
+
+La regresión nativa se comprueba con `xprop` (paquete `x11-utils`) y el Python
+del sistema, después de `setup`, desde una sesión gráfica con GNOME/XWayland:
+
+```sh
+env -u GDK_BACKEND /usr/bin/python3 tests/smoke_linux_window.py
+env -u GDK_BACKEND /usr/bin/python3 tests/smoke_linux_window.py --saved-topmost off
+```
+
+Estas sondas usan ventanas de vista previa y preferencias temporales. Verifican
+geometría, el estado `_NET_WM_STATE_ABOVE` reconocido por el gestor de ventanas,
+alternancia del ajuste y ocultación/reapertura, sin acceder a claves o tareas.
 
 Jev admite TypeSafe/Vercel con claves separadas en Secret Service, ligadas a la
 ruta de la instalación y al proveedor. El monitor consulta presencia sin pedir
@@ -144,3 +162,6 @@ Referencias de implementación:
 - [App Server oficial](https://learn.chatgpt.com/docs/app-server).
 - [WebKitGTK: canal de mensajes](https://webkitgtk.org/reference/webkit2gtk/stable/method.UserContentManager.register_script_message_handler.html).
 - [libsecret: uso desde Python](https://gnome.pages.gitlab.gnome.org/libsecret/libsecret-python-examples.html).
+- [GTK: backend GDK](https://docs.gtk.org/gtk3/running.html#environment-variables).
+- [GTK: posición tras mostrar la ventana](https://docs.gtk.org/gtk3/method.Window.move.html).
+- [GTK: solicitud de mantener delante](https://docs.gtk.org/gtk3/method.Window.set_keep_above.html).
