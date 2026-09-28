@@ -1,6 +1,20 @@
 # Continuidad del proyecto: fases automáticas y validación multiplataforma
 
-## Estado actual — 0.4.4, 28/09/2026
+## Estado actual — 0.5.0, Ubuntu, 28/09/2026
+
+Base remota `df20bc9` incorporada por avance rápido. Integración Linux en la
+rama local `codex/ubuntu-integration`; plan, recuperación y evidencia en
+[LINUX.md](LINUX.md). Reutiliza el frontend Mac sin bifurcarlo, motor Python y
+política 7. Añade GTK/WebKitGTK, integración XDG reversible y Secret Service.
+
+Las sondas aisladas validan conexión, telemetría, fases compatibles y controles
+de aprobación/cancelación en Ubuntu. La sesión de Desktop abierta no se reinicia:
+la conexión habitual requiere cerrar/abrir y observar `desktop_connected`.
+No confundir registro con conexión ni Chrome sintético con aceptación nativa.
+Atlas sigue no disponible; no se ha actualizado. Antes de publicar comprobar
+estado Git, recuentos finales y límites de `VALIDATION.md`.
+
+## Estado histórico — 0.4.4, 28/09/2026
 
 Windows recibió por avance rápido los cinco commits del Mac, desde `1a6d60f`
 hasta `2fc1b2d` (0.4.3). La adaptación local 0.4.4 conserva la política 7 y

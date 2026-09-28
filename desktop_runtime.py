@@ -156,10 +156,39 @@ def discover_macos(explicit=None, roots=None):
     raise DiscoveryError("No se encuentra Desktop con Codex. Indica la ubicación de la app en Ajustes o ejecuta setup --app.")
 
 
+def discover_linux(explicit=None, roots=None):
+    """Official unpacked desktop layout; never pick the unrelated CLI on PATH."""
+    candidates = [Path(explicit).expanduser()] if explicit else list(roots or (
+        Path('/usr/lib/chatgpt'), Path('/opt/ChatGPT'), Path('/opt/chatgpt'), Path('/usr/lib/codex')))
+    for location in candidates:
+        directory = location.resolve().parent if location.is_file() else location.resolve()
+        resources = directory / 'resources'
+        if not directory.exists():
+            continue
+        desktop = next((directory / name for name in ('codex-launcher', 'ChatGPT', 'chatgpt', 'Codex')
+                        if (directory / name).is_file() and os.access(directory / name, os.X_OK)), None)
+        packaged = resources / 'codex-cli'
+        backend = packaged / 'bin/codex' if packaged.exists() else resources / 'codex'
+        if desktop is None or not backend.is_file() or not os.access(backend, os.X_OK):
+            raise DiscoveryError('La instalación Linux está incompleta; no se usará otro motor antiguo.')
+        version = 'unknown'
+        if directory == Path('/usr/lib/chatgpt'):
+            try:
+                result = subprocess.run(['dpkg-query', '-W', '-f=${Version}', 'chatgpt'], capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    version = result.stdout.strip()[:120]
+            except (OSError, subprocess.SubprocessError):
+                pass
+        return Installation(desktop, backend, version, 'linux-desktop')
+    raise DiscoveryError('No se encuentra Desktop para Linux. Ejecuta linux.py setup --app /ruta/a/la/instalacion.')
+
+
 def discover(config=None):
     config = config or {}
     if sys.platform == "win32":
         return discover_windows()
     if sys.platform == "darwin":
         return discover_macos(config.get("desktop_app"))
-    raise DiscoveryError("La integración con Desktop requiere Windows o macOS.")
+    if sys.platform == "linux":
+        return discover_linux(config.get("desktop_app"))
+    raise DiscoveryError("La integración requiere Windows, macOS o Linux.")

@@ -43,8 +43,10 @@ def config():
     value = json.loads(CONFIG.read_text(encoding="utf-8-sig"))
     if sys.platform == "darwin" and value.get("platform") != "darwin":
         raise DiscoveryError("Esta configuración pertenece a otra instalación. Prepara este Mac con macos.py setup.")
-    if sys.platform == "win32" and value.get("platform") == "darwin":
-        raise DiscoveryError("Esta configuración pertenece a un Mac. Usa la configuración local de Windows.")
+    if sys.platform == "win32" and value.get("platform") in ("darwin", "linux"):
+        raise DiscoveryError("Esta configuración pertenece a otro sistema. Usa la configuración local de Windows.")
+    if sys.platform == "linux" and value.get("platform") != "linux":
+        raise DiscoveryError("Esta configuración pertenece a otro sistema. Ejecuta linux.py setup.")
     changed = False
     for key, default in (("inference_telemetry", True), ("prompt_logging", True),
                          ("phase_routing", True), ("history_days", 0)):
@@ -188,6 +190,9 @@ def probe_bridge(wrapper):
 def install():
     cfg = config()
     installation = discover(cfg)  # Discovery and staging before registration.
+    if sys.platform == "linux":
+        from linux_desktop import install as install_linux
+        return install_linux(ROOT, cfg, installation, probe_bridge)
     wrapper = wrapper_path().resolve(strict=True)
     desired = str(wrapper)
     previous = read_environment()
@@ -226,6 +231,9 @@ def install():
 
 
 def uninstall():
+    if sys.platform == "linux":
+        from linux_desktop import uninstall as uninstall_linux
+        return uninstall_linux(ROOT)
     record = read_registration()
     if not record:
         return {"registered": False, "message": "Esta instalación no tiene una conexión registrada."}
@@ -248,6 +256,9 @@ def uninstall():
 
 
 def restore_session():
+    if sys.platform == "linux":
+        from linux_desktop import registered
+        return {"restored": registered(ROOT)}
     record = read_registration()
     if not record or record.get("status") != "registered" or not Path(record["wrapper"]).is_file():
         return {"restored": False}
@@ -273,8 +284,12 @@ def doctor():
         report["message"] = str(error) if isinstance(error, DiscoveryError) else "No se pudo preparar el motor de Desktop."
     try:
         record = read_registration()
-        report["registered"] = bool(record and record.get("status") == "registered" and
-                                    read_environment()["value"] == record["wrapper"] and Path(record["wrapper"]).is_file())
+        if sys.platform == "linux":
+            from linux_desktop import registered
+            report["registered"] = registered(ROOT)
+        else:
+            report["registered"] = bool(record and record.get("status") == "registered" and
+                                        read_environment()["value"] == record["wrapper"] and Path(record["wrapper"]).is_file())
     except (OSError, ValueError, subprocess.SubprocessError):
         report["registration_error"] = True
     for path in STATE.glob("status-*.json"):
@@ -297,6 +312,9 @@ def doctor():
 
 
 def open_app():
+    if sys.platform == "linux":
+        from linux import open_app as open_linux
+        return open_linux()
     installation = discover(config())
     if sys.platform == "darwin":
         from macos import app_running, open_monitor
@@ -331,8 +349,8 @@ def main():
     parser.add_argument("action", choices=("doctor", "install", "uninstall", "restore-session", "open"))
     args = parser.parse_args()
     try:
-        if sys.platform not in ("win32", "darwin"):
-            raise DiscoveryError("Esta conexión requiere Windows o macOS.")
+        if sys.platform not in ("win32", "darwin", "linux"):
+            raise DiscoveryError("Esta conexión requiere Windows, macOS o Linux.")
         output = {"doctor": doctor, "install": install, "uninstall": uninstall,
                   "restore-session": restore_session, "open": open_app}[args.action]()
         print(json.dumps(output, ensure_ascii=False, indent=2))

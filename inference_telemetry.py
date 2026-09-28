@@ -32,7 +32,8 @@ RECORD_COUNTERS = ("records_scanned", "eligible_records", "events_without_model"
                    "unrecognized_records", "completion_records", "failure_records",
                    "api_request_records", "stream_records")
 MAX_CONNECTIONS = 8
-READ_TIMEOUT = 2
+CONNECTION_TIMEOUT = 2
+PROCESSING_WAIT_TIMEOUT = CONNECTION_TIMEOUT / 2
 
 COUNT_FIELDS = {
     "input_token_count": "inference_input_tokens",
@@ -66,6 +67,10 @@ def bounded_number(value, maximum, integer=False):
 class BoundedServer(ThreadingHTTPServer):
     """Admit work before creating a thread, with a total connection deadline."""
     daemon_threads = True
+    # The kernel accept queue must absorb a short burst so process_request can
+    # reject work above MAX_CONNECTIONS with a bounded close instead of making
+    # local clients time out before admission control runs.
+    request_queue_size = MAX_CONNECTIONS * 2
 
     def __init__(self, *args):
         self.slots = threading.BoundedSemaphore(MAX_CONNECTIONS)
@@ -77,7 +82,7 @@ class BoundedServer(ThreadingHTTPServer):
                 self.rejected()
             self.shutdown_request(request)
             return
-        request.settimeout(READ_TIMEOUT)
+        request.settimeout(CONNECTION_TIMEOUT)
         try:
             super().process_request(request, address)
         except BaseException:
@@ -85,7 +90,7 @@ class BoundedServer(ThreadingHTTPServer):
             raise
 
     def process_request_thread(self, request, address):
-        timer = threading.Timer(READ_TIMEOUT, self.shutdown_request, args=(request,))
+        timer = threading.Timer(CONNECTION_TIMEOUT, self.shutdown_request, args=(request,))
         timer.daemon = True
         try:
             timer.start()
@@ -230,7 +235,7 @@ class LocalInferenceTelemetry:
                     raw = self.rfile.read(size)
                     if len(raw) != size:
                         raise ValueError("io")
-                    if not owner.parse_lock.acquire(timeout=READ_TIMEOUT / 2):
+                    if not owner.parse_lock.acquire(timeout=PROCESSING_WAIT_TIMEOUT):
                         raise ValueError("busy")
                     try:
                         encoding = self.headers.get("Content-Encoding", "identity").lower().strip()

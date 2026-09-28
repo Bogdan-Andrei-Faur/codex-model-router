@@ -103,3 +103,38 @@ def sleep_command(process_marker):
     if os.name == 'nt':
         return '& ' + ' '.join("'" + path.replace("'", "''") + "'" for path in (sys.executable, str(script)))
     return shlex.join([sys.executable, str(script)])
+
+
+def host_probe_pids(marker, namespace_pids, proc_root=Path('/proc')):
+    """Translate sandbox PIDs only after identifying our exact synthetic script.
+
+    Linux's native sandbox has its own PID namespace (commonly 2 and 3).
+    Those numbers must never be interpreted as host processes.
+    """
+    if sys.platform != 'linux':
+        return namespace_pids
+    if len(namespace_pids) != 2 or not all(type(pid) is int and pid > 1 for pid in namespace_pids):
+        raise ValueError('Invalid probe PID marker')
+    script = str(Path(marker).with_suffix('.py').resolve())
+    rows, parents = {}, []
+    for directory in Path(proc_root).glob('[0-9]*'):
+        try:
+            fields = dict(line.split(':', 1) for line in (directory / 'status').read_text().splitlines() if ':' in line)
+            ids = [int(value) for value in fields.get('NSpid', '').split()]
+            if not ids:
+                continue
+            pid, parent = int(directory.name), int(fields['PPid'])
+            rows[pid] = (parent, ids[-1])
+            if ids[-1] == namespace_pids[0]:
+                args = (directory / 'cmdline').read_bytes().split(b'\0')
+                if script.encode() in args:
+                    parents.append(pid)
+        except (OSError, ValueError, KeyError):
+            continue
+    if len(parents) != 1:
+        raise RuntimeError('Cannot uniquely identify synthetic sandbox parent on host')
+    parent = parents[0]
+    children = [pid for pid, (ppid, nsid) in rows.items() if ppid == parent and nsid == namespace_pids[1]]
+    if len(children) != 1:
+        raise RuntimeError('Cannot uniquely identify synthetic sandbox child on host')
+    return [parent, children[0]]

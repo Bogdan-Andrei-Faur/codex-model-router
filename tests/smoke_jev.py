@@ -5,6 +5,7 @@ Live mode consumes a small amount of the configured classifier provider quota.
 """
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -25,6 +26,17 @@ CASES = (
 )
 
 
+def live_catalog(state_dir):
+    legacy = state_dir / "catalog.json"
+    if legacy.exists():
+        return json.loads(legacy.read_text(encoding="utf-8"))["models"]
+    for path in sorted(state_dir.glob("status-*.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+        catalog = json.loads(path.read_text(encoding="utf-8")).get("catalog")
+        if catalog:
+            return catalog
+    raise FileNotFoundError("No active router model catalog is available; start Codex Desktop first.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true")
@@ -33,8 +45,9 @@ def main():
     config = json.loads((ROOT / "config.local.json").read_text(encoding="utf-8-sig")) if args.live else {}
     routes = config.get("routes", DEFAULT_ROUTES)
     catalog = {route["model"]: set(EFFORTS) for route in routes.values()}
+    state_dir = Path(os.environ.get("PERSONAL_CODEX_ROUTER_STATE", ROOT / "state"))
     if args.live:
-        catalog = json.loads((ROOT / "state" / "catalog.json").read_text(encoding="utf-8"))["models"]
+        catalog = live_catalog(state_dir)
     failures = 0
     for name, prompt, previous, effort in CASES:
         if args.case and name != args.case:
@@ -47,7 +60,7 @@ def main():
             state = build_state(prompt, {"present": False, "count": 0, "images": 0, "types": []},
                                 routes[previous]["model"] if previous else None, effort, policy["signal"] == "retry")
             state.update({key: policy[key] for key in ("request_kind", "quality_floor", "max_effort_allowed")})
-            result = run_jev(config, ROOT / "state", state, candidates)
+            result = run_jev(config, state_dir, state, candidates)
             report.update({key: result.get(key) for key in ("status", "continuity_strategy", "confidence", "latency_ms", "engine_failure")})
             route = result.get("route") or {}
             report.update(model=route.get("model"), effort=route.get("effort"))

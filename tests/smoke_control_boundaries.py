@@ -24,7 +24,7 @@ from probe_model_compatibility import Collector
 from routing import DEFAULT_ROUTES
 from smoke_native import Client, ROOT
 from control_contract import exact_approval_command, approval_command
-from control_runtime import process_alive, process_state, safe_process_topology, sleep_command, read_process_marker
+from control_runtime import process_alive, process_state, safe_process_topology, sleep_command, read_process_marker, host_probe_pids
 
 
 class ControlClient(Client):
@@ -76,7 +76,7 @@ class ControlClient(Client):
                     "process_id": item.get("processId"),
                     "process_id_type": type(item.get("processId")).__name__,
                 })
-                self.running_pids = read_process_marker(self.process_marker)
+                self.running_pids = host_probe_pids(self.process_marker, read_process_marker(self.process_marker))
                 assert len(self.running_pids) == 2 and all(type(pid) is int and pid > 1 for pid in self.running_pids)
                 assert all(process_alive(pid) for pid in self.running_pids), "Expected live parent and child"
                 self.command_topology = safe_process_topology(self.running_pids)

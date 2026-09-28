@@ -1,5 +1,63 @@
 # Validation and integration notes
 
+## Estado actual — 0.5.0 Ubuntu, 28/09/2026
+
+Base `df20bc9` / 0.4.4, rama local `codex/ubuntu-integration`. Ubuntu 24.04,
+Python 3.12.3, GNOME/Wayland x86_64, Desktop 26.924.22138 y motor
+0.158.0-alpha.2.1. Guía y límites en [LINUX.md](LINUX.md).
+
+- **242 pruebas Python**, todas correctas, ninguna omitida en este equipo.
+  Nuevas pruebas de descubrimiento, instalación/desconexión exacta, conflictos,
+  argumentos, controles del monitor, claves y traducción de PID del sandbox.
+- **14 pruebas JavaScript**, corpus **27/27**, compilación Python,
+  sintaxis JavaScript y `git diff --check` correctos.
+- Handshake/catálogo/cuenta/cierre correctos. Telemetría nativa comprobada en
+  las tres disposiciones de argumentos admitidas, sin errores de recepción.
+- Fase espontánea Terra/Medio → Sol/Alto, checkpoint requested/applied,
+  inferencia observada, tarea sintética archivada, siete solicitudes OTLP y
+  salida 0. Aprobación, rechazo y cancelación correctos, padre/hijo detenidos,
+  17 solicitudes OTLP sin errores. Son procesos aislados, no la app abierta.
+- Llave sintética en Secret Service: almacenar, leer, aislar proveedor y
+  eliminar correctamente. No se reutilizan claves de otra máquina.
+- GTK/WebKit carga realmente la interfaz compartida y recibe su mensaje ready.
+  Revisión Chrome de cuatro vistas, cápsula y detalle a 432×900 y 390×640,
+  sin desbordamiento horizontal. No equivale a aceptación visual GTK completa.
+- Instalación real → desinstalación → reinstalación correctas. Restauración
+  byte a byte y de permisos del acceso anterior, cuyo SHA-256 es
+  `19a7b14888d68f145186b2f47a6569b26cdd3845e3c14f62e68293de5e2b2c3e`.
+  Se mantiene el wrapper previo de entorno MCP y `%U`.
+- Tras el reinicio del propietario, `python3 linux.py doctor` confirma
+  `registered=true`, `connection=desktop_connected`, una sesión Desktop y una
+  sesión del puente. El proceso activo publica producto 0.5.0, handshake y
+  telemetría correctos, catálogo nativo y `restart_required=false`.
+- Jev/Vercel está en el llavero Secret Service y es el motor activo, con Reglas
+  como comparación. Una petición ordinaria posterior al reinicio fue encaminada
+  por Jev a Sol/Alto y Codex aceptó los ajustes nativos. La sonda sintética de
+  estado respondió `ok` en 763 ms, eligió Luna/Low dentro de política y no hizo
+  inferencia Codex ni persistió la respuesta del proveedor.
+- `tests/smoke_jev.py --live` usa ahora el catálogo del snapshot del router
+  activo y respeta `PERSONAL_CODEX_ROUTER_STATE`; conserva compatibilidad con el
+  antiguo `state/catalog.json`. Esto corrige la sonda en Linux sin cambiar el
+  encaminamiento del producto.
+- El layout compartido se verificó a 390×640 y 432×900 píxeles CSS con factores
+  de dispositivo 1×, 1,25×, 1,5× y 2×. En las ocho combinaciones, documento,
+  cuerpo y superficie permanecieron dentro del viewport y sin desbordamiento
+  horizontal.
+- GitHub Actions [36401583079](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/36401583079)
+  pasó los nueve trabajos: Python 3.9/3.14 y monitor en Ubuntu, macOS y Windows.
+  La primera ejecución expuso una carrera en macOS 3.14: la prueba acortaba a la
+  vez la espera del decodificador y el cierre total del socket. Ambos plazos se
+  separaron, conservando dos segundos como límite real de conexión; la regresión
+  pasó 30/30 repeticiones locales y toda la matriz remota.
+- Pendiente de plataforma: aceptación visual extensa del monitor GTK en varios
+  monitores físicos, DPI real y suspensión. El monitor nativo permanece activo
+  y la carga real de la interfaz compartida ya está cubierta por el smoke local.
+- Atlas no está disponible en esta sesión; no se ha podido consultar ni
+  actualizar. La rama `codex/ubuntu-integration` está publicada en el repositorio
+  autoritativo; no se modificaron repositorios Grimaldi. Las secciones siguientes
+  son evidencia histórica.
+
+
 ## Estado actual — 0.4.4, 28/09/2026
 
 Se integró la entrega del Mac hasta `2fc1b2d` y se adaptaron las sondas nativas

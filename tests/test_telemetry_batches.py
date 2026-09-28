@@ -105,7 +105,7 @@ class TelemetryBatchTests(unittest.TestCase):
     def test_busy_decoder_is_bounded_and_snapshot_does_not_wait_for_it(self):
         self.collector.parse_lock.acquire()
         try:
-            with patch('inference_telemetry.READ_TIMEOUT', .15):
+            with patch('inference_telemetry.PROCESSING_WAIT_TIMEOUT', .075):
                 self.assertEqual(self.post(b'{}'), 503)
             self.assertEqual(self.collector.snapshot()['processing_busy'], 1)
         finally:

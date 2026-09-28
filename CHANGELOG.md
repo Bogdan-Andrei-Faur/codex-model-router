@@ -1,5 +1,22 @@
 # Cambios
 
+## 0.5.0 — Ubuntu y monitor compartido, 28/09/2026
+
+- Descubrimiento Linux del backend de Desktop, preparación, diagnóstico y
+  conexión reversible mediante un acceso XDG de usuario. Conserva el comando
+  original y sus argumentos; no reemplaza el entorno MCP del propietario.
+- Contenedor GTK/WebKitGTK que consume los mismos HTML/CSS/JS de macOS.
+  Cápsula/panel, bandeja, historial, valoraciones, pausa y modo por tarea;
+  controles 0.4.4 de fases, prompts, telemetría y reinicio pendiente.
+- Claves por instalación/proveedor mediante Secret Service, sin secretos en
+  argumentos o archivos JSON, con lectura acotada y respaldo local existente.
+- CI ampliada a Ubuntu y pruebas de ciclo de instalación, recuperación,
+  contratos del monitor y privacidad. La sonda de cancelación traduce los PID
+  del sandbox Linux antes de observar el proceso padre y su hijo en el host.
+- No cambia la política 7 ni reimplementa la selección de modelos. La versión
+  se prepara localmente; activación real requiere volver a abrir Desktop.
+
+
 ## 0.4.4 — 2026-09-28
 
 - Integrada la entrega del Mac hasta `2fc1b2d` y verificada en Windows con

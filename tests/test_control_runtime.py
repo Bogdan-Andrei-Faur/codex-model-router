@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from control_contract import approval_command, exact_approval_command
-from control_runtime import process_alive, process_state, sleep_command, read_process_marker
+from control_runtime import process_alive, process_state, sleep_command, read_process_marker, host_probe_pids
 
 
 class ControlPortabilityTests(unittest.TestCase):
@@ -49,6 +49,21 @@ class ControlPortabilityTests(unittest.TestCase):
             self.assertIn('sys.executable', source)
             self.assertNotIn("['sleep'", source)
             self.assertIn(str(marker.with_suffix('.py')), command)
+
+    @unittest.skipUnless(sys.platform == 'linux', 'Linux PID namespaces')
+    def test_namespaced_probe_ids_are_matched_to_exact_script_and_parent(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            marker = root / 'probe/running.json'
+            for pid, parent, inner, args in [(2, 0, 2, b'kthreadd'), (90, 80, 2, str(marker.with_suffix('.py')).encode()), (91, 90, 3, b'python'), (99, 1, 3, b'other')]:
+                d = root / str(pid)
+                d.mkdir()
+                (d / 'status').write_text('PPid: %s\nNSpid: %s %s\n' % (parent, pid, inner))
+                (d / 'cmdline').write_bytes(b'python\0' + args + b'\0')
+            self.assertEqual(host_probe_pids(marker, [2, 3], root), [90, 91])
+            (root / '90/cmdline').write_bytes(b'unrelated')
+            with self.assertRaises(RuntimeError):
+                host_probe_pids(marker, [2, 3], root)
 
     def test_marker_waits_for_windows_writer_and_complete_json(self):
         with patch.object(Path, 'read_text', side_effect=[PermissionError(), '[', '[42,43]']):

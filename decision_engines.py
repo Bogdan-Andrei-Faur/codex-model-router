@@ -321,6 +321,9 @@ def jev_key(state_dir, connection="typesafe"):
         return value.strip()
     if sys.platform == "darwin":
         return _keychain_key(state_dir, "jev-" + connection)
+    if sys.platform == "linux":
+        from linux_secret import read_key
+        return read_key(state_dir, "jev-" + connection)
     try:
         return _unprotect_windows((Path(state_dir) / ("jev-" + connection + ".secret")).read_bytes())
     except OSError:

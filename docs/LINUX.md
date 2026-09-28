@@ -1,0 +1,146 @@
+# Ubuntu / Linux — instalación y recuperación
+
+## Arquitectura
+
+Linux utiliza el router Python existente y los mismos archivos HTML/CSS/JavaScript
+`monitor-ui/` que macOS. `monitor_linux.py` solo aloja esa interfaz con
+GTK 3/WebKitGTK 4.1 y adapta ventana, bandeja y acciones. `monitor_state.py`
+produce el contrato que consume esa interfaz; usa la persistencia compartida,
+los mismos nombres de eventos y modos por tarea. No existe una política de
+modelos específica de Ubuntu. Windows conserva WPF.
+
+La base es `df20bc9` (0.4.4): controles de fases, captura de prompts, telemetría,
+avisos de reinicio y sonda de cancelación de Windows. La adaptación 0.5.0 conserva
+la política 7 y esos controles. Los cambios automáticos entre fases dependen del
+checkpoint y de las restricciones nativas; no se fuerza una transición rechazada.
+
+## Requisitos y preparación
+
+Validado en Ubuntu 24.04, GNOME/Wayland, x86_64, Python 3.12.3 y Desktop
+26.924.22138 con backend 0.158.0-alpha.2.1. Las otras distribuciones/arquitecturas
+requieren validación propia. Se utiliza Python del sistema para disponer de GI:
+
+```sh
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-secret-1 gir1.2-ayatanaappindicator3-0.1
+python3 linux.py setup
+python3 linux.py doctor
+python3 linux.py install
+python3 linux.py monitor
+```
+
+`setup` crea configuración local, wrappers en `dist/` y accesos de usuario
+«Codex automático» y «Monitor de Codex». Copia `monitor-ui/` a `dist/linux-ui`
+como hace el bundle Mac. Repetir setup tras actualizar el código refresca esa
+copia y conserva ajustes locales. No copia configuraciones de Windows/Mac.
+No requiere paquetes pip, Node.js ni un navegador adicional para el monitor.
+
+Para una ubicación no estándar, `python3 linux.py setup --app /ruta/ChatGPT`
+acepta la carpeta o el ejecutable de la instalación y
+`--desktop-entry nombre.desktop` selecciona el acceso habitual. Descubre el motor
+incluido con Desktop, nunca el `codex` independiente que aparezca en PATH.
+Si hay un subpaquete `resources/codex-cli`, exige su launcher completo en vez de
+usar un motor antiguo de reserva. La versión del paquete se consulta con dpkg
+en el layout oficial Ubuntu; en layouts personalizados puede ser desconocida.
+
+## Activación y vuelta atrás
+
+`install` comprueba el wrapper y el protocolo antes de modificar el acceso.
+Crea o adapta una entrada en `$XDG_DATA_HOME/applications` (por defecto
+`~/.local/share/applications`). Conserva el comando original, sus argumentos,
+los códigos de archivos/URLs y cualquier wrapper de entorno existente. También
+adapta las acciones adicionales del acceso. La entrada de sistema queda intacta.
+No establece una variable global de sesión, no modifica `~/.codex/config.toml`,
+no reinicia Desktop y no altera el entorno de procesos en curso.
+
+Al terminar las tareas, cerrar Desktop completamente y volver a abrirlo desde
+su acceso habitual. El wrapper inicia el monitor y ejecuta el acceso anterior
+con `CODEX_CLI_PATH` apuntando al puente. El siguiente diagnóstico debe indicar
+`desktop_connected`; estar registrado o ver el monitor no demuestra conexión.
+`CODEX_CLI_PATH` es una integración observada en la app, no una API pública
+estable. Si una actualización cambia el protocolo, desconectar y revisar.
+
+```sh
+python3 linux.py uninstall
+```
+
+Restaura exactamente el acceso de usuario anterior (incluidos sus permisos), o
+elimina solo la copia propia si antes se usaba el acceso del sistema. Conserva
+historial, configuración y llavero. Si el acceso ha sido modificado externamente,
+rechaza sobrescribirlo. La copia anterior queda en
+`state/desktop-integration.json`, privada, para recuperación. La instalación es
+idempotente. Si se interrumpe mientras registra, `uninstall` puede recuperar su
+copia; no borrar ese registro antes de recuperar el acceso.
+
+El acceso alternativo «Codex automático» evita iniciar una segunda app cuando
+Desktop ya está abierto. El acceso habitual conserva la gestión de instancia
+única original de Desktop. Abrir solo el monitor nunca activa el puente.
+
+Antes de mover/eliminar el repositorio, desconectar. Los wrappers y accesos
+usan rutas absolutas y dependen del checkout, igual que los bundles de Mac.
+Tras moverlo, ejecutar setup e install desde la ubicación nueva.
+
+## Monitor y claves
+
+La bandeja permite alternar cápsula/panel, ocultar, pausar, mantener delante y
+salir. El acceso «Monitor de Codex» vuelve a mostrar la misma instancia. Sin
+AppIndicator se conserva esa forma de recuperación. Cerrar u ocultar el monitor
+no detiene el router. Las preferencias se guardan en
+`state/monitor-ui-linux.json`; el historial y los modos usan el formato común.
+Los archivos JSON se reemplazan atómicamente; las valoraciones usan el mismo
+bloqueo de historial que el puente.
+
+Wayland decide posición, foco y superposición: «Mantener delante» es una
+solicitud al compositor. La zona transparente deja pasar los clics. El panel
+se adapta al área útil; para mover la ventana pueden usarse los atajos del
+escritorio (por ejemplo Alt+F7 en GNOME). No se requiere desactivar Wayland.
+X11, varios monitores, escalado fraccional y suspensión necesitan aceptación
+adicional en sus respectivos equipos.
+
+Jev admite TypeSafe/Vercel con claves separadas en Secret Service, ligadas a la
+ruta de la instalación y al proveedor. El monitor consulta presencia sin pedir
+el secreto. Al guardar transmite el secreto a un helper mediante una tubería,
+nunca argumentos o JSON. La lectura tiene un plazo acotado; el presupuesto de
+Jev y su respaldo a reglas siguen siendo los compartidos. Si el llavero está
+bloqueado/no disponible, desbloquear y reintentar. Cambiar una clave invalida
+la caché mediante un marcador sin contenido secreto. Las variables de entorno
+existentes siguen siendo una alternativa soportada por el motor común.
+
+La configuración nueva de 0.4.4/0.5.0 activa fases, telemetría y captura de prompts,
+con historial indefinido. Ajustes permite desactivar cada opción. Capturar prompts
+guarda texto privado en `state/prompts.jsonl`; no se publica en Git. El modo
+inicial es Reglas, sin clasificadores externos ni comparaciones externas.
+
+## Validación realizada el 28/09/2026
+
+- Pruebas Python del núcleo y nuevos contratos Linux; núcleo JavaScript y corpus
+  de selección. Recuento final en `VALIDATION.md`.
+- `tests/smoke_native.py`: versión, handshake, catálogo, cuenta y cierre correcto.
+- `tests/smoke_telemetry.py`: tres disposiciones de argumentos con configuración
+  efectiva y recepción OTLP autenticada; sin inferencia en esta sonda.
+- `tests/smoke_phase_bridge.py --live --natural`: tarea sintética archivada,
+  checkpoint espontáneo `requested → applied`, inferencias Terra/Medio y Sol/Alto,
+  siete solicitudes OTLP, cero errores y salida 0.
+- `tests/smoke_control_boundaries.py --live`: aprobación y rechazo preservados;
+  cancelación `interrupted`, padre e hijo detenidos, 17 solicitudes OTLP sin
+  errores y salida 0. La sonda anterior confundía PID del sandbox (2/3) con PID
+  del host; ahora identifica el script sintético exacto, traduce NSpid y exige
+  relación padre/hijo. No modifica la cancelación del producto ni mata por PID
+  inferido. Tiene prueba de regresión específica.
+- Secret Service real: clave aleatoria sintética, escritura/lectura, aislamiento
+  por proveedor y retirada al terminar. No se usan claves del usuario.
+- Monitor GTK/WebKit: carga real del HTML y recepción del mensaje `ready` de la
+  interfaz sin errores tras instalar el binding Cairo. La validación visual e
+  interacción de las cuatro vistas y cápsula se hizo en Chrome con datos
+  sintéticos, a 432×900 y 390×640, sin desbordamiento horizontal. No sustituye
+  aceptación manual del contenedor nativo ni de múltiples monitores.
+
+Las pruebas nativas consumieron turnos sintéticos de la suscripción. No se
+reinició Desktop ni se cambiaron conversaciones del usuario. La activación real
+se verifica después de que el usuario vuelva a abrir Desktop. CI ampliada a
+Ubuntu/Windows/macOS; editar el workflow no significa haber ejecutado CI remota.
+Atlas no está disponible en esta sesión; la continuidad se registra localmente.
+
+Referencias de implementación:
+- [App Server oficial](https://learn.chatgpt.com/docs/app-server).
+- [WebKitGTK: canal de mensajes](https://webkitgtk.org/reference/webkit2gtk/stable/method.UserContentManager.register_script_message_handler.html).
+- [libsecret: uso desde Python](https://gnome.pages.gitlab.gnome.org/libsecret/libsecret-python-examples.html).

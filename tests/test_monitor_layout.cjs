@@ -1,11 +1,11 @@
-// Local WebKit-surface layout checks in Chromium; native macOS still needs a Mac.
+// Shared WebKit-surface layout checks in Chromium; native platform shells remain separate.
 const { chromium } = require('playwright');
 const { pathToFileURL } = require('node:url');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 (async () => {
   const channel = process.env.ROUTER_TEST_BROWSER === 'chromium' ? undefined :
-    process.env.ROUTER_TEST_BROWSER || (process.platform === 'darwin' ? 'chrome' : 'msedge');
+    process.env.ROUTER_TEST_BROWSER || (process.platform === 'win32' ? 'msedge' : 'chrome');
   const browser = await chromium.launch({...channel ? {channel} : {},headless:true});
   try {
     const page = await browser.newPage();
@@ -126,6 +126,33 @@ const assert = require('node:assert/strict');
       assert.equal(settingsText.includes('archivo local privado state/prompts.jsonl'),enabled);
     }
     console.log('PASS: settings reflect optional phase routing and private prompt capture');
+    for (const deviceScaleFactor of [1,1.25,1.5,2]) {
+      for (const viewport of [{width:390,height:640},{width:432,height:900}]) {
+        const context=await browser.newContext({viewport,deviceScaleFactor});
+        const dpiPage=await context.newPage();
+        await dpiPage.addInitScript(()=>{
+          window.nativeMessages=[];
+          window.webkit={messageHandlers:{monitor:{postMessage:message=>window.nativeMessages.push(message)}}};
+        });
+        await dpiPage.route('**/codex.png',route=>route.fulfill({path:path.resolve(__dirname,'../assets/codex-official.png')}));
+        await dpiPage.goto(pathToFileURL(path.resolve(__dirname,'../monitor-ui/index.html')).href);
+        await dpiPage.evaluate(height=>window.receive({ui:{mode:'Expanded',reduced:true,panelHeight:height}}),viewport.height);
+        const metrics=await dpiPage.evaluate(()=>({
+          ratio:window.devicePixelRatio,
+          documentFits:document.documentElement.scrollWidth<=document.documentElement.clientWidth,
+          bodyFits:document.body.scrollWidth<=document.body.clientWidth,
+          surface:(()=>{const r=document.querySelector('#surface').getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};})()
+        }));
+        assert.equal(metrics.ratio,deviceScaleFactor,`Unexpected device scale factor: ${deviceScaleFactor}`);
+        assert.ok(metrics.documentFits && metrics.bodyFits,`Horizontal overflow at ${viewport.width}x${viewport.height} @${deviceScaleFactor}x`);
+        assert.ok(metrics.surface.left>=0 && metrics.surface.right<=viewport.width,
+          `Surface escaped width at ${viewport.width}x${viewport.height} @${deviceScaleFactor}x`);
+        assert.ok(metrics.surface.top>=0 && metrics.surface.bottom<=viewport.height,
+          `Surface escaped height at ${viewport.width}x${viewport.height} @${deviceScaleFactor}x`);
+        await context.close();
+      }
+    }
+    console.log('PASS: 390/432 px layouts at 1x, 1.25x, 1.5x and 2x device scale');
     if(process.env.ROUTER_LAYOUT_SCREENSHOT)await page.screenshot({path:process.env.ROUTER_LAYOUT_SCREENSHOT});
     assert.deepEqual(errors,[]);
     console.log('PASS: responsive height, fixed chrome, bottom anchor, drag persistence message and keyboard reset');

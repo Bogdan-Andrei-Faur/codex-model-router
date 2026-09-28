@@ -19,9 +19,27 @@ Los chats laterales locales de Codex también usan el selector. Se muestran como
 historial permanente del selector. Los procesos internos de Desktop, como generar
 títulos, conservan su modelo original. Véase [el alcance y las pruebas](docs/SIDE-CHATS.md).
 
+## Ubuntu / Linux
+
+Ubuntu comparte el motor Python y exactamente los mismos archivos `monitor-ui/`
+que macOS, alojados en GTK/WebKitGTK. Incluye cápsula, panel, bandeja, historial,
+valoraciones, modo manual por tarea, fases, telemetría y claves en Secret Service.
+
+```sh
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-secret-1 gir1.2-ayatanaappindicator3-0.1
+python3 linux.py setup
+python3 linux.py install
+python3 linux.py monitor
+```
+
+La conexión se aplica al siguiente arranque habitual de Desktop. Conserva los
+argumentos y el lanzador anterior, incluido su entorno de MCP. No cierra tareas
+ni modifica la app instalada. `python3 linux.py uninstall` restaura el acceso
+original. Guía, límites de Wayland y validación: [LINUX.md](docs/LINUX.md).
+
 ## macOS
 
-El puente de Python funciona en Windows y macOS. En Mac hay un lanzador y un
+El puente de Python funciona en Windows, macOS y Linux. En Mac hay un lanzador y un
 monitor nativo AppKit propios. Instrucciones, alcance y límites:
 
 **WPF solo necesita validación si vas a usar Windows.** La guía para realizarla
