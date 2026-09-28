@@ -191,6 +191,19 @@ class ProtocolTests(unittest.TestCase):
             "threadId": "t", "model": "gpt-6-astra", "effort": "ultra",
             "input": [{"type": "text", "text": prompt}], **params}}
 
+    def test_restart_reminder_clears_only_after_requested_runtime_settings_load(self):
+        marker = self.router.state_dir / "restart-required.json"
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.write_text('{"phase_routing":true,"inference_telemetry":true}')
+        desired = {"phase_routing": True, "inference_telemetry": True}
+        self.assertFalse(self.router.confirm_restart_settings(desired, True))
+        self.assertTrue(marker.exists())
+        self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES,
+                                         "phase_routing": True, "inference_telemetry": True}))
+        restarted = Router(self.path, self.router.state_dir)
+        self.assertTrue(restarted.confirm_restart_settings(desired, True))
+        self.assertFalse(marker.exists())
+
     def test_only_model_and_effort_change(self):
         original = self.request("Analiza estos adjuntos", input=[
             {"type": "text", "text": "Analiza estos adjuntos", "text_elements": [{"byteRange": {"start": 0, "end": 1}, "placeholder": "x"}]},

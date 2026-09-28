@@ -105,8 +105,11 @@ class DiscoveryTests(unittest.TestCase):
             with self.assertRaises(runtime.DiscoveryError):
                 runtime.discover_macos(roots=[root])
             launcher.write_bytes(b'packaged'); launcher.chmod(0o644)
-            with self.assertRaises(runtime.DiscoveryError):
-                runtime.discover_macos(roots=[root])
+            # Windows does not implement POSIX executable bits. Model the
+            # macOS access check rather than expecting chmod to remove X_OK.
+            with patch.object(runtime.os, 'access', side_effect=lambda path, mode: path != launcher):
+                with self.assertRaises(runtime.DiscoveryError):
+                    runtime.discover_macos(roots=[root])
             launcher.chmod(0o755)
             self.assertEqual(runtime.discover_macos(roots=[root]).backend, launcher)
 
@@ -115,7 +118,8 @@ class IntegrationTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name);(self.root/'dist').mkdir();(self.root/'dist/codex-router.exe').write_bytes(b'wrapper')
-        self.cfg={'enabled':True,'routes':{'custom':{}},'history_days':0}
+        self.cfg={'enabled':True,'routes':{'custom':{}},'history_days':0,
+                  'inference_telemetry':True,'prompt_logging':True,'phase_routing':True}
         for key,value in [('ROOT',self.root),('CONFIG',self.root/'config.local.json'),('STATE',self.root/'state')]:
             patcher=patch.object(desktop,key,value);patcher.start();self.addCleanup(patcher.stop)
         patcher=patch.object(desktop.sys,'platform','win32');patcher.start();self.addCleanup(patcher.stop)
@@ -137,6 +141,15 @@ class IntegrationTests(unittest.TestCase):
         desktop.uninstall()
         self.assertIsNone(self.env['value']);self.assertIsNone(desktop.read_registration())
         self.assertEqual((desktop.STATE/'history.jsonl').read_text(),'history')
+
+    def test_existing_config_gets_active_observability_defaults_without_overwriting_choices(self):
+        desktop.atomic_json(desktop.CONFIG, {'enabled': True, 'inference_telemetry': False})
+        loaded = desktop.config()
+        self.assertFalse(loaded['inference_telemetry'])
+        self.assertTrue(loaded['prompt_logging'])
+        self.assertTrue(loaded['phase_routing'])
+        self.assertEqual(loaded['history_days'], 0)
+        self.assertEqual(json.loads(desktop.CONFIG.read_text()), loaded)
 
     def test_another_integration_is_never_overwritten_or_removed(self):
         self.env['value']='someone-else'

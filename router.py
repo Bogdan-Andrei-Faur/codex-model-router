@@ -78,6 +78,20 @@ class Router:
         self.phases = PhaseController(self, self.phase_config().get("phase_routing") is True)
         self.commands = CommandProcesses()
 
+    def confirm_restart_settings(self, config, telemetry_enabled):
+        """Clear the UI reminder only after this bridge loaded requested settings."""
+        desired = {"phase_routing": config.get("phase_routing") is True,
+                   "inference_telemetry": config.get("inference_telemetry") is True}
+        loaded = {"phase_routing": self.phases.enabled is True,
+                  "inference_telemetry": telemetry_enabled is True}
+        if desired != loaded:
+            return False
+        try:
+            (self.state_dir / "restart-required.json").unlink(missing_ok=True)
+            return True
+        except OSError:
+            return False
+
     def stop_commands(self, commands):
         for command in commands:
             rid = "personal-router-cancel-" + uuid.uuid4().hex
@@ -1043,6 +1057,7 @@ def main():
     router.log({"event": "bridge_started", "backend_pid": proc.pid,
                 "inference_telemetry": bool(telemetry),
                 "prompt_logging": config.get("prompt_logging") is True})
+    router.confirm_restart_settings(config, bool(telemetry))
     heartbeat_stop = threading.Event()
     write_lock = threading.Lock()
     output_lock = threading.Lock()

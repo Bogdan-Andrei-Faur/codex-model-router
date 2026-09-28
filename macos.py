@@ -53,10 +53,14 @@ def setup(app_path=None):
         # silently activate it when bootstrapping this machine.
         if config.get("platform") != "darwin":
             raise ValueError("Ya existe config.local.json de otra instalación. Consérvalo con otro nombre antes de preparar Mac.")
+        for key, default in (("inference_telemetry", True), ("prompt_logging", True),
+                             ("phase_routing", True), ("history_days", 0)):
+            config.setdefault(key, default)
         config.update(python=sys.executable, codex=str(binary), desktop=str(desktop))
     else:
         config = {"platform": "darwin", "enabled": True, "sync_picker": True,
-                  "history_days": 90, "routing_engine": "rules", "comparison_engines": [],
+                  "history_days": 0, "inference_telemetry": True, "prompt_logging": True,
+                  "phase_routing": True, "routing_engine": "rules", "comparison_engines": [],
                   "python": sys.executable, "codex": str(binary), "desktop": str(desktop),
                   "routes": DEFAULT_ROUTES}
     config["installation_mode"] = "auto"

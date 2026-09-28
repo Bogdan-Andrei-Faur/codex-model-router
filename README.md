@@ -64,12 +64,12 @@ reintentos pueden subir de banda cuando existe evidencia de fallo. El respaldo
 local usa los mismos límites y no hereda Luna del turno anterior. Los fallos
 nativos conservan categorías y códigos seguros, sin guardar mensajes del error.
 
-El cambio dentro de un turno es **opcional y está desactivado por defecto**. Al
-activarlo, el checkpoint es obligatorio entre fases sustantivas de las tareas
-nuevas. Una prueba natural de macOS observó Terra/Medio → Sol/Alto sin ordenar
-explícitamente invocar la herramienta. La evaluación real en tareas cotidianas y
-la validación nativa de estos cambios en Windows siguen pendientes. Consulta
-[los límites y pruebas de esta entrega](CHANGELOG.md#043--2026-09-26).
+El cambio dentro de un turno viene **activado por defecto** y puede desactivarse
+en Ajustes. El checkpoint es obligatorio entre fases sustantivas de las tareas
+nuevas. Pruebas naturales en macOS y Windows observaron Terra/Medio → Sol/Alto
+sin ordenar explícitamente invocar la herramienta. La evaluación continuada en
+tareas cotidianas sigue siendo necesaria. Consulta
+[los límites y pruebas de esta entrega](CHANGELOG.md#044--2026-09-28).
 
 ## Distribución y base 0.3.0
 
@@ -131,7 +131,8 @@ inferencia interna. El panel separa el modelo propuesto, aceptado por Codex,
 configuración publicada e inferencia confirmada localmente. Si no conoce un dato,
 muestra «Sin confirmar».
 
-La telemetría de inferencia es opcional. Al activarla desde **Ajustes**, el
+La telemetría de inferencia está activa por defecto y puede desactivarse en
+**Ajustes**. El
 puente crea un receptor temporal que escucha exclusivamente en el propio equipo
 (`127.0.0.1`) durante esa conexión de Codex. Solo conserva modelo,
 razonamiento, tipo de evento, identificadores técnicos acotados y métricas
@@ -150,8 +151,8 @@ no se guarda el lote rechazado. Los contadores son por proceso y se reinician
 con el puente. Un contador de rechazo implica captura incompleta: ampliar los
 límites no recupera eventos ya descartados.
 
-La captura de prompts es otra opción independiente y está desactivada por
-defecto. Con `prompt_logging: true`, el puente guarda el texto exacto recibido en
+La captura de prompts es otra opción independiente, activa por defecto y
+desactivable desde **Ajustes**. Con `prompt_logging: true`, el puente guarda el texto exacto recibido en
 `turn/start` dentro de `state/prompts.jsonl`, con permisos privados y unido al
 mismo `decision_id`, modelo, esfuerzo y límites de política del historial. Incluye
 turnos conservados y manuales, pero no copia adjuntos, respuestas, resultados de
@@ -191,7 +192,10 @@ El panel lateral tiene cuatro vistas:
   incidencias agrupadas, coincidencia entre propuestas y calidad por motor aplicado.
 - **Ajustes** permite pausar el selector, cambiar Mantener delante y conservar el
   historial 30, 90, 180 días o indefinidamente. También permite elegir el motor,
-  activar comparaciones en paralelo y configurar Jev.
+  activar comparaciones en paralelo, configurar Jev y activar los cambios
+  automáticos por fases. Este último ajuste se carga al reiniciar Desktop y se
+  ofrece solo a tareas nuevas; las tareas ya abiertas conservan el enrutamiento
+  entre turnos.
   Los selectores mantienen un contorno visible en todas sus opciones. La configuración
   de Jev aparece solo al elegir ese motor; las claves se editan dentro
   del panel con **Guardar clave** y **Cancelar**, sin abrir otra ventana.
@@ -378,10 +382,11 @@ suscripción. La calidad y el ahorro real requieren observar tareas representati
 - Conserva adjuntos, instrucciones, herramientas y permisos. Si no puede decidir
   con un catálogo válido, deja pasar la petición original. No reintenta trabajos.
 - Los registros locales contienen identificadores, **títulos de tareas**, modelos,
-  razonamiento, motivos, estados, una categoría visual y contadores. El mensaje
-  solo se analiza localmente al enviarlo para obtener esa categoría; no se guarda.
-  No copian mensajes, adjuntos,
-  argumentos de herramientas, respuestas ni credenciales. `state/` se excluye de Git.
+  razonamiento, motivos, estados, una categoría visual y contadores. Con la
+  captura de prompts activa también guardan el mensaje del usuario en
+  `state/prompts.jsonl`; no copian adjuntos, argumentos de herramientas,
+  respuestas ni credenciales. Puede desactivarse en Ajustes y `state/` se
+  excluye de Git.
 - La instalación se descubre en cada arranque. Windows prepara una copia verificada
   del motor y sus auxiliares; macOS utiliza el bundle descubierto. Si una actualización
   cambia el protocolo, usa **Desconectar integración** antes de abrir Desktop normalmente.

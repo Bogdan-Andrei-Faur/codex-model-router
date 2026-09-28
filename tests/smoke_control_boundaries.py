@@ -10,7 +10,6 @@ read or changed.
 import argparse
 import json
 import os
-import shlex
 import subprocess
 from pathlib import Path
 import sys
@@ -24,7 +23,8 @@ from platform_support import with_loopback_telemetry
 from probe_model_compatibility import Collector
 from routing import DEFAULT_ROUTES
 from smoke_native import Client, ROOT
-from control_contract import exact_approval_command
+from control_contract import exact_approval_command, approval_command
+from control_runtime import process_alive, process_state, safe_process_topology, sleep_command, read_process_marker
 
 
 class ControlClient(Client):
@@ -76,14 +76,10 @@ class ControlClient(Client):
                     "process_id": item.get("processId"),
                     "process_id_type": type(item.get("processId")).__name__,
                 })
-                deadline = time.monotonic() + 5
-                while not self.process_marker.exists() and time.monotonic() < deadline:
-                    time.sleep(.02)
-                self.running_pids = json.loads(self.process_marker.read_text())
+                self.running_pids = read_process_marker(self.process_marker)
                 assert len(self.running_pids) == 2 and all(type(pid) is int and pid > 1 for pid in self.running_pids)
                 assert all(process_alive(pid) for pid in self.running_pids), "Expected live parent and child"
-                self.command_topology = safe_process_topology(
-                    [*self.running_pids, item.get("processId")])
+                self.command_topology = safe_process_topology(self.running_pids)
                 self.work_started = True
                 self.cancelled_item_type = item_type
                 self.sequence += 1
@@ -135,44 +131,6 @@ def command_for(overrides, endpoint, token):
         command[2:] + ["app-server"], endpoint, token)
 
 
-def process_alive(pid):
-    try:
-        os.kill(pid, 0)
-        # A zombie has terminated; kill(pid, 0) alone also matches zombies.
-        return process_state(pid) not in ('', 'Z')
-    except ProcessLookupError:
-        return False
-
-
-def process_state(pid):
-    result = subprocess.run(['ps', '-o', 'stat=', '-p', str(pid)], capture_output=True, text=True, timeout=2)
-    return result.stdout.strip()[:1]
-
-
-def safe_process_topology(targets):
-    """Return ephemeral IDs and executable names only; never command arguments."""
-    result = subprocess.run(['ps', '-axo', 'pid=,ppid=,pgid=,comm='],
-                            capture_output=True, text=True, timeout=2)
-    rows = {}
-    for line in result.stdout.splitlines():
-        fields = line.split(None, 3)
-        if len(fields) == 4 and all(field.isdigit() for field in fields[:3]):
-            pid, parent, group = map(int, fields[:3])
-            rows[pid] = {'pid': pid, 'parent': parent, 'group': group,
-                         'executable': Path(fields[3]).name}
-    wanted = {int(value) for value in targets
-              if (type(value) is int and value > 1) or
-              (isinstance(value, str) and value.isascii() and value.isdigit() and int(value) > 1)}
-    frontier = list(wanted)
-    while frontier:
-        pid = frontier.pop()
-        row = rows.get(pid)
-        if row and row['parent'] > 1 and row['parent'] not in wanted:
-            wanted.add(row['parent'])
-            frontier.append(row['parent'])
-    return [rows[pid] for pid in sorted(wanted) if pid in rows]
-
-
 def start_thread(client, cwd, overrides, approval_policy, instructions, sandbox="read-only"):
     result = client.call("thread/start", {"ephemeral": True, "cwd": cwd,
         "model": "gpt-5.6-terra", "modelProvider": "openai", "sandbox": sandbox,
@@ -215,7 +173,7 @@ def main():
             assert (client.call("account/read", {"refreshToken": False}).get("account") or {}).get("type") == "chatgpt"
 
             approval_thread = start_thread(client, scratch, overrides, "on-request",
-                "Use the shell tool once with the exact command: printf APPROVED > " + str(marker) + " . "
+                "Use the shell tool once with the exact command: " + approval_command(str(marker)) + " . "
                 "If the sandbox rejects it, repeat the exact command with sandbox_permissions "
                 "require_escalated and the justification 'Synthetic approval probe'. "
                 "Do not use other tools or paths. After it succeeds, reply exactly APPROVAL-COMPLETE.")
@@ -232,20 +190,17 @@ def main():
 
             marker.unlink()
             denial_thread = start_thread(client, scratch, overrides, "on-request",
-                "Use the shell tool with exactly: printf APPROVED > " + str(marker) +
+                "Use the shell tool with exactly: " + approval_command(str(marker)) +
                 " . Request escalation if the sandbox rejects it. If approval is declined, stop immediately and reply DENIED. Do not retry or use another tool.")
             output, status = client.run_turn(denial_thread, "Run the prescribed command once.", "rejection")
             assert status == "completed" and not marker.exists()
             assert any(a['decision'] == 'decline' for a in client.approvals)
             report['rejection'] = {'approval_declined': True, 'marker_absent': True, 'turn_status': status}
 
-            program = ("import os,json,subprocess; from pathlib import Path; "
-                       "child=subprocess.Popen(['sleep','30']); "
-                       "Path(" + repr(str(client.process_marker)) + ").write_text(json.dumps([os.getpid(),child.pid])); child.wait()")
-            sleep_command = shlex.quote(sys.executable) + " -c " + shlex.quote(program)
+            cancellation_command = sleep_command(client.process_marker)
 
             cancellation_thread = start_thread(client, scratch, overrides, "never",
-                "Use the shell tool once with the exact command: " + sleep_command +
+                "Use the shell tool once with the exact command: " + cancellation_command +
                 " . Do not use other tools. After it finishes, reply exactly SLEEP-COMPLETE.", sandbox="workspace-write")
             output, status = client.run_turn(cancellation_thread,
                 "Run the prescribed sleep command now. It must be executed, not described.", "cancellation")

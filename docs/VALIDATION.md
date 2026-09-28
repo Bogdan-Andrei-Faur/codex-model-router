@@ -1,6 +1,15 @@
 # Validation and integration notes
 
-## Estado actual — 0.4.3, 26/09/2026
+## Estado actual — 0.4.4, 28/09/2026
+
+Se integró la entrega del Mac hasta `2fc1b2d` y se adaptaron las sondas nativas
+para Windows. Compilación WPF, pruebas Python/JS/layout, conexión, telemetría,
+checkpoint natural y cancelación nativa validados en Desktop 26.924.2738.0.
+La evidencia detallada y los límites de aceptación están en
+[WINDOWS-WPF-VALIDATION.md](WINDOWS-WPF-VALIDATION.md). Desktop no se reinició;
+el puente ya abierto conserva su versión cargada hasta el próximo arranque.
+
+## Estado histórico — 0.4.3, 26/09/2026
 
 ### Créditos, cancelación y entrega Windows — 27/09/2026
 

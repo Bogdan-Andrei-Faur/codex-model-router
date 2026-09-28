@@ -1,6 +1,26 @@
 # Continuidad del proyecto: fases automáticas y validación multiplataforma
 
-## Estado actual — 0.4.0, 25/09/2026
+## Estado actual — 0.4.4, 28/09/2026
+
+Windows recibió por avance rápido los cinco commits del Mac, desde `1a6d60f`
+hasta `2fc1b2d` (0.4.3). La adaptación local 0.4.4 conserva la política 7 y
+los valores de configuración existentes. Ver cambios en
+[CHANGELOG.md](../CHANGELOG.md) y evidencia en
+[WINDOWS-WPF-VALIDATION.md](WINDOWS-WPF-VALIDATION.md).
+
+La sonda nativa Windows confirma un checkpoint espontáneo Terra/Medio →
+Sol/Alto dentro del mismo turno sintético; la tarea se archivó. Otra sonda
+confirma aprobación, rechazo y parada de padre e hijo al cancelar. Esto no
+sustituye la aceptación de fases en chats ordinarios de Desktop. No se reinició
+Desktop ni se modificaron claves, historial o preferencias para validar.
+
+Atlas no está disponible entre las herramientas de esta sesión. La identidad
+canónica sigue siendo proyecto `codex-model-router`, repositorio
+`https://github.com/Bogdan-Andrei-Faur/codex-model-router.git`. No se ha escrito
+en Atlas; este documento registra el relevo local y debe sincronizarse cuando
+se recupere acceso. No afirmar que Atlas está actualizado por esta entrega.
+
+## Estado histórico — 0.4.0, 25/09/2026
 
 Entrega local descrita en [CHANGELOG.md](../CHANGELOG.md): checkpoints de fase
 opcionales, selección destacada por un minuto, política 4 y huella independiente

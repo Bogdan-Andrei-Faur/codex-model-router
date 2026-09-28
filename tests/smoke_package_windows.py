@@ -41,6 +41,17 @@ def main():
     # Simulate an in-place update: mutable preferences and the journal survive.
     config_path = root / 'config.local.json'
     config = json.loads(config_path.read_text(encoding='utf-8-sig'))
+    assert all(config.get(key) is True for key in ('inference_telemetry', 'prompt_logging', 'phase_routing'))
+    assert config.get('history_days') == 0
+    legacy = {key: value for key, value in config.items()
+              if key not in ('inference_telemetry', 'prompt_logging', 'phase_routing', 'history_days')}
+    config_path.write_text(json.dumps(legacy), encoding='utf-8')
+    migrated = subprocess.run([str(root / 'dist/codex-router.exe'), '--doctor-json'], env=env,
+                              capture_output=True, timeout=40, creationflags=creation_flags())
+    assert migrated.returncode == 0, 'Existing-config default migration failed'
+    config = json.loads(config_path.read_text(encoding='utf-8-sig'))
+    assert all(config.get(key) is True for key in ('inference_telemetry', 'prompt_logging', 'phase_routing'))
+    assert config.get('history_days') == 0
     config['enabled'] = False
     config_path.write_text(json.dumps(config), encoding='utf-8')
     (root / 'state').mkdir(exist_ok=True)

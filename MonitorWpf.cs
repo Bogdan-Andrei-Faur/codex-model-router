@@ -29,6 +29,7 @@ internal sealed partial class ModernRouterMonitor : Window
     static readonly string ProductBuildId = ReadProductBuildId();
     static readonly string RouterBuildId = ReadProductBuildId(2);
     static readonly string StateFolder = Path.Combine(Root, "state");
+    static readonly string RestartRequiredPath = Path.Combine(StateFolder, "restart-required.json");
     static readonly string UiStatePath = Path.Combine(StateFolder, "monitor-ui.json");
     static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = 8 * 1024 * 1024 };
 
@@ -681,16 +682,15 @@ internal sealed partial class ModernRouterMonitor : Window
                     }
                 }
             }
-            versionLabel.Text = "v" + ProductVersion + (bridgeVersions.Any(v => v != ProductVersion) ? " · puente " + System.String.Join(", ", bridgeVersions) : bridgeBuildMismatch ? " · reinicio del router pendiente" : bridgeBuildUnknown ? " · puente sin verificar" : "");
-            versionLabel.Foreground = bridgeBuildMismatch || bridgeVersions.Any(v => v != ProductVersion) ? Warning : Muted;
+            bool restartRequired = File.Exists(RestartRequiredPath);
+            versionLabel.Text = "v" + ProductVersion + (bridgeVersions.Any(v => v != ProductVersion) ? " · puente " + System.String.Join(", ", bridgeVersions) : bridgeBuildMismatch ? " · router anterior" : bridgeBuildUnknown ? " · puente sin verificar" : "") +
+                (restartRequired ? " · reinicio pendiente" : "");
+            versionLabel.Foreground = restartRequired || bridgeBuildMismatch || bridgeVersions.Any(v => v != ProductVersion) ? Warning : Muted;
             versionLabel.ToolTip = "Monitor " + ProductVersion + ". Puentes activos: " + System.String.Join(", ", bridgeVersions) +
-                (bridgeBuildMismatch || bridgeVersions.Any(v => v != ProductVersion) ? ". La versión del router activo difiere de la incluida con este monitor. Reinicia Desktop al terminar tus tareas para cargar la versión instalada." : bridgeBuildUnknown ? ". El puente activo no informa su versión de componente. No se puede determinar si necesita reinicio; el próximo inicio de Desktop permitirá comprobarlo." : ".") + " Build del monitor: " + ProductBuildId;
+                (restartRequired ? ". Hay ajustes pendientes: reinicia Desktop al terminar tus tareas para cargarlos." :
+                bridgeBuildMismatch || bridgeVersions.Any(v => v != ProductVersion) ? ". La versión del router activo difiere de la incluida con este monitor. Reinicia Desktop al terminar tus tareas para cargar la versión instalada." : bridgeBuildUnknown ? ". El puente activo no informa su versión de componente. No se puede determinar si necesita reinicio; el próximo inicio de Desktop permitirá comprobarlo." : ".") + " Build del monitor: " + ProductBuildId;
             var ordered = rows.OrderByDescending(x => Active(String(x.Value, "status"))).ThenByDescending(x => Number(x.Value, "updated")).ToList();
-            var focus = ordered.OrderByDescending(x => Number(x.Value, "updated")).ThenBy(x => x.Key, StringComparer.Ordinal).FirstOrDefault();
-            if (featuredSelection != null && DateTime.UtcNow < featuredUntil && rows.ContainsKey(featuredSelection))
-                focus = new KeyValuePair<string, Dictionary<string, object>>(featuredSelection, rows[featuredSelection]);
-            else featuredSelection = null;
-            featuredRelease.Visibility = featuredSelection == null ? Visibility.Collapsed : Visibility.Visible;
+            var focus = ChooseFeatured(rows, DateTime.UtcNow);
             int active = ordered.Count(x => Active(String(x.Value, "status")));
             connection.Text = connected == 0 ? "Sin conexión" : modern == 0 ? "Conectado · versión anterior" :
                 active + (active == 1 ? " tarea activa" : " tareas activas");
@@ -715,6 +715,18 @@ internal sealed partial class ModernRouterMonitor : Window
             UpdateTray();
         }
         catch { connection.Text = "Esperando un estado válido"; connection.Foreground = Warning; }
+    }
+
+    KeyValuePair<string, Dictionary<string, object>> ChooseFeatured(
+        Dictionary<string, Dictionary<string, object>> rows, DateTime now)
+    {
+        var focus = rows.OrderByDescending(x => Number(x.Value, "updated"))
+            .ThenBy(x => x.Key, StringComparer.Ordinal).FirstOrDefault();
+        if (featuredSelection != null && now < featuredUntil && rows.ContainsKey(featuredSelection))
+            focus = new KeyValuePair<string, Dictionary<string, object>>(featuredSelection, rows[featuredSelection]);
+        else featuredSelection = null;
+        featuredRelease.Visibility = featuredSelection == null ? Visibility.Collapsed : Visibility.Visible;
+        return focus;
     }
 
     void SelectFeatured(string id)

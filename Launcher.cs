@@ -32,6 +32,7 @@ internal static class Launcher
                 catch (IOException) { if (!File.Exists(ConfigPath)) throw; }
             }
             var config = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(ConfigPath));
+            ApplyProductDefaults(config);
             if (args.Length == 1 && args[0] == "--open") return Manage(config, "open", true);
             if (args.Length == 1 && args[0] == "--doctor") return Manage(config, "doctor", true);
             if (args.Length == 1 && args[0] == "--doctor-json") return Manage(config, "doctor", false);
@@ -65,6 +66,19 @@ internal static class Launcher
                 Console.Error.WriteLine("Codex automático: no se pudo iniciar el puente; ejecuta el diagnóstico de conexión.");
             return 1;
         }
+    }
+
+    static void ApplyProductDefaults(Dictionary<string, object> config)
+    {
+        bool changed = false;
+        foreach (var pair in new Dictionary<string, object> {
+            { "inference_telemetry", true }, { "prompt_logging", true },
+            { "phase_routing", true }, { "history_days", 0 } })
+            if (!config.ContainsKey(pair.Key)) { config[pair.Key] = pair.Value; changed = true; }
+        if (!changed) return;
+        var temp = ConfigPath + ".defaults.tmp";
+        File.WriteAllText(temp, Json.Serialize(config), new UTF8Encoding(false));
+        File.Replace(temp, ConfigPath, null);
     }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]

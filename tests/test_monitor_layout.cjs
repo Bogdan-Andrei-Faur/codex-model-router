@@ -16,11 +16,11 @@ const assert = require('node:assert/strict');
     });
     await page.route('**/codex.png',route=>route.fulfill({path:path.resolve(__dirname,'../assets/codex-official.png')}));
     await page.goto(pathToFileURL(path.resolve(__dirname,'../monitor-ui/index.html')).href);
-    for (const [mismatch,unknown,label] of [[false,false,'v0.3.1'],[false,true,'v0.3.1 · puente sin verificar'],[true,true,'v0.3.1 · reinicio del router pendiente']]) {
-      await page.evaluate(([bridgeBuildMismatch,bridgeBuildUnknown])=>window.receive({productVersion:'0.3.1',bridgeVersions:['0.3.1'],bridgeBuildMismatch,bridgeBuildUnknown}),[mismatch,unknown]);
+    for (const [mismatch,unknown,restartRequired,label] of [[false,false,false,'v0.3.1'],[false,true,false,'v0.3.1 · puente sin verificar'],[true,true,false,'v0.3.1 · router anterior'],[false,false,true,'v0.3.1 · reinicio pendiente']]) {
+      await page.evaluate(([bridgeBuildMismatch,bridgeBuildUnknown,restartRequired])=>window.receive({productVersion:'0.3.1',bridgeVersions:['0.3.1'],bridgeBuildMismatch,bridgeBuildUnknown,restartRequired}),[mismatch,unknown,restartRequired]);
       assert.equal(await page.locator('#product-version').innerText(),label);
     }
-    await page.evaluate(()=>window.receive({bridgeBuildMismatch:false,bridgeBuildUnknown:false}));
+    await page.evaluate(()=>window.receive({bridgeBuildMismatch:false,bridgeBuildUnknown:false,restartRequired:false}));
     for (const height of [1020,1380,674,460]) {
       await page.setViewportSize({width:432,height});
       const preferred=Math.min(height,Math.max(560,(height+20)*.9));
@@ -116,6 +116,16 @@ const assert = require('node:assert/strict');
     assert.ok(telemetryText.includes('Tamaño descomprimido · ≤512 KiB: 10'));
     assert.equal(await page.locator('#statistics').evaluate(el=>el.scrollWidth<=el.clientWidth),true,'Telemetry size diagnostics overflow');
     console.log('PASS: telemetry size bins and distinct receiver rejections');
+    for (const enabled of [false,true]) {
+      await page.evaluate(value=>window.receive({config:{enabled:true,phase_routing:value,prompt_logging:value}}),enabled);
+      await page.locator('[data-tab="settings"]').click();
+      const settingsText=await page.locator('#settings').innerText();
+      assert.ok(settingsText.includes(enabled?'Cambios por fases habilitados':'cambios por fases están desactivados'));
+      assert.ok(settingsText.includes(enabled?'Desactivar cambios automáticos por fases':'Activar cambios automáticos por fases'));
+      assert.ok(settingsText.includes(enabled?'Desactivar captura de prompts':'Activar captura de prompts'));
+      assert.equal(settingsText.includes('archivo local privado state/prompts.jsonl'),enabled);
+    }
+    console.log('PASS: settings reflect optional phase routing and private prompt capture');
     if(process.env.ROUTER_LAYOUT_SCREENSHOT)await page.screenshot({path:process.env.ROUTER_LAYOUT_SCREENSHOT});
     assert.deepEqual(errors,[]);
     console.log('PASS: responsive height, fixed chrome, bottom anchor, drag persistence message and keyboard reset');

@@ -480,10 +480,35 @@ internal sealed partial class ModernRouterMonitor
             SaveVisual(this, Path.Combine(StateFolder, "review-statistics.png"), 1);
             SelectMonitorTab(3); UpdateLayout(); Dispatcher.Invoke(delegate { }, DispatcherPriority.Render);
             Check(settingsContent.Children.OfType<Button>().Count() >= 2, "Settings controls are missing");
+            Check(ContainsText(settingsContent, ReadConfigBool("phase_routing", false) ?
+                "Desactivar cambios automáticos por fases" : "Activar cambios automáticos por fases"),
+                "Phase-routing setting does not reflect the saved configuration");
+            Check(ContainsText(settingsContent, ReadConfigBool("prompt_logging", false) ?
+                "Desactivar captura de prompts" : "Activar captura de prompts"),
+                "Prompt-capture setting does not reflect the saved configuration");
             SaveVisual(this, Path.Combine(StateFolder, "review-settings.png"), 1);
             CheckSettingsInteraction();
             results.Add("PASS: outlined selectors, Rules comparison, engine-specific settings, inline keys with cancel, persistent rating removal and active-engine attribution");
             results.Add("PASS: Statistics and Settings tabs contain real metrics and working controls");
+            var selectionRows = new Dictionary<string, Dictionary<string, object>> {
+                { "older", Fixture("Anterior activa", "gpt-5.6-terra", "medium", "active") },
+                { "newer", Fixture("Reciente terminada", "gpt-5.6-sol", "high", "idle") }
+            };
+            selectionRows["older"]["updated"] = 10; selectionRows["newer"]["updated"] = 20;
+            var selectionNow = DateTime.UtcNow;
+            featuredSelection = null;
+            Check(ChooseFeatured(selectionRows, selectionNow).Key == "newer", "Most recent task must win over active status");
+            featuredSelection = "older"; featuredUntil = selectionNow.AddMinutes(1);
+            Check(ChooseFeatured(selectionRows, selectionNow.AddSeconds(59)).Key == "older" &&
+                featuredRelease.Visibility == Visibility.Visible, "Manual selection did not hold for one minute");
+            Check(ChooseFeatured(selectionRows, selectionNow.AddMinutes(1)).Key == "newer" &&
+                featuredRelease.Visibility == Visibility.Collapsed, "Expired selection did not return to latest task");
+            featuredSelection = "removed"; featuredUntil = selectionNow.AddMinutes(1);
+            Check(ChooseFeatured(selectionRows, selectionNow).Key == "newer" && featuredSelection == null,
+                "Missing selected task did not release selection");
+            selectionRows.Clear();
+            Check(ChooseFeatured(selectionRows, selectionNow).Key == null, "Empty activity retained a featured task");
+            results.Add("PASS: native featured task uses latest activity; manual hold expires after one minute and releases missing tasks");
             var phases = Fixture("Pipeline de Windows", "gpt-5.6-terra", "medium", "active");
             phases["phase_status"] = "active"; phases["pipeline_mode"] = "plan_and_observation";
             phases["accepted_model"] = "gpt-5.6-terra"; phases["accepted_effort"] = "medium";

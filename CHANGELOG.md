@@ -1,5 +1,29 @@
 # Cambios
 
+## 0.4.4 — 2026-09-28
+
+- Integrada la entrega del Mac hasta `2fc1b2d` y verificada en Windows con
+  Desktop 26.924.2738.0. Se conservan fases opcionales, política 7, retención,
+  telemetría y cancelación nativa de 0.4.3.
+- Sondas de aprobación y cancelación compatibles con PowerShell, rutas con
+  espacios y ACL del sandbox Windows. La comprobación de procesos usa un
+  handle de espera; nunca `os.kill(pid, 0)` en Windows. La prueba de permisos
+  del bundle macOS ya no depende de que Windows interprete bits POSIX.
+- Regresión WPF para selección destacada: tarea más reciente, fijación por
+  un minuto, caducidad, desaparición y lista vacía.
+- Ambos monitores describen la configuración real de las fases y avisan cuando
+  está activada la captura local de prompts. Ajustes permite activar o desactivar
+  los cambios automáticos por fases; se cargan tras reiniciar Desktop y solo se
+  ofrecen a tareas nuevas.
+- Fases, telemetría de inferencia, captura de prompts e historial sin caducidad
+  pasan a ser los valores iniciales del producto. Ajustes conserva controles
+  explícitos para desactivar cada captura o limitar el historial.
+- Cambiar fases o telemetría muestra `reinicio pendiente` junto a la versión.
+  El aviso persiste entre aperturas del monitor y desaparece cuando un nuevo
+  puente carga esos valores. La captura de prompts se aplica al siguiente mensaje.
+- Evidencia y límites de Windows en
+  [WINDOWS-WPF-VALIDATION.md](docs/WINDOWS-WPF-VALIDATION.md).
+
 ## 0.4.3 — 2026-09-26
 
 ### Corrección operativa — 2026-09-27

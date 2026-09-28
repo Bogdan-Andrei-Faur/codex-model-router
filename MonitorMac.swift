@@ -15,6 +15,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     let root: URL
     var state: URL { root.appendingPathComponent("state") }
     var configPath: URL { root.appendingPathComponent("config.local.json") }
+    var restartPath: URL { state.appendingPathComponent("restart-required.json") }
     let productVersion: String = Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "sin identificar"
     let productBuildId: String = Bundle.main.object(forInfoDictionaryKey:"RouterBuildId") as? String ?? ""
     let routerBuildId: String = Bundle.main.object(forInfoDictionaryKey:"RouterEngineBuildId") as? String ?? ""
@@ -200,8 +201,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     func configure(_ key:String,_ value:Any) {
         var valid = false
         switch key {
-        case "enabled": valid = CFGetTypeID(value as CFTypeRef) == CFBooleanGetTypeID()
-        case "inference_telemetry": valid = CFGetTypeID(value as CFTypeRef) == CFBooleanGetTypeID()
+        case "enabled", "inference_telemetry", "phase_routing", "prompt_logging": valid = CFGetTypeID(value as CFTypeRef) == CFBooleanGetTypeID()
         case "history_days": valid = [0,30,90,180].contains(value as? Int ?? -1)
         case "routing_engine": valid = ["rules","jev"].contains(value as? String ?? "")
         case "comparison_engines": if let values = value as? [String] { valid = values.count<=2 && Set(values).count==values.count && values.allSatisfy { ["rules","jev"].contains($0) } }
@@ -213,7 +213,14 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         let parts = key.split(separator:".").map(String.init)
         if parts.count==2 { var nested = config[parts[0]] as? [String:Any] ?? [:]; nested[parts[1]]=value; config[parts[0]]=nested }
         else { config[key]=value }
-        do { try write(config,configPath); refresh() } catch { feedback("No se pudo guardar el ajuste.") }
+        do {
+            try write(config,configPath)
+            if ["phase_routing","inference_telemetry"].contains(key) {
+                try write(["phase_routing":config["phase_routing"] as? Bool ?? false,
+                           "inference_telemetry":config["inference_telemetry"] as? Bool ?? false],restartPath)
+            }
+            refresh()
+        } catch { feedback("No se pudo guardar el ajuste.") }
     }
     func saveQuality(_ data:[String:Any]) {
         guard let id = data["id"] as? String,let quality = data["value"] as? String,["","insufficient","adequate","excessive"].contains(quality),journal.contains(where:{$0["decision_id"] as? String == id}) else { feedback("Decisión no disponible.");return }
@@ -293,8 +300,11 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             let taskModes=Dictionary(uniqueKeysWithValues:ids.map{($0,self.taskMode($0))})
             DispatchQueue.main.async {
                 self.busy=false;if let records=records{self.journal=records}
-                let safeConfig=config.filter{["enabled","inference_telemetry","history_days","routing_engine","comparison_engines","jev","routes"].contains($0.key)}
-                var payload:[String:Any]=["productVersion":self.productVersion,"bridgeVersions":Array(bridgeVersions).sorted(),"bridgeBuildMismatch":bridgeBuildMismatch,"bridgeBuildUnknown":bridgeBuildUnknown,"threads":rows,"connections":connections,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"telemetry":telemetry,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
+                var normalizedConfig=config
+                for (key,value) in ["inference_telemetry":true,"phase_routing":true,"prompt_logging":true] where normalizedConfig[key] == nil { normalizedConfig[key]=value }
+                if normalizedConfig["history_days"] == nil { normalizedConfig["history_days"]=0 }
+                let safeConfig=normalizedConfig.filter{["enabled","inference_telemetry","phase_routing","prompt_logging","history_days","routing_engine","comparison_engines","jev","routes"].contains($0.key)}
+                var payload:[String:Any]=["productVersion":self.productVersion,"bridgeVersions":Array(bridgeVersions).sorted(),"bridgeBuildMismatch":bridgeBuildMismatch,"bridgeBuildUnknown":bridgeBuildUnknown,"restartRequired":FileManager.default.fileExists(atPath:self.restartPath.path),"threads":rows,"connections":connections,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"telemetry":telemetry,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
                 if records != nil {payload["history"]=self.journal}
                 guard let encoded=try? JSONSerialization.data(withJSONObject:payload,options:[.sortedKeys]),encoded != self.lastPayload else{return}
                 self.lastPayload=encoded

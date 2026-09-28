@@ -720,18 +720,32 @@ internal sealed partial class ModernRouterMonitor
         }
         settingsContent.Children.Add(choices);
         settingsContent.Children.Add(AnalyticsHeading("FASES Y EVIDENCIA"));
-        AddSettingsNote("La pipeline observa la ejecución. Revisión y cierre siguen pendientes de evidencia. El cambio automático de modelo entre fases aún no está activado.");
-        bool telemetry = ReadConfigBool("inference_telemetry", false);
+        bool phases = ReadConfigBool("phase_routing", true);
+        AddSettingsNote(phases ?
+            "Cambios por fases habilitados en la configuración. Tras cargarla, las tareas nuevas pueden usar checkpoints compatibles; las existentes sin checkpoint cambian entre turnos. Una aceptación no confirma una inferencia." :
+            "La pipeline observa la ejecución. Los cambios por fases están desactivados en la configuración; el modelo se elige entre turnos. Una aceptación no confirma una inferencia.");
+        settingsContent.Children.Add(SettingsAction(phases ? "Desactivar cambios automáticos por fases" : "Activar cambios automáticos por fases",
+            phases ? "Las tareas nuevas podrán cambiar modelo y esfuerzo en checkpoints amplios. Se aplica tras reiniciar Desktop." :
+            "Mantiene el mismo modelo durante cada turno. Se aplica tras reiniciar Desktop.",
+            delegate { WriteConfigValue("phase_routing", !phases); RefreshSettings(); }));
+        bool telemetry = ReadConfigBool("inference_telemetry", true);
         settingsContent.Children.Add(SettingsAction(telemetry ? "Desactivar telemetría local" : "Activar telemetría local",
             telemetry ? "Confirma inferencias mediante un receptor temporal en este equipo. Se aplicará al reiniciar Desktop." :
             "Confirma modelo y razonamiento ejecutados. Solo usa un receptor temporal en este equipo; no guarda mensajes ni respuestas.",
             delegate { WriteConfigValue("inference_telemetry", !telemetry); RefreshSettings(); }));
+        bool prompts = ReadConfigBool("prompt_logging", true);
+        settingsContent.Children.Add(SettingsAction(prompts ? "Desactivar captura de prompts" : "Activar captura de prompts",
+            prompts ? "Guarda cada nuevo mensaje con su decisión para evaluar el enrutamiento. El cambio se aplica al siguiente mensaje." :
+            "No guarda el texto de los mensajes; las estadísticas agregadas continúan disponibles.",
+            delegate { WriteConfigValue("prompt_logging", !prompts); RefreshSettings(); }));
         BuildRoutingEngineSettings();
         settingsContent.Children.Add(AnalyticsHeading("POLÍTICA ACTUAL"));
         AddPolicy("Luna", "Tareas delimitadas", "Ligero"); AddPolicy("Terra", "Cambios concretos", "Medio");
         AddPolicy("Sol", "Ingeniería compleja", "Alto"); AddPolicy("Astra", "UX, auditorías y gran alcance", "Muy alto");
         settingsContent.Children.Add(AnalyticsHeading("PRIVACIDAD"));
-        AddSettingsNote("El historial guarda fecha, tarea, modelo, razonamiento, motores, tiempos, motivos, estado, incidencias y contadores de tokens. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales.");
+        AddSettingsNote(prompts ?
+            "Además de las métricas, se guarda el texto de tus mensajes en el archivo local privado state/prompts.jsonl para evaluar las decisiones. No guarda respuestas, adjuntos, herramientas ni credenciales." :
+            "El historial guarda fecha, tarea, modelo, razonamiento, motores, tiempos, motivos, estado, incidencias y contadores de tokens. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales.");
     }
 
     double Telemetry(string key)
@@ -979,9 +993,9 @@ internal sealed partial class ModernRouterMonitor
         try
         {
             var data = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(Path.Combine(Root, "config.local.json")));
-            return data.ContainsKey("history_days") ? Convert.ToInt32(data["history_days"]) : 90;
+            return data.ContainsKey("history_days") ? Convert.ToInt32(data["history_days"]) : 0;
         }
-        catch { return 90; }
+        catch { return 0; }
     }
 
     bool ReadConfigBool(string key, bool fallback)
@@ -1043,6 +1057,14 @@ internal sealed partial class ModernRouterMonitor
             var data = Json.Deserialize<Dictionary<string, object>>(File.ReadAllText(path)); data[key] = value;
             string temp = path + ".monitor.tmp"; File.WriteAllText(temp, Json.Serialize(data), new System.Text.UTF8Encoding(false));
             File.Replace(temp, path, null);
+            if (key == "phase_routing" || key == "inference_telemetry")
+            {
+                Directory.CreateDirectory(StateFolder);
+                File.WriteAllText(RestartRequiredPath, Json.Serialize(new Dictionary<string, object> {
+                    { "phase_routing", data.ContainsKey("phase_routing") && Convert.ToBoolean(data["phase_routing"]) },
+                    { "inference_telemetry", data.ContainsKey("inference_telemetry") && Convert.ToBoolean(data["inference_telemetry"]) }
+                }), new UTF8Encoding(false));
+            }
         }
         catch { connection.Text = "No se pudo guardar el ajuste"; connection.Foreground = Warning; }
     }

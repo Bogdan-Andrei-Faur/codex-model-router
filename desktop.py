@@ -45,6 +45,14 @@ def config():
         raise DiscoveryError("Esta configuración pertenece a otra instalación. Prepara este Mac con macos.py setup.")
     if sys.platform == "win32" and value.get("platform") == "darwin":
         raise DiscoveryError("Esta configuración pertenece a un Mac. Usa la configuración local de Windows.")
+    changed = False
+    for key, default in (("inference_telemetry", True), ("prompt_logging", True),
+                         ("phase_routing", True), ("history_days", 0)):
+        if key not in value:
+            value[key] = default
+            changed = True
+    if changed:
+        atomic_json(CONFIG, value)
     return value
 
 

@@ -35,11 +35,11 @@ class ExplicitRequests(unittest.TestCase):
     def test_approval_validator_rejects_additional_commands(self):
         from control_contract import exact_approval_command
         marker='/synthetic/marker'
-        self.assertTrue(exact_approval_command('printf APPROVED > '+marker,marker))
-        self.assertTrue(exact_approval_command("/bin/zsh -lc 'printf APPROVED > /synthetic/marker'",marker))
+        self.assertTrue(exact_approval_command('printf APPROVED > '+marker,marker,windows=False))
+        self.assertTrue(exact_approval_command("/bin/zsh -lc 'printf APPROVED > /synthetic/marker'",marker,windows=False))
         for command in ('printf APPROVED > /elsewhere','printf APPROVED > /synthetic/marker; touch /elsewhere',
                         'env printf APPROVED > /synthetic/marker', '/bin/zsh -lc "printf APPROVED > /synthetic/marker" extra'):
-            self.assertFalse(exact_approval_command(command,marker))
+            self.assertFalse(exact_approval_command(command,marker,windows=False))
 
 class BoundaryLifecycle(unittest.TestCase):
     def setUp(self):

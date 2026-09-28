@@ -229,12 +229,13 @@ are consumed internally. Completion/closure retires pending calls. Interrupt,
 steer and client settings changes disable subsequent phase selection. None of
 this changes approval requirements or already captured inference steps.
 
-Activation for a controlled Desktop test: set `phase_routing` to `true` in
-`config.local.json`, fully restart Desktop, and create a new task. Existing
+Activation for a controlled Desktop test: use **Ajustes → Activar cambios
+automáticos por fases** (or set `phase_routing` to `true` in
+`config.local.json`), fully restart Desktop, and create a new task. Existing
 tasks without the tool continue using between-turn routing. Setting the flag
 back to `false` prevents new phase changes; a restart also removes the native
-feature override. There is no monitor toggle yet. An inherited tool on a known
-child/fork returns `preserved`; it is not a child-routing mechanism.
+feature override. An inherited tool on a known child/fork returns `preserved`;
+it is not a child-routing mechanism.
 
 ```text
 python3.11 tests/smoke_phase_bridge.py --live
