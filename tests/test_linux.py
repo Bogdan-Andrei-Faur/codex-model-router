@@ -117,6 +117,27 @@ class LinuxMonitorContractTests(unittest.TestCase):
         atomic_json(root / 'config.local.json', {'enabled': True, 'routes': {}, 'jev': {'connection': 'typesafe', 'api_key': 'PRIVATE_SENTINEL'}})
         return MonitorState(root, ROOT)
 
+    def test_policy_matches_router_migration_without_rewriting_config(self):
+        from copy import deepcopy
+        from model_catalog import LEGACY_ROUTES, DEFAULT_ROUTES
+        from router import read_config
+        custom = deepcopy(LEGACY_ROUTES)
+        custom['normal']['effort'] = 'high'
+        cases = [({'routes': LEGACY_ROUTES}, DEFAULT_ROUTES),
+                 ({'routes': custom}, custom),
+                 ({'routes': LEGACY_ROUTES, 'model_catalog_version': 'pinned'}, LEGACY_ROUTES)]
+        for config, expected in cases:
+            with self.subTest(config=config), tempfile.TemporaryDirectory() as directory:
+                model = self.make(directory)
+                path = model.root / 'config.local.json'
+                atomic_json(path, dict(config, jev={'connection': 'vercel', 'api_key': 'PRIVATE_SENTINEL'}))
+                original = path.read_bytes()
+                payload = model.payload()
+                self.assertEqual(payload['config']['routes'], expected)
+                self.assertEqual(payload['config']['routes'], read_config(path)['routes'])
+                self.assertNotIn('PRIVATE_SENTINEL', json.dumps(payload))
+                self.assertEqual(path.read_bytes(), original)
+
     def test_payload_uses_freshest_row_and_excludes_private_config(self):
         with tempfile.TemporaryDirectory() as directory:
             model = self.make(directory)

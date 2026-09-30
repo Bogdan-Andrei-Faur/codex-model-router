@@ -6,6 +6,7 @@ from pathlib import Path
 import time
 
 from build_identity import identity, router_identity
+from model_catalog import migrate_config
 from state_store import atomic_json, append_record, file_lock, read_records
 from task_modes import read_mode, mode_path
 
@@ -107,7 +108,7 @@ class MonitorState:
         if signature != self.signature:
             self.history = [record for path in paths for record in read_records(path)]
             self.signature = signature
-        config = read_json(self.root / 'config.local.json')
+        config = migrate_config(read_json(self.root / 'config.local.json'))
         safe = {key: config[key] for key in CONFIG_KEYS if key in config}
         for key, default in [('phase_routing', True), ('inference_telemetry', True), ('prompt_logging', True), ('history_days', 0)]:
             safe.setdefault(key, default)

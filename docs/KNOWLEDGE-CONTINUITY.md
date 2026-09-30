@@ -1,5 +1,16 @@
 # Continuidad del proyecto: fases automáticas y validación multiplataforma
 
+## Aceptación Ubuntu 0.6.0 — 30/09/2026
+
+Desktop `26.928.21956` / backend `0.159.2`: puente activo 0.6.0/política 8.
+Sondas nativas aisladas verifican continuidad/herramientas entre turnos,
+rechazo Luna 6 ↔ Sol 6.1 dentro del turno y cambios Medio → Alto manteniendo
+el modelo con inferencia confirmada. Evidencia y límites en [VALIDATION.md](VALIDATION.md).
+El monitor Linux mostraba las rutas originales; ahora usa `migrate_config`
+al construir el payload, como el router, sin reescribir ajustes locales.
+Rutas personalizadas/versionadas se conservan. Pendiente uso natural extenso
+y aceptación nativa de esta entrega en macOS. No se usa Atlas en esta sesión.
+
 ## Estado actual — 0.6.0, Windows, 30/09/2026
 
 Catálogo actualizado y política 8: ver [MODEL-CATALOG.md](MODEL-CATALOG.md)

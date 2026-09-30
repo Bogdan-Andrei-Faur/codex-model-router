@@ -1,5 +1,26 @@
 # Validation and integration notes
 
+## Aceptación nativa Ubuntu 0.6.0 — 30/09/2026
+
+- Desktop `26.928.21956`, backend `0.159.2`: tras reabrir, el puente real publica
+  producto 0.6.0, política 8 y heartbeat reciente; `desktop_connected`, 1/1 sesiones.
+- `smoke_native.py --live`: Luna 6/Sol 6.1 aceptados entre turnos, respuesta,
+  contexto y herramienta dinámica correctos. Tarea sintética archivada y cierre 0.
+- `probe_model_compatibility.py --live --current`: ambas direcciones Luna 6 ↔
+  Sol 6.1 rechazadas con RPC -32600 por la frontera de revisión del Node REPL.
+  Contexto y herramienta preservados; inferencia inicial confirmada en telemetría.
+- La sonda `--current --same-model` confirma Medio → Alto aplicado en ambos
+  modelos, con inferencias de ambos esfuerzos. Cero errores OTLP y cierres 0.
+- Regresión GTK/XWayland: posición, ABOVE, activar/desactivar, ocultar/reabrir,
+  panel y cápsula correctos. No sustituye pruebas físicas de varios monitores/DPI.
+- Corregida la política antigua en Ajustes Linux: `MonitorState` aplica la misma
+  migración en memoria que el router. Conserva rutas personalizadas/versionadas
+  y archivos locales. 253 pruebas Python correctas, incluida esta regresión.
+- Informes locales en `state/linux-catalog-native-smoke-20260930.json`,
+  `state/model-compatibility-current-probe.json` y
+  `state/model-reasoning-current-probe.json`; no se publican datos de `state/`.
+  No se reinició Desktop ni se cambiaron chats del usuario durante las sondas.
+
 ## Corrección del monitor tras reiniciar Ubuntu — 28/09/2026
 
 - Reproducido el cambio de backend: el acceso del escritorio no heredaba
