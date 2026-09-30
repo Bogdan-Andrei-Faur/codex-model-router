@@ -36,6 +36,12 @@ def payload(model="gpt-5.6-terra", effort="medium", kind="response.completed"):
 
 
 class InferenceTelemetryTests(unittest.TestCase):
+    def test_new_generations_are_observed_without_retaining_private_content(self):
+        for model in ("gpt-6-luna", "gpt-6-sol", "gpt-6.1-sol"):
+            records = list(safe_records(payload(model=model)))
+            self.assertEqual(records[0]['model'], model)
+            self.assertNotIn('PRIVATE_PROMPT', str(records))
+
     def test_allowlist_drops_all_content_and_metadata(self):
         self.assertEqual(list(safe_records(payload())), [{"event_name": "codex.sse_event", "event_kind": "response.completed",
             "model": "gpt-5.6-terra", "effort": "medium", "thread_id": "thread_12345678",

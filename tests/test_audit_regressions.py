@@ -43,10 +43,10 @@ class AuditRegressions(unittest.TestCase):
         router.catalog = {r['model']: set(EFFORTS) for r in DEFAULT_ROUTES.values()}
         router.client_line(wire({'id': 1, 'method': 'thread/resume', 'params': {'threadId': 'task-audit'}}))
         router.server_line(wire({'id': 1, 'result': {'thread': {'id': 'task-audit', 'name': 'Synthetic task'},
-                                                   'model': 'gpt-5.6-luna', 'modelProvider': 'openai', 'reasoningEffort': 'low'}}))
+                                                   'model': 'gpt-6-luna', 'modelProvider': 'openai', 'reasoningEffort': 'low'}}))
 
     def request(self, text, request=2):
-        return {'id': request, 'method': 'turn/start', 'params': {'threadId': 'task-audit', 'model': 'gpt-5.6-luna',
+        return {'id': request, 'method': 'turn/start', 'params': {'threadId': 'task-audit', 'model': 'gpt-6-luna',
                                                                   'effort': 'low', 'input': [{'type': 'text', 'text': text}]}}
 
     def assistant(self, text):
@@ -61,7 +61,7 @@ class AuditRegressions(unittest.TestCase):
             stream.write('{broken\n')
         self.router = Router(self.config, self.root / 'state')
         self.resume(self.router)
-        with patch('router.run_jev', return_value={'engine': 'jev', 'status': 'ok', 'route': {'model': 'gpt-5.6-luna', 'effort': 'low'}}):
+        with patch('router.run_jev', return_value={'engine': 'jev', 'status': 'ok', 'route': {'model': 'gpt-6-luna', 'effort': 'low'}}):
             actual = json.loads(self.router.client_line(wire(self.request('Adelante'))))
         self.assertEqual(actual['params']['model'], 'gpt-6-astra')
         self.assertGreaterEqual(EFFORTS.index(actual['params']['effort']), EFFORTS.index('high'))
@@ -72,7 +72,7 @@ class AuditRegressions(unittest.TestCase):
                 summary = response_summary(text)
                 self.assertTrue(summary['completed'])
                 route, _ = select_route_details('Gracias', DEFAULT_ROUTES, 'critical', 'max', response_context=summary)
-                self.assertEqual(route, {'model': 'gpt-5.6-luna', 'effort': 'low'})
+                self.assertEqual(route, {'model': 'gpt-6-luna', 'effort': 'low'})
         self.assistant('Queda pendiente corregir seguridad.')
         self.assistant('No queda nada pendiente.')
         restarted = Router(self.config, self.root / 'state')
@@ -83,9 +83,9 @@ class AuditRegressions(unittest.TestCase):
         self.router = Router(self.config, self.root / 'state')
         self.resume(self.router)
         with patch('router.run_jev', return_value={'engine': 'jev', 'status': 'ok',
-                   'route': {'model': 'gpt-5.6-terra', 'effort': 'medium'}}) as jev:
+                   'route': {'model': 'gpt-6.1-sol', 'effort': 'medium'}}) as jev:
             actual = json.loads(self.router.client_line(wire(self.request('Ok, implementa un formulario de contactos'))))
-        self.assertEqual(actual['params']['model'], 'gpt-5.6-terra')
+        self.assertEqual(actual['params']['model'], 'gpt-6.1-sol')
         state = jev.call_args.args[2]
         self.assertNotIn('previous_response_context', state)
         self.assertEqual(state['quality_floor'], 'normal')
@@ -94,9 +94,9 @@ class AuditRegressions(unittest.TestCase):
         self.router.server_line(wire({'method': 'turn/completed', 'params': {
             'threadId': 'task-audit', 'turn': {'id': 'turn-independent', 'status': 'completed'}}}))
         followup = self.request('Sigue con lo que falta', 3)
-        followup['params'].update(model='gpt-5.6-terra', effort='medium')
+        followup['params'].update(model='gpt-6.1-sol', effort='medium')
         with patch('router.run_jev', return_value={'engine': 'jev', 'status': 'ok',
-                   'route': {'model': 'gpt-5.6-terra', 'effort': 'medium'}}):
+                   'route': {'model': 'gpt-6.1-sol', 'effort': 'medium'}}):
             actual = json.loads(self.router.client_line(wire(followup)))
         self.assertEqual(actual['params']['model'], 'gpt-6-astra')
 
@@ -125,12 +125,12 @@ class AuditRegressions(unittest.TestCase):
     def test_new_decision_clears_inference_evidence_and_binds_build(self):
         row = self.router.threads['task-audit']
         row.update(observed_model='gpt-6-astra', observed_effort='max', inference_source='old', tokens={'inputTokens': 1}, turn_id='old')
-        self.router.new_decision('task-audit', 'gpt-5.6-luna', 'low', 'synthetic', 'synthetic', 'automatic')
+        self.router.new_decision('task-audit', 'gpt-6-luna', 'low', 'synthetic', 'synthetic', 'automatic')
         for key in ('observed_model', 'observed_effort', 'tokens', 'inference_source', 'turn_id'):
             self.assertNotIn(key, row)
         record = list(read_records(self.root / 'state/history.jsonl'))[-1]
         self.assertTrue(record['build_id'])
-        self.assertEqual(record['routing_policy_version'], 7)
+        self.assertEqual(record['routing_policy_version'], 8)
 
     def test_identical_routed_wire_is_still_one_automatic_decision(self):
         self.config.write_text(json.dumps({'enabled': True, 'routes': DEFAULT_ROUTES}))
@@ -157,9 +157,9 @@ class AuditRegressions(unittest.TestCase):
 
     def test_delayed_and_duplicate_inferences_never_confirm_new_turn(self):
         row = self.router.threads['task-audit']
-        row.update(phase_status='active', phase_model='gpt-5.6-luna', phase_effort='low', turn_id='turn-current', decision_started_at=time.time())
+        row.update(phase_status='active', phase_model='gpt-6-luna', phase_effort='low', turn_id='turn-current', decision_started_at=time.time())
         self.router.current_decisions['task-audit'] = 'decision-current'
-        base = dict(event_kind='response.completed', model='gpt-5.6-luna', effort='low', thread_id='task-audit')
+        base = dict(event_kind='response.completed', model='gpt-6-luna', effort='low', thread_id='task-audit')
         self.router.observe_inference(dict(base, turn_id='turn-old', event_id='old'))
         self.assertNotIn('observed_model', row)
         record = dict(base, turn_id='turn-current', event_id='new', timestamp=time.time())

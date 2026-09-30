@@ -18,7 +18,8 @@ import json
 import threading
 import zlib
 
-MODELS = frozenset(("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-6-astra"))
+from model_catalog import MODELS as REVIEWED_MODELS
+MODELS = frozenset(REVIEWED_MODELS)
 EFFORTS = frozenset(("low", "medium", "high", "xhigh", "max", "ultra"))
 EVENT_NAMES = frozenset(("codex.api_request", "codex.sse_event", "codex.websocket_event"))
 EVENT_KINDS = frozenset(("response.created", "response.completed", "response.failed"))

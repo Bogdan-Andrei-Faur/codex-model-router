@@ -31,7 +31,7 @@ class ReviewPolicyTests(unittest.TestCase):
                 _, policy = select_route_details(text, DEFAULT_ROUTES)
                 choices = candidate_routes(DEFAULT_ROUTES, {r['model']: set(EFFORTS) for r in DEFAULT_ROUTES.values()}, policy)
                 self.assertTrue(choices)
-                self.assertTrue(all(r['model'] not in ('gpt-5.6-luna', 'gpt-5.6-terra') and
+                self.assertTrue(all(r['tier'] not in ('simple', 'normal') and
                                     EFFORTS.index(r['effort']) >= EFFORTS.index('high') for r in choices.values()))
 
     def test_bounded_and_non_directive_requests_do_not_gain_review_floor(self):
@@ -52,7 +52,7 @@ class ReviewPolicyTests(unittest.TestCase):
         self.assertEqual(classify('Revisa la autenticación del proyecto').quality_floor, 'complex')
         self.assertEqual(classify('Audita una vulnerabilidad del proyecto').quality_floor, 'critical')
         route, policy = select_route_details('Usa Luna: revisa el proyecto', DEFAULT_ROUTES)
-        self.assertEqual((route['model'], policy['source']), ('gpt-5.6-luna', 'explicit'))
+        self.assertEqual((route['model'], policy['source']), ('gpt-6-luna', 'explicit'))
 
 
 class DiagnosticSanitizerTests(unittest.TestCase):
@@ -92,12 +92,12 @@ class NativeLifecycleTests(unittest.TestCase):
         self.router.catalog = {r['model']: set(EFFORTS) for r in DEFAULT_ROUTES.values()}
         self.router.client_line(wire({'id': 1, 'method': 'thread/resume', 'params': {'threadId': 'task'}}))
         self.router.server_line(wire({'id': 1, 'result': {'thread': {'id': 'task', 'name': 'Synthetic'},
-                                                     'modelProvider': 'openai', 'model': 'gpt-5.6-luna', 'reasoningEffort': 'low'}}))
+                                                     'modelProvider': 'openai', 'model': 'gpt-6-luna', 'reasoningEffort': 'low'}}))
         self.begin()
 
     def begin(self, turn='turn-1', request=2):
         self.router.client_line(wire({'id': request, 'method': 'turn/start', 'params': {'threadId': 'task',
-            'model': 'gpt-5.6-luna', 'effort': 'low', 'input': [{'type': 'text', 'text': 'Traduce hola'}]}}))
+            'model': 'gpt-6-luna', 'effort': 'low', 'input': [{'type': 'text', 'text': 'Traduce hola'}]}}))
         self.router.server_line(wire({'id': request, 'result': {'turn': {'id': turn}}}))
 
     def notify(self, retry=False, turn='turn-1', error=None):
@@ -173,7 +173,7 @@ class NativeLifecycleTests(unittest.TestCase):
         self.complete('completed')
         for code in (-32603, 'PRIVATE'):
             self.router.client_line(wire({'id': 3, 'method': 'turn/start', 'params': {'threadId': 'task',
-                'model': 'gpt-5.6-luna', 'effort': 'low', 'input': [{'type': 'text', 'text': 'Traduce hola'}]}}))
+                'model': 'gpt-6-luna', 'effort': 'low', 'input': [{'type': 'text', 'text': 'Traduce hola'}]}}))
             self.router.server_line(wire({'id': 3, 'error': {'code': code, 'message': 'PRIVATE'}}))
             result = self.records('decision_rejected')[-1]
             self.assertEqual(result['error_type'], 'turn_rejected')
@@ -197,14 +197,14 @@ class NativeLifecycleTests(unittest.TestCase):
         self.complete('completed')
         config = self.router.config_path
         config.write_text(json.dumps({'enabled': True, 'routes': DEFAULT_ROUTES, 'routing_engine': 'jev'}))
-        for model, effort in [('gpt-5.6-luna', 'low'), ('gpt-5.6-sol', 'high')]:
+        for model, effort in [('gpt-6-luna', 'low'), ('gpt-6.1-sol', 'high')]:
             with self.subTest(model=model), patch('router.run_jev', return_value={
                     'engine': 'jev', 'status': 'ok', 'route': {'model': model, 'effort': effort}}):
                 self.router.pending.clear()
                 request = wire({'id': 3, 'method': 'turn/start', 'params': {'threadId': 'task',
-                    'model': 'gpt-5.6-luna', 'effort': 'low', 'input': [{'type': 'text', 'text': 'Haz una revision de como esta iendo'}]}})
+                    'model': 'gpt-6-luna', 'effort': 'low', 'input': [{'type': 'text', 'text': 'Haz una revision de como esta iendo'}]}})
                 actual = json.loads(self.router.client_line(request))['params']
-                self.assertEqual((actual['model'], actual['effort']), ('gpt-5.6-sol', 'high'))
+                self.assertEqual((actual['model'], actual['effort']), ('gpt-6.1-sol', 'high'))
 
 
 if __name__ == '__main__':

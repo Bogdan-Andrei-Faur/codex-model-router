@@ -7,7 +7,8 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from phase_control import TOOL, SPEC
-from routing import DEFAULT_ROUTES, EFFORTS
+from routing import EFFORTS
+from model_catalog import LEGACY_ROUTES as DEFAULT_ROUTES
 from router import Router
 from task_modes import mode_path
 from state_store import atomic_json
@@ -18,12 +19,36 @@ def wire(value):
 
 
 class PhaseControlTests(unittest.TestCase):
+    def test_current_luna_escalation_stops_at_native_boundary_without_sending_update(self):
+        from model_catalog import DEFAULT_ROUTES as CURRENT_ROUTES, MODELS
+        self.settings['routes'] = copy.deepcopy(CURRENT_ROUTES)
+        self.config.write_text(json.dumps(self.settings))
+        self.router.catalog = {model: set(EFFORTS) for model in MODELS}
+        self.begin(model='gpt-6-luna')
+        self.checkpoint()
+        output = self.router.drain_outbound()
+        self.assertEqual(len(output), 1)
+        self.assertEqual(self.status(output[0]), 'requires_new_turn')
+        self.assertEqual(self.router.threads['t']['pending_phase_floor'], 'complex')
+        self.assertEqual(self.router.threads['t']['accepted_model'], 'gpt-6-luna')
+
+    def test_current_sol_can_change_reasoning_without_changing_model(self):
+        from model_catalog import DEFAULT_ROUTES as CURRENT_ROUTES, MODELS
+        self.settings['routes'] = copy.deepcopy(CURRENT_ROUTES)
+        self.config.write_text(json.dumps(self.settings))
+        self.router.catalog = {model: set(EFFORTS) for model in MODELS}
+        self.begin(model='gpt-6.1-sol')
+        self.checkpoint()
+        output = self.router.drain_outbound()
+        self.assertEqual(output[0]['method'], 'turn/settings/update')
+        self.assertEqual((output[0]['params']['model'], output[0]['params']['effort']), ('gpt-6.1-sol', 'high'))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.config = self.root / "config.json"
-        self.settings = {"enabled": True, "phase_routing": True, "sync_picker": False,
+        self.settings = {"model_catalog_version": "legacy-test", "enabled": True, "phase_routing": True, "sync_picker": False,
                          "routes": copy.deepcopy(DEFAULT_ROUTES)}
         self.config.write_text(json.dumps(self.settings))
         self.router = Router(self.config, self.root / "state")

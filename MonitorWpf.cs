@@ -831,7 +831,7 @@ internal sealed partial class ModernRouterMonitor : Window
         string foreground = "#C5C8D3", background = "#353741";
         if (model)
         {
-            switch (label) {
+            switch (label.Split(' ')[0]) {
                 case "Luna": foreground = "#ACDEFF"; background = "#273B4B"; break;
                 case "Terra": foreground = "#A4E4C6"; background = "#283E36"; break;
                 case "Sol": foreground = "#F0D19C"; background = "#423A2A"; break;
@@ -909,7 +909,10 @@ internal sealed partial class ModernRouterMonitor : Window
             case "completed": case "idle": return "En espera"; case "waiting": return "Esperando tu respuesta"; case "error": case "failed": return "Error";
             case "interrupted": return "Interrumpida"; default: return "Estado sin confirmar"; }
     }
-    static string Model(string value) { return value.Replace("gpt-5.6-", "").Replace("gpt-6-", "").Replace("gpt-", "").ToUpperInvariantFirst(); }
+    static string Model(string value) {
+        var match = System.Text.RegularExpressions.Regex.Match(value, @"^gpt-(\d+(?:\.\d+)?)-(luna|terra|sol|astra)$");
+        return match.Success ? match.Groups[2].Value.ToUpperInvariantFirst() + " " + match.Groups[1].Value : value;
+    }
     static string Effort(string value)
     {
         switch (value) { case "low": return "Ligero"; case "medium": return "Medio"; case "high": return "Alto";

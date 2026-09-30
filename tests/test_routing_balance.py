@@ -50,7 +50,7 @@ class BalancedPolicyTests(unittest.TestCase):
             for prompt in ('Tengo una duda sobre esto', '¿Por qué ocurre?', 'Ok, arréglalo'):
                 with self.subTest(previous=previous, prompt=prompt):
                     route, _ = select_route_details(prompt, DEFAULT_ROUTES, previous, 'low')
-                    self.assertEqual(route, {'model': 'gpt-5.6-sol', 'effort': 'high'})
+                    self.assertEqual(route, {'model': 'gpt-6.1-sol', 'effort': 'high'})
 
     def test_known_pending_work_can_continue_on_terra_or_astra(self):
         for floor in ('normal', 'complex', 'critical'):
@@ -97,12 +97,12 @@ class BalancedBridgeTests(unittest.TestCase):
         self.config.write_text(json.dumps({'enabled': True, 'routes': DEFAULT_ROUTES, 'routing_engine': 'jev'}))
         self.router = Router(self.config, self.root / 'state')
         self.router.catalog = {r['model']: set(EFFORTS) for r in DEFAULT_ROUTES.values()}
-        self.router.threads['t'] = {'name': 'Synthetic', 'provider': 'openai', 'model': 'gpt-5.6-luna',
+        self.router.threads['t'] = {'name': 'Synthetic', 'provider': 'openai', 'model': 'gpt-6-luna',
                                   'effort': 'low', 'tier': 'simple', 'seen_turn': True}
 
     def request(self, prompt):
         return wire({'id': 10, 'method': 'turn/start', 'params': {'threadId': 't',
-                    'model': 'gpt-5.6-luna', 'effort': 'low', 'input': [{'type': 'text', 'text': prompt}]}})
+                    'model': 'gpt-6-luna', 'effort': 'low', 'input': [{'type': 'text', 'text': prompt}]}})
 
     def route(self, prompt, result):
         self.router.pending.clear()
@@ -115,7 +115,7 @@ class BalancedBridgeTests(unittest.TestCase):
                        {'engine': 'jev', 'status': 'unavailable', 'engine_failure': 'timeout'}):
             for prompt in ('Tengo una duda sobre esto', '¿Por qué ocurre?'):
                 actual, _ = self.route(prompt, result)
-                self.assertEqual((actual['model'], actual['effort']), ('gpt-5.6-sol', 'high'))
+                self.assertEqual((actual['model'], actual['effort']), ('gpt-6.1-sol', 'high'))
         self.assertNotIn('task_contract', self.router.threads['t'])  # Uncertainty is not a new pending task.
 
     def test_ordinary_change_is_bounded_to_terra_for_every_jev_proposal(self):
@@ -134,7 +134,7 @@ class BalancedBridgeTests(unittest.TestCase):
         restarted = Router(self.config, self.root / 'state')
         self.router.threads['t'].update(restarted.thread_categories['t'])
         actual, mock = self.route('¿Por qué ocurre?', {'engine': 'jev', 'status': 'ok', 'route': DEFAULT_ROUTES['complex']})
-        self.assertEqual(actual['model'], 'gpt-5.6-sol')
+        self.assertEqual(actual['model'], 'gpt-6.1-sol')
         state = mock.call_args.args[2]
         self.assertEqual(state['work_context']['plan_steps'], ['verify'])
         self.assertTrue(state['work_context']['legacy_uncertain'])
@@ -144,14 +144,14 @@ class BalancedBridgeTests(unittest.TestCase):
         actual, _ = self.route('Adelante', {'engine': 'jev', 'status': 'ok', 'route': DEFAULT_ROUTES['simple']})
         self.assertEqual(actual['model'], 'gpt-6-astra')
         actual, mock = self.route('Añade un campo al formulario', {'engine': 'jev', 'status': 'ok', 'route': DEFAULT_ROUTES['normal']})
-        self.assertEqual(actual['model'], 'gpt-5.6-terra')
+        self.assertEqual(actual['model'], 'gpt-6.1-sol')
         self.assertEqual(mock.call_args.args[2]['work_context']['work_floor'], 'critical')
         self.assertNotIn('previous_response_context', mock.call_args.args[2])
 
     def test_new_task_clears_context_and_bounded_request_stays_light(self):
         self.router.threads['t']['task_contract'] = merge_contract(None, response_summary('Falta corregir una vulnerabilidad'))
         actual, mock = self.route('Nueva tarea: traduce hola', {'engine': 'jev', 'status': 'ok', 'route': DEFAULT_ROUTES['simple']})
-        self.assertEqual(actual['model'], 'gpt-5.6-luna')
+        self.assertEqual(actual['model'], 'gpt-6-luna')
         self.assertNotIn('work_context', mock.call_args.args[2])
 
     def test_band_metadata_is_recorded_without_exported_context(self):
@@ -170,7 +170,7 @@ class BalancedBridgeTests(unittest.TestCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({'thread': 't', 'mode': 'manual'}))
         actual, mock = self.route('Revisa el proyecto', {'engine': 'jev', 'status': 'unavailable'})
-        self.assertEqual(actual['model'], 'gpt-5.6-luna')
+        self.assertEqual(actual['model'], 'gpt-6-luna')
         mock.assert_not_called()
 
 

@@ -115,7 +115,7 @@ class RoutingPolicyTests(unittest.TestCase):
         result = classify("Adelante", "simple", previous_effort="low", response_context=context)
         self.assertEqual((result.tier, result.quality_floor, result.request_kind), ("complex", "complex", "planned_followup"))
         route, reasons = select_route_details("Adelante", DEFAULT_ROUTES, "simple", "low", response_context=context)
-        self.assertEqual(route, {"model": "gpt-5.6-sol", "effort": "high"})
+        self.assertEqual(route, {"model": "gpt-6.1-sol", "effort": "high"})
         self.assertEqual(reasons["quality_floor"], "complex")
         reset = classify("Nueva tarea: traduce hola al inglés", "simple", previous_effort="low", response_context=context)
         self.assertEqual((reset.tier, reset.quality_floor), ("simple", None))
@@ -164,7 +164,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(restarted.client_line(raw),raw)
         restarted.server_line(encode({'id':7,'result':{'turn':{'id':'turn'}}}))
         self.path.write_text(json.dumps({'enabled':True,'routes':DEFAULT_ROUTES}))
-        self.assertEqual(json.loads(restarted.client_line(raw))['params']['model'],'gpt-5.6-luna')
+        self.assertEqual(json.loads(restarted.client_line(raw))['params']['model'],'gpt-6-luna')
 
     def test_damaged_task_preference_cannot_reenable_routing(self):
         from task_modes import mode_path, read_mode
@@ -180,7 +180,7 @@ class ProtocolTests(unittest.TestCase):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES}))
         self.router = Router(self.path, Path(self.tmp.name) / "state")
         self.router.catalog = {x["model"]: set(EFFORTS) for x in DEFAULT_ROUTES.values()}
-        self.router.catalog["gpt-5.6-luna"].remove("ultra")
+        self.router.catalog["gpt-6-luna"].remove("ultra")
         self.router.threads["t"] = {"provider": "openai", "model": "gpt-6-astra", "seen_turn": False}
 
     def tearDown(self):
@@ -225,9 +225,9 @@ class ProtocolTests(unittest.TestCase):
     def test_jev_engine_can_select_a_valid_pair_and_keeps_telemetry_content_free(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         fake_jev.return_value = {"engine": "jev", "status": "ok", "latency_ms": 25, "confidence": .91,
-                                 "engine_model": "jev-test", "route": {"model": "gpt-5.6-terra", "effort": "medium", "tier": "normal", "label": "Terra · medium"}}
+                                 "engine_model": "jev-test", "route": {"model": "gpt-6.1-sol", "effort": "medium", "tier": "normal", "label": "Terra · medium"}}
         result = json.loads(self.router.client_line(encode(self.request("PRIVATE_JEV_SENTINEL implementa un cambio concreto"))))
-        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-terra", "medium"))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6.1-sol", "medium"))
         records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
         self.assertEqual(records[-1]["routing_engine"], "jev")
         self.assertNotIn("PRIVATE_JEV_SENTINEL", (Path(self.tmp.name) / "state" / "history.jsonl").read_text())
@@ -253,15 +253,15 @@ class ProtocolTests(unittest.TestCase):
         self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True,
                                       name="Auditoría de seguridad", agent_category="audit")
         fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
-                                "route": {"model": "gpt-5.6-terra", "effort": "medium", "label": "Terra · medium"}}
+                                "route": {"model": "gpt-6.1-sol", "effort": "medium", "label": "Terra · medium"}}
         result = json.loads(self.router.client_line(encode(self.request("Parece que ahora si esta funcionando"))))
-        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-terra", "medium"))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6.1-sol", "medium"))
         policy, candidates = fake_jev.call_args.args[2:4]
         self.assertEqual(policy["request_kind"], "acknowledgement")
         self.assertIsNone(policy["quality_floor"])
         self.assertTrue(all(r["tier"] in ("simple", "normal") and r["effort"] in ("low", "medium") for r in candidates.values()))
         records = [json.loads(line) for line in (Path(self.tmp.name) / "state" / "history.jsonl").read_text().splitlines()]
-        self.assertEqual(records[0]["routing_policy_version"], 7)
+        self.assertEqual(records[0]["routing_policy_version"], 8)
         self.assertEqual(records[0]["request_kind"], "acknowledgement")
         self.assertNotIn("Parece que ahora", str(records))
 
@@ -270,9 +270,9 @@ class ProtocolTests(unittest.TestCase):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         self.router.threads["t"].update(name="Auditoría de seguridad", agent_category="audit")
         fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "reassess",
-                                "route": {"model": "gpt-5.6-luna", "effort": "low", "label": "Luna · low"}}
+                                "route": {"model": "gpt-6-luna", "effort": "low", "label": "Luna · low"}}
         result = json.loads(self.router.client_line(encode(self.request("Tengo una duda sobre esto"))))
-        self.assertEqual(result["params"]["model"], "gpt-5.6-sol")
+        self.assertEqual(result["params"]["model"], "gpt-6.1-sol")
         self.assertEqual(fake_jev.call_args.args[2]["quality_floor"], "complex")
         self.assertEqual({r['tier'] for r in fake_jev.call_args.args[3].values()}, {'complex'})
 
@@ -283,7 +283,7 @@ class ProtocolTests(unittest.TestCase):
         fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
                                 "route": {"model": "gpt-6-astra", "effort": "max", "label": "Astra · max"}}
         result = json.loads(self.router.client_line(encode(self.request("Parece que ahora si esta funcionando"))))
-        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-luna", "low"))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6-luna", "low"))
         self.assertEqual(self.router.threads["t"]["engine_status"], "guardrail")
         self.assertEqual(self.router.threads["t"]["routing_engine"], "rules")
 
@@ -293,7 +293,7 @@ class ProtocolTests(unittest.TestCase):
         self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True)
         self.router.threads["t"]["task_contract"] = {"version": 2, "status": "pending", "floor": "critical"}
         fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
-                                "route": {"model": "gpt-5.6-luna", "effort": "low"}}
+                                "route": {"model": "gpt-6-luna", "effort": "low"}}
         result = json.loads(self.router.client_line(encode(self.request("Adelante, impleméntalo"))))
         self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6-astra", "xhigh"))
         self.assertEqual(self.router.threads["t"]["engine_status"], "guardrail")
@@ -304,20 +304,20 @@ class ProtocolTests(unittest.TestCase):
         self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True)
         fake_jev.return_value = {"engine": "jev", "status": "unavailable", "engine_failure": "rate_limited"}
         result = json.loads(self.router.client_line(encode(self.request("Parece que ahora si esta funcionando"))))
-        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-luna", "low"))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6-luna", "low"))
         self.assertEqual(self.router.threads["t"]["routing_engine"], "rules")
 
     @patch("router.run_jev")
     def test_response_plan_is_sent_as_metadata_for_brief_confirmation(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
-        self.router.threads["t"].update(model="gpt-5.6-terra", effort="medium", tier="normal", seen_turn=True,
+        self.router.threads["t"].update(model="gpt-6.1-sol", effort="medium", tier="normal", seen_turn=True,
                                       response_context={"has_plan": True, "implementation_pending": True,
                                                         "mentions_tests": True, "mentions_deployment": False,
                                                         "risk_signals": False, "response_kind": "plan", "work_floor": "normal"})
         fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
-                                "route": {"model": "gpt-5.6-terra", "effort": "medium", "label": "Terra · medium"}}
+                                "route": {"model": "gpt-6.1-sol", "effort": "medium", "label": "Terra · medium"}}
         result = json.loads(self.router.client_line(encode(self.request("Adelante"))))
-        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-terra", "medium"))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6.1-sol", "medium"))
         state = fake_jev.call_args.args[2]
         self.assertEqual(state["previous_response_context"]["response_kind"], "plan")
         self.assertTrue(state["previous_response_context"]["mentions_tests"])
@@ -326,11 +326,11 @@ class ProtocolTests(unittest.TestCase):
     def test_pending_points_prevent_jev_from_selecting_luna(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         context = summarize_response_context("Faltan varios puntos: integrar los cambios entre servicios, corregir el flujo y validar las pruebas.")
-        self.router.threads["t"].update(model="gpt-5.6-luna", effort="low", tier="simple", seen_turn=True, response_context=context)
+        self.router.threads["t"].update(model="gpt-6-luna", effort="low", tier="simple", seen_turn=True, response_context=context)
         fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
-                                "route": {"model": "gpt-5.6-luna", "effort": "low", "label": "Luna · low"}}
+                                "route": {"model": "gpt-6-luna", "effort": "low", "label": "Luna · low"}}
         result = json.loads(self.router.client_line(encode(self.request("Adelante"))))
-        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-sol", "high"))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6.1-sol", "high"))
         self.assertEqual(self.router.threads["t"]["engine_status"], "guardrail")
         state, candidates = fake_jev.call_args.args[2:4]
         self.assertEqual(state["previous_response_context"]["work_floor"], "complex")
@@ -340,12 +340,12 @@ class ProtocolTests(unittest.TestCase):
     def test_pending_tests_keep_floor_for_elliptical_followup_after_luna(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         context = summarize_response_context("Todavía quedan cambios por hacer y después hay que ejecutar las pruebas.")
-        self.router.threads["t"].update(model="gpt-5.6-luna", effort="low", tier="simple",
+        self.router.threads["t"].update(model="gpt-6-luna", effort="low", tier="simple",
                                         seen_turn=True, response_context=context)
         fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
-                                "route": {"model": "gpt-5.6-luna", "effort": "low", "label": "Luna · low"}}
+                                "route": {"model": "gpt-6-luna", "effort": "low", "label": "Luna · low"}}
         result = json.loads(self.router.client_line(encode(self.request("Haz lo que consideres necesario para dejarlo bien."))))
-        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-sol", "high"))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6.1-sol", "high"))
         state, candidates = fake_jev.call_args.args[2:4]
         self.assertEqual((state["request_kind"], state["quality_floor"]), ("planned_followup", "complex"))
         self.assertTrue(all(route["tier"] in ("complex", "critical") for route in candidates.values()))
@@ -354,9 +354,9 @@ class ProtocolTests(unittest.TestCase):
     def test_jev_cannot_reduce_a_research_quality_floor(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         fake_jev.return_value = {"engine": "jev", "status": "ok", "latency_ms": 25, "confidence": .91,
-                                 "engine_model": "jev-test", "route": {"model": "gpt-5.6-luna", "effort": "low", "tier": "simple", "label": "Luna · low"}}
+                                 "engine_model": "jev-test", "route": {"model": "gpt-6-luna", "effort": "low", "tier": "simple", "label": "Luna · low"}}
         result = json.loads(self.router.client_line(encode(self.request("Investiga una condición de carrera entre servicios"))))
-        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-sol", "high"))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6.1-sol", "high"))
         state = fake_jev.call_args.args[2]
         self.assertEqual(state["quality_floor"], "complex")
 
@@ -401,7 +401,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertNotIn("PRIVATE_SENTINEL", str(context))
 
     def test_internal_ephemeral_root_keeps_native_settings_and_creates_no_decision(self):
-        self.router.threads["helper"] = {"provider": "openai", "model": "gpt-5.6-luna",
+        self.router.threads["helper"] = {"provider": "openai", "model": "gpt-6-luna",
                                           "effort": "low", "ephemeral": True, "parent": None}
         request = self.request("Generate a concise UI title", threadId="helper")
         raw = encode(request)
@@ -409,7 +409,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertNotIn("helper", self.router.pending)
         self.assertNotIn("helper", self.router.current_decisions)
         self.assertFalse((Path(self.tmp.name) / "state" / "history.jsonl").exists())
-        self.assertEqual(self.router.threads["helper"]["model"], "gpt-5.6-luna")
+        self.assertEqual(self.router.threads["helper"]["model"], "gpt-6-luna")
 
     def test_pending_turn_does_not_reroute_a_second_message(self):
         self.router.client_line(encode(self.request()))
@@ -449,13 +449,13 @@ class ProtocolTests(unittest.TestCase):
         # A server-side tool request may share a numeric id with our request.
         router.server_line(encode({"id": 1, "method": "item/tool/call", "params": {}}))
         self.assertIn(1, router.requests)
-        router.server_line(encode({"id": 1, "result": {"data": [{"model": "gpt-5.6-luna",
+        router.server_line(encode({"id": 1, "result": {"data": [{"model": "gpt-6-luna",
             "supportedReasoningEfforts": [{"reasoningEffort": "low"}]}]}}))
         router.client_line(encode({"id": 2, "method": "thread/start", "params": {}}))
         router.server_line(encode({"id": 2, "result": {"thread": {"id": "t"},
             "modelProvider": "openai", "model": "gpt-6-astra"}}))
         result = json.loads(router.client_line(encode(self.request())))
-        self.assertEqual(result["params"]["model"], "gpt-5.6-luna")
+        self.assertEqual(result["params"]["model"], "gpt-6-luna")
 
     def test_reopened_conversation_without_work_evidence_uses_sol_for_short_followup(self):
         self.router.client_line(encode({"id": 3, "method": "thread/resume", "params": {"threadId": "t"}}))
@@ -463,14 +463,14 @@ class ProtocolTests(unittest.TestCase):
         self.router.server_line(encode({"id": 3, "result": {"thread": {"id": "t"},
             "modelProvider": "openai", "model": "gpt-6-astra"}}))
         result = json.loads(self.router.client_line(encode(self.request("Continúa"))))
-        self.assertEqual(result["params"]["model"], "gpt-5.6-sol")
+        self.assertEqual(result["params"]["model"], "gpt-6.1-sol")
 
     def test_logs_contain_no_prompt_attachment_or_auth(self):
         self.router.client_line(encode(self.request("Traduce PRIVATE_SENTINEL password sk-not-real")))
         text = "".join(p.read_text() for p in (Path(self.tmp.name) / "state").glob("*.json"))
         self.assertNotIn("PRIVATE_SENTINEL", text)
         self.assertNotIn("sk-not-real", text)
-        self.assertIn("gpt-5.6-luna", text)
+        self.assertIn("gpt-6-luna", text)
 
     def test_prompt_dataset_is_exact_correlated_private_and_opt_in(self):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES,
@@ -510,11 +510,11 @@ class ProtocolTests(unittest.TestCase):
         outgoing = self.router.drain_outbound()
         self.assertEqual(len(outgoing), 1)
         self.assertEqual(outgoing[0]["method"], "thread/settings/update")
-        self.assertEqual(outgoing[0]["params"], {"threadId": "t", "model": "gpt-5.6-luna", "effort": "low"})
+        self.assertEqual(outgoing[0]["params"], {"threadId": "t", "model": "gpt-6-luna", "effort": "low"})
         self.assertFalse(self.router.server_line(encode({"id": outgoing[0]["id"], "result": {}})))
         self.assertTrue(self.router.server_line(encode({"id": 123, "result": {}})))
         self.assertTrue(self.router.server_line(encode({"method": "thread/settings/updated", "params": {
-            "threadId": "t", "threadSettings": {"model": "gpt-5.6-luna", "effort": "medium"}}})))
+            "threadId": "t", "threadSettings": {"model": "gpt-6-luna", "effort": "medium"}}})))
 
     def test_rejected_turn_does_not_send_display_sync_or_retry(self):
         self.router.client_line(encode(self.request()))
@@ -525,7 +525,7 @@ class ProtocolTests(unittest.TestCase):
 
     def test_luna_ultra_falls_back_to_supported_max(self):
         result = json.loads(self.router.client_line(encode(self.request("Usa Luna con esfuerzo Ultra: traduce hola"))))
-        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-luna", "max"))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6-luna", "max"))
         self.assertIn("Ultra no está disponible", self.router.threads["t"]["effort_reason"])
 
     def test_persistent_history_tracks_decision_lifecycle_without_content(self):
@@ -544,7 +544,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(records[0]["agent_category"], "text")
         self.assertEqual(records[0]["agent_confidence"], "alta")
         self.assertEqual(records[1]["routing_engine"], "rules")
-        self.assertEqual(records[1]["proposed_model"], "gpt-5.6-luna")
+        self.assertEqual(records[1]["proposed_model"], "gpt-6-luna")
         self.assertEqual((records[2]["routing_engine"], records[2]["engine_applied"]), ("rules", False))
         self.assertEqual(records[-1]["inputTokens"], 20)
         self.assertNotIn("PRIVATE_HISTORY_SENTINEL", (Path(self.tmp.name) / "state" / "history.jsonl").read_text())
@@ -557,7 +557,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(records[-1]["event"], "decision_usage")
         self.assertEqual(records[-1]["inputTokens"], 40)
         first_id = self.router.current_decisions["t"]
-        self.router.new_decision("t", "gpt-5.6-terra", "medium", "reason", "effort", "automatic")
+        self.router.new_decision("t", "gpt-6.1-sol", "medium", "reason", "effort", "automatic")
         self.assertNotEqual(first_id, self.router.current_decisions["t"])
         self.assertNotIn("tokens", self.router.threads["t"])
 
@@ -581,7 +581,7 @@ class ProtocolTests(unittest.TestCase):
         self.router.server_line(encode({"id": 7, "result": {"turn": {"id": "q"}}}))
         self.assertEqual(self.router.threads["t"]["phase_status"], "accepted")
         self.router.server_line(encode({"method": "thread/settings/updated", "params": {"threadId": "t", "threadSettings": {"model": "gpt-6-astra", "effort": "max"}}}))
-        self.assertEqual(self.router.threads["t"]["model"], "gpt-5.6-luna")
+        self.assertEqual(self.router.threads["t"]["model"], "gpt-6-luna")
         self.assertEqual(self.router.threads["t"]["effort"], "low")
         self.assertEqual(self.router.threads["t"]["confirmation"], "Aceptado por Codex")
         self.assertEqual(self.router.threads["t"]["phase_status"], "accepted")
@@ -600,7 +600,7 @@ class ProtocolTests(unittest.TestCase):
                            "threadSettings": {"model": "gpt-6-astra", "effort": "max"}}})
         self.router.server_line(settings)
         self.assertEqual(self.router.threads["t"]["phase_status"], "active")
-        self.assertEqual(self.router.threads["t"]["phase_model"], "gpt-5.6-luna")
+        self.assertEqual(self.router.threads["t"]["phase_model"], "gpt-6-luna")
         self.router.server_line(encode({"method": "turn/completed", "params": {
             "threadId": "t", "turn": {"status": "completed"}}}))
         self.router.server_line(settings)
@@ -626,11 +626,11 @@ class ProtocolTests(unittest.TestCase):
         self.router.threads["t"].update(agent_category="architecture", agent_confidence="alta")
         self.router.server_line(encode({"method": "item/started", "params": {"threadId": "t", "item": {
             "type": "collabAgentToolCall", "senderThreadId": "t", "receiverThreadIds": ["child"],
-            "model": "gpt-5.6-sol", "reasoningEffort": "high", "prompt": "SECRET_PROMPT",
+            "model": "gpt-6.1-sol", "reasoningEffort": "high", "prompt": "SECRET_PROMPT",
             "agentsStates": {"child": {"status": "running", "message": "SECRET_RESULT"}}}}}))
         self.router.log({"event": "snapshot"})
         child = self.router.threads["child"]
-        self.assertEqual((child["model"], child["parent"], child["confirmation"]), ("gpt-5.6-sol", "t", "Solicitado por agente"))
+        self.assertEqual((child["model"], child["parent"], child["confirmation"]), ("gpt-6.1-sol", "t", "Solicitado por agente"))
         self.assertEqual((child["agent_category"], child["agent_confidence"]), ("architecture", "heredada"))
         logged = next((Path(self.tmp.name) / "state").glob("*.json")).read_text()
         self.assertNotIn("SECRET_", logged)
@@ -657,11 +657,11 @@ class ProtocolTests(unittest.TestCase):
         restarted.catalog = {x["model"]: set(EFFORTS) for x in DEFAULT_ROUTES.values()}
         self.assertEqual(restarted.thread_categories["t"]["task_floor"], "complex")
         restarted.threads["t"] = {**restarted.thread_categories["t"], "provider": "openai",
-                                  "model": "gpt-5.6-luna", "effort": "low", "tier": "simple", "seen_turn": True}
+                                  "model": "gpt-6-luna", "effort": "low", "tier": "simple", "seen_turn": True}
         fake_jev.return_value = {"engine": "jev", "status": "ok", "continuity_strategy": "continue",
-                                "route": {"model": "gpt-5.6-luna", "effort": "low", "label": "Luna · low"}}
+                                "route": {"model": "gpt-6-luna", "effort": "low", "label": "Luna · low"}}
         result = json.loads(restarted.client_line(encode(self.request("Sigue con lo que falta"))))
-        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-5.6-sol", "high"))
+        self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6.1-sol", "high"))
         self.assertEqual(restarted.threads["t"]["engine_status"], "guardrail")
         history = (Path(self.tmp.name) / "state" / "history.jsonl").read_text(encoding="utf-8")
         self.assertNotIn("PRIVATE_SENTINEL", history)

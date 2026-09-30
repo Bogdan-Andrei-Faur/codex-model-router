@@ -18,6 +18,7 @@ internal sealed class DecisionRecord
     public double Time, StartedTime, FinishedTime;
     public bool Accepted;
     public int NativeRetries;
+    public readonly Dictionary<string, double[]> UsageEstimates = new Dictionary<string, double[]>();
     public string ErrorCode, ErrorHttpStatus;
     public readonly Dictionary<string, object> PhaseEvidence = new Dictionary<string, object>();
     public int InputTokens, OutputTokens, CachedTokens, ReasoningTokens;
@@ -231,6 +232,9 @@ internal sealed partial class ModernRouterMonitor
             if (!item.PhaseEvidence.ContainsKey("phase_events")) item.PhaseEvidence["phase_events"] = new List<Dictionary<string, object>>();
             ((List<Dictionary<string, object>>)item.PhaseEvidence["phase_events"]).Add(new Dictionary<string, object>(data));
         }
+        if (eventName == "inference_observed" && String(data, "evidence_confidence") == "confirmed" &&
+            String(data, "estimate_basis") == "standard_equivalent_not_billed" && String(data, "inference_event_id") != "")
+            item.UsageEstimates[String(data, "inference_event_id")] = new double[] { data.ContainsKey("estimated_api_standard_usd") ? Number(data, "estimated_api_standard_usd") : double.NaN, Number(data, "estimated_codex_standard_credits") };
         if (eventName == "inference_metric" || eventName == "inference_observed" || eventName == "inference_probable")
         {
             if (!item.PhaseEvidence.ContainsKey("inference_samples")) item.PhaseEvidence["inference_samples"] = new Dictionary<string, Dictionary<string, object>>();
@@ -400,6 +404,9 @@ internal sealed partial class ModernRouterMonitor
         AddExplanation(historyDetail, "POR QUÉ EL RAZONAMIENTO", decision.EffortReason);
         if (!System.String.IsNullOrEmpty(decision.ContinuityStrategy))
             AddExplanation(historyDetail, "DECISIÓN DE CONTINUIDAD", FriendlyContinuityStrategy(decision.ContinuityStrategy));
+        if (decision.UsageEstimates.Count > 0) AddExplanation(historyDetail, "ESTIMACIÓN STANDARD",
+            decision.UsageEstimates.Values.Sum(v => v[1]).ToString("F4") + " créditos Codex" + (decision.UsageEstimates.Values.All(v => !double.IsNaN(v[0])) ? " · $" + decision.UsageEstimates.Values.Sum(v => v[0]).ToString("F6") + " equivalentes API" : " · API sin estimar: falta información de escritura en caché") +
+            ". Solo inferencias con uso completo; no es una factura ni el consumo de tu suscripción. Fast y otros modos no se incluyen.");
         AddQualityControls(decision);
         if (decision.Comparisons.Count > 0)
         {
@@ -642,6 +649,14 @@ internal sealed partial class ModernRouterMonitor
                 statisticsContent.Children.Add(notice);
             }
         }
+        var estimates = decisions.SelectMany(item => item.UsageEstimates.Values).ToList();
+        if (estimates.Count > 0)
+        {
+            statisticsContent.Children.Add(AnalyticsHeading("ESTIMACIÓN STANDARD"));
+            var estimateNote = Txt(estimates.Sum(value => value[1]).ToString("F4") + " créditos equivalentes · " + estimates.Count +
+                " inferencias con uso completo. Cobertura parcial; no es el consumo de tu suscripción. Fast y otros modos no se incluyen.", 12, Muted);
+            estimateNote.TextWrapping = TextWrapping.Wrap; statisticsContent.Children.Add(estimateNote);
+        }
         statisticsContent.Children.Add(AnalyticsHeading("MODELOS"));
         AddBreakdown(decisions.Where(item => item.Model != null).GroupBy(item => item.Model).ToDictionary(group => group.Key, group => group.Count()), true);
         statisticsContent.Children.Add(AnalyticsHeading("RAZONAMIENTO"));
@@ -739,9 +754,9 @@ internal sealed partial class ModernRouterMonitor
             "No guarda el texto de los mensajes; las estadísticas agregadas continúan disponibles.",
             delegate { WriteConfigValue("prompt_logging", !prompts); RefreshSettings(); }));
         BuildRoutingEngineSettings();
-        settingsContent.Children.Add(AnalyticsHeading("POLÍTICA ACTUAL"));
-        AddPolicy("Luna", "Tareas delimitadas", "Ligero"); AddPolicy("Terra", "Cambios concretos", "Medio");
-        AddPolicy("Sol", "Ingeniería compleja", "Alto"); AddPolicy("Astra", "UX, auditorías y gran alcance", "Muy alto");
+        settingsContent.Children.Add(AnalyticsHeading("POLÍTICA POR DEFECTO"));
+        AddPolicy("Luna 6", "Tareas delimitadas", "Ligero"); AddPolicy("Sol 6.1", "Cambios concretos", "Medio");
+        AddPolicy("Sol 6.1", "Ingeniería compleja", "Alto"); AddPolicy("Astra 6", "UX, auditorías y gran alcance", "Muy alto");
         settingsContent.Children.Add(AnalyticsHeading("PRIVACIDAD"));
         AddSettingsNote(prompts ?
             "Además de las métricas, se guarda el texto de tus mensajes en el archivo local privado state/prompts.jsonl para evaluar las decisiones. No guarda respuestas, adjuntos, herramientas ni credenciales." :

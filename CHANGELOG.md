@@ -1,5 +1,17 @@
 # Cambios
 
+## 0.6.0 — Catálogo actualizado, 30/09/2026
+
+- Luna 6 y Sol 6.1 en Reglas/JEV; modelos anteriores reconocidos como alternativas.
+- Migración solo de valores antiguos intactos, selección explícita con versión y
+  etiquetas por generación en Windows/macOS/Linux.
+- Telemetría reconoce todas las generaciones revisadas y conserva estimaciones
+  Standard separadas del uso observado, con cobertura y tarifas fechadas.
+- Verificación nativa entre turnos; Desktop rechaza Luna 6 ↔ Sol 6.1 dentro del
+  turno por un requisito de revisión distinto. No se habilitan esos saltos.
+- Aro de agente centrado también con escalado Windows fraccionario.
+- Evidencia y limitaciones en [MODEL-CATALOG.md](docs/MODEL-CATALOG.md).
+
 ## 0.5.0 — Ubuntu y monitor compartido, 28/09/2026
 
 - Descubrimiento Linux del backend de Desktop, preparación, diagnóstico y

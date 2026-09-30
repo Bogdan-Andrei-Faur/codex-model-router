@@ -52,14 +52,14 @@ heightGrip.addEventListener('keydown',event=>{
 const el = (tag, cls, text) => { const node = document.createElement(tag); if(cls) node.className=cls; if(text !== undefined) node.textContent=String(text); return node; };
 function button(text, action, cls='') { const node=el('button',cls,text);node.addEventListener('click',action);return node; }
 function palette(node, colors) {node.style.setProperty('--tint',colors[0]);node.style.setProperty('--face',colors[1]);return node;}
-function badge(value, effort=false) { const label=effort ? C.efforts[value] || 'Sin confirmar' : C.model(value);const node=palette(el('span','badge',label), effort ? C.effortColors[value] || C.neutral : C.models[label] || C.neutral);node.title=(effort?'Razonamiento: ':'Modelo: ')+label;return node; }
+function badge(value, effort=false) { const label=effort ? C.efforts[value] || 'Sin confirmar' : C.model(value);const node=palette(el('span','badge',label), effort ? C.effortColors[value] || C.neutral : C.models[C.family(value)] || C.neutral);node.title=(effort?'Razonamiento: ':'Modelo: ')+label;return node; }
 function tags(row, normalized=false) {const box=el('div','tags');box.append(badge(normalized?row.model:C.setting(row,'model')),badge(normalized?row.effort:C.setting(row,'effort'),true));return box;}
 function svg(tag, attributes={}) { const node=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [key,value] of Object.entries(attributes))node.setAttribute(key,String(value));return node; }
 function avatar(id,row,open, existing) {
   const node=existing || button('',open,'avatar');
   node.classList.toggle('working',C.active(row.status));
   node.setAttribute('aria-label',`${row.name || id} · ${C.model(C.setting(row,'model'))} · ${C.efforts[C.setting(row,'effort')] || 'Sin confirmar'} · ${C.status(row.status)}`);
-  const colors=C.models[C.model(C.setting(row,'model'))] || C.neutral;palette(node,colors);
+  const colors=C.models[C.family(C.setting(row,'model'))] || C.neutral;palette(node,colors);
   node.style.setProperty('--effort',(C.effortColors[C.setting(row,'effort')] || C.neutral)[0]);
   const identity=C.identity(row);
   if(!existing) {
@@ -91,7 +91,7 @@ function openPeek(id) {
 function renderPeek() {
   const row=state.threads[peekId];if(!row)return closePeek();
   const box=$('peek'),content=el('div','peek-content'),ident=C.identity(row);
-  const category=palette(el('div','peek-category',ident[0]),C.models[C.model(C.setting(row,'model'))] || C.neutral);
+  const category=palette(el('div','peek-category',ident[0]),C.models[C.family(C.setting(row,'model'))] || C.neutral);
   category.title='Tipo orientativo · confianza '+(row.agent_confidence || 'sin confirmar');
   content.append(category,el('div','peek-title',row.name || peekId),tags(row),el('div','peek-meta',C.status(row.status)));
   box.replaceChildren(content);
@@ -244,6 +244,10 @@ function renderHistory() {
     if(chosen.signal)explanation(detail,'SEÑAL DE RESULTADO',chosen.signal==='retry'?'La siguiente petición indicó que el resultado no había resuelto la tarea.':chosen.signal);
   }
   list.append(el('h3','section-title','DECISIONES RECIENTES'));
+  if(chosen?.usage_estimates) {
+    const samples=Object.values(chosen.usage_estimates);
+    explanation(detail,'ESTIMACIÓN STANDARD',samples.reduce((n,s)=>n+s.credits,0).toFixed(4)+' créditos Codex'+(samples.every(s=>Number.isFinite(s.usd))?' · $'+samples.reduce((n,s)=>n+s.usd,0).toFixed(6)+' equivalentes API':' · API sin estimar: falta información de escritura en caché')+'. Solo inferencias con uso completo; no es una factura ni el consumo de tu suscripción. Fast y otros modos no se incluyen.');
+  }
   const filtered=history.filter(d=>[d.title,C.model(d.model),C.efforts[d.effort],engines[d.routing_engine],C.status(d.status)].join(' ').toLocaleLowerCase().includes(historyQuery.toLocaleLowerCase()));
   historyOffset=Math.min(historyOffset,Math.max(0,Math.floor((filtered.length-1)/40)*40));
   for(const record of filtered.slice(historyOffset,historyOffset+40)) {
@@ -266,7 +270,7 @@ function metric(parent,label,value,ratio=1,color='var(--accent)') {
 function heading(parent,label){parent.append(el('h3','heading',label));}
 function breakdown(parent,label,items,getKey,colors={}) {
   if(label)heading(parent,label);const counts={};for(const item of items){const key=getKey(item);if(key)counts[key]=(counts[key]||0)+1;}
-  const max=Math.max(1,...Object.values(counts));for(const [key,count] of Object.entries(counts).sort((a,b)=>b[1]-a[1]))metric(parent,key,fmt(count),count/max,colors[key]?.[0] || C.neutral[0]);
+  const max=Math.max(1,...Object.values(counts));for(const [key,count] of Object.entries(counts).sort((a,b)=>b[1]-a[1]))metric(parent,key,fmt(count),count/max,colors[key]?.[0] || colors[C.family(key)]?.[0] || C.neutral[0]);
   if(!Object.keys(counts).length)parent.append(el('p','','Sin datos todavía'));
 }
 function statistics() {
@@ -316,9 +320,14 @@ function statistics() {
     if(!receiving)content.append(el('p','warning','El receptor está abierto, pero no recibe eventos. Esto no significa que no haya agentes trabajando.'));
     else if(!(telemetry.eligible_records||0))content.append(el('p','warning','Se recibieron eventos sin modelo utilizable; no se conserva su contenido.'));
   }
-  const transitions={compatible_group:'Cambios compatibles',same_model:'Mismo modelo',blocked_astra_boundary:'Frontera de Astra',unknown_model:'Modelo desconocido'};
+  const transitions={compatible_group:'Cambios compatibles',same_model:'Mismo modelo',blocked_astra_boundary:'Frontera de Astra',unknown_model:'Modelo desconocido',blocked_review_boundary:'Cambio requiere otro turno',unverified_transition:'Transición sin validar'};
   const transitionRows=history.filter(d=>d.phase_transition);
   if(transitionRows.length)for(const [key,label] of Object.entries(transitions)){const count=transitionRows.filter(d=>d.phase_transition===key).length;if(count)metric(content,label,fmt(count),count/transitionRows.length,key==='blocked_astra_boundary'?'var(--warning)':'var(--good)');}
+  const estimates=history.flatMap(d=>Object.values(d.usage_estimates||{}));
+  if(estimates.length) {
+    content.append(el('div','section-label','ESTIMACIÓN STANDARD'));
+    content.append(el('p','',estimates.reduce((n,e)=>n+e.credits,0).toFixed(4)+' créditos equivalentes · '+fmt(estimates.length)+' inferencias con uso completo. Cobertura parcial; no es el consumo de tu suscripción. Fast y otros modos no se incluyen.'));
+  }
   breakdown(content,'MODELOS',history,d=>d.model?C.model(d.model):'',C.models);breakdown(content,'RAZONAMIENTO',history,d=>C.efforts[d.effort],Object.fromEntries(Object.entries(C.efforts).map(([key,label])=>[label,C.effortColors[key]])));breakdown(content,'MOTOR DE ENRUTAMIENTO',history,d=>engines[d.routing_engine]);
   heading(content,'FIABILIDAD DE LOS MOTORES');
   const attempts=history.flatMap(d=>Object.values(d.comparisons));

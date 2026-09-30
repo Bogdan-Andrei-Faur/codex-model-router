@@ -20,6 +20,7 @@ import urllib.error
 import urllib.request
 
 from routing import EFFORTS, TIERS
+from model_catalog import model_label
 from state_store import atomic_json, file_lock
 
 
@@ -54,7 +55,6 @@ def candidate_routes(routes, catalog, policy=None):
         "complex": ("medium", "high", "xhigh"),
         "critical": ("high", "xhigh", "max"),
     }
-    names = {"simple": "Luna", "normal": "Terra", "complex": "Sol", "critical": "Astra"}
     descriptions = {
         "simple": "transformación de texto, confirmación o acción mecánica explícitamente pequeña; no investigación ni seguimiento técnico incierto",
         "normal": "cambio concreto y comprobable",
@@ -93,7 +93,7 @@ def candidate_routes(routes, catalog, policy=None):
             if effort in available:
                 key = "%s_%s" % (tier, effort)
                 choices[key] = {"model": model, "effort": effort, "tier": tier,
-                                "label": "%s · %s" % (names.get(tier, tier.title()), effort),
+                                "label": "%s · %s" % (model_label(model), effort),
                                 "description": descriptions.get(tier, "tarea de Codex") + ". " + effort_descriptions.get(effort, "")}
     return choices
 

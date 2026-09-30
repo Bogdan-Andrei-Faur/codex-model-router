@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from decision_engines import build_state, candidate_routes, run_jev
+from model_catalog import migrate_config, available_routes
 from routing import DEFAULT_ROUTES, EFFORTS, select_route_details
 
 
@@ -27,14 +28,18 @@ CASES = (
 
 
 def live_catalog(state_dir):
-    legacy = state_dir / "catalog.json"
-    if legacy.exists():
-        return json.loads(legacy.read_text(encoding="utf-8"))["models"]
-    for path in sorted(state_dir.glob("status-*.json"), key=lambda item: item.stat().st_mtime, reverse=True):
-        catalog = json.loads(path.read_text(encoding="utf-8")).get("catalog")
-        if catalog:
-            return catalog
-    raise FileNotFoundError("No active router model catalog is available; start Codex Desktop first.")
+    # Historical snapshots cannot establish availability after a Desktop update.
+    from smoke_native import Client
+    client = Client()
+    try:
+        client.call("initialize", {"clientInfo": {"name": "classifier_catalog_probe", "version": "1.0"}})
+        client.send({"method": "initialized", "params": {}})
+        rows = client.call("model/list", {})["data"]
+        return {m["model"]: {e["reasoningEffort"] for e in m.get("supportedReasoningEfforts", [])}
+                for m in rows if not m.get("hidden")}
+    finally:
+        client.close()
+        client.temp.cleanup()
 
 
 def main():
@@ -43,11 +48,13 @@ def main():
     parser.add_argument("--case", choices=[case[0] for case in CASES])
     args = parser.parse_args()
     config = json.loads((ROOT / "config.local.json").read_text(encoding="utf-8-sig")) if args.live else {}
+    config = migrate_config(config)
     routes = config.get("routes", DEFAULT_ROUTES)
     catalog = {route["model"]: set(EFFORTS) for route in routes.values()}
     state_dir = Path(os.environ.get("PERSONAL_CODEX_ROUTER_STATE", ROOT / "state"))
     if args.live:
         catalog = live_catalog(state_dir)
+        routes = available_routes(routes, catalog)
     failures = 0
     for name, prompt, previous, effort in CASES:
         if args.case and name != args.case:

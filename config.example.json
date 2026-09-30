@@ -7,7 +7,9 @@
   "phase_routing": true,
   "history_days": 0,
   "routing_engine": "rules",
-  "comparison_engines": ["rules"],
+  "comparison_engines": [
+    "rules"
+  ],
   "jev": {
     "connection": "typesafe",
     "timeout_seconds": 4,
@@ -16,9 +18,22 @@
   },
   "python": "C:\\Python314\\python.exe",
   "routes": {
-    "simple": {"model": "gpt-5.6-luna", "effort": "low"},
-    "normal": {"model": "gpt-5.6-terra", "effort": "medium"},
-    "complex": {"model": "gpt-5.6-sol", "effort": "high"},
-    "critical": {"model": "gpt-6-astra", "effort": "xhigh"}
-  }
+    "simple": {
+      "model": "gpt-6-luna",
+      "effort": "low"
+    },
+    "normal": {
+      "model": "gpt-6.1-sol",
+      "effort": "medium"
+    },
+    "complex": {
+      "model": "gpt-6.1-sol",
+      "effort": "high"
+    },
+    "critical": {
+      "model": "gpt-6-astra",
+      "effort": "xhigh"
+    }
+  },
+  "model_catalog_version": "2026-09-30"
 }

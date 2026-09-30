@@ -1,6 +1,25 @@
 # Continuidad del proyecto: fases automáticas y validación multiplataforma
 
-## Estado actual — 0.5.0, Ubuntu, 28/09/2026
+## Estado actual — 0.6.0, Windows, 30/09/2026
+
+Catálogo actualizado y política 8: ver [MODEL-CATALOG.md](MODEL-CATALOG.md)
+para migración, tarifas, verificaciones y límites. El registro de modelos ya no
+se deduce de las cuatro rutas. El monitor distingue generaciones y el receptor
+acepta telemetría de Luna 6, Sol 6 y Sol 6.1. Solo migran rutas antiguas intactas.
+
+No habilitar Luna 6 ↔ Sol 6.1 dentro del turno: la sonda del backend 0.159.0
+rechaza ambas direcciones por `admitted node REPL review requirement`. No intentar
+saltarse esa condición. El cambio entre turnos conserva contexto y herramienta.
+Pendiente aceptación nativa macOS/Linux y evaluación de calidad con uso natural.
+El usuario reinició Desktop y se verificó el puente 0.6.0, política 8, build
+`182a61cc583472f6`, con catálogo nuevo y telemetría recibiendo sin errores. Desktop
+se actualizó además a `26.928.2636.0` / backend `0.159.2`: conexión comprobada,
+pero las sondas de compatibilidad de fases corresponden a `0.159.0`. No trasladar
+esa evidencia a pruebas nuevas de fases en `0.159.2`. Este chat estaba en Manual;
+JEV seguía configurado para las tareas en Automático. Atlas sigue no disponible;
+no se ha actualizado.
+
+## Estado histórico — 0.5.0, Ubuntu, 28/09/2026
 
 Base remota `df20bc9` incorporada por avance rápido. Integración Linux en la
 rama local `codex/ubuntu-integration`; plan, recuperación y evidencia en

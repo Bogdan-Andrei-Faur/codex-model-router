@@ -19,7 +19,7 @@ def evaluate():
             row['response_context'] = response_summary(response)
             row['task_contract'] = merge_contract(row.get('task_contract'), row['response_context'])
         route, policy = select_route_details(case['prompt'], DEFAULT_ROUTES, attachments=case.get('attachments', False), response_context=effective_context(row))
-        tier = next(key for key, value in DEFAULT_ROUTES.items() if value['model'] == route['model'])
+        tier = policy['tier']
         passed = (TIERS.index(case['min_model']) <= TIERS.index(tier) <= TIERS.index(case['max_model']) and
                   EFFORTS.index(case['min_effort']) <= EFFORTS.index(route['effort']) <= EFFORTS.index(case['max_effort']))
         candidates = candidate_routes(DEFAULT_ROUTES, catalog, policy)

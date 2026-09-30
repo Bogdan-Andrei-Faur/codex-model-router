@@ -1,6 +1,6 @@
 """Native account smoke. Default reads version/catalog only. --live uses quota.
 
-Live work is an ephemeral, isolated test session, never a saved user task. No
+Live work uses an isolated synthetic task archived on completion. No
 credentials or real conversations are read; MCP servers are disabled for it.
 """
 import argparse
@@ -17,6 +17,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from platform_support import creation_flags
+from model_catalog import MODELS
 WRAPPER = ROOT / "dist" / ("codex-router-v19.exe" if os.name == "nt" else "codex-router")
 
 
@@ -124,6 +125,8 @@ def main():
     assert version.returncode == 0 and b"codex-cli" in version.stdout
     report = {"version": version.stdout.decode().strip(), "live": args.live}
     client = Client()
+    thread = None
+    scratch = tempfile.TemporaryDirectory(prefix="router-native-check-")
     try:
         client.call("initialize", {"clientInfo": {"name": "personal_router_smoke", "version": "0.1.0"},
                                   "capabilities": {"experimentalApi": True}})
@@ -137,7 +140,7 @@ def main():
         report["models"] = [m["model"] for m in models["data"] if m["model"].startswith("gpt-")]
         report["catalog"] = {"checked": time.time(), "models": {
             m["model"]: [e["reasoningEffort"] for e in m.get("supportedReasoningEfforts", [])]
-            for m in models["data"] if m["model"] in ("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-6-astra")
+            for m in models["data"] if m["model"] in MODELS and not m.get("hidden")
         }}
         account = client.call("account/read", {"refreshToken": False})
         report["account_type"] = (account.get("account") or {}).get("type")
@@ -153,30 +156,35 @@ def main():
                 settings = tomllib.loads(home_config.read_text(encoding="utf-8-sig"))
                 for name in settings.get("mcp_servers", {}):
                     overrides["mcp_servers." + name + ".enabled"] = False
-            result = client.call("thread/start", {"ephemeral": True, "cwd": str(ROOT),
+            result = client.call("thread/start", {"ephemeral": False, "cwd": scratch.name,
                 "model": "gpt-6-astra", "modelProvider": "openai", "sandbox": "read-only",
                 "approvalPolicy": "never", "config": overrides,
                 "baseInstructions": "You are a minimal test assistant. Follow the requested output format. Use no tools except router_echo when asked. Do not access files, run commands, search or edit anything.",
-                "developerInstructions": "This is an ephemeral routing smoke test, not project work.",
+                "developerInstructions": "This is a synthetic routing smoke test, not project work.",
                 "dynamicTools": [{"type": "function", "name": "router_echo", "description": "Return the supplied value unchanged.",
                     "inputSchema": {"type": "object", "properties": {"value": {"type": "integer"}}, "required": ["value"], "additionalProperties": False}}]})
             thread = result["thread"]["id"]
             first = client.turn(thread, "Traduce 'hola' al ingles. Responde solo con la palabra traducida. Recuerda que mi numero de prueba es 37.")
             assert first.strip().lower().strip(".!") in ("hello", "hi"), first
             print("Routed answer: OK", flush=True)
-            second = client.turn(thread, "¿Que numero de prueba te di? Responde solo con ese numero.")
+            second = client.turn(thread, "Usa gpt-6.1-sol. ¿Que numero de prueba te di? Responde solo con ese numero.")
             assert second.strip().strip(".") == "37", second
             print("Conversation continuity: OK", flush=True)
             third = client.turn(thread, "Usa Luna. Llama a router_echo con value 52 y responde solo con el resultado. Es necesario llamar a la herramienta.")
             assert client.tool_calls == 1 and third.strip().strip(".") == "52", third
             print("Dynamic tool request and response: OK", flush=True)
             report["checks"] = ["real_answer", "context_preserved", "dynamic_tool_roundtrip"]
-            report["test_thread_ephemeral"] = True
-            assert "gpt-5.6-luna" in client.native_models, "No native model confirmation received"
+            report["test_thread_archived"] = True
+            assert "gpt-6-luna" in client.native_models and "gpt-6.1-sol" in client.native_models, "No native model confirmation received: " + repr(client.native_models)
             report["native_models"] = client.native_models
             print("Native engine confirms Luna and publishes its settings: OK", flush=True)
     finally:
-        client.close()
+        try:
+            if thread:
+                client.call("thread/archive", {"threadId": thread})
+        finally:
+            client.close()
+            scratch.cleanup()
     report["bridge_exit"] = client.p.returncode
     assert client.p.returncode == 0, "Bridge did not shut down cleanly"
     report["checked_at_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())

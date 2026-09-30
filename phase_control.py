@@ -11,6 +11,7 @@ import uuid
 
 from phase_tracking import ASTRA, can_switch_within_turn, transition_kind
 from routing import DEFAULT_ROUTES, EFFORTS
+from model_catalog import available_routes
 from state_store import atomic_json
 from task_modes import read_mode
 
@@ -168,7 +169,7 @@ class PhaseController:
         tier = TIERS.index(args["complexity"])
         if args["phase"] != "summarize" and turn["floor"] in TIERS:
             tier = max(tier, TIERS.index(turn["floor"]))
-        route = config.get("routes", DEFAULT_ROUTES).get(TIERS[tier], {})
+        route = available_routes(config.get("routes", DEFAULT_ROUTES), self.router.catalog).get(TIERS[tier], {})
         model, effort = route.get("model"), route.get("effort")
         minimum = turn["min_effort"] if args["phase"] != "summarize" else None
         if minimum in EFFORTS and effort in EFFORTS and EFFORTS.index(effort) < EFFORTS.index(minimum):
@@ -177,8 +178,11 @@ class PhaseController:
         source = row.get("accepted_model") or row.get("model")
         job = {"call": rid, "phase_id": uuid.uuid4().hex, "source_model": source, "thread": tid, "turn_id": turn["id"], "decision_id": turn.get("decision_id") or self.router.current_decisions.get(tid), "phase": args["phase"], "model": model,
             "effort": effort, "tier": TIERS[tier], "transition": transition_kind(source, model), "deadline": self.clock() + 10}
-        if model == ASTRA and source != ASTRA:
-            row["pending_phase_floor"] = "critical"
+        # A blocked escalation must not tell the smaller model to carry on with
+        # work whose checkpoint established a higher capability requirement.
+        blocked_escalation = (source == "gpt-6-luna" and model == "gpt-6.1-sol")
+        if (model == ASTRA and source != ASTRA) or blocked_escalation:
+            row["pending_phase_floor"] = TIERS[tier]
             row["pending_phase_name"] = args["phase"]
             row["pending_phase_id"] = uuid.uuid4().hex
             self.router.save_task(tid, row)

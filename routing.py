@@ -11,12 +11,8 @@ TIERS = ("simple", "normal", "complex", "critical")
 EFFORTS = ("low", "medium", "high", "xhigh", "max", "ultra")
 EFFORT_LABELS = dict(zip(EFFORTS, ("Ligero", "Medio", "Alto", "Muy alto", "Máx.", "Ultra")))
 AGENT_CATEGORIES = ("interface", "correction", "tests", "audit", "architecture", "text", "research", "configuration", "automation", "general")
-DEFAULT_ROUTES = {
-    "simple": {"model": "gpt-5.6-luna", "effort": "low"},
-    "normal": {"model": "gpt-5.6-terra", "effort": "medium"},
-    "complex": {"model": "gpt-5.6-sol", "effort": "high"},
-    "critical": {"model": "gpt-6-astra", "effort": "xhigh"},
-}
+from model_catalog import DEFAULT_ROUTES, MODELS
+
 
 @dataclass(frozen=True)
 class Decision:
@@ -234,10 +230,11 @@ def explicit_model(text, routes):
     value = normalize(text)
     value = re.sub(r"```[\s\S]*?(?:```|$)|`[^`]*`|\"[^\"]*\"|“[^”]*”|«[^»]*»", " ", value)
     value = re.sub(r"(?m)^\s*>.*$", " ", value)
-    model = r"(?:gpt-[\d.]+-)?(luna|terra|sol|astra)\b"
+    value = re.sub(r"\bgpt-(\d+(?:\.\d+)?)\s+(luna|terra|sol|astra)\b", r"gpt-\1-\2", value)
+    model = r"(gpt-\d+(?:\.\d+)?(?:-(?:luna|terra|sol|astra))?|(?:luna|terra|sol|astra))\b"
     prefix = r"(?:\s*(?:ahora|now|por favor|please|ok|vale)[, ]+)*"
     orders = []
-    for clause in re.split(r"[\n.;!?]+", value):
+    for clause in re.split(r"[\n;!?]+|(?<!\d)\.|\.(?!\d)", value):
         clause = clause.strip()
         if re.search(r"\b(?:no|not|don't|nunca|never|sin)\b", clause):
             continue
@@ -250,7 +247,16 @@ def explicit_model(text, routes):
             return None
         orders.extend(matches)
     choices = set(orders)
-    return dict(routes[names[orders[0]]]) if len(choices) == 1 else None
+    if len(choices) != 1:
+        return None
+    chosen = orders[0]
+    if chosen.startswith("gpt-"):
+        if chosen not in MODELS:
+            return None
+        return {"model": chosen, "effort": routes[MODELS[chosen][2]]["effort"]}
+    if chosen == "terra":
+        return {"model": "gpt-5.6-terra", "effort": routes["normal"]["effort"]}
+    return dict(routes[names[chosen]])
 
 def select_route(text, routes, previous=None, previous_effort=None, attachments=False):
     route, reasons = select_route_details(text, routes, previous, previous_effort, attachments)
@@ -291,12 +297,12 @@ def select_route_details(text, routes, previous=None, previous_effort=None, atta
         }.get(route["effort"], "nivel configurado para esta categoría")
     source = "explicit" if explicit or m else "automatic"
     retry = has(r"\b(sigue fallando|no funciona|mismo error|still fails|still broken|did not work|no lo has solucionado)\b", normalize(text))
-    # Ordinary task/question work stays on Terra. A retry is intentionally not
+    # Ordinary task/question work stays in the normal effort band. A retry is intentionally not
     # capped here: fresh failure evidence may still open the Sol/Astra bands.
     normal_ceiling = (decision.request_kind in ("acknowledgement", "status_check", "bounded", "mechanical")
                       or (decision.quality_floor == "normal" and decision.request_kind != "retry"))
     ceiling = "critical" if decision.quality_floor == "critical" else "normal" if normal_ceiling else "complex"
-    return route, {"model": model_reason, "effort": effort_reason, "source": source,
+    return route, {"tier": MODELS.get(route["model"], (None, None, decision.tier))[2] if explicit else decision.tier, "model": model_reason, "effort": effort_reason, "source": source,
                    "signal": "retry" if retry else None, "quality_floor": decision.quality_floor,
                    "min_effort": ("high" if decision.quality_floor in ("complex", "critical") else "medium" if decision.quality_floor == "normal" and decision.effort != "low" else "low"),
                    "request_kind": decision.request_kind, "quality_ceiling": ceiling, "max_effort_allowed": decision.max_effort_allowed,

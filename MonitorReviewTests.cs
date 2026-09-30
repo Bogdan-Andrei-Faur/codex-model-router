@@ -68,7 +68,7 @@ internal sealed partial class ModernRouterMonitor
         connection.Text = "4 tareas activas"; connection.Foreground = Good;
         var avatarRows = new List<KeyValuePair<string, Dictionary<string, object>>> {
             new KeyValuePair<string, Dictionary<string, object>>("ui", Fixture("Pulir la cápsula de agentes", "gpt-6-astra", "high", "active")),
-            new KeyValuePair<string, Dictionary<string, object>>("fix", Fixture("Corregir el formulario", "gpt-5.6-terra", "medium", "active")),
+            new KeyValuePair<string, Dictionary<string, object>>("fix", Fixture("Corregir el formulario", "gpt-6.1-sol", "medium", "active")),
             new KeyValuePair<string, Dictionary<string, object>>("test", Fixture("Comprobar el historial", "gpt-5.6-sol", "high", "active")) };
         RefreshAgentCapsule(avatarRows, false);
         ApplyFocus("example", Fixture("Revisar el monitor de Codex", "gpt-6-astra", "xhigh", "active"), 4);
@@ -212,6 +212,8 @@ internal sealed partial class ModernRouterMonitor
     void CheckAgentCapsule()
     {
         SwitchMode(MonitorMode.Compact, false); PaintFixtures(); UpdateLayout();
+        Check(Model("gpt-6.1-sol") == "Sol 6.1" && Model("gpt-6-sol") == "Sol 6" && Model("gpt-5.6-sol") == "Sol 5.6", "Model versions were collapsed");
+        Check(BadgeColor("Sol 6.1", true).ToString() == BadgeColor("Sol 5.6", true).ToString(), "Model version changed family palette");
         Check(agentAvatars.Count == 3 && activeAgentRows.Count == 3, "Active avatars missing");
         Check(IdentifyAgent(activeAgentRows["ui"]).Name == "Interfaces" && IdentifyAgent(activeAgentRows["fix"]).Name == "Corrección", "Task icon catalog is not differentiated");
         var catalog = new Dictionary<string, string> { { "interface", "Interfaces" }, { "correction", "Corrección" },
@@ -282,6 +284,8 @@ internal sealed partial class ModernRouterMonitor
         RunUiFor(80);
         rows.Add(new KeyValuePair<string, Dictionary<string, object>>("ui", Fixture("Pulir la cápsula de agentes", "gpt-5.6-terra", "medium", "active")));
         RefreshAgentCapsule(rows, true); RunUiFor(500);
+        Check(Model("gpt-6.1-sol") == "Sol 6.1" && Model("gpt-6-sol") == "Sol 6" && Model("gpt-5.6-sol") == "Sol 5.6", "Model versions were collapsed");
+        Check(BadgeColor("Sol 6.1", true).ToString() == BadgeColor("Sol 5.6", true).ToString(), "Model version changed family palette");
         Check(agentAvatars.Count == 3 && !agentAvatars["ui"].Leaving, "Reactivation during exit lost or duplicated avatar");
         ShowAgentPeek("ui", false); UpdateLayout();
         Check(ContainsText(agentPeekContent, "Terra") && ContainsText(agentPeekContent, "Medio"), "Changed model or effort was not reflected in peek");
@@ -384,7 +388,7 @@ internal sealed partial class ModernRouterMonitor
             var pending = Fixture("Cambio de modelo pendiente", "gpt-5.6-luna", "low", "pending");
             pending["requested_model"] = "gpt-6-astra"; pending["requested_effort"] = "xhigh";
             ApplyFocus("pending", pending, 1);
-            Check(TagText(mainTags, 0) == "Astra" && TagText(mainTags, 1) == "Muy alto", "Pending turn shows previous settings");
+            Check(TagText(mainTags, 0) == "Astra 6" && TagText(mainTags, 1) == "Muy alto", "Pending turn shows previous settings");
             Check(confirmation.Text.Contains("pendiente"), "Pending selection shown as accepted");
             results.Add("PASS: pending selection shows requested settings and unconfirmed evidence");
 

@@ -23,7 +23,12 @@
   const active = status => ['active','inProgress','running','pending'].includes(status);
   const status = value => ({active:'Trabajando',inProgress:'Trabajando',running:'Trabajando',pending:'Enviando',completed:'En espera',idle:'En espera',waiting:'Esperando tu respuesta',error:'Error',failed:'Error',interrupted:'Interrumpida'}[value] || 'Estado sin confirmar');
   const setting = (row, key) => row.status === 'pending' ? row['requested_'+key] : row[key] || row['requested_'+key];
-  function model(value) { const name = String(value || 'Sin confirmar').replace(/^gpt-(?:5\.6-|6-)?/,''); return name.charAt(0).toUpperCase()+name.slice(1); }
+  function model(value) {
+    const name=String(value || 'Sin confirmar'), match=/^gpt-(\d+(?:\.\d+)?)-(luna|terra|sol|astra)$/.exec(name);
+    return match ? match[2].charAt(0).toUpperCase()+match[2].slice(1)+' '+match[1] : name;
+  }
+  function family(value) { return model(value).split(' ')[0]; }
+
   function identity(row) {
     if (identities[row.agent_category]) return identities[row.agent_category];
     const text = (row.name || row.model_reason || row.reason || '').toLowerCase();
@@ -42,6 +47,9 @@
       const id = event.decision_id;
       if (typeof id !== 'string' || !id) continue;
       const item = map.get(id) || {id,time:0,accepted:false,comparisons:{}};
+      if(event.event==='inference_observed' && event.evidence_confidence==='confirmed' && event.estimate_basis==='standard_equivalent_not_billed' && event.inference_event_id) {
+        (item.usage_estimates ||= {})[event.inference_event_id]={usd:event.estimated_api_standard_usd,credits:event.estimated_codex_standard_credits};
+      }
       if (event.event === 'phase_checkpoint') {
         (item.phase_events ||= []).push({...event});
         if (event.phase_status === 'applied') {
@@ -108,7 +116,7 @@
     return (type || '') + (row.error_http_status !== undefined ? ' · HTTP '+row.error_http_status : '') +
       (row.error_code !== undefined ? ' · RPC '+row.error_code : '');
   }
-  const api = {models,efforts,effortColors,neutral,identities,active,status,setting,model,identity,stableOrder,decisions,featuredThread,errorLabel};
+  const api = {models,efforts,effortColors,neutral,identities,active,status,setting,model,family,identity,stableOrder,decisions,featuredThread,errorLabel};
   if (typeof module !== 'undefined') module.exports = api;
   else scope.MonitorCore = api;
 })(globalThis);

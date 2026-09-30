@@ -186,7 +186,9 @@ internal sealed partial class ModernRouterMonitor
         if (visual.Orbit != null) visual.Orbit.BeginAnimation(RotateTransform.AngleProperty, null);
         Brush color = BadgeColor(model, true);
         visual.Button.Background = TransparentBrush;
-        var art = new Grid { Width = 44, Height = 44 };
+        // Keep the face and orbit on the same geometric center at fractional DPI.
+        // Inherited pixel rounding can offset the 32 DIP face from the 44 DIP ring.
+        var art = new Grid { Width = 44, Height = 44, UseLayoutRounding = false };
         art.Children.Add(new Border { Tag = "agent-face", Width = 32, Height = 32, CornerRadius = new CornerRadius(16),
             Background = Badge(model, true).Background, HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center });

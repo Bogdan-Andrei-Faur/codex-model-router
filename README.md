@@ -1,8 +1,10 @@
 # Codex automático — selector personal
 
+Catálogo, tarifas, migración y evidencia de compatibilidad: [modelos 0.6.0](docs/MODEL-CATALOG.md).
+
 ## Versión
 
-El producto usa versiones semánticas. La versión actual es **0.4.3**:
+El producto usa versiones semánticas. La versión actual es **0.6.0**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en la esquina inferior derecha del
 panel procede del archivo común `VERSION`. Cada entrega se registra en
@@ -75,8 +77,8 @@ la tarea destacada y reevaluación de peticiones independientes sin heredar por
 defecto el nivel crítico del historial. Los avisos de actualización comparan el
 router por separado de la interfaz.
 
-La política 7 acota las opciones de Jev por petición: Luna/Terra para trabajo
-claramente pequeño, Terra para trabajo normal, Sol para revisiones, ingeniería
+La política 8 acota las opciones de Jev por petición: Luna 6/Sol 6.1 para trabajo
+claramente pequeño, Sol 6.1 para trabajo normal y para revisiones, ingeniería
 compleja y seguimientos inciertos, y Astra ante señales críticas actuales. Los
 reintentos pueden subir de banda cuando existe evidencia de fallo. El respaldo
 local usa los mismos límites y no hereda Luna del turno anterior. Los fallos
@@ -235,13 +237,13 @@ comprobar lo aceptado. No se han modificado archivos de la app instalada.
 
 | Modelo | Uso de esta política personal |
 | --- | --- |
-| Luna | Traducciones, formato, resúmenes de un texto aportado, confirmaciones, contadores y cambios mecánicos explícitamente pequeños. |
-| Terra | Cambios concretos, validaciones acotadas y explicaciones que necesitan contexto; Jev puede subir a Sol. |
-| Sol | Diagnóstico, arquitectura, autenticación ordinaria, revisión abierta y seguimientos de alcance incierto; Alto como mínimo. |
-| Astra | Auditorías explícitas, vulnerabilidades, consecuencias importantes, diseño visual amplio, adjuntos y continuación de trabajo crítico acreditado. |
+| Luna 6 | Traducciones, formato, resúmenes de un texto aportado, confirmaciones, contadores y cambios mecánicos explícitamente pequeños. |
+| Sol 6.1 · Ligero/Medio | Cambios concretos, validaciones acotadas y explicaciones que necesitan contexto. |
+| Sol 6.1 · Alto/Muy alto | Diagnóstico, arquitectura, autenticación ordinaria, revisión abierta y seguimientos de alcance incierto; Alto como mínimo. |
+| Astra 6 | Auditorías explícitas, vulnerabilidades, consecuencias importantes, diseño visual amplio, adjuntos y continuación de trabajo crítico acreditado. |
 
 Astra no queda restringido a emergencias. Un cambio mecánico como «cambia solo el
-color de este texto» puede ir a Terra aunque sea frontend. «Rediseña la UX de
+color de este texto» puede ir a Sol 6.1/Ligero aunque sea frontend. «Rediseña la UX de
 este panel» va a Astra. Esta es una política ajustada a tus prioridades; no una
 clasificación científica de todo lo que puede hacer cada modelo.
 

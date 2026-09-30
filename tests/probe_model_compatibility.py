@@ -54,7 +54,8 @@ class Collector:
 
 
 class MatrixClient(Client):
-    def __init__(self, command, source, final_target):
+    def __init__(self, command, source, final_target, allow_rejection=False):
+        self.allow_rejection = allow_rejection
         self.source = source
         self.final_target = final_target
         self.turn_id = None
@@ -94,7 +95,7 @@ class MatrixClient(Client):
                         assert self.change(tid, self.source) == {"status": "applied"}, "Could not restore baseline"
                 target = self.final_target
                 self.final_switch = {"model": target, "effort": "high", **self.change(tid, target, "high")}
-                assert self.final_switch["status"] == "applied", "Final test transition rejected"
+                assert self.allow_rejection or self.final_switch["status"] == "applied", "Final test transition rejected"
                 self.send({"id": event["id"], "result": {"success": True,
                     "contentItems": [{"type": "inputText", "text": self.receipt}]}})
             else:
@@ -126,12 +127,22 @@ class MatrixClient(Client):
 
 
 def main():
+    global MODELS, FINAL_TARGET
     parser = argparse.ArgumentParser()
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--reverse", action="store_true", help="Verify the other three compatible directions")
+    parser.add_argument("--current", action="store_true", help="Probe both Luna 6 / Sol 6.1 directions")
+    parser.add_argument("--same-model", action="store_true", help="Validate reasoning changes on each current model")
     args = parser.parse_args()
+    if args.same_model and not args.current:
+        parser.error("--same-model requires --current")
+    if args.current and args.reverse:
+        parser.error("--current and --reverse are separate probes")
+    if args.current:
+        MODELS = ("gpt-6-luna", "gpt-6.1-sol")
+        FINAL_TARGET = {m: m for m in MODELS} if args.same_model else {MODELS[0]: MODELS[1], MODELS[1]: MODELS[0]}
     if not args.live:
-        parser.error("--live is required: four synthetic turns consume subscription quota")
+        parser.error("--live is required: synthetic turns consume subscription quota")
     install = discover()
     overrides = {"features.shell_tool": False, "features.web_search": False,
         "features.code_mode": True, "features.code_mode_host": True, "features.apps": False,
@@ -159,7 +170,7 @@ def main():
                     command += ["-c", key + "=" + json.dumps(value)]
                 endpoint = "http://127.0.0.1:" + str(collector.server.server_port) + "/v1/logs"
                 command += ["-c", 'otel.exporter={otlp-http={endpoint="' + endpoint + '",protocol="json",headers={"Authorization"="Bearer ' + collector.token + '"}}}', "app-server"]
-                client = MatrixClient(command, source, targets[source])
+                client = MatrixClient(command, source, targets[source], allow_rejection=args.current and not args.same_model)
                 client.call("initialize", {"clientInfo": {"name": "model_compatibility_probe", "version": "0.1.0"},
                     "capabilities": {"experimentalApi": True}})
                 client.send({"method": "initialized", "params": {}})
@@ -185,6 +196,7 @@ def main():
                     telemetry=sorted(collector.events, key=lambda e: int(e.get("time_unix_nano") or 0)))
                 completed = [event for event in row["telemetry"]
                     if event.get("event.name") == "codex.sse_event" and event.get("event.kind") == "response.completed"]
+                row["native_source_inference_verified"] = any(e.get("model") == source and e.get("model_reasoning_effort") == "medium" for e in completed)
                 row["native_telemetry_transition_verified"] = (
                     any(e.get("model") == source and e.get("model_reasoning_effort") == "medium" for e in completed)
                     and any(e.get("model") == targets[source] and e.get("model_reasoning_effort") == "high" for e in completed))
@@ -192,10 +204,12 @@ def main():
                 print(source + ": " + row["status"] + "; telemetry events " + str(len(collector.events)), flush=True)
     finally:
         report["checked_at_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        filename = "model-compatibility-reverse-probe.json" if args.reverse else "model-compatibility-probe.json"
+        filename = "model-reasoning-current-probe.json" if args.same_model else "model-compatibility-current-probe.json" if args.current else "model-compatibility-reverse-probe.json" if args.reverse else "model-compatibility-probe.json"
         (ROOT/"state"/filename).write_text(json.dumps(report, indent=2), encoding="utf-8")
     assert all(r.get("native_exit") == 0 for r in report["runs"]), "Native shutdown failed"
-    assert all(r.get("native_telemetry_transition_verified") for r in report["runs"]), "Model/effort telemetry missing"
+    assert all(r.get("native_source_inference_verified") for r in report["runs"]), "Source inference telemetry missing"
+    if not args.current or args.same_model:
+        assert all(r.get("native_telemetry_transition_verified") for r in report["runs"]), "Model/effort telemetry missing"
     print("Report: state/" + filename, flush=True)
 
 

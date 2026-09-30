@@ -70,14 +70,14 @@ class SideChatTests(unittest.TestCase):
                 self.fork(order=order)
                 original = self.turn()
                 routed = json.loads(self.start_turn())
-                self.assertEqual(routed["params"]["model"], "gpt-5.6-luna")
+                self.assertEqual(routed["params"]["model"], "gpt-6-luna")
                 self.assertEqual(self.router.threads["parent"], parent)
                 self.assertFalse(self.router.threads["side"].get("parent"))
                 self.assertEqual(self.router.threads["side"]["forked_from"], "parent")
                 expected = copy.deepcopy(original)
-                expected["params"].update(model="gpt-5.6-luna", effort="low")
+                expected["params"].update(model="gpt-6-luna", effort="low")
                 expected["params"]["collaborationMode"]["settings"].update(
-                    model="gpt-5.6-luna", reasoning_effort="low")
+                    model="gpt-6-luna", reasoning_effort="low")
                 self.assertEqual(routed, expected)
 
     def test_internal_and_unknown_forks_keep_native_model_even_with_ancestry(self):
@@ -96,7 +96,7 @@ class SideChatTests(unittest.TestCase):
                                           "routing_engine": "jev"}))
         self.fork()
         with patch("router.run_jev", return_value={"status": "ok", "engine": "jev",
-                   "route": {"model": "gpt-5.6-luna", "effort": "low", "tier": "simple"},
+                   "route": {"model": "gpt-6-luna", "effort": "low", "tier": "simple"},
                    "continuity_strategy": "reassess"}) as classify:
             self.start_turn()
             classify.assert_called_once()

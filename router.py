@@ -33,6 +33,7 @@ from request_dispatch import Dispatcher
 from phase_control import PhaseController
 from error_diagnostics import DIAGNOSTIC_FIELDS, native_error, rpc_error, clear_error
 from process_control import CommandProcesses
+from model_catalog import MODELS, migrate_config, available_routes, estimate_standard_usage, CATALOG_VERSION
 
 ROOT = Path(os.environ.get("PERSONAL_CODEX_ROUTER_ROOT", Path(__file__).resolve().parent)).resolve()
 PRODUCT_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
@@ -42,7 +43,7 @@ SHADOW_SLOTS = threading.BoundedSemaphore(2)
 
 
 def read_config(path):
-    return json.loads(Path(path).read_text(encoding="utf-8-sig"))
+    return migrate_config(json.loads(Path(path).read_text(encoding="utf-8-sig")))
 
 
 class Router:
@@ -153,9 +154,10 @@ class Router:
                         "inference_duration_ms", "inference_ttft_ms", "inference_attempt",
                         "inference_http_status", "inference_success", "observed_candidate_model", "observed_candidate_effort"})
         allowed.update({"phase_id", "phase_source_model", "inference_event_name", "inference_event_kind", "inference_event_id"})
-        allowed.update({"inference_sample_count", "inference_failure_count"})
+        allowed.update({"inference_sample_count", "inference_failure_count", "estimated_api_standard_usd",
+                        "estimated_codex_standard_credits", "estimate_basis", "estimate_rates_version"})
         record = {"schema": 3, "product_version": BUILD[0], "build_id": BUILD[1], "router_build_id": ROUTER_BUILD,
-                  "routing_policy_version": POLICY_VERSION, "time": time.time(), "time_iso":
+                  "routing_policy_version": POLICY_VERSION, "model_catalog_version": CATALOG_VERSION, "time": time.time(), "time_iso":
                   time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "event": event,
                   "session": str(os.getpid())}
         record.update({key: value for key, value in fields.items() if key in allowed and value is not None})
@@ -352,6 +354,7 @@ class Router:
             row.update(observed_model=model, observed_effort=effort,
                        inference_source="otlp_loopback", evidence_confidence="confirmed")
             self.stats["telemetry_confirmed"] += 1
+            metrics.update(estimate_standard_usage(model, metrics))
             self.record_history("inference_observed", decision_id=self.current_decisions.get(tid), thread=tid,
                                 title=row.get("name"), status=row.get("status"), observed_model=model,
                                 observed_effort=effort, inference_source="otlp_loopback",
@@ -411,6 +414,8 @@ class Router:
                         self.handshake_complete = True
                     elif method == "model/list" and "error" not in message:
                         for model in result.get("data", []):
+                            if model.get("hidden"):
+                                continue
                             self.catalog[model["model"]] = {
                                 e["reasoningEffort"] for e in model.get("supportedReasoningEfforts", [])}
                     elif method in ("thread/start", "thread/fork", "thread/resume", "thread/read"):
@@ -460,7 +465,7 @@ class Router:
                                         **phase_update(row, "accepted", model=accepted.get("model"), effort=accepted.get("effort"))})
                             self.phases.begin(tid, row.get("turn_id"), accepted)
                             self.stats["accepted"] += 1
-                            if accepted["model"] in {"gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"}:
+                            if accepted["model"] in MODELS and MODELS[accepted["model"]][1] != "astra":
                                 self.stats["non_astra"] += 1
                             self.log({"event": "turn_accepted", "thread": tid, **accepted})
                             self.record_history("decision_accepted", decision_id=accepted.get("decision_id"),
@@ -793,8 +798,8 @@ class Router:
         mode = params.get("collaborationMode") or {}
         settings = mode.get("settings") or {}
         current = settings.get("model") or params.get("model") or state.get("model")
-        routes = config.get("routes", DEFAULT_ROUTES)
-        owned_models = {r["model"] for r in routes.values()}
+        routes = available_routes(config.get("routes", DEFAULT_ROUTES), self.catalog)
+        owned_models = set(MODELS) | {r["model"] for r in routes.values()}
         # Do not move a non-OpenAI conversation to paid ChatGPT implicitly.
         if state.get("provider") != "openai" or current not in owned_models:
             self.log({"event": "preserved", "thread": tid, "reason": "other_or_unknown_provider"})
@@ -810,7 +815,7 @@ class Router:
             self.clear_pending_phase(tid)
         previous = state.get("tier")
         if previous is None:
-            previous = next((t for t, r in routes.items() if r["model"] == current), None)
+            previous = MODELS.get(current, (None, None, None))[2]
             # A fresh thread's default Astra isn't evidence of a complex task.
             if not state.get("seen_turn"):
                 previous = None
@@ -833,7 +838,7 @@ class Router:
             route = dict(routes[pending_phase_floor])
             reasons.update(quality_floor=pending_phase_floor, quality_ceiling=pending_phase_floor,
                            min_effort=route["effort"], max_effort_allowed=False,
-                           model="continuación autorizada de una fase que requiere Astra en un turno nuevo",
+                           model="continuación autorizada de una fase que requiere cambiar de modelo en un turno nuevo",
                            effort="mínimo de razonamiento de la fase pendiente", request_kind="phase_continuation")
         baseline_route, baseline_reasons = dict(route), dict(reasons)
         if (reasons.get("quality_floor") in ("normal", "complex", "critical") and
@@ -917,7 +922,10 @@ class Router:
         if "collaborationMode" in params and params["collaborationMode"] is not None:
             changed["params"]["collaborationMode"]["settings"]["model"] = model
             changed["params"]["collaborationMode"]["settings"]["reasoning_effort"] = effort
-        tier = next(t for t, r in routes.items() if r["model"] == model)
+        tier = reasons.get("tier", "complex")
+        if engine_applied:
+            matched = [r for r in candidates.values() if r["model"] == model and r["effort"] == effort]
+            tier = next((r["tier"] for r in matched if r["tier"] == tier), matched[0]["tier"] if matched else tier)
         continuity_strategy = engine_result.get("continuity_strategy") if engine_applied and engine_name == ENGINE_JEV else None
         decision_id = self.new_decision(tid, model, effort, reasons["model"], reasons["effort"], reasons["source"],
                                         current, reasons.get("signal"), category, confidence, continuity_strategy, routing_policy)

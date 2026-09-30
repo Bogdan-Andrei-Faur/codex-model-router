@@ -7,6 +7,7 @@ is marked as observed.
 
 ASTRA = "gpt-6-astra"
 from workload import STEPS
+from model_catalog import MODELS
 COMPATIBLE_LIVE_MODELS = frozenset(("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"))
 
 
@@ -34,7 +35,9 @@ def transition_kind(source, destination):
         return "blocked_astra_boundary"
     if source in COMPATIBLE_LIVE_MODELS and destination in COMPATIBLE_LIVE_MODELS:
         return "compatible_group"
-    return "unknown_model"
+    if {source, destination} == {"gpt-6-luna", "gpt-6.1-sol"}:
+        return "blocked_review_boundary"
+    return "unverified_transition" if source in MODELS and destination in MODELS else "unknown_model"
 
 
 def can_switch_within_turn(source, destination):

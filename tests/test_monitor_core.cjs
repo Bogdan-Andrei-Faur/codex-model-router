@@ -101,9 +101,23 @@ test('ten distinct task categories and all effort dots have explicit identity',(
   assert.equal(Object.keys(C.identities).length,10);assert.equal(new Set(Object.values(C.identities).map(x=>x[1])).size,10);
   for(const key of Object.keys(C.efforts))assert.equal(C.effortColors[key].length,2);
   assert.equal(C.identity({agent_category:'interface',name:'Audit'})[0],'Interfaces');
-  assert.equal(C.model('gpt-6-astra'),'Astra');assert.equal(C.status('waiting'),'Esperando tu respuesta');
+  assert.equal(C.model('gpt-6-astra'),'Astra 6');assert.equal(C.status('waiting'),'Esperando tu respuesta');
 });
 test('Windows model and effort badge colors retain readable contrast',()=>{
   const l = hex => {const rgb=hex.slice(1).match(/../g).map(n=>parseInt(n,16)/255).map(n=>n<=.04045?n/12.92:((n+.055)/1.055)**2.4);return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;};
   for(const pair of [...Object.values(C.models),...Object.values(C.effortColors)])assert.ok((l(pair[0])+.05)/(l(pair[1])+.05)>=4.5);
+});
+
+
+test('model generations stay distinct while preserving family palette',()=>{
+  assert.equal(C.model('gpt-6.1-sol'),'Sol 6.1');
+  assert.equal(C.model('gpt-6-sol'),'Sol 6');
+  assert.equal(C.model('gpt-5.6-sol'),'Sol 5.6');
+  for(const id of ['gpt-6.1-sol','gpt-6-sol','gpt-5.6-sol']) assert.deepEqual(C.models[C.family(id)],C.models.Sol);
+});
+
+test('usage estimates deduplicate completions and exclude unconfirmed evidence',()=>{
+  const event={event:'inference_observed',decision_id:'d',inference_event_id:'response1',evidence_confidence:'confirmed',estimate_basis:'standard_equivalent_not_billed',estimated_api_standard_usd:.02,estimated_codex_standard_credits:.5};
+  const row=C.decisions([event,event,{...event,event:'inference_probable',inference_event_id:'response2'}])[0];
+  assert.deepEqual(row.usage_estimates,{response1:{usd:.02,credits:.5}});
 });
