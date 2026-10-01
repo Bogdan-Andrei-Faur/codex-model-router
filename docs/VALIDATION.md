@@ -1,5 +1,16 @@
 # Validation and integration notes
 
+## Diseño redondeado de cuota 0.7.2 — 01/10/2026
+
+- Radio de 16 px, trazo de 3.5 px con extremos redondos, fondo `#373343`
+  y texto de 10 px seminegrita con el color de acento en las tres plataformas.
+  El dibujo compartido y WPF conservan el centrado por los límites del texto.
+- `npm run test:layout` y `xvfb-run -a python3 tests/check_usage_gtk.py`
+  correctos en Ubuntu, incluyendo cápsula, panel lateral y escalado fraccionario.
+- CI incorpora compilación de AppKit/WebKit y WPF además de las pruebas web.
+  La compilación no sustituye la aceptación visual de las aplicaciones nativas
+  en los equipos del usuario.
+
 ## Corrección CI de centrado 0.7.1 — 01/10/2026
 
 - Las ejecuciones `36830475732` (`main`) y `36830475920` (`v0.7.0`) fallaron

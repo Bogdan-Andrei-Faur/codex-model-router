@@ -401,12 +401,12 @@ internal sealed partial class ModernRouterMonitor
             "Contexto: sin medición disponible";
     }
 
-    static Grid UsageRing(double radius, double? percent, Brush color, string tag)
+    static Grid UsageRing(double radius, double? percent, Brush color, string tag, double thickness = 2, bool rounded = false)
     {
         var ring = new Grid { Width = 44, Height = 44, UseLayoutRounding = false, IsHitTestVisible = false, Tag = tag };
         var track = new System.Windows.Shapes.Path { Data = new EllipseGeometry(new Point(22, 22), radius, radius),
-            Stroke = color, StrokeThickness = 2, Opacity = .2 };
-        if (!percent.HasValue) track.StrokeDashArray = new DoubleCollection(new[] { 1.0, 1.5 });
+            Stroke = color, StrokeThickness = thickness, Opacity = .2 };
+        if (!percent.HasValue) track.StrokeDashArray = new DoubleCollection(new[] { 2 / thickness, 3 / thickness });
         ring.Children.Add(track);
         if (percent.HasValue && percent.Value > 0)
         {
@@ -420,7 +420,9 @@ internal sealed partial class ModernRouterMonitor
                     new Size(radius, radius), 0, percent.Value > 50, SweepDirection.Clockwise, true));
                 geometry = new PathGeometry(new[] { figure });
             }
-            ring.Children.Add(new System.Windows.Shapes.Path { Data = geometry, Stroke = color, StrokeThickness = 2 });
+            ring.Children.Add(new System.Windows.Shapes.Path { Data = geometry, Stroke = color, StrokeThickness = thickness,
+                StrokeStartLineCap = rounded ? PenLineCap.Round : PenLineCap.Flat,
+                StrokeEndLineCap = rounded ? PenLineCap.Round : PenLineCap.Flat });
         }
         return ring;
     }
@@ -460,16 +462,19 @@ internal sealed partial class ModernRouterMonitor
 
     static Grid QuotaArt(double? percent)
     {
-        var art = UsageRing(19, percent, Accent, "quota-ring");
+        var color = percent.HasValue ? Accent : Muted;
+        var art = UsageRing(16, percent, color, "quota-ring", 3.5, true);
+        art.Children.Insert(0, new System.Windows.Shapes.Path { Tag = "quota-face",
+            Data = new EllipseGeometry(new Point(22, 22), 16, 16), Fill = Brush("#FF373343") });
         string label = percent.HasValue ? percent.Value + "%" : "—";
         var formatted = new FormattedText(label, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
             new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
-            10, percent.HasValue ? Ink : Muted);
+            10, color);
         var glyphs = formatted.BuildGeometry(new Point());
         var bounds = glyphs.Bounds;
         glyphs.Transform = new TranslateTransform(22 - bounds.Left - bounds.Width / 2, 22 - bounds.Top - bounds.Height / 2);
         art.Children.Add(new System.Windows.Shapes.Path { Tag = "quota-number", Data = glyphs,
-            Fill = percent.HasValue ? Ink : Muted, Stretch = Stretch.None });
+            Fill = color, Stretch = Stretch.None });
         return art;
     }
 

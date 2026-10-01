@@ -1,10 +1,13 @@
-param([switch]$BuildOnly)
+param(
+    [switch]$BuildOnly,
+    [string]$FrameworkReferencePath = 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1'
+)
 $ErrorActionPreference = 'Stop'
 $routerRoot = $PSScriptRoot
 $routerOutput = Join-Path $routerRoot 'dist'
 New-Item -ItemType Directory -Path $routerOutput -Force | Out-Null
 $routerCompiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-$routerFramework = 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1'
+$routerFramework = $FrameworkReferencePath
 $routerIcon = Join-Path $routerRoot 'assets\codex.ico'
 $routerPng = [IO.File]::ReadAllBytes((Join-Path $routerRoot 'assets\codex-official.png'))
 $routerWriter = [IO.BinaryWriter]::new([IO.File]::Create($routerIcon))

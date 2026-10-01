@@ -21,6 +21,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Compile Windows native monitor
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./build.ps1 -BuildOnly -FrameworkReferencePath 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8'
+      - name: Compile macOS native monitor
+        if: runner.os == 'macOS'
+        run: xcrun swiftc MonitorMac.swift -o "$RUNNER_TEMP/codex-monitor-mac" -framework AppKit -framework WebKit -framework Security -target "$(uname -m)-apple-macosx12.0"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

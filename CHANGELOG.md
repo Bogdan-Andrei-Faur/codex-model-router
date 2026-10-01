@@ -1,5 +1,13 @@
 # Cambios
 
+## 0.7.2 — Cuota con formas redondeadas, 01/10/2026
+
+- Aro de cuota con trazo de 3.5 px, extremos redondos y fondo lila de 32 px;
+  porcentaje seminegrita centrado. Mismo diseño en cápsula y panel lateral,
+  tanto en macOS/Linux compartidos como en Windows/WPF.
+- CI compila también los monitores nativos macOS y Windows. El build Windows
+  permite elegir las referencias de .NET Framework conservando su valor inicial.
+
 ## 0.7.1 — Centrado de cuota entre plataformas, 01/10/2026
 
 - Centrado horizontal del porcentaje según los límites reales del texto SVG,

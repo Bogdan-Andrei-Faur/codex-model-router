@@ -4,7 +4,7 @@ Catálogo, tarifas, migración y evidencia de compatibilidad: [modelos 0.6.0](do
 
 ## Versión
 
-El producto usa versiones semánticas. La versión actual es **0.7.1**:
+El producto usa versiones semánticas. La versión actual es **0.7.2**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en la esquina inferior derecha del
 panel procede del archivo común `VERSION`. Cada entrega se registra en

@@ -66,12 +66,14 @@ function gaugeRing(radius,percent,cls) {
 function refreshQuota() {
   const gauge=C.quotaGauge(state.accountUsage,!!state.connections);
   for(const node of [$('quota'),$('quota-panel')]) {
-    const ring=gaugeRing(19,gauge.percent,'quota-ring'),label=gauge.percent===null?'—':gauge.percent+'%';
+    const ring=gaugeRing(16,gauge.percent,'quota-ring'),label=gauge.percent===null?'—':gauge.percent+'%';
+    ring.prepend(svg('circle',{cx:22,cy:22,r:16,class:'quota-face'}));
     const text=svg('text',{x:22,'text-anchor':'middle',class:'quota-number'});text.textContent=label;
     // Center the visible glyphs, rather than the font's line box. The same SVG
     // coordinates place both the arc and number regardless of button layout.
     const context=document.createElement('canvas').getContext('2d');
-    context.font='600 10px '+getComputedStyle(node).fontFamily;
+    const style=getComputedStyle(node);
+    context.font=style.fontWeight+' '+style.fontSize+' '+style.fontFamily;
     const metrics=context.measureText(label);
     const offset=Number.isFinite(metrics.actualBoundingBoxAscent) && Number.isFinite(metrics.actualBoundingBoxDescent)?
       (metrics.actualBoundingBoxAscent-metrics.actualBoundingBoxDescent)/2:3.5;
