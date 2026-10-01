@@ -4,6 +4,7 @@ let state = {threads:{},history:[],config:{enabled:true},ui:{mode:'Compact',topm
 let currentTab = 'activity', order = [], selectedDecision = null, selectedThread = null, peekId = null, peekTimer, reasonOpen = false;
 let dataSignature = '', history = [], avatars = new Map(), orbitSequence = 0;
 let featuredSelection = null, featuredTimer;
+let quotaOpen = false;
 function releaseFeatured() {
   clearTimeout(featuredTimer);featuredSelection=null;
   if(currentTab==='activity')activity();
@@ -55,6 +56,39 @@ function palette(node, colors) {node.style.setProperty('--tint',colors[0]);node.
 function badge(value, effort=false) { const label=effort ? C.efforts[value] || 'Sin confirmar' : C.model(value);const node=palette(el('span','badge',label), effort ? C.effortColors[value] || C.neutral : C.models[C.family(value)] || C.neutral);node.title=(effort?'Razonamiento: ':'Modelo: ')+label;return node; }
 function tags(row, normalized=false) {const box=el('div','tags');box.append(badge(normalized?row.model:C.setting(row,'model')),badge(normalized?row.effort:C.setting(row,'effort'),true));return box;}
 function svg(tag, attributes={}) { const node=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [key,value] of Object.entries(attributes))node.setAttribute(key,String(value));return node; }
+function gaugeRing(radius,percent,cls) {
+  const ring=svg('svg',{viewBox:'0 0 44 44',class:'usage-ring '+cls,'aria-hidden':'true'}),length=2*Math.PI*radius;
+  ring.append(svg('circle',{cx:22,cy:22,r:radius,class:'usage-track',...(percent===null?{'stroke-dasharray':'2 3'}:{})}));
+  if(percent!==null)ring.append(svg('circle',{cx:22,cy:22,r:radius,class:'usage-progress',transform:'rotate(-90 22 22)',
+    'stroke-dasharray':length,'stroke-dashoffset':length*(1-percent/100),visibility:percent===0?'hidden':'visible'}));
+  return ring;
+}
+function refreshQuota() {
+  const gauge=C.quotaGauge(state.accountUsage,!!state.connections);
+  for(const node of [$('quota'),$('quota-panel')]) {
+    const ring=gaugeRing(19,gauge.percent,'quota-ring'),label=gauge.percent===null?'—':gauge.percent+'%';
+    const text=svg('text',{x:22,'text-anchor':'middle',class:'quota-number'});text.textContent=label;
+    // Center the visible glyphs, rather than the font's line box. The same SVG
+    // coordinates place both the arc and number regardless of button layout.
+    const context=document.createElement('canvas').getContext('2d');
+    context.font='600 10px '+getComputedStyle(node).fontFamily;
+    const metrics=context.measureText(label);
+    const offset=Number.isFinite(metrics.actualBoundingBoxAscent) && Number.isFinite(metrics.actualBoundingBoxDescent)?
+      (metrics.actualBoundingBoxAscent-metrics.actualBoundingBoxDescent)/2:3.5;
+    text.setAttribute('y',22+offset);ring.append(text);node.replaceChildren(ring);
+    node.title=gauge.details;node.setAttribute('aria-label',gauge.details);
+    node.classList.toggle('unavailable',gauge.percent===null);
+  }
+  $('quota-panel-details').querySelector('p').textContent=gauge.details;
+  if(quotaOpen)renderQuotaPeek();
+}
+function renderQuotaPeek() {
+  const content=el('div','peek-content');content.append(el('div','peek-category','CUOTA DE LA CUENTA'),el('p','quota-details',C.quotaGauge(state.accountUsage,!!state.connections).details));
+  $('peek').replaceChildren(content);$('surface').style.setProperty('--peek-height',(96+content.offsetHeight)+'px');
+}
+function openQuota() {
+  closePeek();quotaOpen=true;$('peek').hidden=false;document.body.classList.add('peek');renderQuotaPeek();
+}
 function avatar(id,row,open, existing) {
   const node=existing || button('',open,'avatar');
   node.classList.toggle('working',C.active(row.status));
@@ -74,6 +108,9 @@ function avatar(id,row,open, existing) {
     orbit.style.animationDelay=`-${(performance.now()%2800)/1000}s`;
     node.append(face,track,orbit,el('span','effort-dot'));
   } else node.querySelector('.glyph path').setAttribute('d',identity[1]);
+  const context=C.contextGauge(row);
+  node.querySelector('.context-ring')?.remove();node.append(gaugeRing(16,context.percent,'context-ring'));
+  node.title=context.label;node.setAttribute('aria-label',node.getAttribute('aria-label')+' · '+context.label);
   return node;
 }
 function setMode(mode,notify=true) {
@@ -85,6 +122,7 @@ function setMode(mode,notify=true) {
   if(mode==='Expanded')renderPage();
 }
 function openPeek(id) {
+  quotaOpen=false;
   clearTimeout(peekTimer);if(!state.threads[id])return;
   peekId=id;$('peek').hidden=false;document.body.classList.add('peek');renderPeek();
 }
@@ -93,19 +131,20 @@ function renderPeek() {
   const box=$('peek'),content=el('div','peek-content'),ident=C.identity(row);
   const category=palette(el('div','peek-category',ident[0]),C.models[C.family(C.setting(row,'model'))] || C.neutral);
   category.title='Tipo orientativo · confianza '+(row.agent_confidence || 'sin confirmar');
-  content.append(category,el('div','peek-title',row.name || peekId),tags(row),el('div','peek-meta',C.status(row.status)));
+  content.append(category,el('div','peek-title',row.name || peekId),tags(row),el('div','peek-meta',C.status(row.status)),el('p','',C.contextGauge(row).label));
   box.replaceChildren(content);
   $('surface').style.setProperty('--peek-height',(80+16+content.offsetHeight)+'px');
 }
-function closePeek() {clearTimeout(peekTimer);peekId=null;$('peek').hidden=true;document.body.classList.remove('peek');}
+function closePeek() {clearTimeout(peekTimer);peekId=null;quotaOpen=false;$('peek').hidden=true;document.body.classList.remove('peek');}
+function capsuleLimit() {return Math.max(1,Math.min(5,Math.floor((Math.min(366,innerWidth-16)-2-22-40-40-48-36)/44)));}
 function capsule() {
   const rows=state.threads;
   order=C.stableOrder(order,rows);
-  const visible=order.slice(0,5),host=$('agents');
+  const limit=capsuleLimit(),visible=order.slice(0,limit),host=$('agents');
   for(const [id,node] of avatars) if(!visible.includes(id)) {
     if(node.classList.contains('leave'))continue;
     node.classList.add('leave');
-    setTimeout(()=>{if(!order.slice(0,5).includes(id)){node.remove();avatars.delete(id);if(!order.length&&!avatars.size)capsule();}},420);
+    setTimeout(()=>{if(!order.slice(0,capsuleLimit()).includes(id)){node.remove();avatars.delete(id);if(!order.length&&!avatars.size)capsule();}},420);
   }
   host.querySelector('.idle')?.remove();host.querySelector('.overflow')?.remove();
   for(const id of visible) {
@@ -118,8 +157,7 @@ function capsule() {
   }
   // Never reorder surviving agents. Newly active ones join at the end.
   if(!visible.length&&!avatars.size)host.append(el('span','idle','Todo en calma'));
-  if(order.length>5)host.append(button('+'+(order.length-5),()=>setMode('Expanded'),'overflow'));
-  $('count').textContent=order.length ? `${order.length} ${order.length===1?'tarea activa':'tareas activas'}` : 'Sin tareas activas';
+  if(order.length>limit)host.append(button('+'+(order.length-limit),()=>setMode('Expanded'),'overflow'));
   if(peekId){if(!order.includes(peekId))closePeek();else renderPeek();}
 }
 function showTab(name) {
@@ -202,7 +240,7 @@ function activity() {
     const art=avatar(id,row,()=>{});art.tabIndex=-1;
     const badges=el('div','row-tags');badges.append(badge(C.setting(row,'model')),badge(C.setting(row,'effort'),true));
     // Avoid nested interactive controls while preserving the shared avatar.
-    const artHost=el('span');artHost.append(...art.childNodes);artHost.className=art.className;artHost.style.cssText=art.style.cssText;
+    const artHost=el('span');artHost.append(...art.childNodes);artHost.className=art.className;artHost.style.cssText=art.style.cssText;artHost.title=art.title;
     card.append(artHost,copy,badges);page.append(card);
   }
   if(rows.length<=1)page.append(el('div','empty','No hay otras tareas observadas.'));
@@ -413,6 +451,7 @@ window.receive = incoming => {
   $('product-version').textContent='v'+(state.productVersion || '—')+(bridgeMismatch.length?' · puente '+bridgeMismatch.join(', '):state.bridgeBuildMismatch?' · router anterior':state.bridgeBuildUnknown?' · puente sin verificar':'')+(state.restartRequired?' · reinicio pendiente':'');
   $('product-version').title=state.restartRequired?'Hay ajustes pendientes. Reinicia Desktop al terminar tus tareas para cargarlos.':(bridgeMismatch.length||state.bridgeBuildMismatch)?'La versión del router activo difiere de la incluida con este monitor. Reinicia Desktop al terminar tus tareas para cargar la versión instalada.':state.bridgeBuildUnknown?'El puente activo no informa su versión de componente. No se puede determinar si necesita reinicio; el próximo inicio de Desktop permitirá comprobarlo.':'Versión de Codex automático';
   capsule();
+  refreshQuota();
   const signature=JSON.stringify([state.threads,state.history,state.connections,state.taskModes,state.telemetry]);
   const settingsChanged=oldConfig!==JSON.stringify(state.config) || oldUi!==JSON.stringify(state.ui);
   if(signature!==dataSignature || settingsChanged){
@@ -423,6 +462,13 @@ window.receive = incoming => {
 };
 window.monitorFeedback = text => { $('feedback').textContent=text;setTimeout(()=>{$('feedback').textContent='';},7000); };
 $('expand').onclick=()=>setMode('Expanded');$('collapse').onclick=()=>setMode('Compact');$('hide').onclick=()=>setMode('Hidden');$('pause').onclick=()=>configure('enabled',!state.config.enabled);
+$('quota').onclick=openQuota;
+$('quota-panel').onclick=()=>{
+  const details=$('quota-panel-details');details.hidden=!details.hidden;
+  $('quota-panel').setAttribute('aria-expanded',String(!details.hidden));
+};
+window.addEventListener('resize',capsule);
+setInterval(refreshQuota,2000);
 for(const node of document.querySelectorAll('[data-tab]'))node.onclick=()=>showTab(node.dataset.tab);
 $('compact').addEventListener('mouseenter',()=>clearTimeout(peekTimer));$('compact').addEventListener('mouseleave',()=>{peekTimer=setTimeout(closePeek,220);});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'){if(peekId)closePeek();else setMode('Compact');}});

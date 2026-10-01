@@ -266,12 +266,14 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
             var bridgeBuildMismatch=false
             var bridgeBuildUnknown=false
             var telemetry=[String:Any](dictionaryLiteral:("enabled",false))
+            var accountUsage=[String:Any]()
             let files=(try? FileManager.default.contentsOfDirectory(at:self.state,includingPropertiesForKeys:nil)) ?? []
             for file in files.sorted(by:{$0.lastPathComponent<$1.lastPathComponent}) where file.lastPathComponent.hasPrefix("status-") && file.pathExtension=="json" {
                 let data=self.read(file)
                 if data["client_name"] as? String == "other" {continue}
                 guard let heartbeat=data["heartbeat"] as? Double,abs(Date().timeIntervalSince1970-heartbeat)<12,let pid=data["pid"] as? Int32,kill(pid,0)==0,let threads=data["threads"] as? [String:[String:Any]] else{continue}
                 connections+=1
+                if let usage=data["account_usage"] as? [String:Any],(usage["updated"] as? Double ?? 0)>=(accountUsage["updated"] as? Double ?? 0) {accountUsage=usage}
                 bridgeVersions.insert(data["product_version"] as? String ?? "desconocida")
                 if let build=data["router_build_id"] as? String,!build.isEmpty,!self.routerBuildId.isEmpty {
                     if build != self.routerBuildId {bridgeBuildMismatch=true}
@@ -287,7 +289,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
                 }
                 for (id,row) in threads {let old=rows[id] as? [String:Any] ?? [:];if (row["updated"] as? Double ?? 0)>=(old["updated"] as? Double ?? 0){rows[id]=row}}
             }
-            if self.preview { let fixture=self.read(self.root.appendingPathComponent("preview.json"));rows=fixture["threads"] as? [String:Any] ?? [:];connections=1 }
+            if self.preview { let fixture=self.read(self.root.appendingPathComponent("preview.json"));rows=fixture["threads"] as? [String:Any] ?? [:];accountUsage=fixture["account_usage"] as? [String:Any] ?? [:];connections=1 }
             let paths=["history.jsonl","history.recovered.jsonl"].map{self.state.appendingPathComponent($0)}
             let signature=paths.map{path->String in let info=try? path.resourceValues(forKeys:[.contentModificationDateKey,.fileSizeKey]);return "\(info?.contentModificationDate?.timeIntervalSince1970 ?? 0):\(info?.fileSize ?? 0)"}.joined(separator:"|")
             var records:[[String:Any]]?
@@ -306,6 +308,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
                 let safeConfig=normalizedConfig.filter{["enabled","inference_telemetry","phase_routing","prompt_logging","history_days","routing_engine","comparison_engines","jev","routes"].contains($0.key)}
                 var payload:[String:Any]=["productVersion":self.productVersion,"bridgeVersions":Array(bridgeVersions).sorted(),"bridgeBuildMismatch":bridgeBuildMismatch,"bridgeBuildUnknown":bridgeBuildUnknown,"restartRequired":FileManager.default.fileExists(atPath:self.restartPath.path),"threads":rows,"connections":connections,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"telemetry":telemetry,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
                 if records != nil {payload["history"]=self.journal}
+                payload["accountUsage"]=accountUsage
                 guard let encoded=try? JSONSerialization.data(withJSONObject:payload,options:[.sortedKeys]),encoded != self.lastPayload else{return}
                 self.lastPayload=encoded
                 self.web.callAsyncJavaScript("window.receive(payload)",arguments:["payload":payload],in:nil,in:.page){ result in if case .failure=result {self.lastPayload=Data()} }

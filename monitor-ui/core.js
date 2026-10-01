@@ -116,7 +116,26 @@
     return (type || '') + (row.error_http_status !== undefined ? ' · HTTP '+row.error_http_status : '') +
       (row.error_code !== undefined ? ' · RPC '+row.error_code : '');
   }
-  const api = {models,efforts,effortColors,neutral,identities,active,status,setting,model,family,identity,stableOrder,decisions,featuredThread,errorLabel};
+  function contextGauge(row) {
+    const usage=row.context_window || {},value=usage.used_percent;
+    const known=Number.isFinite(value) && value>=0 && Number.isFinite(usage.capacity_tokens) && usage.capacity_tokens>0;
+    const percent=known?Math.min(100,value):null;
+    return {percent,label:known?`Contexto usado: ${Number(percent.toFixed(1))} % · ${usage.used_tokens} / ${usage.capacity_tokens} tokens · última medición`:'Contexto: sin medición disponible'};
+  }
+  function quotaGauge(usage={},connected=true,now=Date.now()/1000) {
+    const value=usage.remaining_percent;
+    const fresh=connected && Number.isFinite(usage.valid_until) && now<usage.valid_until;
+    const percent=fresh && Number.isFinite(value) && value>=0?Math.min(100,value):null;
+    const lines=(usage.windows || []).map(w=>{
+      const minutes=w.duration_minutes;
+      const duration=minutes===10080?'semanal':minutes && minutes%1440===0?`${minutes/1440} días`:minutes && minutes%60===0?`${minutes/60} h`:minutes?`${minutes} min`:w.window;
+      return `${w.limit_id} · ${duration}: ${w.remaining_percent} % disponible`+(w.resets_at?` · se renueva ${new Date(w.resets_at*1000).toLocaleString('es-ES')}`:'');
+    });
+    const label=percent===null?'Cuota de Codex: sin datos actuales':`Cuota disponible: ${percent} % · límite más restrictivo`;
+    if(usage.ordinary_usage_allowed===false)lines.push('Codex informa que el uso incluido no está disponible.');
+    return {percent,label,details:[label,...lines,...(!fresh && lines.length?['Última lectura; pendiente de actualizar.']:[])].join('\n')};
+  }
+  const api = {models,efforts,effortColors,neutral,identities,active,status,setting,model,family,identity,stableOrder,decisions,featuredThread,errorLabel,contextGauge,quotaGauge};
   if (typeof module !== 'undefined') module.exports = api;
   else scope.MonitorCore = api;
 })(globalThis);

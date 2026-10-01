@@ -1,5 +1,34 @@
 # Validation and integration notes
 
+## Aros de contexto y cuota 0.7.0 — 01/10/2026
+
+- `python3 -m unittest discover -s tests -q`: 261 pruebas correctas. Nuevas
+  regresiones de uso: último contexto frente a consumo acumulado, capacidad
+  ausente, caché sin doble conteo, compactación, cambio de modelo/cuenta,
+  notificaciones parciales, respuestas internas tardías, caducidad y privacidad.
+- `python3 tests/evaluate_routing.py`: 27/27 casos de la política 8 conservados.
+- `npm test`: 18 pruebas de semántica compartida. `npm run test:layout`:
+  regresiones existentes y aros 0/37/100/desconocido, etiquetas accesibles,
+  detalle, caducidad sin eventos nuevos, desconexión y cápsula con siete agentes
+  en 390/432 px a escalas 1/1.25/1.5/2. Los fixtures son simulados.
+- Corrección visual posterior: recuento retirado de la cápsula, centros verticales
+  de agentes/logo/cuota alineados y porcentaje centrado por las métricas de los
+  caracteres. Cuota y detalle añadidos a la cabecera del panel lateral, con
+  actualización, caducidad y desconexión sincronizadas entre ambas vistas.
+  Pruebas de layout y GTK correctas; geometría de texto preparada también en WPF.
+- `python3 tests/probe_usage.py`: puente/backend nativos de Ubuntu, cuenta
+  autenticada, una ventana recibida mediante la consulta interna; RPC normal
+  posterior correcto, respuesta interna oculta y cero peticiones de inferencia.
+  Usa un directorio de estado temporal, no modifica chats ni credenciales.
+- `xvfb-run -a python3 tests/check_usage_gtk.py`: aplicación GTK/WebKit real,
+  fixture aislado, porcentaje de cuota, geometría del contexto y ajuste de la
+  cápsula correctos. El test utiliza los assets de `python3 linux.py setup`.
+- El código y las regresiones WPF están preparados; **compilación y aceptación
+  nativas Windows y macOS pendientes**. No se usaron equipos ni agentes remotos.
+- El monitor local se puede actualizar sin cerrar Desktop. El puente de una
+  sesión ya abierta conserva el código anterior hasta volver a abrir Desktop:
+  no se acredita recepción de contexto real de esa sesión antes del reinicio.
+
 ## Aceptación nativa Ubuntu 0.6.0 — 30/09/2026
 
 - Desktop `26.928.21956`, backend `0.159.2`: tras reabrir, el puente real publica

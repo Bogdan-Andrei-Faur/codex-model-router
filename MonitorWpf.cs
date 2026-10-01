@@ -46,7 +46,6 @@ internal sealed partial class ModernRouterMonitor : Window
         HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, PanningMode = PanningMode.VerticalOnly };
     readonly StackPanel mainTags = new StackPanel { Orientation = Orientation.Horizontal };
     readonly Grid headerActivity = new Grid { Width = 18, Height = 18 };
-    readonly TextBlock compactCount = Txt("0 activas", 12, Muted, FontWeights.Medium);
     readonly TextBlock connection = Txt("Esperando conexión", 12, Muted);
     readonly TextBlock mainTask = Txt("Sin tarea seleccionada", 17, Ink, FontWeights.SemiBold);
     readonly Border taskModeHost = new Border();
@@ -269,6 +268,7 @@ internal sealed partial class ModernRouterMonitor : Window
         var header = new Grid { Margin = new Thickness(18, 16, 12, 11) };
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
         var logo = Logo(32); Grid.SetColumn(logo, 0); header.Children.Add(logo);
@@ -277,17 +277,34 @@ internal sealed partial class ModernRouterMonitor : Window
         var connectionRow = new StackPanel { Orientation = Orientation.Horizontal };
         connectionRow.Children.Add(headerActivity); connectionRow.Children.Add(connection);
         headerCopy.Children.Add(connectionRow); Grid.SetColumn(headerCopy, 1); header.Children.Add(headerCopy);
+        panelQuotaButton = Btn("—", delegate {
+            quotaDetailsPanel.Visibility = quotaDetailsPanel.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+        }, true);
+        panelQuotaButton.Width = 44; panelQuotaButton.MinWidth = 44; panelQuotaButton.Height = 44;
+        panelQuotaButton.Padding = new Thickness(0); panelQuotaButton.Template = AvatarTemplate();
+        panelQuotaButton.Content = QuotaArt(null);
+        System.Windows.Automation.AutomationProperties.SetName(panelQuotaButton, "Cuota de Codex");
+        Grid.SetColumn(panelQuotaButton, 2); header.Children.Add(panelQuotaButton);
         var collapse = Btn("›", delegate { SwitchMode(MonitorMode.Compact, true); }, true);
-        collapse.ToolTip = "Volver a vista compacta"; Grid.SetColumn(collapse, 2); header.Children.Add(collapse);
+        collapse.ToolTip = "Volver a vista compacta"; Grid.SetColumn(collapse, 3); header.Children.Add(collapse);
         collapse.Content = NavigationGlyph("M0,0 L5,5 L0,10", 6);
         collapse.VerticalAlignment = VerticalAlignment.Center;
         System.Windows.Automation.AutomationProperties.SetName(collapse, "Volver a vista compacta");
         var hide = Btn("×", delegate { SwitchMode(MonitorMode.Hidden, true); }, true);
-        hide.ToolTip = "Ocultar monitor"; Grid.SetColumn(hide, 3); header.Children.Add(hide);
+        hide.ToolTip = "Ocultar monitor"; Grid.SetColumn(hide, 4); header.Children.Add(hide);
         hide.Content = NavigationGlyph("M0,0 L10,10 M10,0 L0,10", 10);
         hide.VerticalAlignment = VerticalAlignment.Center;
         System.Windows.Automation.AutomationProperties.SetName(hide, "Ocultar monitor");
-        Grid.SetRow(header, 0); expandedView.Children.Add(header);
+        var headerStack = new StackPanel(); headerStack.Children.Add(header);
+        quotaPanelText.TextWrapping = TextWrapping.Wrap;
+        var quotaCopy = new StackPanel(); quotaCopy.Children.Add(Label("CUOTA DE LA CUENTA")); quotaCopy.Children.Add(quotaPanelText);
+        quotaDetailsPanel.Child = new ScrollViewer { Content = quotaCopy, MaxHeight = 140,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        quotaDetailsPanel.Margin = new Thickness(18, 0, 18, 11); quotaDetailsPanel.Padding = new Thickness(12);
+        quotaDetailsPanel.Background = Panel2; quotaDetailsPanel.BorderBrush = Line;
+        quotaDetailsPanel.BorderThickness = new Thickness(1); quotaDetailsPanel.CornerRadius = new CornerRadius(16);
+        headerStack.Children.Add(quotaDetailsPanel);
+        Grid.SetRow(headerStack, 0); expandedView.Children.Add(headerStack);
 
         var tabs = BuildTabBar(); Grid.SetRow(tabs, 1); expandedView.Children.Add(tabs);
 
@@ -623,6 +640,7 @@ internal sealed partial class ModernRouterMonitor : Window
             pauseButton.Content = enabled ? "Ⅱ  Pausar selección" : "▶  Activar selección";
             var rows = new Dictionary<string, Dictionary<string, object>>();
             var telemetry = new Dictionary<string, double>();
+            var accountUsage = new Dictionary<string, object>();
             bool telemetryAvailable = false;
             int connected = 0, modern = 0;
             var bridgeVersions = new HashSet<string>();
@@ -647,6 +665,8 @@ internal sealed partial class ModernRouterMonitor : Window
                 }
                 catch { continue; }
                 connected++;
+                var usage = Dict(data.ContainsKey("account_usage") ? data["account_usage"] : null);
+                if (Number(usage, "updated") >= Number(accountUsage, "updated")) accountUsage = usage;
                 bridgeVersions.Add(String(data, "product_version", "desconocida"));
                 if (RouterBuildId == "" || String(data, "router_build_id") == "") bridgeBuildUnknown = true;
                 else if (String(data, "router_build_id") != RouterBuildId) bridgeBuildMismatch = true;
@@ -708,6 +728,7 @@ internal sealed partial class ModernRouterMonitor : Window
                 if (ordered.Count <= 1) taskList.Children.Add(EmptyRow("No hay otras tareas observables"));
             }
             RefreshAgentCapsule(ordered);
+            RefreshQuota(accountUsage, connected > 0);
             analyticsConnected = connected > 0;
             telemetryHealth.Clear(); foreach (var pair in telemetry) telemetryHealth[pair.Key] = pair.Value;
             telemetryReceiverAvailable = telemetryAvailable;
@@ -795,7 +816,6 @@ internal sealed partial class ModernRouterMonitor : Window
         lastActiveCount = active; lastConnected = connected;
         headerActivity.Children.Clear();
         headerActivity.Children.Add(ActivityIndicator(active > 0, connected ? Good : Warning));
-        compactCount.Foreground = Muted;
     }
 
     static Grid ActivityIndicator(bool active, Brush color)

@@ -1,5 +1,19 @@
 # Cambios
 
+## 0.7.0 — Contexto y cuota, 01/10/2026
+
+- Borde de contexto por agente en cápsula y actividad; conserva la órbita de
+  trabajo y el color del modelo. Tokens/porcentaje disponibles en el detalle.
+- Aro de cuota disponible de la cuenta en cápsula y panel lateral, con porcentaje interior,
+  ventanas y renovaciones al abrirlo. Lectura nativa sin inferencias ni canjes.
+- Contrato común de uso para Windows/WPF y macOS/Linux/WebKit, con estados
+  desconocidos, caducidad, compactación y cambios de cuenta/modelo.
+- Espacio reservado para la cuota y desbordamiento de agentes con «+N».
+- Porcentaje centrado según los caracteres visibles; agentes centrados en
+  vertical en la cápsula, sin texto de recuento bajo los iconos.
+- Pruebas de transporte, normalización, privacidad y dibujo en múltiples DPI.
+  La compilación y aceptación nativas en Mac y Windows quedan pendientes.
+
 ## 0.6.0 — Catálogo actualizado, 30/09/2026
 
 - Luna 6 y Sol 6.1 en Reglas/JEV; modelos anteriores reconocidos como alternativas.

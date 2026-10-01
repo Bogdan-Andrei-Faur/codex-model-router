@@ -37,6 +37,9 @@ internal sealed partial class ModernRouterMonitor
     readonly DispatcherTimer peekCloseTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(220) };
     readonly TextBlock agentsIdle = Txt("Todo en calma", 13, Muted);
     Button moreAgents, expandAgents;
+    Button quotaButton, panelQuotaButton;
+    readonly TextBlock quotaPanelText = Txt("", 12, Muted);
+    readonly Border quotaDetailsPanel = new Border { Visibility = Visibility.Collapsed };
     readonly Border featuredAgentHost = new Border();
     AgentAvatar featuredAvatar;
     static readonly DateTime AgentOrbitEpoch = DateTime.UtcNow;
@@ -52,16 +55,19 @@ internal sealed partial class ModernRouterMonitor
         var bar = new Grid { Margin = new Thickness(12, 8, 12, 8) };
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(48) });
         bar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
         var crew = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         agentStrip.Height = 44; crew.Children.Add(agentStrip);
-        compactCount.FontSize = 11; compactCount.Foreground = Muted;
-        compactCount.HorizontalAlignment = HorizontalAlignment.Center;
-        compactCount.Margin = new Thickness(0, 2, 0, 0); crew.Children.Add(compactCount);
         var codexLogo = Logo(40);
         codexLogo.ToolTip = "Codex automático";
         Grid.SetColumn(codexLogo, 0); bar.Children.Add(codexLogo);
         Grid.SetColumn(crew, 1); bar.Children.Add(crew);
+        quotaButton = Btn("—", delegate { ShowQuotaPeek(); }, true);
+        quotaButton.Width = 44; quotaButton.MinWidth = 44; quotaButton.Height = 44;
+        quotaButton.Padding = new Thickness(0); quotaButton.Template = AvatarTemplate();
+        Grid.SetColumn(quotaButton, 2); bar.Children.Add(quotaButton);
+        RefreshQuota(new Dictionary<string, object>(), false);
         expandAgents = Btn("", delegate { SwitchMode(MonitorMode.Expanded, true); }, true);
         expandAgents.MinWidth = 28; expandAgents.VerticalAlignment = VerticalAlignment.Center;
         expandAgents.Content = NavigationGlyph("M5,0 L0,5 L5,10", 6);
@@ -69,12 +75,12 @@ internal sealed partial class ModernRouterMonitor
         System.Windows.Automation.AutomationProperties.SetName(expandAgents, "Desplegar panel lateral");
         var expandDivider = new Border { BorderBrush = Line, BorderThickness = new Thickness(1, 0, 0, 0),
             Padding = new Thickness(6, 0, 0, 0), Height = 38, VerticalAlignment = VerticalAlignment.Center, Child = expandAgents };
-        Grid.SetColumn(expandDivider, 2); bar.Children.Add(expandDivider);
+        Grid.SetColumn(expandDivider, 3); bar.Children.Add(expandDivider);
         Grid.SetRow(bar, 1); compactView.Children.Add(bar);
         moreAgents = Btn("", delegate { SwitchMode(MonitorMode.Expanded, true); }, false);
         moreAgents.MinWidth = 0; moreAgents.Width = 34; moreAgents.Padding = new Thickness(0);
         moreAgents.Background = Panel2; moreAgents.VerticalAlignment = VerticalAlignment.Center;
-        agentsIdle.HorizontalAlignment = HorizontalAlignment.Center; agentsIdle.Margin = new Thickness(0, 9, 0, 0);
+        agentsIdle.HorizontalAlignment = HorizontalAlignment.Center; agentsIdle.VerticalAlignment = VerticalAlignment.Center;
         peekCloseTimer.Tick += delegate { peekCloseTimer.Stop(); CloseAgentPeek(true); };
         compactView.MouseEnter += delegate { peekCloseTimer.Stop(); };
         compactView.MouseLeave += delegate { peekCloseTimer.Stop(); peekCloseTimer.Start(); };
@@ -178,9 +184,12 @@ internal sealed partial class ModernRouterMonitor
         string effort = Effort(Setting(row, "effort", ""));
         var identity = IdentifyAgent(row);
         bool working = Active(String(row, "status"));
-        string signature = model + ":" + effort + ":" + identity.Name + ":" + String(row, "status");
+        var context = Dict(row.ContainsKey("context_window") ? row["context_window"] : null);
+        string contextLabel = ContextLabel(context);
+        string signature = model + ":" + effort + ":" + identity.Name + ":" + String(row, "status") + Json.Serialize(context);
         System.Windows.Automation.AutomationProperties.SetName(visual.Button,
-            String(row, "name", visual.Id) + " · " + model + " · " + Effort(Setting(row, "effort", "")) + " · " + Status(String(row, "status")));
+            String(row, "name", visual.Id) + " · " + model + " · " + Effort(Setting(row, "effort", "")) + " · " + Status(String(row, "status")) + " · " + contextLabel);
+        visual.Button.ToolTip = contextLabel;
         if (signature == visual.Signature) return;
         visual.Signature = signature;
         if (visual.Orbit != null) visual.Orbit.BeginAnimation(RotateTransform.AngleProperty, null);
@@ -200,6 +209,7 @@ internal sealed partial class ModernRouterMonitor
             StrokeLineJoin = PenLineJoin.Round, Width = 19, Height = 19, Stretch = Stretch.Uniform,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         art.Children.Add(glyph);
+        art.Children.Add(UsageRing(16, ContextPercent(context), color, "context-ring"));
         var tint = ((SolidColorBrush)color).Color;
         var orbitBrush = new LinearGradientBrush();
         orbitBrush.StartPoint = new Point(0, 0); orbitBrush.EndPoint = new Point(1, 1);
@@ -242,7 +252,7 @@ internal sealed partial class ModernRouterMonitor
         foreach (var pair in rows.Where(pair => Active(String(pair.Value, "status")))) activeAgentRows[pair.Key] = pair.Value;
         agentOrder.RemoveAll(id => !activeAgentRows.ContainsKey(id));
         foreach (string id in activeAgentRows.Keys) if (!agentOrder.Contains(id)) agentOrder.Add(id);
-        int limit = Math.Max(1, Math.Min(5, (int)((TargetGeometry(MonitorMode.Compact).Width - 16 - 2 - 24 - 40 - 40 - 34) / 44)));
+        int limit = Math.Max(1, Math.Min(5, (int)((TargetGeometry(MonitorMode.Compact).Width - 16 - 2 - 24 - 40 - 40 - 48 - 34) / 44)));
         var visibleIds = new HashSet<string>(agentOrder.Take(limit));
         agentStrip.Children.Remove(moreAgents); agentStrip.Children.Remove(agentsIdle);
         foreach (var visual in agentAvatars.Values.ToList())
@@ -276,9 +286,7 @@ internal sealed partial class ModernRouterMonitor
             agentStrip.Children.Add(moreAgents);
         }
         if (activeAgentRows.Count == 0) agentStrip.Children.Add(agentsIdle);
-        compactCount.Text = activeAgentRows.Count == 0 ? "Sin tareas activas" : activeAgentRows.Count +
-            (activeAgentRows.Count == 1 ? " agente activo" : " agentes activos");
-        if (peekAgentId != null)
+        if (peekAgentId != null && peekAgentId != "@account")
         {
             if (!activeAgentRows.ContainsKey(peekAgentId)) CloseAgentPeek(animate);
             else ShowAgentPeek(peekAgentId, animate);
@@ -326,7 +334,7 @@ internal sealed partial class ModernRouterMonitor
         if (mode != MonitorMode.Compact || !activeAgentRows.ContainsKey(id)) return;
         peekCloseTimer.Stop();
         var row = activeAgentRows[id];
-        string signature = id + ":" + Json.Serialize(row.Where(pair => new[] { "name", "model", "effort", "requested_model", "requested_effort", "status", "reason", "agent_category", "agent_confidence" }.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value));
+        string signature = id + ":" + Json.Serialize(row.Where(pair => new[] { "name", "model", "effort", "requested_model", "requested_effort", "status", "reason", "agent_category", "agent_confidence", "context_window" }.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value));
         if (peekAgentId == id && signature == peekSignature) return;
         peekAgentId = id; peekSignature = signature;
         agentPeekContent.Children.Clear();
@@ -343,6 +351,9 @@ internal sealed partial class ModernRouterMonitor
         FillTags(tags, model, Effort(Setting(row, "effort", ""))); agentPeekContent.Children.Add(tags);
         var status = Txt(Status(String(row, "status")), 12, Muted); status.Margin = new Thickness(0, 10, 0, 12);
         agentPeekContent.Children.Add(status);
+        var contextText = Txt(ContextLabel(Dict(row.ContainsKey("context_window") ? row["context_window"] : null)), 12, Muted);
+        contextText.TextWrapping = TextWrapping.Wrap; contextText.Margin = new Thickness(0, 0, 0, 12);
+        agentPeekContent.Children.Add(contextText);
         agentPeekContent.Children.Add(new Border { Height = 1, Background = Line });
         agentPeek.Visibility = Visibility.Visible;
         double width = Math.Max(1, TargetGeometry(MonitorMode.Compact).Width - 16 - 38);
@@ -363,5 +374,115 @@ internal sealed partial class ModernRouterMonitor
         if (animate && IsVisible && SystemParameters.ClientAreaAnimation)
             surface.BeginAnimation(HeightProperty, new DoubleAnimation(from, surface.Height, ModeTransitionDuration)
             { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }, FillBehavior = FillBehavior.Stop });
+    }
+
+    static double? GaugeValue(Dictionary<string, object> data, string key)
+    {
+        object raw; double value;
+        if (!data.TryGetValue(key, out raw) || raw == null || raw is bool || raw is string ||
+            !double.TryParse(Convert.ToString(raw, System.Globalization.CultureInfo.InvariantCulture),
+                System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value) ||
+            double.IsNaN(value) || double.IsInfinity(value) || value < 0) return null;
+        return value;
+    }
+
+    static double? ContextPercent(Dictionary<string, object> context)
+    {
+        var capacity = GaugeValue(context, "capacity_tokens");
+        var used = GaugeValue(context, "used_percent");
+        return capacity.HasValue && capacity.Value > 0 && used.HasValue ? (double?)Math.Min(100, used.Value) : null;
+    }
+
+    static string ContextLabel(Dictionary<string, object> context)
+    {
+        var value = ContextPercent(context);
+        return value.HasValue ? "Contexto usado: " + value.Value.ToString("0.#") + " % · " +
+            String(context, "used_tokens") + " / " + String(context, "capacity_tokens") + " tokens · última medición" :
+            "Contexto: sin medición disponible";
+    }
+
+    static Grid UsageRing(double radius, double? percent, Brush color, string tag)
+    {
+        var ring = new Grid { Width = 44, Height = 44, UseLayoutRounding = false, IsHitTestVisible = false, Tag = tag };
+        var track = new System.Windows.Shapes.Path { Data = new EllipseGeometry(new Point(22, 22), radius, radius),
+            Stroke = color, StrokeThickness = 2, Opacity = .2 };
+        if (!percent.HasValue) track.StrokeDashArray = new DoubleCollection(new[] { 1.0, 1.5 });
+        ring.Children.Add(track);
+        if (percent.HasValue && percent.Value > 0)
+        {
+            Geometry geometry;
+            if (percent.Value >= 100) geometry = new EllipseGeometry(new Point(22, 22), radius, radius);
+            else
+            {
+                double angle = percent.Value / 100 * Math.PI * 2;
+                var figure = new PathFigure { StartPoint = new Point(22, 22 - radius), IsClosed = false };
+                figure.Segments.Add(new ArcSegment(new Point(22 + radius * Math.Sin(angle), 22 - radius * Math.Cos(angle)),
+                    new Size(radius, radius), 0, percent.Value > 50, SweepDirection.Clockwise, true));
+                geometry = new PathGeometry(new[] { figure });
+            }
+            ring.Children.Add(new System.Windows.Shapes.Path { Data = geometry, Stroke = color, StrokeThickness = 2 });
+        }
+        return ring;
+    }
+
+    void RefreshQuota(Dictionary<string, object> usage, bool connected)
+    {
+        var value = GaugeValue(usage, "remaining_percent");
+        bool fresh = connected && (GaugeValue(usage, "valid_until") ?? 0) > DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        double? percent = fresh && value.HasValue ? (double?)Math.Min(100, value.Value) : null;
+        string label = percent.HasValue ? "Cuota disponible: " + percent.Value + " % · límite más restrictivo" : "Cuota de Codex: sin datos actuales";
+        var lines = new List<string> { label };
+        object raw;
+        var windows = usage.TryGetValue("windows", out raw) ? raw as System.Collections.IEnumerable : null;
+        if (windows != null) foreach (var item in windows)
+        {
+            var w = Dict(item); double minutes = GaugeValue(w, "duration_minutes") ?? 0;
+            string duration = minutes == 10080 ? "semanal" : minutes > 0 && minutes % 1440 == 0 ? (minutes / 1440) + " días" :
+                minutes > 0 && minutes % 60 == 0 ? (minutes / 60) + " h" : minutes > 0 ? minutes + " min" : String(w, "window");
+            string detail = String(w, "limit_id") + " · " + duration + ": " + String(w, "remaining_percent") + " % disponible";
+            var reset = GaugeValue(w, "resets_at");
+            if (reset.HasValue && reset.Value < 253402300800) detail += " · se renueva " + DateTimeOffset.FromUnixTimeSeconds((long)reset.Value).LocalDateTime;
+            lines.Add(detail);
+        }
+        if (String(usage, "ordinary_usage_allowed").ToLowerInvariant() == "false") lines.Add("Codex informa que el uso incluido no está disponible.");
+        if (!fresh && lines.Count > 1) lines.Add("Última lectura; pendiente de actualizar.");
+        string details = System.String.Join("\n", lines);
+        foreach (var button in new[] { quotaButton, panelQuotaButton })
+        {
+            if (button == null) continue;
+            button.Content = QuotaArt(percent);
+            button.ToolTip = details;
+            System.Windows.Automation.AutomationProperties.SetName(button, details);
+        }
+        quotaPanelText.Text = details;
+        if (peekAgentId == "@account") ShowQuotaPeek();
+    }
+
+    static Grid QuotaArt(double? percent)
+    {
+        var art = UsageRing(19, percent, Accent, "quota-ring");
+        string label = percent.HasValue ? percent.Value + "%" : "—";
+        var formatted = new FormattedText(label, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+            new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
+            10, percent.HasValue ? Ink : Muted);
+        var glyphs = formatted.BuildGeometry(new Point());
+        var bounds = glyphs.Bounds;
+        glyphs.Transform = new TranslateTransform(22 - bounds.Left - bounds.Width / 2, 22 - bounds.Top - bounds.Height / 2);
+        art.Children.Add(new System.Windows.Shapes.Path { Tag = "quota-number", Data = glyphs,
+            Fill = percent.HasValue ? Ink : Muted, Stretch = Stretch.None });
+        return art;
+    }
+
+    void ShowQuotaPeek()
+    {
+        if (mode != MonitorMode.Compact) return;
+        peekCloseTimer.Stop(); peekAgentId = "@account";
+        agentPeekContent.Children.Clear();
+        agentPeekContent.Children.Add(Txt("CUOTA DE LA CUENTA", 11, Accent));
+        var detail = Txt(Convert.ToString(quotaButton.ToolTip), 12, Muted);
+        detail.TextWrapping = TextWrapping.Wrap; detail.Margin = new Thickness(0, 8, 0, 12);
+        agentPeekContent.Children.Add(detail); agentPeek.Visibility = Visibility.Visible;
+        agentPeekContent.Measure(new Size(Math.Max(1, TargetGeometry(MonitorMode.Compact).Width - 54), double.PositiveInfinity));
+        ResizeAgentSurface(Math.Min(Height - 16, 96 + agentPeekContent.DesiredSize.Height), false);
     }
 }

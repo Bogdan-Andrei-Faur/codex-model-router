@@ -4,13 +4,47 @@ Catálogo, tarifas, migración y evidencia de compatibilidad: [modelos 0.6.0](do
 
 ## Versión
 
-El producto usa versiones semánticas. La versión actual es **0.6.0**:
+El producto usa versiones semánticas. La versión actual es **0.7.0**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en la esquina inferior derecha del
 panel procede del archivo común `VERSION`. Cada entrega se registra en
 [CHANGELOG.md](CHANGELOG.md) y una etiqueta Git anotada `v<versión>` apunta a su
 commit. La huella de compilación y la versión de política son identificadores
 técnicos independientes; no sustituyen a la versión del producto.
+
+## Contexto y cuota de Codex
+
+El borde del fondo de cada agente indica el contexto ocupado: comienza arriba y
+se cierra al 100 %. Conserva el color del modelo; la órbita exterior sigue
+indicando actividad. Al pasar el ratón o abrir el agente se muestra el porcentaje
+y los tokens de la última medición. Se calcula con `last.totalTokens` y
+`modelContextWindow` del evento nativo `thread/tokenUsage/updated`; no suma el
+consumo acumulado ni vuelve a contar la caché. Es una medición entre respuestas,
+no un contador en tiempo real de cada token. Tras compactar o cambiar de modelo,
+espera una nueva medición. Los agentes hijos necesitan su propio evento.
+
+El aro lateral de la cápsula y el de la cabecera del panel muestran el
+**porcentaje de cuota disponible** de la cuenta, con el número dentro. Al
+pulsarlo aparecen las ventanas que informa Codex,
+sus porcentajes y fechas de renovación. Si hay varios límites, representa el
+más restrictivo; la cuota es compartida por la cuenta y no se suma por agente ni
+por sesión. No representa saldo de API ni créditos adicionales, y el porcentaje
+no garantiza autorización para seguir usando el servicio.
+
+La cápsula compacta centra los agentes en vertical y omite el recuento de tareas
+bajo sus iconos. El recuento permanece en la cabecera del panel lateral.
+
+Los datos ausentes aparecen como un aro discontinuo y «—», nunca como 0 %. La
+cuota se consulta mediante `account/rateLimits/read` cada minuto y se actualiza
+también con sus notificaciones; una muestra caduca al renovarse su ventana o a
+los tres minutos sin refresco. Una desconexión invalida el indicador. Son lecturas
+sin inferencia, compras ni canjes. Los snapshots solo guardan porcentajes,
+ventanas y tiempos; no identificadores de cuenta ni credenciales.
+
+Windows, macOS y Linux comparten estos datos y significados; Mac/Linux comparten
+además el dibujo web y Windows utiliza WPF. Las tareas que ya estaban ejecutándose
+necesitan volver a abrir Desktop para cargar el nuevo puente. La validación
+nativa realizada y las pendientes figuran en [VALIDATION.md](docs/VALIDATION.md).
 
 Elige modelo y razonamiento antes de cada nuevo mensaje enviado a Codex. Sigue
 usando la app y la suscripción actuales. Puede decidir mediante reglas locales

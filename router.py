@@ -34,6 +34,7 @@ from phase_control import PhaseController
 from error_diagnostics import DIAGNOSTIC_FIELDS, native_error, rpc_error, clear_error
 from process_control import CommandProcesses
 from model_catalog import MODELS, migrate_config, available_routes, estimate_standard_usage, CATALOG_VERSION
+from usage_state import AccountUsage, context_window
 
 ROOT = Path(os.environ.get("PERSONAL_CODEX_ROUTER_ROOT", Path(__file__).resolve().parent)).resolve()
 PRODUCT_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
@@ -73,6 +74,7 @@ class Router:
         self.inventory = ThreadInventory()
         self.client_name = "unknown"
         self.handshake_complete = False
+        self.account_usage = AccountUsage()
         self.telemetry = None
         self.inference_ids = set()
         self.metric_buckets = {}
@@ -233,6 +235,8 @@ class Router:
                                                              agent_confidence=agent_confidence or "baja")
         row = self.threads.setdefault(tid, {})
         clear_error(row)
+        if model != row.get('model'):
+            row.pop('context_window', None)
         self.native_errors.pop(tid, None)
         for field in ("tokens", "observed_model", "observed_effort", "inference_source", "evidence_confidence",
                       "accepted_model", "accepted_effort", "completed_at", "turn_id", "phase_id", "phase_accepted_at"):
@@ -265,6 +269,7 @@ class Router:
                                        "inventory_synced_at": self.inventory.synced_at,
                                        "catalog": {m: sorted(e) for m, e in self.catalog.items()},
                                        "stats": self.stats,
+                                       "account_usage": self.account_usage.snapshot,
                                        "telemetry": self.telemetry.snapshot() if self.telemetry else {"enabled": False}},
                                        ensure_ascii=False, indent=2), encoding="utf-8")
             os.replace(temp, target)
@@ -384,6 +389,8 @@ class Router:
             if not isinstance(message, dict):
                 return
             with self.lock:
+                if self.account_usage.consume(message):
+                    return False
                 phase_config = self.phase_config() if message.get("method") == "item/tool/call" else {}
                 if self.phases.consume(message, phase_config):
                     return False
@@ -642,13 +649,16 @@ class Router:
                 elif method == "thread/tokenUsage/updated":
                     usage = params.get("tokenUsage", {}).get("last", {})
                     tokens = {k: usage[k] for k in ("inputTokens", "outputTokens", "cachedInputTokens", "reasoningOutputTokens") if k in usage}
-                    self.threads.setdefault(tid, {}).update(tokens=tokens, updated=time.time())
+                    self.threads.setdefault(tid, {}).update(tokens=tokens, updated=time.time(),
+                        context_window=context_window(params.get('tokenUsage')))
                     if self.current_decisions.get(tid):
                         self.record_history("decision_usage", decision_id=self.current_decisions[tid], thread=tid, **tokens)
                 elif method == "thread/settings/updated":
                     settings = params.get("threadSettings") or {}
                     state = self.threads.setdefault(tid, {})
                     if settings.get("model"):
+                        if settings['model'] != state.get('configured_model', state.get('model')):
+                            state.pop('context_window', None)
                         state["configured_model"] = settings["model"]
                         state["configured_effort"] = settings.get("effort")
                         # Published picker settings can arrive after start/completion,
@@ -663,6 +673,9 @@ class Router:
                                             phase_transition=state.get("phase_transition"), configured_model=settings["model"],
                                             configured_effort=settings.get("effort"), pipeline_mode="observation",
                                             phase_pipeline=state.get("phase_pipeline"))
+                if method == 'thread/compacted' or (method in ('item/started', 'item/completed')
+                        and (params.get('item') or {}).get('type') == 'contextCompaction'):
+                    self.threads.get(tid, {}).pop('context_window', None)
         except (ValueError, KeyError, TypeError, AttributeError):
             pass
         return True
@@ -670,6 +683,9 @@ class Router:
     def drain_outbound(self):
         self.maintain_retention()
         with self.lock:
+            request = self.account_usage.poll(self.handshake_complete and self.client_name != 'other')
+            if request:
+                self.outbound.append(request)
             self.flush_metrics()
             self.phases.poll()
             result, self.outbound = self.outbound, []

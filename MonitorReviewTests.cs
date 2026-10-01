@@ -292,15 +292,17 @@ internal sealed partial class ModernRouterMonitor
         CloseAgentPeek(false);
         for (int i = 0; i < 5; i++) rows.Add(new KeyValuePair<string, Dictionary<string, object>>("extra-" + i, Fixture("Prueba adicional " + i, "gpt-5.6-sol", "high", "active")));
         RefreshAgentCapsule(rows, false); UpdateLayout();
-        Check(agentAvatars.Count == 5 && moreAgents.Content.ToString() == "+3", "Overflow agents are not capped at five");
+        Check(agentAvatars.Count == 4 && moreAgents.Content.ToString() == "+4", "Overflow must reserve room for the account ring");
         Check(agentStrip.ActualWidth < surface.ActualWidth - 50, "Avatar strip overflows capsule");
+        Check(agentStrip.TransformToAncestor(surface).Transform(new Point(agentStrip.ActualWidth, 0)).X <=
+            quotaButton.TransformToAncestor(surface).Transform(new Point()).X, "Agent strip overlaps quota ring");
         SaveVisual(this, Path.Combine(StateFolder, "review-agents-overflow.png"), 1);
         moreAgents.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Check(mode == MonitorMode.Expanded, "Overflow action did not open the detailed panel");
         Check(agentAvatars.Values.All(v => !v.Orbit.HasAnimatedProperties), "Hidden capsule keeps orbit clocks running");
         SwitchMode(MonitorMode.Compact, false);
         RefreshAgentCapsule(new List<KeyValuePair<string, Dictionary<string, object>>>(), true); RunUiFor(500); UpdateLayout();
-        Check(agentAvatars.Count == 0 && compactCount.Text == "Sin tareas activas", "Inactive agents were not removed");
+        Check(agentAvatars.Count == 0 && agentStrip.Children.Contains(agentsIdle), "Inactive agents were not removed");
         SaveVisual(this, Path.Combine(StateFolder, "review-agents-idle.png"), 1);
         PaintFixtures(); UpdateLayout();
     }
@@ -311,6 +313,31 @@ internal sealed partial class ModernRouterMonitor
         var results = new List<string>();
         try
         {
+            Check(!ContextPercent(new Dictionary<string, object>()).HasValue, "Missing context must not become zero");
+            foreach (double percent in new[] { 0.0, 37.0, 100.0 })
+            {
+                var context = new Dictionary<string, object> { { "used_percent", percent }, { "capacity_tokens", 1000 }, { "used_tokens", percent * 10 } };
+                Check(ContextPercent(context) == percent, "Context percentage changed");
+                var ring = UsageRing(16, percent, Accent, "test");
+                Check(ring.Children.Count == (percent == 0 ? 1 : 2), "Zero/full context ring path mismatch");
+                if (percent == 100) Check(((System.Windows.Shapes.Path)ring.Children[1]).Data is EllipseGeometry, "Full ring must close");
+                var usage = new Dictionary<string, object> { { "remaining_percent", percent }, { "valid_until", DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 60 } };
+                RefreshQuota(usage, true);
+                foreach (var button in new[] { quotaButton, panelQuotaButton })
+                {
+                    var number = ((Grid)button.Content).Children.OfType<System.Windows.Shapes.Path>().First(p => Convert.ToString(p.Tag) == "quota-number");
+                    var bounds = number.Data.Bounds;
+                    Check(Math.Abs(bounds.Left + bounds.Width / 2 - 22) < .01 && Math.Abs(bounds.Top + bounds.Height / 2 - 22) < .01,
+                        "Visible quota glyphs must be centered on the circle");
+                    Check(System.Windows.Automation.AutomationProperties.GetName(button).Contains(percent + " %"), "Quota percentage not accessible in both views");
+                }
+                RefreshQuota(usage, false);
+                Check(System.Windows.Automation.AutomationProperties.GetName(quotaButton).Contains("sin datos actuales"), "Disconnected quota must be unknown");
+                usage["valid_until"] = 1;
+                RefreshQuota(usage, true);
+                Check(System.Windows.Automation.AutomationProperties.GetName(panelQuotaButton).Contains("sin datos actuales"), "Expired quota must be unknown");
+            }
+            results.Add("PASS: context and quota rings distinguish 0/37/100/unknown, full circle, expiry and disconnection");
             foreach (var work in new[] { new Rect(0, 0, 1920, 1040), new Rect(0, 0, 2560, 1400), new Rect(0, 0, 1536, 824),
                 new Rect(0, 0, 1280, 680), new Rect(-1920, 0, 1920, 1040), new Rect(0, -900, 1600, 900), new Rect(0, 0, 800, 480) })
             {

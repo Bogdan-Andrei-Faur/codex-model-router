@@ -2,6 +2,25 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../monitor-ui/core.js');
 
+test('context gauges distinguish unknown, empty, full and latest measurement',()=>{
+  assert.equal(C.contextGauge({}).percent,null);
+  assert.equal(C.contextGauge({context_window:{used_percent:0,capacity_tokens:100,used_tokens:0}}).percent,0);
+  assert.equal(C.contextGauge({context_window:{used_percent:180,capacity_tokens:100,used_tokens:180}}).percent,100);
+  assert.match(C.contextGauge({context_window:{used_percent:37.2,capacity_tokens:1000,used_tokens:372}}).label,/37.2 %.*372 \/ 1000.*última medición/);
+});
+
+test('quota expires without a new snapshot and disconnected or missing means unknown',()=>{
+  const usage={remaining_percent:76,valid_until:200,windows:[{limit_id:'codex',window:'primary',duration_minutes:10080,remaining_percent:76,resets_at:200}]};
+  assert.equal(C.quotaGauge(usage,true,199).percent,76);
+  assert.equal(C.quotaGauge(usage,true,200).percent,null);
+  assert.equal(C.quotaGauge(usage,false,100).percent,null);
+  assert.equal(C.quotaGauge({},true,100).percent,null);
+  assert.match(C.quotaGauge(usage,true,100).details,/semanal: 76 % disponible/);
+  assert.equal(C.quotaGauge({...usage,remaining_percent:0},true,100).percent,0);
+  assert.equal(C.quotaGauge({...usage,remaining_percent:100},true,100).percent,100);
+  assert.match(C.quotaGauge({...usage,ordinary_usage_allowed:false},true,100).details,/uso incluido no está disponible/);
+});
+
 test('phase replay updates acceptance, separates old inference and retains metrics by class',()=>{
   const events=[{event:'decision_created',decision_id:'d',model:'gpt-5.6-terra',time:1},
     {event:'decision_accepted',decision_id:'d',accepted_model:'gpt-5.6-terra',time:2},

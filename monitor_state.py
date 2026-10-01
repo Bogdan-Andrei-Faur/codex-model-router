@@ -72,6 +72,7 @@ class MonitorState:
     def payload(self):
         threads, versions, connections = {}, set(), 0
         telemetry = {'enabled': False}
+        account_usage = {}
         mismatch = unknown = False
         for path in sorted(self.state.glob('status-*.json')):
             data = read_json(path)
@@ -82,6 +83,9 @@ class MonitorState:
             if any(e.get('event') == 'bridge_stopped' for e in data.get('events', []) if isinstance(e, dict)):
                 continue
             connections += 1
+            usage = data.get('account_usage')
+            if isinstance(usage, dict) and number(usage.get('updated')) >= number(account_usage.get('updated')):
+                account_usage = usage
             versions.add(str(data.get('product_version', 'desconocida')))
             build = data.get('router_build_id')
             mismatch |= bool(build and build != self.router_build)
@@ -96,6 +100,7 @@ class MonitorState:
                     threads[tid] = row
         if self.preview:
             threads = read_json(self.root / 'preview.json').get('threads', {})
+            account_usage = read_json(self.root / 'preview.json').get('account_usage', {})
             connections = 1
         paths = [self.state / name for name in ('history.jsonl', 'history.recovered.jsonl')]
         signature = []
@@ -119,6 +124,7 @@ class MonitorState:
                 'bridgeBuildUnknown': unknown, 'restartRequired': (self.state / 'restart-required.json').exists(),
                 'threads': threads, 'connections': connections, 'history': self.history, 'config': safe,
                 'taskModes': {tid: read_mode(self.state, tid) for tid in tids}, 'telemetry': telemetry,
+                'accountUsage': account_usage,
                 'preview': self.preview, 'platform': 'linux', 'secretStorage': 'el llavero de Linux (Secret Service)'}
 
     def configure(self, key, value):
