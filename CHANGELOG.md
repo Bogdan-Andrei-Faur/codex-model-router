@@ -1,5 +1,11 @@
 # Cambios
 
+## 0.8.1 — Compilación del indicador en Windows, 01/10/2026
+
+- Referencia explícita a `System.Windows.Media.Geometry` en los arcos de
+  compactación; evita la colisión con el método de geometría del monitor WPF
+  que detectó la CI al compilar 0.8.0.
+
 ## 0.8.0 — Indicador de compactación, 01/10/2026
 
 - Dos arcos giran y se contraen alrededor del agente mientras Codex compacta

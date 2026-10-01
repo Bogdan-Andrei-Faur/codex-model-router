@@ -1,5 +1,11 @@
 # Validation and integration notes
 
+## Corrección de compilación WPF 0.8.1 — 01/10/2026
+
+- La compilación Windows de 0.8.0 detectó `CS0119` en `MonitorAgents.cs`:
+  `Geometry` resolvía al método del monitor en vez del tipo WPF. Se usa
+  `System.Windows.Media.Geometry.Parse`, como en el resto de dibujos del monitor.
+
 ## Indicador de compactación 0.8.0 — 01/10/2026
 
 - El backend instalado genera esquemas v2 con `contextCompaction` en

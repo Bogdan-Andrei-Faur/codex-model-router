@@ -220,7 +220,7 @@ internal sealed partial class ModernRouterMonitor
         {
             var ring = new Grid { Tag = "compacting-ring", Width = 44, Height = 44, IsHitTestVisible = false };
             ring.Children.Add(new System.Windows.Shapes.Path {
-                Data = Geometry.Parse("M22,6 A16,16 0 0 1 38,22 M22,38 A16,16 0 0 1 6,22"),
+                Data = System.Windows.Media.Geometry.Parse("M22,6 A16,16 0 0 1 38,22 M22,38 A16,16 0 0 1 6,22"),
                 Stroke = color, StrokeThickness = 2.5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round });
             visual.CompactionRotation = new RotateTransform(0, 22, 22);
             visual.CompactionScale = new ScaleTransform(1, 1, 22, 22);
