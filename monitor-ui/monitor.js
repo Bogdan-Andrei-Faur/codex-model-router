@@ -76,6 +76,10 @@ function refreshQuota() {
     const offset=Number.isFinite(metrics.actualBoundingBoxAscent) && Number.isFinite(metrics.actualBoundingBoxDescent)?
       (metrics.actualBoundingBoxAscent-metrics.actualBoundingBoxDescent)/2:3.5;
     text.setAttribute('y',22+offset);ring.append(text);node.replaceChildren(ring);
+    // SVG middle anchoring uses advance width. Glyph overhang can make the
+    // rendered bounds asymmetric (notably with the Windows system font).
+    const bounds=text.getBBox();
+    if(bounds.width>0)text.setAttribute('x',22+(22-bounds.x-bounds.width/2));
     node.title=gauge.details;node.setAttribute('aria-label',gauge.details);
     node.classList.toggle('unavailable',gauge.percent===null);
   }
@@ -118,6 +122,7 @@ function setMode(mode,notify=true) {
   state.ui.mode=mode;closePeek();
   document.body.classList.remove('compact','expanded','hidden');document.body.classList.add(mode.toLowerCase());
   $('compact').hidden=mode!=='Compact';$('expanded').hidden=mode!=='Expanded';
+  refreshQuota(); // Hidden SVG text has no bounds; measure the newly visible view.
   if(notify)native({action:'mode',value:mode});
   if(mode==='Expanded')renderPage();
 }

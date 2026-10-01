@@ -45,6 +45,15 @@ const {pathToFileURL}=require('node:url');
       assert.ok(boxes[0].right<=boxes[1].left && boxes[1].right<=boxes[2].left,'Quota overlaps controls');
       const visible=await page.locator('#agents .avatar').count();
       assert.equal(await page.locator('#agents .overflow').innerText(),'+'+(7-visible));
+      for(const font of ['sans-serif','serif','monospace','Lato Black','C059']) {
+        await page.evaluate(font=>{
+          for(const id of ['quota','quota-panel'])document.getElementById(id).style.fontFamily=font;
+          window.receive({});
+        },font);
+        const offset=await page.locator('#quota .quota-number').evaluate(n=>{const bounds=n.getBBox();return bounds.x+bounds.width/2-22;});
+        assert.ok(Math.abs(offset)<.1,`Glyph overhang shifted quota center for ${font}: ${offset}`);
+      }
+      await page.evaluate(()=>{for(const id of ['quota','quota-panel'])document.getElementById(id).style.fontFamily='';window.receive({});});
       await page.locator('#quota').click();
       assert.match(await page.locator('#peek').innerText(),/CUOTA DE LA CUENTA.*\n.*semanal/s);
       await page.clock.fastForward(12000);
@@ -70,6 +79,8 @@ const {pathToFileURL}=require('node:url');
       const panelQuota=page.locator('#quota-panel');
       assert.equal(await panelQuota.isVisible(),true,'Panel header does not include quota');
       assert.equal(await panelQuota.textContent(),'76%');
+      const panelOffset=await panelQuota.locator('.quota-number').evaluate(n=>{const b=n.getBBox();return b.x+b.width/2-22;});
+      assert.ok(Math.abs(panelOffset)<.1,'Panel quota was measured while hidden and stayed off-center');
       await panelQuota.click();
       assert.equal(await panelQuota.getAttribute('aria-expanded'),'true');
       assert.match(await page.locator('#quota-panel-details').innerText(),/Cuota disponible: 76 %/);

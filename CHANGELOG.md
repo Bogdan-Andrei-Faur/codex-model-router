@@ -1,5 +1,14 @@
 # Cambios
 
+## 0.7.1 — Centrado de cuota entre plataformas, 01/10/2026
+
+- Centrado horizontal del porcentaje según los límites reales del texto SVG,
+  incluidos los caracteres que sobresalen del ancho tipográfico en Windows.
+- Nueva medición al abrir cada vista; un aro oculto no conserva coordenadas
+  calculadas sin dimensiones. Centrado vertical y porcentaje conservados.
+- Regresión con varias fuentes y ambos modos. Corrige el fallo del trabajo
+  `monitor (windows-latest)` en las pipelines de `main` y `v0.7.0`.
+
 ## 0.7.0 — Contexto y cuota, 01/10/2026
 
 - Borde de contexto por agente en cápsula y actividad; conserva la órbita de

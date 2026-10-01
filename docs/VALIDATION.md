@@ -1,5 +1,21 @@
 # Validation and integration notes
 
+## Corrección CI de centrado 0.7.1 — 01/10/2026
+
+- Las ejecuciones `36830475732` (`main`) y `36830475920` (`v0.7.0`) fallaron
+  únicamente en `monitor (windows-latest)`, paso `npm run test:layout`, con
+  `Number is not horizontally centered on the quota circle`. Las otras ocho
+  combinaciones de cada ejecución terminaron correctamente.
+- `text-anchor: middle` centraba el ancho tipográfico, mientras que los límites
+  SVG incluían los salientes del carácter. Reproducido localmente con `Lato Black`
+  y `C059`: desplazamientos de aproximadamente 0.32 y 0.33 px respectivamente.
+- El número se recoloca según `getBBox()` conservando el centrado vertical por
+  las métricas de los caracteres. Al cambiar de modo se mide la vista visible;
+  los elementos ocultos pueden informar dimensiones nulas.
+- Regresión de fuentes, escalados y ambas vistas en `test_usage_layout.cjs`,
+  conservando la tolerancia de 0.1 px. La CI web no sustituye la aceptación del
+  monitor WPF nativo ni la compilación del contenedor macOS.
+
 ## Aros de contexto y cuota 0.7.0 — 01/10/2026
 
 - `python3 -m unittest discover -s tests -q`: 261 pruebas correctas. Nuevas
