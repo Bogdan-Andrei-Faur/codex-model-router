@@ -9,6 +9,20 @@ test('context gauges distinguish unknown, empty, full and latest measurement',()
   assert.match(C.contextGauge({context_window:{used_percent:37.2,capacity_tokens:1000,used_tokens:372}}).label,/37.2 %.*372 \/ 1000.*última medición/);
 });
 
+test('compaction supersedes token usage and remains distinct from missing measurements',()=>{
+  const row={context_window:{used_percent:90,capacity_tokens:100,used_tokens:90},context_compaction:{state:'compacting'}};
+  assert.equal(C.contextGauge(row).percent,null);
+  assert.equal(C.contextGauge(row).compacting,true);
+  assert.match(C.contextGauge(row).label,/Compactando contexto/);
+  row.context_compaction.state='awaiting_usage';
+  assert.equal(C.contextGauge(row).percent,null);
+  assert.equal(C.contextGauge(row).compacting,false);
+  assert.match(C.contextGauge(row).label,/esperando nueva medición/);
+  delete row.context_compaction;
+  assert.equal(C.contextGauge(row).percent,90);
+  assert.match(C.contextGauge({}).label,/sin medición/);
+});
+
 test('quota expires without a new snapshot and disconnected or missing means unknown',()=>{
   const usage={remaining_percent:76,valid_until:200,windows:[{limit_id:'codex',window:'primary',duration_minutes:10080,remaining_percent:76,resets_at:200}]};
   assert.equal(C.quotaGauge(usage,true,199).percent,76);

@@ -247,6 +247,21 @@ internal sealed partial class ModernRouterMonitor
             }
         }
         SetAgentOrbit(original, true);
+        var compactingRow = new Dictionary<string, object>(original.Row);
+        compactingRow["context_window"] = new Dictionary<string, object> { { "used_percent", 90 }, { "capacity_tokens", 100 }, { "used_tokens", 90 } };
+        compactingRow["context_compaction"] = new Dictionary<string, object> { { "state", "compacting" } };
+        UpdateAgentAvatar(original, compactingRow);
+        Check(original.CompactionRotation != null && Convert.ToString(original.Button.ToolTip).Contains("Compactando contexto"), "Compaction is indistinguishable from missing usage");
+        Check(!original.Orbit.HasAnimatedProperties, "Activity orbit must yield to compaction motion");
+        if (SystemParameters.ClientAreaAnimation) Check(original.CompactionRotation.HasAnimatedProperties && original.CompactionScale.HasAnimatedProperties, "Compaction lacks motion");
+        SetAgentOrbit(original, false);
+        Check(!original.CompactionRotation.HasAnimatedProperties && !original.CompactionScale.HasAnimatedProperties, "Hidden compaction keeps animating");
+        compactingRow["context_compaction"] = new Dictionary<string, object> { { "state", "awaiting_usage" } };
+        UpdateAgentAvatar(original, compactingRow);
+        Check(original.CompactionRotation == null && Convert.ToString(original.Button.ToolTip).Contains("esperando nueva medición"), "Completed compaction still animates or shows stale usage");
+        var waitingRing = ((Grid)original.Button.Content).Children.OfType<Grid>().First(child => Convert.ToString(child.Tag) == "context-ring");
+        Check(waitingRing.Children.Count == 1, "Waiting for a fresh measurement still draws the old percentage");
+        UpdateAgentAvatar(original, activeAgentRows["ui"]);
         // Reasoning can change without changing model, task or working state.
         foreach (string level in new[] { "low", "medium", "high", "xhigh", "max", "ultra", "" })
         {

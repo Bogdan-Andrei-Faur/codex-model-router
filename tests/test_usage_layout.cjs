@@ -92,12 +92,44 @@ const {pathToFileURL}=require('node:url');
       assert.match(await page.locator('#quota-panel-details').innerText(),/sin datos actuales/);
       await panelQuota.click();
       assert.equal(await page.locator('#quota-panel-details').isVisible(),false);
+      await page.locator('#collapse').click();
+      await page.evaluate(()=>window.receive({threads:{a0:{name:'Diseñar el monitor',status:'active',model:'gpt-6.1-sol',effort:'high',agent_category:'interface',
+        context_window:{used_percent:90,used_tokens:90000,capacity_tokens:100000},context_compaction:{state:'compacting'}}},
+        accountUsage:{remaining_percent:76,valid_until:Date.now()/1000+60},ui:{mode:'Compact',reduced:false}}));
+      await page.clock.fastForward(500);
+      const compacting=page.locator('#agents .compacting-ring');
+      assert.equal(await compacting.count(),1);
+      assert.equal(await avatar.locator('.usage-progress').count(),0,'Compaction must not display a stale percentage');
+      assert.match(await avatar.getAttribute('aria-label'),/Compactando contexto/);
+      assert.equal(await avatar.locator('.orbit').evaluate(n=>getComputedStyle(n).display),'none','Compaction needs its own motion instead of the activity orbit');
+      const motion=await compacting.evaluate(n=>{
+        const animation=n.getAnimations()[0];
+        const name=getComputedStyle(n).animationName;
+        animation.currentTime=0;const first=getComputedStyle(n).transform;
+        animation.currentTime=800;const second=getComputedStyle(n).transform;
+        window.compactionTestRing=n;
+        return {name,moves:first!==second};
+      });
+      assert.equal(motion.name,'context-compacting');assert.ok(motion.moves);
+      await page.evaluate(()=>window.receive({}));
+      assert.ok(await compacting.evaluate(n=>n===window.compactionTestRing),'Heartbeat restarted the compaction animation');
+      if(width===432 && deviceScaleFactor===2 && process.env.ROUTER_COMPACTION_SCREENSHOT)await page.locator('#surface').screenshot({path:process.env.ROUTER_COMPACTION_SCREENSHOT});
+      await page.evaluate(()=>window.receive({ui:{mode:'Compact',reduced:true}}));
+      assert.equal(await compacting.evaluate(n=>getComputedStyle(n).animationName),'none');
+      assert.match(await avatar.getAttribute('aria-label'),/Compactando contexto/,'Reduced motion must still identify compaction');
+      await page.locator('#expand').click();
+      assert.equal(await page.locator('.featured-row .compacting-ring').count(),1,'Panel lost the compaction state');
+      await page.evaluate(()=>window.receive({threads:{a0:{name:'Diseñar el monitor',status:'active',model:'gpt-6.1-sol',context_compaction:{state:'awaiting_usage'}}}}));
+      assert.equal(await page.locator('.compacting-ring').count(),0,'Compaction animation stayed after completion');
+      assert.match(await page.locator('.featured-row .avatar').getAttribute('aria-label'),/esperando nueva medición/);
+      await page.evaluate(()=>window.receive({threads:{a0:{name:'Diseñar el monitor',status:'active',model:'gpt-6.1-sol',context_window:{used_percent:20,used_tokens:20000,capacity_tokens:100000}}}}));
+      assert.match(await page.locator('.featured-row .avatar').getAttribute('aria-label'),/Contexto usado: 20 %/);
       await page.evaluate(()=>window.receive({connections:0,accountUsage:{}}));
       assert.equal(await page.locator('#quota').innerText(),'—');
       assert.equal(await panelQuota.textContent(),'—');
       assert.deepEqual(errors,[]);
       await page.close();
     }
-    console.log('PASS: gauges 0/37/100/unknown, stale/disconnected quota, overflow, keyboard and aligned circles at 390/432 px × 1/1.25/1.5/2 DPI');
+    console.log('PASS: gauges, compaction lifecycle/motion/reduced motion, stale/disconnected quota, overflow, keyboard and aligned circles at 390/432 px × 1/1.25/1.5/2 DPI');
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

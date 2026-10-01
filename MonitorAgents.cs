@@ -18,6 +18,8 @@ internal sealed partial class ModernRouterMonitor
         public Border Slot;
         public Button Button;
         public RotateTransform Orbit;
+        public RotateTransform CompactionRotation;
+        public ScaleTransform CompactionScale;
         public bool Leaving, ActivityView;
     }
 
@@ -185,14 +187,19 @@ internal sealed partial class ModernRouterMonitor
         var identity = IdentifyAgent(row);
         bool working = Active(String(row, "status"));
         var context = Dict(row.ContainsKey("context_window") ? row["context_window"] : null);
-        string contextLabel = ContextLabel(context);
-        string signature = model + ":" + effort + ":" + identity.Name + ":" + String(row, "status") + Json.Serialize(context);
+        string compactionState = String(Dict(row.ContainsKey("context_compaction") ? row["context_compaction"] : null), "state");
+        bool compacting = compactionState == "compacting";
+        string contextLabel = ContextLabel(context, row);
+        string signature = model + ":" + effort + ":" + identity.Name + ":" + String(row, "status") + Json.Serialize(context) +
+            compactionState;
         System.Windows.Automation.AutomationProperties.SetName(visual.Button,
             String(row, "name", visual.Id) + " · " + model + " · " + Effort(Setting(row, "effort", "")) + " · " + Status(String(row, "status")) + " · " + contextLabel);
         visual.Button.ToolTip = contextLabel;
         if (signature == visual.Signature) return;
         visual.Signature = signature;
         if (visual.Orbit != null) visual.Orbit.BeginAnimation(RotateTransform.AngleProperty, null);
+        StopCompactionAnimation(visual);
+        visual.CompactionRotation = null; visual.CompactionScale = null;
         Brush color = BadgeColor(model, true);
         visual.Button.Background = TransparentBrush;
         // Keep the face and orbit on the same geometric center at fractional DPI.
@@ -209,7 +216,19 @@ internal sealed partial class ModernRouterMonitor
             StrokeLineJoin = PenLineJoin.Round, Width = 19, Height = 19, Stretch = Stretch.Uniform,
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         art.Children.Add(glyph);
-        art.Children.Add(UsageRing(16, ContextPercent(context), color, "context-ring"));
+        if (compacting)
+        {
+            var ring = new Grid { Tag = "compacting-ring", Width = 44, Height = 44, IsHitTestVisible = false };
+            ring.Children.Add(new System.Windows.Shapes.Path {
+                Data = Geometry.Parse("M22,6 A16,16 0 0 1 38,22 M22,38 A16,16 0 0 1 6,22"),
+                Stroke = color, StrokeThickness = 2.5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round });
+            visual.CompactionRotation = new RotateTransform(0, 22, 22);
+            visual.CompactionScale = new ScaleTransform(1, 1, 22, 22);
+            var transforms = new TransformGroup();
+            transforms.Children.Add(visual.CompactionRotation); transforms.Children.Add(visual.CompactionScale);
+            ring.RenderTransform = transforms; art.Children.Add(ring);
+        }
+        else art.Children.Add(UsageRing(16, compactionState == "awaiting_usage" ? null : ContextPercent(context), color, "context-ring"));
         var tint = ((SolidColorBrush)color).Color;
         var orbitBrush = new LinearGradientBrush();
         orbitBrush.StartPoint = new Point(0, 0); orbitBrush.EndPoint = new Point(1, 1);
@@ -217,7 +236,7 @@ internal sealed partial class ModernRouterMonitor
         orbitBrush.GradientStops.Add(new GradientStop(tint, 1));
         // Rotate a fixed square around an explicit center. A partial path's own
         // bounding box is not its circle's center and makes the orbit wobble.
-        var orbitLayer = new Grid { Tag = "orbit-sweep", Width = 44, Height = 44, IsHitTestVisible = false, Visibility = working ? Visibility.Visible : Visibility.Collapsed };
+        var orbitLayer = new Grid { Tag = "orbit-sweep", Width = 44, Height = 44, IsHitTestVisible = false, Visibility = working && !compacting ? Visibility.Visible : Visibility.Collapsed };
         orbitLayer.Children.Add(new System.Windows.Shapes.Path {
             Data = System.Windows.Media.Geometry.Parse("M22,2 A20,20 0 0 1 42,22"),
             Stroke = orbitBrush, StrokeThickness = 1.6, StrokeStartLineCap = PenLineCap.Round,
@@ -234,7 +253,20 @@ internal sealed partial class ModernRouterMonitor
     static void SetAgentOrbit(AgentAvatar visual, bool active)
     {
         if (visual.Orbit == null) return;
-        if (active && Active(String(visual.Row, "status")) && !visual.Leaving && SystemParameters.ClientAreaAnimation)
+        bool animate = active && Active(String(visual.Row, "status")) && !visual.Leaving && SystemParameters.ClientAreaAnimation;
+        if (animate && visual.CompactionRotation != null)
+        {
+            if (!visual.CompactionRotation.HasAnimatedProperties)
+            {
+                visual.CompactionRotation.BeginAnimation(RotateTransform.AngleProperty,
+                    new DoubleAnimation(0, -180, TimeSpan.FromSeconds(1.6)) { RepeatBehavior = RepeatBehavior.Forever });
+                var pulse = new DoubleAnimation(1, .84, TimeSpan.FromSeconds(.8)) { AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever };
+                visual.CompactionScale.BeginAnimation(ScaleTransform.ScaleXProperty, pulse);
+                visual.CompactionScale.BeginAnimation(ScaleTransform.ScaleYProperty, pulse);
+            }
+        }
+        else StopCompactionAnimation(visual);
+        if (animate && visual.CompactionRotation == null)
         {
             if (!visual.Orbit.HasAnimatedProperties)
             {
@@ -244,6 +276,16 @@ internal sealed partial class ModernRouterMonitor
             }
         }
         else visual.Orbit.BeginAnimation(RotateTransform.AngleProperty, null);
+    }
+
+    static void StopCompactionAnimation(AgentAvatar visual)
+    {
+        if (visual.CompactionRotation != null) visual.CompactionRotation.BeginAnimation(RotateTransform.AngleProperty, null);
+        if (visual.CompactionScale != null)
+        {
+            visual.CompactionScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+            visual.CompactionScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+        }
     }
 
     void RefreshAgentCapsule(IEnumerable<KeyValuePair<string, Dictionary<string, object>>> rows, bool animate = true)
@@ -334,7 +376,7 @@ internal sealed partial class ModernRouterMonitor
         if (mode != MonitorMode.Compact || !activeAgentRows.ContainsKey(id)) return;
         peekCloseTimer.Stop();
         var row = activeAgentRows[id];
-        string signature = id + ":" + Json.Serialize(row.Where(pair => new[] { "name", "model", "effort", "requested_model", "requested_effort", "status", "reason", "agent_category", "agent_confidence", "context_window" }.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value));
+        string signature = id + ":" + Json.Serialize(row.Where(pair => new[] { "name", "model", "effort", "requested_model", "requested_effort", "status", "reason", "agent_category", "agent_confidence", "context_window", "context_compaction" }.Contains(pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value));
         if (peekAgentId == id && signature == peekSignature) return;
         peekAgentId = id; peekSignature = signature;
         agentPeekContent.Children.Clear();
@@ -351,7 +393,7 @@ internal sealed partial class ModernRouterMonitor
         FillTags(tags, model, Effort(Setting(row, "effort", ""))); agentPeekContent.Children.Add(tags);
         var status = Txt(Status(String(row, "status")), 12, Muted); status.Margin = new Thickness(0, 10, 0, 12);
         agentPeekContent.Children.Add(status);
-        var contextText = Txt(ContextLabel(Dict(row.ContainsKey("context_window") ? row["context_window"] : null)), 12, Muted);
+        var contextText = Txt(ContextLabel(Dict(row.ContainsKey("context_window") ? row["context_window"] : null), row), 12, Muted);
         contextText.TextWrapping = TextWrapping.Wrap; contextText.Margin = new Thickness(0, 0, 0, 12);
         agentPeekContent.Children.Add(contextText);
         agentPeekContent.Children.Add(new Border { Height = 1, Background = Line });
@@ -393,8 +435,11 @@ internal sealed partial class ModernRouterMonitor
         return capacity.HasValue && capacity.Value > 0 && used.HasValue ? (double?)Math.Min(100, used.Value) : null;
     }
 
-    static string ContextLabel(Dictionary<string, object> context)
+    static string ContextLabel(Dictionary<string, object> context, Dictionary<string, object> row)
     {
+        string state = String(Dict(row.ContainsKey("context_compaction") ? row["context_compaction"] : null), "state");
+        if (state == "compacting") return "Compactando contexto…";
+        if (state == "awaiting_usage") return "Contexto: esperando nueva medición tras compactar";
         var value = ContextPercent(context);
         return value.HasValue ? "Contexto usado: " + value.Value.ToString("0.#") + " % · " +
             String(context, "used_tokens") + " / " + String(context, "capacity_tokens") + " tokens · última medición" :

@@ -115,7 +115,18 @@ function avatar(id,row,open, existing) {
     node.append(face,track,orbit,el('span','effort-dot'));
   } else node.querySelector('.glyph path').setAttribute('d',identity[1]);
   const context=C.contextGauge(row);
-  node.querySelector('.context-ring')?.remove();node.append(gaugeRing(16,context.percent,'context-ring'));
+  node.classList.toggle('compacting',!!context.compacting);
+  if(context.compacting) {
+    if(!node.querySelector('.compacting-ring')) {
+      node.querySelector('.context-ring')?.remove();
+      const ring=svg('svg',{viewBox:'0 0 44 44',class:'usage-ring context-ring compacting-ring','aria-hidden':'true'});
+      ring.append(svg('path',{d:'M22,6 A16,16 0 0 1 38,22 M22,38 A16,16 0 0 1 6,22'}));
+      ring.style.animationDelay=`-${(performance.now()%1600)/1000}s`;
+      node.append(ring);
+    }
+  } else {
+    node.querySelector('.context-ring')?.remove();node.append(gaugeRing(16,context.percent,'context-ring'));
+  }
   node.title=context.label;node.setAttribute('aria-label',node.getAttribute('aria-label')+' · '+context.label);
   return node;
 }

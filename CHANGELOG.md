@@ -1,5 +1,16 @@
 # Cambios
 
+## 0.8.0 — Indicador de compactación, 01/10/2026
+
+- Dos arcos giran y se contraen alrededor del agente mientras Codex compacta
+  su contexto, sustituyendo el aro de porcentaje y la órbita de trabajo.
+  Mismo estado y diseño en Linux, macOS y Windows, en cápsula y panel lateral.
+- Observación de `contextCompaction` por agente, con compatibilidad para
+  `thread/compacted`. Tras terminar espera una medición nueva; descarta los
+  datos durante la compactación y las finalizaciones de otros turnos/items.
+- Movimiento reducido, pausa al ocultar y limpieza al cancelar, cerrar o
+  comenzar otro turno. Regresiones Python, web, GTK y WPF preparadas.
+
 ## 0.7.2 — Cuota con formas redondeadas, 01/10/2026
 
 - Aro de cuota con trazo de 3.5 px, extremos redondos y fondo lila de 32 px;

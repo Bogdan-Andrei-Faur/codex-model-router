@@ -22,6 +22,46 @@ def context_window(usage, now=None):
     return result
 
 
+def update_context_compaction(row, method, params, now=None):
+    """Track observed item lifecycle independently of token measurements."""
+    now = time.time() if now is None else now
+    current = row.get('context_compaction') or {}
+    item = params.get('item') or {}
+    compaction_item = method in ('item/started', 'item/completed') and item.get('type') == 'contextCompaction'
+    if compaction_item or method == 'thread/compacted':
+        turn_id = params.get('turnId')
+        if turn_id and row.get('turn_id') and turn_id != row['turn_id']:
+            return  # A late item from an older turn cannot change this turn.
+        if method == 'item/completed' and current.get('item_id') and item.get('id') != current['item_id']:
+            return
+        row.pop('context_window', None)
+        row['context_compaction'] = {'state': 'compacting' if method == 'item/started' else 'awaiting_usage',
+                                     'turn_id': turn_id, 'item_id': item.get('id'), 'updated': now}
+        if method == 'item/started' and row.get('status') not in ('active', 'inProgress', 'running', 'pending'):
+            row['status'] = 'inProgress'
+        row['updated'] = now
+    elif method == 'thread/tokenUsage/updated':
+        if current.get('state') == 'compacting':
+            row.pop('context_window', None)  # In-flight measurements may still describe the old context.
+        elif 'used_percent' in (row.get('context_window') or {}):
+            row.pop('context_compaction', None)
+    elif method == 'turn/started' or method in ('thread/closed', 'thread/archived', 'thread/deleted'):
+        row.pop('context_compaction', None)
+        if current:
+            row['updated'] = now
+    elif method == 'turn/completed' and current.get('state') == 'compacting':
+        if (params.get('turn') or {}).get('status') == 'completed':
+            current.update(state='awaiting_usage', updated=now)
+        else:
+            row.pop('context_compaction', None)
+    elif method == 'thread/status/changed' and current.get('state') == 'compacting':
+        status = (params.get('status') or {}).get('type')
+        if status == 'idle':
+            current.update(state='awaiting_usage', updated=now)
+        elif status in ('notLoaded', 'error', 'failed', 'interrupted', 'closed'):
+            row.pop('context_compaction', None)
+
+
 class AccountUsage:
     """Bounded read-only RPC polling; internal replies never reach Desktop."""
     def __init__(self):

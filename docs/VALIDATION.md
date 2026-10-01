@@ -1,5 +1,23 @@
 # Validation and integration notes
 
+## Indicador de compactación 0.8.0 — 01/10/2026
+
+- El backend instalado genera esquemas v2 con `contextCompaction` en
+  `item/started` y `item/completed`. La documentación oficial describe el mismo
+  ciclo: https://learn.chatgpt.com/docs/app-server#items.
+- El router publica estados de compactación y espera de medición por agente.
+  Descarta mediciones durante la compactación y eventos de otros turnos/items;
+  cancelación, cierre o un turno nuevo retiran el estado transitorio.
+- 264 pruebas Python y 19 JavaScript correctas. Regresión web de inicio/final,
+  medición posterior, continuidad entre heartbeats, modo compacto/panel,
+  movimiento reducido y escalados fraccionarios. GTK/WebKit real pasa el mismo
+  ciclo con fixtures aislados; no se compactaron chats del usuario.
+- WPF incluye el mismo dibujo y regresiones de animación/ocultación/final.
+  La CI compila los monitores nativos de Mac y Windows y ejecuta la matriz de
+  pruebas web/Python de las tres plataformas. La aceptación visual nativa en
+  Mac/Windows sigue pendiente. Las sesiones Desktop abiertas cargarán la
+  observación nueva al volver a abrir.
+
 ## Diseño redondeado de cuota 0.7.2 — 01/10/2026
 
 - Radio de 16 px, trazo de 3.5 px con extremos redondos, fondo `#373343`

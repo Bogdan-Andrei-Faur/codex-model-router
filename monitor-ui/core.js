@@ -117,6 +117,9 @@
       (row.error_code !== undefined ? ' · RPC '+row.error_code : '');
   }
   function contextGauge(row) {
+    const phase=(row.context_compaction || {}).state;
+    if(phase==='compacting')return {percent:null,compacting:true,label:'Compactando contexto…'};
+    if(phase==='awaiting_usage')return {percent:null,compacting:false,label:'Contexto: esperando nueva medición tras compactar'};
     const usage=row.context_window || {},value=usage.used_percent;
     const known=Number.isFinite(value) && value>=0 && Number.isFinite(usage.capacity_tokens) && usage.capacity_tokens>0;
     const percent=known?Math.min(100,value):null;

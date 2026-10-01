@@ -4,7 +4,7 @@ Catálogo, tarifas, migración y evidencia de compatibilidad: [modelos 0.6.0](do
 
 ## Versión
 
-El producto usa versiones semánticas. La versión actual es **0.7.2**:
+El producto usa versiones semánticas. La versión actual es **0.8.0**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en la esquina inferior derecha del
 panel procede del archivo común `VERSION`. Cada entrega se registra en
@@ -22,6 +22,13 @@ y los tokens de la última medición. Se calcula con `last.totalTokens` y
 consumo acumulado ni vuelve a contar la caché. Es una medición entre respuestas,
 no un contador en tiempo real de cada token. Tras compactar o cambiar de modelo,
 espera una nueva medición. Los agentes hijos necesitan su propio evento.
+
+Durante la compactación, dos arcos giran y se contraen alrededor del icono del
+agente, sustituyendo el porcentaje de contexto y la órbita de trabajo. El detalle
+indica «Compactando contexto». Se activa con `item/started` de tipo
+`contextCompaction` y termina con `item/completed`; también reconoce el aviso
+antiguo `thread/compacted`. Al terminar muestra «esperando nueva medición» hasta
+recibir datos válidos. La animación respeta la preferencia de movimiento reducido.
 
 El aro lateral de la cápsula y el de la cabecera del panel muestran el
 **porcentaje de cuota disponible** de la cuenta, con el número dentro. Al

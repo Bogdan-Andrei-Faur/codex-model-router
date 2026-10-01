@@ -34,7 +34,7 @@ from phase_control import PhaseController
 from error_diagnostics import DIAGNOSTIC_FIELDS, native_error, rpc_error, clear_error
 from process_control import CommandProcesses
 from model_catalog import MODELS, migrate_config, available_routes, estimate_standard_usage, CATALOG_VERSION
-from usage_state import AccountUsage, context_window
+from usage_state import AccountUsage, context_window, update_context_compaction
 
 ROOT = Path(os.environ.get("PERSONAL_CODEX_ROUTER_ROOT", Path(__file__).resolve().parent)).resolve()
 PRODUCT_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
@@ -591,6 +591,8 @@ class Router:
                             row.setdefault("confirmation", "Configurado; sin envío observado")
                 elif method in ("item/started", "item/completed"):
                     item = params.get("item", {})
+                    if tid and item.get('type') == 'contextCompaction':
+                        self.threads.setdefault(tid, {})
                     if item.get("type") == "commandExecution":
                         turn_id = params.get("turnId") or self.threads.get(tid, {}).get("turn_id")
                         item_id = item.get("id")
@@ -673,9 +675,13 @@ class Router:
                                             phase_transition=state.get("phase_transition"), configured_model=settings["model"],
                                             configured_effort=settings.get("effort"), pipeline_mode="observation",
                                             phase_pipeline=state.get("phase_pipeline"))
-                if method == 'thread/compacted' or (method in ('item/started', 'item/completed')
-                        and (params.get('item') or {}).get('type') == 'contextCompaction'):
-                    self.threads.get(tid, {}).pop('context_window', None)
+                if tid and tid in self.threads:
+                    row = self.threads[tid]
+                    before = (row.get('context_compaction') or {}).get('state')
+                    update_context_compaction(row, method, params)
+                    after = (row.get('context_compaction') or {}).get('state')
+                    if before != after:
+                        self.log({'event': 'context_compaction', 'thread': tid, 'state': after or 'cleared'})
         except (ValueError, KeyError, TypeError, AttributeError):
             pass
         return True

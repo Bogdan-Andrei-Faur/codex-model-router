@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from usage_state import AccountUsage, context_window
+from usage_state import AccountUsage, context_window, update_context_compaction
 from router import Router
 from monitor_state import MonitorState
 from routing import DEFAULT_ROUTES
@@ -120,6 +120,59 @@ class UsageStateTests(unittest.TestCase):
                 self.assertEqual(MonitorState(root).payload()['accountUsage']['remaining_percent'], 30)
             with patch('monitor_state.time.time', return_value=113):
                 self.assertEqual(MonitorState(root).payload()['accountUsage'], {})
+
+    def test_compaction_lifecycle_is_per_agent_and_snapshot_is_visible_to_monitor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); config = root / 'config.json'
+            config.write_text(json.dumps({'routes': DEFAULT_ROUTES}))
+            router = Router(config, root / 'state')
+            router.threads = {'parent': {'status': 'active', 'turn_id': 'turn',
+                                        'context_window': {'used_percent': 90}}, 'child': {'parent': 'parent'}}
+            def event(method, **params):
+                self.assertTrue(router.server_line(json.dumps({'method': method, 'params': {'threadId': 'parent', **params}})))
+            event('item/started', turnId='turn', item={'id': 'compact', 'type': 'contextCompaction'})
+            self.assertEqual(router.threads['parent']['context_compaction']['state'], 'compacting')
+            self.assertNotIn('context_compaction', router.threads['child'])
+            event('thread/tokenUsage/updated', tokenUsage={'last': {'totalTokens': 90}, 'modelContextWindow': 100})
+            self.assertNotIn('context_window', router.threads['parent'])
+            router.log({'event': 'test_compaction'})
+            monitor = MonitorState(root, code_root=Path(__file__).resolve().parents[1])
+            self.assertEqual(monitor.payload()['threads']['parent']['context_compaction']['state'], 'compacting')
+            event('item/completed', turnId='turn', item={'id': 'compact', 'type': 'contextCompaction'})
+            self.assertEqual(router.threads['parent']['context_compaction']['state'], 'awaiting_usage')
+            event('thread/tokenUsage/updated', tokenUsage={'last': {'totalTokens': 20}})
+            self.assertEqual(router.threads['parent']['context_compaction']['state'], 'awaiting_usage')
+            event('thread/tokenUsage/updated', tokenUsage={'last': {'totalTokens': 20}, 'modelContextWindow': 100})
+            self.assertNotIn('context_compaction', router.threads['parent'])
+            self.assertEqual(router.threads['parent']['context_window']['used_percent'], 20)
+
+    def test_compaction_ignores_late_turns_and_other_item_completions(self):
+        row = {'turn_id': 'current', 'context_window': {'used_percent': 50}}
+        start = {'turnId': 'current', 'item': {'id': 'current-item', 'type': 'contextCompaction'}}
+        update_context_compaction(row, 'item/started', start, now=1)
+        for turn_id, item_id in [('old', 'current-item'), ('current', 'old-item')]:
+            update_context_compaction(row, 'item/completed',
+                {'turnId': turn_id, 'item': {'id': item_id, 'type': 'contextCompaction'}}, now=2)
+            self.assertEqual(row['context_compaction']['state'], 'compacting')
+            self.assertEqual(row['context_compaction']['updated'], 1)
+        update_context_compaction(row, 'item/started',
+            {'turnId': 'old', 'item': {'id': 'old-item', 'type': 'contextCompaction'}}, now=3)
+        self.assertEqual(row['context_compaction']['item_id'], 'current-item')
+
+    def test_compaction_stops_on_terminal_events_or_a_new_turn(self):
+        for method, params in [('turn/completed', {'turn': {'status': 'interrupted'}}),
+                               ('turn/completed', {'turn': {'status': 'failed'}}),
+                               ('turn/started', {}), ('thread/closed', {}),
+                               ('thread/status/changed', {'status': {'type': 'notLoaded'}})]:
+            row = {'context_compaction': {'state': 'compacting'}}
+            update_context_compaction(row, method, params, now=2)
+            self.assertNotIn('context_compaction', row, method)
+        for method, params in [('turn/completed', {'turn': {'status': 'completed'}}),
+                               ('thread/status/changed', {'status': {'type': 'idle'}}),
+                               ('thread/compacted', {})]:
+            row = {'context_compaction': {'state': 'compacting'}}
+            update_context_compaction(row, method, params, now=3)
+            self.assertEqual(row['context_compaction']['state'], 'awaiting_usage', method)
 
 
 if __name__ == '__main__':

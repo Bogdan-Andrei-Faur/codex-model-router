@@ -19,15 +19,34 @@ def main():
         app = Monitor(root, preview=True)
         errors = []
         started = time.monotonic()
+        def compaction_complete(web, result, _data):
+            try:
+                data = json.loads(web.evaluate_javascript_finish(result).to_string())
+                assert data['started'] and data['animated'] and data['label'] and data['completed'] and data['measured'], data
+                print(json.dumps({'webkit_gtk': True, 'quota_centered': True, 'agents_centered': True,
+                                  'panel_quota_and_details': True, 'compaction_lifecycle': True}))
+            except Exception as error:
+                errors.append(str(error))
+            finally:
+                app.quit()
         def panel_complete(web, result, _data):
             try:
                 data = json.loads(web.evaluate_javascript_finish(result).to_string())
                 assert data['visible'] and data['details'] and data['quota'] == '76%', data
-                print(json.dumps({'webkit_gtk': True, 'quota_centered': True, 'agents_centered': True,
-                                  'panel_quota_and_details': True}))
+                script = """JSON.stringify((()=>{
+                  const row={name:'Vista de prueba',status:'active',model:'gpt-6.1-sol'};
+                  window.receive({threads:{sample:{...row,context_compaction:{state:'compacting'}}},ui:{mode:'Expanded',reduced:false}});
+                  const ring=document.querySelector('.featured-row .compacting-ring');
+                  const result={started:!!ring,animated:!!ring&&getComputedStyle(ring).animationName==='context-compacting',
+                    label:document.querySelector('.featured-row .avatar').getAttribute('aria-label').includes('Compactando contexto')};
+                  window.receive({threads:{sample:{...row,context_compaction:{state:'awaiting_usage'}}}});
+                  result.completed=!document.querySelector('.compacting-ring')&&document.querySelector('.featured-row .avatar').title.includes('esperando nueva medición');
+                  window.receive({threads:{sample:{...row,context_window:{used_percent:20,used_tokens:20,capacity_tokens:100}}}});
+                  result.measured=document.querySelector('.featured-row .avatar').title.includes('Contexto usado: 20 %');
+                  return result;})())"""
+                app.web.evaluate_javascript(script, -1, None, app.page, None, compaction_complete, None)
             except Exception as error:
                 errors.append(str(error))
-            finally:
                 app.quit()
         def inspect_panel():
             script = """JSON.stringify((()=>{
