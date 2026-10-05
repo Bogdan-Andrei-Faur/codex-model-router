@@ -90,6 +90,24 @@ class DockerAdapterTests(unittest.TestCase):
                     sandbox.run_sandbox(root, str(root / 'worker.py'))
             run.assert_not_called()
 
+    @unittest.skipIf(os.name == 'nt', 'Windows temp alias covered by lifecycle tests')
+    def test_ancestor_alias_resolves_but_argument_escape_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp); root = base / 'actual'; root.mkdir()
+            (root / 'worker.py').write_text('pass')
+            alias = base / 'alias'; alias.symlink_to(root, target_is_directory=True)
+            calls = []
+            def run(cmd, **kwargs):
+                calls.append(cmd)
+                body = b'{"Status":"exited","ExitCode":0,"Error":""}' if 'inspect' in cmd else b''
+                return subprocess.CompletedProcess(cmd, 0, body, b'')
+            with patch.object(sandbox, 'docker_command', return_value=['docker']), \
+                    patch.object(sandbox.subprocess, 'run', side_effect=run):
+                sandbox.run_sandbox(alias, str(alias / 'worker.py'))
+                self.assertEqual(calls[0][-1], '/grader/worker.py')
+                with self.assertRaisesRegex(sandbox.SandboxUnavailable, 'grader_argument_outside_root'):
+                    sandbox.run_sandbox(root, str(root / '..' / 'outside.py'))
+
     @unittest.skipIf(os.name == 'nt', 'Container guard imports Linux resource module')
     def test_missing_effective_controls_stop_before_candidate_loading(self):
         from tests import grader_limits as limits

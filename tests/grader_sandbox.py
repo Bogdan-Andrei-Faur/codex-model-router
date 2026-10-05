@@ -54,7 +54,9 @@ def run_sandbox(root, *args, timeout=4):
         path = Path(arg)
         if path.is_absolute():
             try:
-                relative = path.relative_to(root)
+                # macOS /var -> /private/var and Windows short-name temp
+                # aliases must use the same canonical spelling as the root.
+                relative = path.resolve().relative_to(root)
             except ValueError:
                 raise SandboxUnavailable('grader_argument_outside_root') from None
             translated.append('/grader/' + relative.as_posix())
