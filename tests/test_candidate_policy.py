@@ -143,6 +143,9 @@ class CandidatePolicyTests(unittest.TestCase):
         result=mcp_overrides('[mcp_servers.atlas]\n[mcp_servers."safe-name".env]\n[mcp_servers.\'literal\']')
         self.assertEqual(len(result),3)
         self.assertTrue(all(v is False for v in result.values()))
+        self.assertEqual(mcp_overrides('[mcp_servers] # parent\n# empty\n\n[mcp_servers.safe]\nurl="ignored"'),
+                         {'mcp_servers.safe.enabled':False})
+        with self.assertRaises(ValueError):mcp_overrides('[mcp_servers."server.with.dots"]')
         for text in ('[mcp_servers]\na={}', 'mcp_servers = { a = {} }'):
             with self.assertRaises(ValueError):mcp_overrides(text)
 

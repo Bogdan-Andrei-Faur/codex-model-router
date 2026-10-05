@@ -68,9 +68,18 @@ def client_for(config_path):
 
 
 def mcp_overrides(text):
-    # Fail closed on root/inline tables rather than silently missing servers.
+    # An empty parent table is valid TOML. Inline server definitions inside it
+    # still fail closed rather than silently leaving a configured MCP enabled.
     result={}
+    parent=False
     for line in text.splitlines():
+        stripped=line.strip()
+        if parent and stripped and not stripped.startswith(('#','[')):
+            raise ValueError('unsupported_mcp_config')
+        if re.fullmatch(r'\s*\[mcp_servers\]\s*(?:#.*)?',line):
+            parent=True
+            continue
+        if stripped.startswith('['):parent=False
         if not re.match(r'^\s*\[.*mcp_servers',line):
             if re.match(r'^\s*mcp_servers\s*=',line):
                 raise ValueError('unsupported_mcp_config')
@@ -78,6 +87,8 @@ def mcp_overrides(text):
         match=re.fullmatch(r'''\s*\[mcp_servers\.(?:([A-Za-z0-9_-]+)|"([^"\\\n]+)"|'([^'\n]+)')(?:\.[^\]]+)?\]\s*(?:#.*)?''',line)
         if not match:raise ValueError('unsupported_mcp_config')
         name=next(x for x in match.groups() if x)
+        if not re.fullmatch(r'[A-Za-z0-9_-]+',name):
+            raise ValueError('unsupported_mcp_config')
         result['mcp_servers.'+name+'.enabled']=False
     return result
 

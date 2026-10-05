@@ -25,7 +25,7 @@ from desktop_runtime import discover
 from task_modes import read_mode
 from phase_tracking import phase_update, proposed_phase
 from inference_telemetry import LocalInferenceTelemetry
-from inference_attribution import COUNTERS as ATTRIBUTION_COUNTERS, attribute
+from inference_attribution import COUNTERS as ATTRIBUTION_COUNTERS, COMPLETION_FIELDS, attribute
 from workload import effective_context, merge_contract, plan_steps, context_for_engine, resumes_work, cancels_work
 from state_store import (recover_tasks, persist_task, append_record, append_prompt_record,
                          compact_history, compact_prompt_history)
@@ -321,6 +321,9 @@ class Router:
                     self.inference_ids = {event_id}
             if completion:
                 self.stats["telemetry_events"] += 1
+                for field in COMPLETION_FIELDS:
+                    if record.get(field) is None or record.get(field) == '':
+                        self.stats['telemetry_completion_missing_' + field] += 1
             for field in ('thread_id', 'turn_id', 'timestamp'):
                 if record.get(field) is None or record.get(field) == '':
                     self.stats['telemetry_missing_' + field] += 1
@@ -329,6 +332,7 @@ class Router:
                 self.stats['telemetry_' + rejection] += 1
                 if completion:
                     self.stats["telemetry_unattributed"] += 1
+                    self.stats['telemetry_completion_' + rejection] += 1
                     self.log({"event": "inference_unattributed", "model": model, "effort": effort, 'reason': rejection})
                 return
             tid, row = candidate

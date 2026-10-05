@@ -7,6 +7,13 @@ COUNTERS = (
     'telemetry_inactive', 'telemetry_no_candidate', 'telemetry_ambiguous',
     'telemetry_model_mismatch', 'telemetry_effort_mismatch', 'telemetry_invalid_timestamp',
 )
+REJECTIONS = ('unknown_thread', 'turn_mismatch', 'stale', 'inactive', 'no_candidate',
+              'ambiguous', 'model_mismatch', 'effort_mismatch', 'invalid_timestamp')
+COMPLETION_FIELDS = ('thread_id', 'turn_id', 'response_id', 'effort', 'timestamp')
+# Existing rejection counters include API requests and stream packets. Keep a
+# separate completion denominator for portable evidence/health comparisons.
+COUNTERS += tuple('telemetry_completion_' + reason for reason in REJECTIONS)
+COUNTERS += tuple('telemetry_completion_missing_' + field for field in COMPLETION_FIELDS)
 
 
 def attribute(record, threads, now):

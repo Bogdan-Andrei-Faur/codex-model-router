@@ -8,6 +8,24 @@ def attr(key,value):
 
 
 class IdentityProbeTests(unittest.TestCase):
+    def test_raw_usage_identity_does_not_invent_model_or_retain_response_content(self):
+        shapes=IdentityShapes();shapes.native_thread='private-thread';shapes.native_turn='private-turn'
+        params=dict(threadId='private-thread',turnId='private-turn',responseId='private-response',
+                    usage={'inputTokens':10},items=['PRIVATE_CONTENT'],
+                    usageMetadata={'amount':'PRIVATE_AMOUNT','metadata':{'secret-key':'SECRET_VALUE'}})
+        shapes.consume_raw({'method':'rawResponse/completed','params':params})
+        shapes.consume_raw({'method':'rawResponse/completed','params':params})
+        shapes.consume_raw({'method':'rawResponse/completed','params':dict(params,turnId='older-turn')})
+        report=shapes.report()
+        raw=report['raw_response_evidence']
+        self.assertEqual(raw['counts'],dict(joined=1,duplicates=1,unjoined=1))
+        self.assertEqual(raw['methods'],{'rawResponse/completed':3})
+        self.assertEqual(raw['model_linked_responses'],0)
+        self.assertIn({'key':'usageMetadata.metadata.other_key','type':'str','count':1},raw['field_types'])
+        for value in ('private-thread','private-turn','private-response','PRIVATE_CONTENT',
+                      'PRIVATE_AMOUNT','secret-key','SECRET_VALUE'):
+            self.assertNotIn(value,json.dumps(report))
+
     def test_posterior_model_tags_require_own_conversation_and_deduplicate_logs(self):
         shapes=IdentityShapes();shapes.native_thread='private-thread'
         record={'event_kind':'response.completed','thread_id':'private-thread',

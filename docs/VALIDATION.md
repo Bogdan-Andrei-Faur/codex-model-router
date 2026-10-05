@@ -1,5 +1,17 @@
 # Validation and integration notes
 
+## Diagnóstico de atribución Ubuntu — 05/10/2026
+
+[Informe y reproducción](TELEMETRY-ATTRIBUTION.md): tres turnos aislados correctos
+reproducen la ausencia de IDs de turno/respuesta en los logs OTLP. Las dos sondas
+con eventos raw reciben una respuesta identificada y dos logs de finalización
+por turno; no hay enlace nativo que permita confirmar modelo/esfuerzo por respuesta.
+Corregido el lector de configuración MCP de las sondas y añadidos contadores de
+cobertura/rechazo exclusivos de finalizaciones en el código compartido.
+444 pruebas Python (26 omisiones de plataforma) y corpus 27/27 correctos.
+Puente habitual conectado con la revisión anterior; activación de los nuevos
+contadores pendiente de reinicio de Desktop.
+
 ## Comprobaciones para publicación y traspaso — 05/10/2026
 
 La [primera CI de la publicación](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37265778417)
