@@ -24,6 +24,15 @@ solo en POSIX y el test de hover espera el estado oculto con límite de dos
 segundos; no cambia el comportamiento del producto. Las matrices ya no cancelan
 los demás sistemas ante un fallo, para conservar todos los diagnósticos.
 
+La [tercera CI](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37266579456)
+pasa ocho de nueve trabajos, incluidos los tres monitores y Python en Windows
+y Mac. Ubuntu 3.9 detectó una aserción de tiempo de un test histórico: 352 ms
+frente a un límite de 300 ms que incluía planificación y escritura del circuito.
+El test ahora prueba timeout mientras el acceso simulado a credenciales sigue
+bloqueado, con eventos y una espera acotada. El clasificador no cambia.
+Windows CI ejecutó el self-test WebView2 nativo; esto no acredita QA de usuario,
+DPAPI real, dos pantallas ni instalación gráfica.
+
 - Fuente 0.8.1, huella `065bd68c49e922f0`: 439 pruebas Python en 24 s,
   seis omisiones por plataforma; 26 pruebas JS y siete grupos de navegador.
 - Corpus de routing 27/27 y seis casos JEV offline correctos, sin proveedor.

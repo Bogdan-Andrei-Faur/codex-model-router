@@ -197,16 +197,30 @@ class AuditRegressions(unittest.TestCase):
         self.assertEqual(native, [message])
 
     def test_classifier_total_deadline_includes_credentials(self):
-        done = threading.Event()
+        done, entered, finished = threading.Event(), threading.Event(), threading.Event()
         def slow(*args):
-            done.wait(.4)
+            entered.set()
+            done.wait(5)
             return None
+        results = []
+        def classify():
+            try:
+                results.append(run_jev({'jev': {'timeout_seconds': .1}}, self.root, {}, {}))
+            finally:
+                finished.set()
         with patch('decision_engines.jev_key', side_effect=slow):
-            started = time.monotonic()
-            result = run_jev({'jev': {'timeout_seconds': .1}}, self.root, {}, {})
-            self.assertLess(time.monotonic() - started, .3)
-            self.assertEqual(result['engine_failure'], 'timeout')
-            done.set()
+            worker = threading.Thread(target=classify, daemon=True)
+            worker.start()
+            try:
+                self.assertTrue(entered.wait(2), 'Credential lookup did not start')
+                # Prove timeout returns while credentials remain blocked;
+                # scheduler delays and circuit-state writes are not a deadline.
+                self.assertTrue(finished.wait(2), 'Deadline waited for credential lookup')
+                self.assertFalse(done.is_set())
+                self.assertEqual(results[0]['engine_failure'], 'timeout')
+            finally:
+                done.set()
+                worker.join(timeout=2)
 
     def test_forever_history_and_concurrent_process_writers(self):
         state = self.root / 'journal'; state.mkdir()
