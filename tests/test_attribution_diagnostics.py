@@ -24,12 +24,16 @@ class AttributionDiagnosticsTests(unittest.TestCase):
         self.router.threads[self.thread] = dict(turn_id='turn-current', phase_status='active',
             status='inProgress', phase_model='gpt-6-luna', phase_effort='low', phase_pipeline=[])
         self.router.current_decisions[self.thread] = 'decision-current'
+        self.event_timestamp_ns = time.time_ns() - 1_000_000_000
 
     def record(self, kind='response.completed', **changes):
         data = payload(model='gpt-6-luna', effort='low', kind=kind)
         log = data['resourceLogs'][0]['scopeLogs'][0]['logRecords'][0]
         log['attributes'] = [a for a in log['attributes'] if a['key'] != 'model_reasoning_effort']
-        log.update(timeUnixNano='0', observedTimeUnixNano=str(time.time_ns()))
+        # Distinct fixtures must not rely on the host clock ticking between
+        # calls (Windows/Python 3.9 can return the same time for several calls).
+        self.event_timestamp_ns += 1_000_000
+        log.update(timeUnixNano='0', observedTimeUnixNano=str(self.event_timestamp_ns))
         record, = safe_records(data)
         return dict(record, **changes)
 
