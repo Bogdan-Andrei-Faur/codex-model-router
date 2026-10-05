@@ -24,13 +24,15 @@ from gi.repository import Gdk, Gio, GLib, Gtk, WebKit2
 
 from build_identity import identity, router_identity
 from monitor_state import MonitorState, read_json
-from state_store import atomic_json
+from state_store import atomic_json, file_lock
+from application_layout import code_root, data_root, manifest
 
-ROOT = Path(__file__).resolve().parent
+ROOT = code_root()
 
 
 class Monitor(Gtk.Application):
-    def __init__(self, root=ROOT, preview=False):
+    def __init__(self, root=None, preview=False):
+        root = Path(root) if root is not None else data_root(ROOT)
         app_id = 'local.codex.modelrouter.m' + hashlib.sha256(str(root.resolve()).encode()).hexdigest()[:20]
         super().__init__(application_id=app_id, flags=Gio.ApplicationFlags.FLAGS_NONE)
         self.root = root
@@ -47,6 +49,7 @@ class Monitor(Gtk.Application):
             self.ratio = .9
         self.ratio = min(1, max(.1, self.ratio))
         self.window = None
+        self.migration_lock = None
         self.ready = self.busy = self.action_busy = False
         self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix='monitor')
         self.keys = dict.fromkeys(('jev-typesafe', 'jev-vercel'), False)
@@ -54,20 +57,31 @@ class Monitor(Gtk.Application):
         self.history_requested = False
         self.history_revision = -1
         self.mode_request = None
-        self.page = (ROOT / 'dist/linux-ui/index.html').resolve().as_uri()
+        self.page = (ROOT / ('ui/index.html' if manifest(ROOT) else 'dist/linux-ui/index.html')).resolve().as_uri()
         self.panel_height = 760
         self.connect('activate', self.activate_window)
         self.connect('shutdown', self.shutdown)
 
     def shutdown(self, *_):
         self.model.close()
-        self.executor.shutdown(wait=False, cancel_futures=True)
+        self.executor.shutdown(wait=True, cancel_futures=True)
+        if self.migration_lock is not None:
+            self.migration_lock.__exit__(None, None, None)
+            self.migration_lock = None
 
     def activate_window(self, *_):
         if self.window:
             self.set_mode('Compact' if self.mode == 'Hidden' else self.mode)
             self.window.present()
             return
+        if not self.preview:
+            self.migration_lock = file_lock(self.root / 'state/monitor-linux.lock', timeout=.1)
+            try:
+                self.migration_lock.__enter__()
+            except TimeoutError:
+                self.migration_lock = None
+                self.quit()
+                return
         self.hold()
         self.window = Gtk.ApplicationWindow(application=self)
         self.window.set_title('Codex automático · Monitor · v' + self.model.version)
@@ -355,7 +369,7 @@ class Monitor(Gtk.Application):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('root', nargs='?', type=Path, default=ROOT)
+    parser.add_argument('root', nargs='?', type=Path, default=data_root(ROOT))
     parser.add_argument('--preview', action='store_true')
     args = parser.parse_args()
     (args.root / 'state').mkdir(mode=0o700, parents=True, exist_ok=True)

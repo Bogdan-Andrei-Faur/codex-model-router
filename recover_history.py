@@ -10,6 +10,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import uuid
+from state_store import private_open
 
 
 def recover_records(snapshot):
@@ -57,9 +59,15 @@ def recover(source, destination):
         destination.parent.mkdir(parents=True, exist_ok=True)
         text = existing + ("\n" if existing and not existing.endswith("\n") else "")
         text += "".join(json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n" for record in records)
-        temp = destination.with_suffix(".tmp")
-        temp.write_text(text, encoding="utf-8")
-        os.replace(temp, destination)
+        temp = destination.with_name(destination.name + "." + uuid.uuid4().hex + ".tmp")
+        try:
+            with private_open(temp, "x", encoding="utf-8") as stream:
+                stream.write(text)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temp, destination)
+        finally:
+            temp.unlink(missing_ok=True)
     return len(records)
 
 

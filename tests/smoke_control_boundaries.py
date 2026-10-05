@@ -28,7 +28,7 @@ from control_runtime import process_alive, process_state, safe_process_topology,
 
 
 class ControlClient(Client):
-    def __init__(self, command, scratch, marker, config):
+    def __init__(self, command, scratch, marker, config, env_overrides=None):
         self.scratch = str(Path(scratch).resolve())
         self.marker = str(Path(marker).resolve())
         self.mode = None
@@ -42,7 +42,7 @@ class ControlClient(Client):
         self.running_pids = []
         self.command_metadata = []
         self.command_topology = []
-        super().__init__(command, {"PERSONAL_CODEX_ROUTER_CONFIG": str(config)})
+        super().__init__(command, {**(env_overrides or {}), "PERSONAL_CODEX_ROUTER_CONFIG": str(config)})
 
     def next(self, timeout=45):
         message = self.messages.get(timeout=timeout)
@@ -122,13 +122,13 @@ def disabled_integrations():
     return overrides
 
 
-def command_for(overrides, endpoint, token):
+def command_for(overrides, endpoint, token, env):
     install = discover()
     command = [sys.executable, str(ROOT / "router.py")]
     for key, value in overrides.items():
         command += ["-c", key + "=" + json.dumps(value)]
     return install, command[:2] + with_loopback_telemetry(
-        command[2:] + ["app-server"], endpoint, token)
+        command[2:] + ["app-server"], endpoint, token, env=env)
 
 
 def start_thread(client, cwd, overrides, approval_policy, instructions, sandbox="read-only"):
@@ -150,7 +150,8 @@ def main():
     overrides = disabled_integrations()
     collector = Collector()
     endpoint = "http://127.0.0.1:" + str(collector.server.server_port) + "/v1/logs"
-    install, command = command_for(overrides, endpoint, collector.token)
+    env = {}
+    install, command = command_for(overrides, endpoint, collector.token, env)
     if args.native:
         command = [str(install.backend), *command[2:]]
     with tempfile.TemporaryDirectory(prefix="router-control-probe-") as scratch:
@@ -161,7 +162,7 @@ def main():
             "routes": DEFAULT_ROUTES}), encoding="utf-8")
         outside = tempfile.TemporaryDirectory(prefix="router-approval-marker-", dir=ROOT / "state")
         marker = Path(outside.name) / "control-boundary-marker"
-        client = ControlClient(command, scratch, marker, config)
+        client = ControlClient(command, scratch, marker, config, env_overrides=env)
         report = {"desktop_version": install.version, "ephemeral": True,
             "router_present": not args.native,
             "scope": "isolated native approval and cancellation callbacks", "passed": False}

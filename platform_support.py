@@ -1,5 +1,6 @@
 """Small OS boundary shared by the bridge, launcher and smoke checks."""
 import os
+import json
 from pathlib import Path
 import signal
 import select
@@ -95,17 +96,31 @@ def with_server_overrides(args, overrides):
     return [*args, *inherited, *overrides]
 
 
-def with_loopback_telemetry(args, endpoint, token=None):
+TELEMETRY_AUTH_ENV = "OTEL_EXPORTER_OTLP_LOGS_HEADERS"
+
+
+def telemetry_exporter(endpoint):
+    """Credentials use the native OTLP SDK's signal-specific environment."""
+    return 'otel.exporter={otlp-http={endpoint=' + json.dumps(endpoint) + ',protocol="json"}}'
+
+
+def with_loopback_telemetry(args, endpoint, token=None, *, env=None, traces=False):
     """Append process-local OTel settings to the app-server's own overrides."""
     index = app_server_index(args)
     if index is None:
         return list(args)
+    if token:
+        if env is None:
+            raise ValueError("private_telemetry_environment_required")
+        env[TELEMETRY_AUTH_ENV] = "Authorization=Bearer " + token
+        if traces:
+            env["OTEL_EXPORTER_OTLP_TRACES_HEADERS"] = env[TELEMETRY_AUTH_ENV]
+    exporter = telemetry_exporter(endpoint)
     overrides = [
         "-c", "otel.log_user_prompt=false",
-        "-c", 'otel.trace_exporter="none"',
+        "-c", exporter.replace('otel.exporter=', 'otel.trace_exporter=', 1) if traces else 'otel.trace_exporter="none"',
         "-c", 'otel.metrics_exporter="none"',
-        "-c", 'otel.exporter={otlp-http={endpoint="' + endpoint + '",protocol="json"' +
-        (',headers={"Authorization"="Bearer ' + token + '"}' if token else '') + '}}',
+        "-c", exporter,
     ]
     # Desktop adds -c overrides after app-server (for example its bundled MCP).
     # With both layouts present, the native CLI uses the subcommand's overrides

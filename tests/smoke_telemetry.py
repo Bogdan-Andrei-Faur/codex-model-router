@@ -41,8 +41,9 @@ def probe(binary, layout, live=False):
                     "--analytics-default-enabled", "-c", "bundled.mcp_servers.codex_app.enabled=false"]
         else:
             args += ["app-server"]
-        command = [str(binary), *with_loopback_telemetry(args, collector.endpoint, collector.token)]
-        client = Client(command)
+        env = {}
+        command = [str(binary), *with_loopback_telemetry(args, collector.endpoint, collector.token, env=env)]
+        client = Client(command, env_overrides=env)
         client.call("initialize", {"clientInfo": {"name": "router_telemetry_probe", "version": "0.2.0"}})
         client.send({"method": "initialized", "params": {}})
         effective = client.call("config/read", {"includeLayers": False})["config"]

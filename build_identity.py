@@ -15,7 +15,7 @@ def identity(root):
         return PRODUCT_VERSION, BUILD_ID
     version = (root / "VERSION").read_text(encoding="utf-8").strip()
     digest = hashlib.sha256()
-    paths = sorted([*root.glob("*.py"), *root.glob("*.cs"), *root.glob("*.swift"), *root.glob("monitor-ui/*"), *root.glob("assets/*")])
+    paths = sorted([*root.glob("*.py"), *root.glob("*.cs"), *root.glob("*.swift"), *root.glob("monitor-ui/*"), *root.glob("ui/*"), *root.glob("assets/*")])
     for path in paths:
         if path.is_file() and path.name != "build_stamp.py":
             digest.update(str(path.relative_to(root)).replace("\\", "/").encode())

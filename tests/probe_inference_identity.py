@@ -164,11 +164,9 @@ def run(live=False,traces=False,model='gpt-6-luna',effort='low',fixture=None,exe
             args=[]
             for key,value in overrides.items():args+=['-c',key+'='+json.dumps(value)]
             args+=['app-server','--analytics-default-enabled']
-            args=with_loopback_telemetry(args,collector.endpoint,collector.token)
-            if traces:
-                args=[('otel.trace_exporter={otlp-http={endpoint="'+collector.endpoint+'",protocol="json",headers={Authorization="Bearer '+collector.token+'"}}}')
-                      if a=='otel.trace_exporter="none"' else a for a in args]
-            client=Client([str(install.backend),*args])
+            env={}
+            args=with_loopback_telemetry(args,collector.endpoint,collector.token,env=env,traces=traces)
+            client=Client([str(install.backend),*args],env_overrides=env)
             client.call('initialize',{'clientInfo':{'name':'native_identity_shape_probe','version':'1'},
                                       'capabilities':{'experimentalApi':True}})
             client.send({'method':'initialized','params':{}})

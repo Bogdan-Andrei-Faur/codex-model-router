@@ -24,11 +24,11 @@ from tests.native_response_evidence import RawEvidence
 
 
 class TrialClient(Client):
-    def __init__(self,command,workspace,shapes,raw):
+    def __init__(self,command,workspace,shapes,raw,env_overrides=None):
         self.workspace=workspace;self.shapes=shapes;self.raw=raw;self.denied_requests=0
         self.turn_finished=False
         self.items=Counter()
-        super().__init__(command)
+        super().__init__(command,env_overrides=env_overrides)
 
     def next(self,timeout=45):
         message=self.messages.get(timeout=timeout)
@@ -68,7 +68,9 @@ def run_arm(case,model,effort='high',workspace=None,dynamic_specs=None,task_kind
         args=[]
         for key,value in overrides.items():args+=['-c',key+'='+json.dumps(value)]
         args+=['app-server','--analytics-default-enabled']
-        client=TrialClient([str(install.backend),*with_loopback_telemetry(args,collector.endpoint,collector.token)],workspace,shapes,raw)
+        env={}
+        command=[str(install.backend),*with_loopback_telemetry(args,collector.endpoint,collector.token,env=env)]
+        client=TrialClient(command,workspace,shapes,raw,env_overrides=env)
         client.call('initialize',{'clientInfo':{'name':'isolated_multifile_trial','version':'1'},'capabilities':{'experimentalApi':True}})
         client.send({'method':'initialized','params':{}})
         catalog=client.call('model/list',{})['data']

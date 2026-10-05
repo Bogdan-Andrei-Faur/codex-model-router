@@ -28,7 +28,7 @@ from inference_telemetry import LocalInferenceTelemetry
 from inference_attribution import COUNTERS as ATTRIBUTION_COUNTERS, COMPLETION_FIELDS, attribute
 from workload import effective_context, merge_contract, plan_steps, context_for_engine, resumes_work, cancels_work
 from state_store import (recover_tasks, persist_task, append_record, append_prompt_record,
-                         compact_history, compact_prompt_history)
+                         compact_history, compact_prompt_history, atomic_json, private_directory)
 from build_identity import identity, router_identity, POLICY_VERSION
 from request_dispatch import Dispatcher
 from phase_control import PhaseController
@@ -182,7 +182,7 @@ class Router:
         if row.get('decision_id') == fields.get('decision_id') and row.get('routing_policy_version') == candidate_policy.VERSION:
             record['routing_policy_version'] = candidate_policy.VERSION
         try:
-            self.state_dir.mkdir(parents=True, exist_ok=True)
+            private_directory(self.state_dir)
             history = self.state_dir / "history.jsonl"
             append_record(self.state_dir, record)
             self.history_writes += 1
@@ -278,10 +278,9 @@ class Router:
         self.events.append(event)
         self.events = self.events[-100:]
         try:
-            self.state_dir.mkdir(parents=True, exist_ok=True)
+            private_directory(self.state_dir)
             target = self.state_dir / ("status-%s.json" % os.getpid())
-            temp = target.with_suffix(".tmp")
-            temp.write_text(json.dumps({"version": 3, "storage_schema": 3, "product_version": BUILD[0], "build_id": BUILD[1], "router_build_id": ROUTER_BUILD,
+            atomic_json(target, {"version": 3, "storage_schema": 3, "product_version": BUILD[0], "build_id": BUILD[1], "router_build_id": ROUTER_BUILD,
                                        "routing_policy_version": POLICY_VERSION, "pid": os.getpid(), "events": self.events,
                                        "heartbeat": time.time(), "threads": self.inventory.visible(self.threads),
                                        "client_name": self.client_name, "handshake_complete": self.handshake_complete,
@@ -289,9 +288,7 @@ class Router:
                                        "catalog": {m: sorted(e) for m, e in self.catalog.items()},
                                        "stats": self.stats,
                                        "account_usage": self.account_usage.snapshot,
-                                       "telemetry": self.telemetry.snapshot() if self.telemetry else {"enabled": False}},
-                                       ensure_ascii=False, indent=2), encoding="utf-8")
-            os.replace(temp, target)
+                                       "telemetry": self.telemetry.snapshot() if self.telemetry else {"enabled": False}})
         except OSError:
             pass  # Diagnostics must never break a user's message.
 
@@ -1170,7 +1167,7 @@ def main():
         try:
             telemetry = LocalInferenceTelemetry(router.observe_inference)
             router.set_telemetry(telemetry)
-            args = with_loopback_telemetry(args, telemetry.endpoint, telemetry.token)
+            args = with_loopback_telemetry(args, telemetry.endpoint, telemetry.token, env=env)
         except OSError:
             telemetry = None
     try:

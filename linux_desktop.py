@@ -1,5 +1,6 @@
 """Reversible XDG desktop integration. Never change system launchers or sessions."""
 import base64
+from contextlib import ExitStack
 import hashlib
 import json
 import os
@@ -93,30 +94,84 @@ def registered(root):
     return target.is_file() and fingerprint(target.read_bytes()) == record['installed_sha256'] and Path(record['wrapper']).is_file()
 
 
-def install(root, config, installation, probe):
+def fallback_launcher(root, launcher):
+    """A user-owned shim survives apt removal and runs the original Exec argv."""
+    path = Path(root) / 'state/launchers/codex-desktop'
+    target = shlex.quote(str(launcher))
+    content = '#!/bin/sh\n' + 'if [ -x ' + target + ' ]; then\n'
+    content += '  export PERSONAL_CODEX_ROUTER_ROOT=' + shlex.quote(str(Path(root).resolve())) + '\n'
+    content += '  exec ' + target + ' "$@"\nfi\n'
+    content += 'unset CODEX_CLI_PATH PERSONAL_CODEX_ROUTER_CONFIG PERSONAL_CODEX_ROUTER_ROOT PERSONAL_CODEX_ROUTER_CODE_ROOT PERSONAL_CODEX_ROUTER_STATE\nexec "$@"\n'
+    atomic_text(path, content, 0o700)
+    return path
+
+
+def legacy_root(root):
+    marker = Path(root) / 'state/legacy-installation.json'
+    if not marker.exists():
+        return None
+    value = json.loads(marker.read_text())
+    source = Path(value['root']).resolve()
+    if value.get('schema') != 1 or source == Path(root).resolve():
+        raise DiscoveryError('La referencia de migración no es válida.')
+    return source if source.is_dir() else None
+
+
+def install(root, config, installation, probe, wrapper=None, launcher=None, monitor=None):
     root = Path(root)
+    packaged = wrapper is not None
+    wrapper = Path(wrapper) if packaged else root / 'dist/codex-router'
+    launcher = Path(launcher) if packaged else root / 'dist/codex-desktop'
     state = root / 'state'
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
-    with file_lock(state / 'desktop-integration.lock'):
+    with ExitStack() as locks:
+        locks.enter_context(file_lock(state / 'desktop-integration.lock'))
         record = registration(root)
         if record:
-            if record.get('platform') != 'linux' or record.get('wrapper') != str(root / 'dist/codex-router'):
+            if record.get('platform') != 'linux' or record.get('wrapper') != str(wrapper):
                 raise DiscoveryError('Existe una conexión de otra instalación; no se ha sustituido.')
             if registered(root):
+                legacy = legacy_root(root) if packaged and monitor is not None else None
+                if legacy:
+                    from linux_legacy_handoff import redirect_launchers
+                    redirect_launchers(root, legacy, wrapper, monitor, installation.backend, launcher)
                 return {'registered': True, 'message': 'Conexión ya instalada. Se aplica al siguiente arranque de Desktop.'}
             if record.get('status') == 'registered':
                 raise DiscoveryError('El acceso cambió después de instalar el selector. Se ha conservado.')
-        wrapper = root / 'dist/codex-router'
         check = subprocess.run([str(wrapper), '--version'], capture_output=True, timeout=45)
         if check.returncode or not check.stdout.startswith(b'codex-cli '):
             raise DiscoveryError('El puente no supera la prueba de arranque.')
         checks = probe(wrapper)
         source, target = desktop_source(config)
         original = source.read_bytes()
-        desired = wrapped_entry(original.decode('utf-8'), root / 'dist/codex-desktop').encode('utf-8')
+        previous = target.read_bytes() if target.exists() else None
+        previous_mode = target.stat().st_mode & 0o777 if target.exists() else None
+        rollback, rollback_mode = previous, previous_mode
+        legacy = legacy_root(root) if packaged else None
+        if legacy:
+            locks.enter_context(file_lock(legacy / 'state/desktop-integration.lock'))
+            old = registration(legacy)
+            if old and old.get('status') == 'registered':
+                from installation_migration import reject_active
+                reject_active(legacy / 'state')
+                if Path(old['target']) != target:
+                    raise DiscoveryError('La conexión anterior ha cambiado. Se ha conservado.')
+                legacy_previous = base64.b64decode(old['previous']) if old['previous'] is not None else None
+                if registered(legacy):
+                    previous = legacy_previous
+                    previous_mode = old.get('previous_mode')
+                    source = Path(old['source'])
+                    original = previous if previous is not None else source.read_bytes()
+                elif previous != legacy_previous:
+                    # After disconnecting the migrated package, the true original
+                    # is restored. Permit reconnect without reviving the old shim.
+                    raise DiscoveryError('La conexión anterior ha cambiado. Se ha conservado.')
+        if packaged:
+            launcher = fallback_launcher(root, launcher)
+        desired = wrapped_entry(original.decode('utf-8'), launcher).encode('utf-8')
         record = {'schema': 1, 'platform': 'linux', 'status': 'preparing', 'wrapper': str(wrapper),
-                  'target': str(target), 'previous': base64.b64encode(target.read_bytes()).decode('ascii') if target.exists() else None,
-                  'previous_mode': target.stat().st_mode & 0o777 if target.exists() else None,
+                  'target': str(target), 'previous': base64.b64encode(previous).decode('ascii') if previous is not None else None,
+                  'previous_mode': previous_mode,
                   'source': str(source), 'installed_sha256': fingerprint(desired),
                   'installed_at': time.time(), 'desktop_version': installation.version, 'protocol_checks': checks}
         # Persist the recovery information before touching the user's shortcut.
@@ -127,8 +182,14 @@ def install(root, config, installation, probe):
             atomic_json(state / 'desktop-integration.json', record)
         except Exception:
             if target.exists() and fingerprint(target.read_bytes()) == record['installed_sha256']:
-                restore_previous(record)
+                if rollback is None:
+                    target.unlink()
+                else:
+                    atomic_text(target, rollback.decode('utf-8'), rollback_mode or 0o644)
             raise
+    if packaged and monitor is not None and legacy:
+        from linux_legacy_handoff import redirect_launchers
+        redirect_launchers(root, legacy, wrapper, monitor, installation.backend, launcher)
     return {'registered': True, 'desktop_version': installation.version,
             'message': 'Conexión instalada. Cierra Desktop cuando terminen tus tareas y ábrelo desde su acceso habitual. La sesión actual no cambia.'}
 

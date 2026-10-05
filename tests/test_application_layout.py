@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 import application_layout as layout
-from installation_migration import import_legacy
+from installation_migration import import_legacy, MigrationError
 from state_store import atomic_json
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -91,6 +91,34 @@ class ApplicationLayoutTests(unittest.TestCase):
                 if kind=='existing':self.assertEqual((target/'owner').read_text(),'preserve')
                 else:self.assertFalse(target.exists())
                 self.assertEqual(list(Path(folder).glob('.router-import-*')),[])
+
+    def test_stopped_snapshot_with_reused_live_pid_does_not_block_import(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source=Path(folder)/'source';target=Path(folder)/'data';self.legacy(source)
+            atomic_json(source/'state/status-old.json',{'pid':os.getpid(),'heartbeat':1,
+                'events':[{'event':'heartbeat'},{'event':'bridge_stopped','exit_code':0}]})
+            result=import_legacy(source,target)
+            self.assertTrue(result['imported'])
+            self.assertEqual((source/'config.local.json').read_bytes(),(target/'config.local.json').read_bytes())
+
+    def test_live_bridge_is_not_ignored_when_an_earlier_event_says_stopped(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source=Path(folder)/'source';target=Path(folder)/'data';self.legacy(source)
+            atomic_json(source/'state/status-test.json',{'pid':os.getpid(),
+                'events':[{'event':'bridge_stopped'},{'event':'heartbeat'}]})
+            with self.assertRaises(MigrationError) as failure:import_legacy(source,target)
+            self.assertEqual(failure.exception.code,'active_bridge')
+            self.assertFalse(target.exists())
+
+    def test_invalid_and_missing_config_have_safe_specific_diagnostics(self):
+        for content,expected in ((None,'missing_config'),('{"secret":"PRIVATE_SENTINEL",','invalid_config')):
+            with tempfile.TemporaryDirectory() as folder:
+                source=Path(folder)/'source';source.mkdir();target=Path(folder)/'data'
+                if content is not None:(source/'config.local.json').write_text(content)
+                with self.assertRaises(MigrationError) as failure:import_legacy(source,target)
+                self.assertEqual(failure.exception.code,expected)
+                self.assertNotIn('PRIVATE_SENTINEL',str(failure.exception))
+                self.assertFalse(target.exists())
 
     def test_packaged_dispatch_source_fixture_uses_explicit_root_and_does_not_register(self):
         with tempfile.TemporaryDirectory() as folder:

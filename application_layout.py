@@ -39,7 +39,7 @@ def manifest(resources):
     if not path.exists():
         return None
     value = json.loads(path.read_text(encoding='utf-8'))
-    if not isinstance(value, dict) or value.get('schema') != 1 or value.get('layout') != 'macos-bundle-v1':
+    if not isinstance(value, dict) or value.get('schema') != 1 or value.get('layout') not in ('macos-bundle-v1', 'linux-deb-v1'):
         raise ValueError('Manifiesto de instalación no compatible.')
     return value
 

@@ -12,6 +12,7 @@ import math
 import re
 from pathlib import Path
 import secrets
+import struct
 import sys
 import time
 import uuid
@@ -22,9 +23,76 @@ from model_catalog import MODELS
 from outcome_evaluation import evaluate_checks, record_check
 from trial_evaluation import evaluate_trials, record_attempt
 from error_diagnostics import ERROR_TYPES, HTTP_ERRORS
+from state_store import private_open
 
 SCHEMA = 'router-evidence/2'
 MAX_FILE = 128 * 1024 * 1024
+MAX_TOTAL_BYTES = 64 * 1024 * 1024
+MAX_MEMBERS = 1024
+MAX_LINES = 100000
+MAX_RECORDS = 50000
+MAX_SNAPSHOTS = 10000
+MAX_LINE = 256 * 1024
+MAX_JSON = 2 * 1024 * 1024
+MAX_OUTPUT = 64 * 1024 * 1024
+MAX_CENTRAL_DIRECTORY = 1024 * 1024
+
+
+class EvidenceBudget:
+    def __init__(self):
+        self.bytes = self.members = self.lines = self.output = 0
+
+    def consume(self, field, count, maximum):
+        value = getattr(self, field) + count
+        if value > maximum:
+            raise ValueError('evidence_budget_exceeded')
+        setattr(self, field, value)
+
+    def lines_from(self, stream):
+        first = True
+        while True:
+            line = stream.readline(MAX_LINE + 1)
+            if not line:
+                return
+            self.consume('bytes', len(line), MAX_TOTAL_BYTES)
+            self.consume('lines', 1, MAX_LINES)
+            if len(line) > MAX_LINE:
+                raise ValueError('evidence_line_too_large')
+            yield line.decode('utf-8-sig' if first else 'utf-8')
+            first = False
+
+    def json_from(self, stream):
+        data = stream.read(MAX_JSON + 1)
+        self.consume('bytes', len(data), MAX_TOTAL_BYTES)
+        if len(data) > MAX_JSON:
+            raise ValueError('evidence_json_too_large')
+        return json.loads(data.decode('utf-8-sig'))
+
+
+def check_zip_budget(stream):
+    """Bound central-directory allocation before ZipFile builds Python objects."""
+    stream.seek(0, 2)
+    size = stream.tell()
+    if size > MAX_TOTAL_BYTES:
+        raise ValueError('evidence_budget_exceeded')
+    stream.seek(max(0, size - 65557))
+    tail = stream.read(65557)
+    start = tail.rfind(b'PK\x05\x06')
+    if start < 0 or len(tail) - start < 22:
+        raise BadZipFile('missing_directory')
+    _, disk, directory_disk, local_count, count, directory_bytes, _, comment = struct.unpack_from('<4s4H2LH', tail, start)
+    if len(tail) - start != 22 + comment or disk or directory_disk or local_count != count:
+        raise BadZipFile('unsupported_directory')
+    # ZipFile may override even small classic EOCD fields from a ZIP64 record.
+    # Evidence's budgets do not need ZIP64: reject it before metadata parsing.
+    end_offset = size - len(tail) + start
+    if end_offset >= 20:
+        stream.seek(end_offset - 20)
+        if stream.read(4) == b'PK\x06\x07':
+            raise ValueError('zip64_evidence_not_supported')
+    if count > MAX_MEMBERS or directory_bytes > MAX_CENTRAL_DIRECTORY:
+        raise ValueError('evidence_budget_exceeded')
+    stream.seek(0)
 IDENTITIES = ('decision_id','thread','turn_id','phase_id','session','runtime_instance','inference_event_id',
               'evaluation_id','workload_id','check_id','trial_run_id','engine_comparison_id')
 ENUMS = {
@@ -157,21 +225,26 @@ def export(source, output, platform='unknown', version=None):
     if platform not in ('macos','ubuntu','windows','unknown') or (version is not None and (not isinstance(version,str) or not re.fullmatch(r'\d{1,3}\.\d{1,3}\.\d{1,3}',version))):
         raise ValueError('invalid_export_scope')
     key = secrets.token_bytes(32); cutoff = time.time(); records = []; snapshots = []; malformed = 0; duplicates = 0; seen = set()
-    def history(data):
+    budget = EvidenceBudget()
+    def history(stream):
         nonlocal malformed, duplicates
-        for line in data.decode('utf-8-sig').splitlines():
+        for line in budget.lines_from(stream):
             if not line.strip():
                 continue
             try:
                 raw = json.loads(line)
                 row = scrub(raw,key)
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, RecursionError):
                 malformed += 1; continue
             if row is None or row.get('time',0) > cutoff:
                 continue
             fingerprint = hashlib.sha256(json.dumps(raw,sort_keys=True,separators=(',',':')).encode()).digest()
             if fingerprint in seen:
                 duplicates += 1; continue
+            if len(records) >= MAX_RECORDS:
+                raise ValueError("evidence_budget_exceeded")
+            encoded = json.dumps(row, separators=(",", ":"))
+            budget.consume("output", len(encoded.encode("utf-8")) + 1, MAX_OUTPUT)
             seen.add(fingerprint); records.append(row)
     def snapshot(raw):
         if not isinstance(raw,dict):
@@ -185,43 +258,73 @@ def export(source, output, platform='unknown', version=None):
         for field in ('stats','telemetry'):
             values = raw.get(field)
             result[field] = {k:v for k,v in values.items() if k in SNAPSHOT_FIELDS and type(v) in (int,float) and math.isfinite(v) and 0 <= v <= 10**12} if isinstance(values,dict) else {}
+        if not result["stats"] and not result["telemetry"] and "heartbeat" not in result:
+            return
+        if len(snapshots) >= MAX_SNAPSHOTS:
+            raise ValueError("evidence_budget_exceeded")
+        budget.consume("output", len(json.dumps(result).encode("utf-8")), MAX_OUTPUT)
         snapshots.append(result)
     if source.is_dir():
         for filename in ('history.jsonl','history.recovered.jsonl'):
             path = source/filename
             if path.exists():
+                budget.consume('members', 1, MAX_MEMBERS)
                 with path.open('rb') as stream:
                     import os
-                    size = min(os.fstat(stream.fileno()).st_size, MAX_FILE+1)
-                    data = stream.read(size)
-                if len(data) > MAX_FILE:
-                    raise ValueError('history_file_too_large')
-                history(data)
-        for path in sorted(source.glob('status-*.json')):
-            if path.stat().st_size <= MAX_FILE:
-                try: snapshot(json.loads(path.read_text(encoding='utf-8-sig')))
-                except (ValueError,OSError): malformed += 1
+                    if os.fstat(stream.fileno()).st_size > MAX_FILE:
+                        raise ValueError('history_file_too_large')
+                    history(stream)
+        for path in source.glob('status-*.json'):
+            budget.consume('members', 1, MAX_MEMBERS)
+            with path.open('rb') as stream:
+                try:
+                    raw = budget.json_from(stream)
+                except (json.JSONDecodeError, UnicodeError, RecursionError):
+                    malformed += 1
+                    continue
+                snapshot(raw)
     else:
-        with ZipFile(source) as z:
-            names = z.namelist()
-            if len(names) != len(set(names)):
-                raise ValueError('duplicate_archive_members')
-            for name in names:
-                info = z.getinfo(name)
-                if info.file_size > MAX_FILE:
-                    raise ValueError('archive_member_too_large')
-                if name.endswith(('data/history.jsonl','data/history.recovered.jsonl')) or name == 'events.jsonl':
-                    history(z.read(name))
-                elif name.endswith('data/bridge_snapshots.jsonl'):
-                    for line in z.read(name).decode('utf-8-sig').splitlines():
-                        try: snapshot(json.loads(line))
-                        except ValueError: malformed += 1
-                elif '/status/status-' in name and name.endswith('.json'):
-                    try: snapshot(json.loads(z.read(name)))
-                    except ValueError: malformed += 1
-                elif name == 'snapshots.json':
-                    for raw in json.loads(z.read(name)):
-                        snapshot(raw)
+        with source.open('rb') as archive:
+            check_zip_budget(archive)
+            with ZipFile(archive) as z:
+                names = z.namelist()
+                if len(names) > MAX_MEMBERS:
+                    raise ValueError('evidence_budget_exceeded')
+                if len(names) != len(set(names)):
+                    raise ValueError('duplicate_archive_members')
+                for name in names:
+                    budget.consume('members', 1, MAX_MEMBERS)
+                    info = z.getinfo(name)
+                    if info.file_size > MAX_FILE:
+                        raise ValueError('archive_member_too_large')
+                    if name.endswith(('data/history.jsonl','data/history.recovered.jsonl')) or name == 'events.jsonl':
+                        with z.open(info) as stream:
+                            history(stream)
+                    elif name.endswith('data/bridge_snapshots.jsonl'):
+                        with z.open(info) as stream:
+                            for line in budget.lines_from(stream):
+                                try:
+                                    raw = json.loads(line)
+                                except (ValueError, RecursionError):
+                                    malformed += 1
+                                    continue
+                                snapshot(raw)
+                    elif ('/status/status-' in name and name.endswith('.json')) or name == 'snapshots.json':
+                        with z.open(info) as stream:
+                            try:
+                                raw = budget.json_from(stream)
+                            except (json.JSONDecodeError, UnicodeError, RecursionError):
+                                malformed += 1
+                                continue
+                        if name == 'snapshots.json':
+                            if not isinstance(raw, list):
+                                raise ValueError('invalid_snapshot_array')
+                            if len(raw) > MAX_SNAPSHOTS:
+                                raise ValueError('evidence_budget_exceeded')
+                            for row in raw:
+                                snapshot(row)
+                        else:
+                            snapshot(raw)
     if version:
         selected = {r.get('decision_id') for r in records if r.get('event') == 'decision_created' and r.get('product_version') == version}
         records = [r for r in records if r.get('product_version') == version or (r.get('decision_id') in selected and 'product_version' not in r)]
@@ -238,11 +341,15 @@ def export(source, output, platform='unknown', version=None):
                                'Different platforms/workloads/windows are descriptive, not a controlled platform experiment.',
                                'Token snapshots and standard estimates are not billed cost.']}
     contents = {'events.jsonl':''.join(json.dumps(r,separators=(',',':'))+'\n' for r in records),
-                'summary.json':json.dumps(summary,indent=2), 'snapshots.json':json.dumps(snapshots,indent=2)}
+                'summary.json':json.dumps(summary,indent=2), 'snapshots.json':json.dumps(snapshots,separators=(',',':'))}
+    # Every successful export must be readable under the same import budgets.
+    if len(contents['snapshots.json'].encode('utf-8')) > MAX_JSON:
+        raise ValueError('evidence_json_too_large')
     manifest['sha256'] = {name:hashlib.sha256(value.encode()).hexdigest() for name,value in contents.items()}
     # Exclusive output creation preserves prior exports and avoids replacing input.
-    with output.open('xb') as stream:
-        if sys.platform != 'win32': output.chmod(0o600)
+    if sum(len(value.encode('utf-8')) for value in contents.values()) > MAX_OUTPUT:
+        raise ValueError('evidence_budget_exceeded')
+    with private_open(output, 'xb') as stream:
         with ZipFile(stream,'w',ZIP_DEFLATED) as z:
             for name,value in contents.items(): z.writestr(name,value)
             z.writestr('manifest.json',json.dumps(manifest,indent=2))

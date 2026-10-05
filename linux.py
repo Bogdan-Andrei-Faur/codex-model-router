@@ -11,8 +11,10 @@ import sys
 from desktop_runtime import discover_linux, DiscoveryError
 from linux_desktop import atomic_text, applications, entry_quote, app_running, desktop_source, registration
 from state_store import atomic_json
+from application_layout import code_root, data_root, manifest, installed_path, runtime_command
 
-ROOT = Path(__file__).resolve().parent
+CODE_ROOT = code_root()
+ROOT = data_root(CODE_ROOT)
 
 
 def dependencies():
@@ -82,7 +84,8 @@ def setup(app=None, entry=None):
 
 
 def open_monitor():
-    subprocess.Popen([sys.executable, str(ROOT / 'monitor_linux.py')], stdin=subprocess.DEVNULL,
+    command = runtime_command('monitor', CODE_ROOT, ROOT) if manifest(CODE_ROOT) else [sys.executable, str(CODE_ROOT / 'monitor_linux.py'), str(ROOT)]
+    subprocess.Popen(command, stdin=subprocess.DEVNULL,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
 
@@ -91,7 +94,7 @@ def launch_native(command):
         raise DiscoveryError('Falta el comando del acceso original.')
     config = ROOT / 'config.local.json'
     env = dict(os.environ)
-    wrapper = ROOT / 'dist/codex-router'
+    wrapper = installed_path(CODE_ROOT, 'bridge') if manifest(CODE_ROOT) else ROOT / 'dist/codex-router'
     if wrapper.is_file() and config.is_file():
         env.update(CODEX_CLI_PATH=str(wrapper), PERSONAL_CODEX_ROUTER_CONFIG=str(config))
         open_monitor()

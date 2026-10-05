@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import hashlib
 import json
 import os
+import stat
 from pathlib import Path
 import threading
 import time
@@ -12,13 +13,60 @@ _locks = {}
 _guard = threading.Lock()
 
 
+def private_directory(path):
+    """Seal an owned state directory without following a replacement link."""
+    path = Path(path)
+    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    info = path.lstat()
+    if not stat.S_ISDIR(info.st_mode):
+        raise OSError("unsafe_state_directory")
+    if os.name != "nt":
+        if info.st_uid != os.getuid():
+            raise OSError("unowned_state_directory")
+        path.chmod(0o700)
+    return path
+
+
+def private_open(path, mode="w", **kwargs):
+    """Create owner-only files; restrict existing descriptors before any write."""
+    path = Path(path)
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    flags = os.O_CREAT | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0)
+    if mode == "a+b":
+        flags |= os.O_RDWR | os.O_APPEND
+    elif mode in ("w", "wb", "x", "xb"):
+        flags |= os.O_WRONLY
+        if mode.startswith("x"):
+            flags |= os.O_EXCL
+    else:
+        raise ValueError("unsupported_private_open_mode")
+    fd = os.open(path, flags, 0o600)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+            raise OSError("unsafe_state_file")
+        if os.name != "nt":
+            if info.st_uid != os.getuid():
+                raise OSError("unowned_state_file")
+            os.fchmod(fd, 0o600)
+        if mode.startswith("w"):
+            os.ftruncate(fd, 0)
+        stream = os.fdopen(fd, mode, **kwargs)
+    except BaseException:
+        os.close(fd)
+        raise
+    return stream
+
+
 @contextmanager
 def file_lock(path, timeout=10):
     path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    # Generic locks also live beside migration destinations. Never change the
+    # permissions of a caller's existing shared parent or its siblings.
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     with _guard:
         local = _locks.setdefault(str(path.resolve()), threading.RLock())
-    with local, path.open("a+b") as stream:
+    with local, private_open(path, "a+b") as stream:
         stream.seek(0, 2)
         if stream.tell() == 0:
             stream.write(b"\0")
@@ -64,27 +112,25 @@ def read_records(path):
 
 def atomic_json(path, value):
     path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     temporary = path.with_name(path.name + "." + uuid.uuid4().hex + ".tmp")
     try:
-        with temporary.open("w", encoding="utf-8") as stream:
+        with private_open(temporary, "x", encoding="utf-8") as stream:
             json.dump(value, stream, ensure_ascii=False, separators=(",", ":"))
             stream.flush()
             os.fsync(stream.fileno())
-        if os.name != "nt":
-            temporary.chmod(0o600)
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
 
 
 def _append_jsonl(state, filename, lockname, record):
-    state = Path(state)
+    state = private_directory(state)
     with file_lock(state / lockname):
         history = state / filename
         # A killed writer can leave a partial final line. Isolate it before the
         # next append so recovery can still read the next valid record.
-        with history.open("a+b") as stream:
+        with private_open(history, "a+b") as stream:
             stream.seek(0, 2)
             if stream.tell():
                 stream.seek(-1, 2)
@@ -92,8 +138,6 @@ def _append_jsonl(state, filename, lockname, record):
                     stream.write(b"\n")
             stream.write((json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8"))
             stream.flush()
-        if os.name != "nt":
-            history.chmod(0o600)
 
 
 def append_record(state, record):
@@ -109,6 +153,7 @@ def compact_history(state, days, now=None):
     state = Path(state)
     if days <= 0:
         return  # Siempre means no event-count cap.
+    private_directory(state)
     now = time.time() if now is None else now
     # Older running bridges do not participate in the lock. Defer destructive
     # retention until they exit, including during an in-place product upgrade.
@@ -127,7 +172,7 @@ def compact_history(state, days, now=None):
         kept = [r for r in rows if (r.get("decision_id") in recent if r.get("decision_id") else isinstance(r.get("time"), (int, float)) and r.get("time", 0) >= cutoff)]
         temporary = state / ("history-" + uuid.uuid4().hex + ".tmp")
         try:
-            with temporary.open("w", encoding="utf-8", newline="\n") as stream:
+            with private_open(temporary, "x", encoding="utf-8", newline="\n") as stream:
                 for row in kept:
                     stream.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
                 stream.flush()
@@ -141,7 +186,7 @@ def compact_prompt_history(state, days, now=None):
     """Apply the normal history retention window to the private prompt file."""
     if days <= 0:
         return
-    state = Path(state)
+    state = private_directory(state)
     cutoff = (time.time() if now is None else now) - days * 86400
     prompts = state / "prompts.jsonl"
     with file_lock(state / "prompts.lock"):
@@ -149,13 +194,11 @@ def compact_prompt_history(state, days, now=None):
                 if isinstance(row.get("time"), (int, float)) and row["time"] >= cutoff]
         temporary = state / ("prompts-" + uuid.uuid4().hex + ".tmp")
         try:
-            with temporary.open("w", encoding="utf-8", newline="\n") as stream:
+            with private_open(temporary, "x", encoding="utf-8", newline="\n") as stream:
                 for row in rows:
                     stream.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
                 stream.flush()
                 os.fsync(stream.fileno())
-            if os.name != "nt":
-                temporary.chmod(0o600)
             os.replace(temporary, prompts)
         finally:
             temporary.unlink(missing_ok=True)
@@ -164,6 +207,7 @@ def compact_prompt_history(state, days, now=None):
 def persist_task(state, thread, row, only_if_missing=False):
     if not thread:
         return
+    state = private_directory(state)
     key = hashlib.sha256(thread.encode()).hexdigest()
     fields = {k: row[k] for k in ("agent_category", "agent_confidence", "task_contract", "task_floor",
                                   "pending_phase_floor", "pending_phase_name", "pending_phase_id", "candidate_contract") if k in row}

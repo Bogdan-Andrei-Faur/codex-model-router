@@ -46,8 +46,9 @@ def main():
         command += ["app-server"]
         collector = Collector()
         endpoint = "http://127.0.0.1:" + str(collector.server.server_port) + "/v1/logs"
-        command = command[:2] + with_loopback_telemetry(command[2:], endpoint, collector.token)
-        client = Client(command, {"PERSONAL_CODEX_ROUTER_CONFIG": str(settings)})
+        env = {"PERSONAL_CODEX_ROUTER_CONFIG": str(settings)}
+        command = command[:2] + with_loopback_telemetry(command[2:], endpoint, collector.token, env=env)
+        client = Client(command, env)
         tid = None
         report = {"desktop_version": install.version, "scope": "isolated bridge, synthetic archived task",
                   "passed": False, "archived": False}

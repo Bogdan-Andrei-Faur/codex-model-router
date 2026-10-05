@@ -198,7 +198,9 @@ def install():
     installation = discover(cfg)  # Discovery and staging before registration.
     if sys.platform == "linux":
         from linux_desktop import install as install_linux
-        return install_linux(ROOT, cfg, installation, probe_bridge)
+        options = {'wrapper': wrapper_path(), 'launcher': installed_path(CODE_ROOT, 'launcher'),
+                   'monitor': installed_path(CODE_ROOT, 'monitor')} if manifest(CODE_ROOT) else {}
+        return install_linux(ROOT, cfg, installation, probe_bridge, **options)
     wrapper = wrapper_path().resolve(strict=True)
     desired = str(wrapper)
     previous = read_environment()

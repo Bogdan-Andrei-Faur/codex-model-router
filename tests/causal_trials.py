@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 
 from tests import multifile_trials as base
-from tests.coding_trials import sandbox_command, decode
+from tests.coding_trials import require_memory_result, sandbox_command, decode
 
 HERE=Path(__file__).resolve().parent
 CASE_HASH='cb3be493bc0f2bceed667e2a8d4baae551b8bd371f2643cbfd822a6ec03c5c8f'
@@ -37,6 +37,7 @@ def grade(case,sources):
         try:
             result=subprocess.run(sandbox_command(root,str(worker),case['id'],str(candidate)),
                 cwd=root,env={'PATH':'/usr/bin:/bin'},capture_output=True,timeout=4)
+            require_memory_result(result)
             checks=decode(result.stdout) if result.returncode==0 else {}
             safe={k:v for k,v in checks.items() if k in CHECKS and type(v) is bool} if isinstance(checks,dict) else {}
             return dict(source_contract=True,**(safe or {'execution':False}))

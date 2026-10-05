@@ -19,6 +19,7 @@ import tomllib
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from desktop_runtime import discover
+from platform_support import with_loopback_telemetry
 from smoke_native import Client, ROOT
 
 MODELS = ("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-6-astra")
@@ -54,7 +55,7 @@ class Collector:
 
 
 class MatrixClient(Client):
-    def __init__(self, command, source, final_target, allow_rejection=False):
+    def __init__(self, command, source, final_target, allow_rejection=False, env_overrides=None):
         self.allow_rejection = allow_rejection
         self.source = source
         self.final_target = final_target
@@ -62,7 +63,7 @@ class MatrixClient(Client):
         self.receipt = secrets.token_hex(8)
         self.transitions = []
         self.events = []
-        super().__init__(command)
+        super().__init__(command, env_overrides=env_overrides)
 
     def change(self, thread, model, effort="medium"):
         try:
@@ -169,8 +170,9 @@ def main():
                 for key, value in overrides.items():
                     command += ["-c", key + "=" + json.dumps(value)]
                 endpoint = "http://127.0.0.1:" + str(collector.server.server_port) + "/v1/logs"
-                command += ["-c", 'otel.exporter={otlp-http={endpoint="' + endpoint + '",protocol="json",headers={"Authorization"="Bearer ' + collector.token + '"}}}', "app-server"]
-                client = MatrixClient(command, source, targets[source], allow_rejection=args.current and not args.same_model)
+                env = {}
+                command = command[:1] + with_loopback_telemetry(command[1:] + ["app-server"], endpoint, collector.token, env=env)
+                client = MatrixClient(command, source, targets[source], allow_rejection=args.current and not args.same_model, env_overrides=env)
                 client.call("initialize", {"clientInfo": {"name": "model_compatibility_probe", "version": "0.1.0"},
                     "capabilities": {"experimentalApi": True}})
                 client.send({"method": "initialized", "params": {}})

@@ -1,5 +1,75 @@
 # Validation and integration notes
 
+## Cached Linux launcher handoff — 2026-10-05
+
+After import and XDG registration, the real Desktop still executed the legacy
+bridge, monitor and Desktop entry points. This produced an
+old-data bridge and a second monitor despite an intact new Desktop shortcut.
+Package revision 7 redirects exact generated legacy launchers to the installed
+bridge/monitor and the imported data root. Original bytes and permissions are
+kept in `state/legacy-launchers.json`; unknown/custom scripts are preserved.
+
+455 Python tests passed (26 platform skips), including exact argv/root forwarding,
+idempotent adoption, package-removal fallback, custom-script preservation and
+partial-write rollback. The real GTK/WebKit package smoke test also executes a
+legacy monitor launcher while its packaged monitor is already open: the second
+command activates the same application and exits without a second WebKit window.
+The cached Desktop launcher is also exercised with a synthetic original Desktop
+command, including shell metacharacters passed as literal argv.
+This proves the launchers and singleton behavior, not activation of an already
+running Desktop backend; its next launch must be checked separately.
+
+## Offline import correction — 2026-10-05
+
+The real Ubuntu source contained a terminated `status-7303.json` snapshot whose
+PID had been reused by Chrome. Checking only whether the PID existed incorrectly
+treated it as an active bridge. Offline import now ignores a snapshot whose last
+event is `bridge_stopped`; a running bridge or a later heartbeat still blocks it.
+This shared correction applies to all three platforms. Source configuration was
+valid and was preserved.
+
+The Ubuntu first-run dialog now distinguishes a missing/malformed configuration,
+foreign platform, occupied destination, active Codex bridge and held monitor/data
+lock. Unknown exceptions remain generic to avoid exposing private data. Local
+package revision 5 includes this fix. 453 Python tests passed (26 platform skips),
+and the real packaged GTK/WebKit test accepted a terminated snapshot with a reused
+live PID while showing the specific active-Codex error for a running bridge.
+
+## Ubuntu standalone package — 2026-10-05
+
+Local artifact: `release/linux-validation/codex-model-router_0.8.1-4_all.deb`.
+SHA-256: `1557090a4f0007f85ed4a42192b5a2ab8be1619d2dde3a76dc1fc1695b1fc9a1`.
+This is a local candidate, not a published release or signed update channel.
+
+- APT lifecycle passed in clean Ubuntu 24.04/Python 3.12 and Ubuntu 26.04/Python
+  3.14 x86_64 containers: dependency resolution, unprivileged runtime, migration,
+  IPC, upgrade from revision 3 to 4, remove, purge and reinstall. Configuration
+  and synthetic history survived every step. The surviving user launcher runs
+  the original Desktop command after package removal.
+- Real GTK cancel/new/import and shared WebKit preview passed under isolated
+  D-Bus/Xvfb on Ubuntu 26.04, using extracted package resources and temporary
+  user data. No publisher signature, full GNOME compositor or ARM acceptance
+  is implied by this test.
+- The packaged bridge completed `initialize` and `model/list` against this
+  machine's official Desktop backend, with temporary router data. No inference,
+  Desktop registration or engine patch was performed.
+- 449 Python tests passed (26 platform-specific skips); routing corpus 27/27;
+  shared monitor JavaScript tests 26/26. Connection transfer tests include active
+  source refusal, external shortcut preservation, failed-write rollback,
+  disconnect/reconnect and exact argument forwarding after package removal.
+- CI now includes both Ubuntu package lifecycle variants and native GTK/WebKit
+  readiness. These new jobs have only been validated locally at this point;
+  do not reuse the earlier main CI result as evidence for this patch.
+
+The initial candidate above preceded the owner's live migration. That migration
+is now complete with package 0.8.1-8: after restarting Desktop, the installed
+build had one packaged monitor and one packaged bridge, a completed handshake,
+and 13 authenticated telemetry requests with zero rejected requests. The
+telemetry credential was absent from native process arguments and the snapshot
+mode was 0600. Original data and launcher backups were preserved.
+Applying downloaded updates, Windows setup, Mac GUI migration, distribution and
+publisher trust remain separate work.
+
 ## Diagnóstico de atribución Ubuntu — 05/10/2026
 
 [Informe y reproducción](TELEMETRY-ATTRIBUTION.md): tres turnos aislados correctos
@@ -1767,3 +1837,41 @@ This implementation is original. No upstream router source code was copied.
 - [Codex Smart Router](https://github.com/giovannimirarchi420/codex-smart-router):
   reference for routing before `turn/start` and handling collaboration-mode model
   overrides. This project does not use its classifier or separate TUI.
+# Security remediation checks (2026-10-05)
+
+The four current-source findings are addressed in shared enforcement paths:
+owner-only POSIX creation before writes, native OTLP header environment transport,
+bounded evidence import/export, and a verified memory gate before grader workers.
+These changes do not modify the official Codex backend.
+
+Evidence ceilings are 1,024 archive/directory members, 64 MiB total decoded input,
+100,000 lines (including empty/invalid/duplicate lines), 50,000 retained events,
+10,000 retained snapshots, 256 KiB per JSONL line, 2 MiB per JSON document and
+64 MiB serialized output. Snapshot output also obeys the 2 MiB JSON ceiling so
+successful exports remain reimportable. ZIP64 archives are rejected before
+Python builds their central-directory objects. Exceeding a ceiling rejects the
+operation before output creation; it does not silently truncate evidence.
+
+Run `python -m unittest discover -s tests` from a clean launcher environment,
+then `python tests/smoke_telemetry.py --layout root --layout subcommand --layout desktop`
+on each native host. The latter requests no model inference. It must receive
+authenticated native events and preserve existing configuration precedence.
+Literal `${VAR}` headers were not expanded by Ubuntu's native Codex CLI 0.159.2;
+the implementation uses `OTEL_EXPORTER_OTLP_LOGS_HEADERS` and, for explicit trace
+probes, `OTEL_EXPORTER_OTLP_TRACES_HEADERS` in the child environment instead.
+
+Every generated-code worker runs behind `tests/grader_limits.py`. It first
+sets a 256 MiB address-space ceiling and checks kernel enforcement with bounded
+heap/mmap allocations in a separate trusted process. If that check fails, it
+returns 78 before loading candidate code; callers raise
+`SandboxUnavailable('hard_grader_memory_budget_unavailable')`. The guard does
+not replace Seatbelt, CPU, file, descriptor or wall-time controls. Frozen scoring
+workers and their hashes remain unchanged.
+
+Linux quota tests cannot certify macOS. Native macOS Seatbelt compatibility,
+kernel quota enforcement and legitimate grader controls remain a release gate.
+If macOS ignores address-space limits, grading stays unavailable until a verified
+hard memory isolation mechanism is supplied; RSS polling is not an equivalent
+substitute. Native Windows/macOS telemetry checks are also separate from Ubuntu
+proof. Do not mark the original scan closed or claim a three-platform release
+from Linux-only results.

@@ -1,5 +1,55 @@
 # Ubuntu / Linux — instalación y recuperación
 
+## Paquete autónomo `.deb`
+
+`build_linux_package.py` produce un paquete sin dependencia del checkout ni de
+un entorno de desarrollo. APT instala Python del sistema, GTK/WebKit, Cairo y
+Secret Service como dependencias; no se incluye ni modifica el motor de Codex.
+Se comparte el layout de recursos/datos y la importación con macOS.
+
+El paquete instala el programa en `/usr/lib/codex-model-router` y añade
+«Codex Model Router» al menú de aplicaciones. Guarda los datos en
+`$XDG_DATA_HOME/codex-model-router`, o `~/.local/share/codex-model-router`.
+No contiene scripts de instalación que alteren directorios personales.
+
+En el primer inicio puedes cancelar, empezar de cero o seleccionar la carpeta
+anterior que contiene `config.local.json`. Antes de importar, termina las tareas
+y cierra Desktop y el monitor anterior. Se conservan ajustes, historial,
+preferencias y referencias a las claves, sin consultar sus valores. La carpeta
+original queda como respaldo; se rechazan destinos ocupados y puentes activos.
+
+Después de importar, usa **Ajustes → Conectar al inicio habitual**. El monitor
+verifica el puente y transfiere el acceso anterior solo si sigue siendo suyo.
+Los cambios externos se conservan y un fallo restaura el acceso previo. El
+paquete no reinicia Desktop; la conexión se aplica al siguiente inicio normal.
+El traspaso también redirige los tres lanzadores generados de la carpeta anterior
+(puente, monitor e inicio de Desktop):
+Desktop puede conservar sus rutas al margen del acceso `.desktop`. Cada uno
+delega en el paquete y en su misma raíz de datos, para reutilizar el monitor
+abierto. Los scripts originales quedan en un recibo privado de recuperación.
+Los lanzadores personalizados o modificados externamente no se sustituyen.
+**Desconectar** restaura el acceso original. APT puede quitar/purgar el paquete
+sin borrar datos personales; el pequeño lanzador de usuario que queda abre
+Desktop directamente cuando el paquete ya no existe.
+Si Desktop conserva una ruta antigua y el paquete ya no existe, el antiguo
+lanzador del puente delega en el backend nativo y el del monitor no abre ventanas.
+
+Construcción y comprobaciones para desarrollo:
+
+```sh
+sudo apt install python3 desktop-file-utils
+python3 build_linux_package.py --output release/linux --revision 1
+sudo apt install ./release/linux/codex-model-router_0.8.1-1_all.deb
+dbus-run-session -- xvfb-run -a /usr/bin/python3 tests/smoke_package_linux.py release/linux/*.deb
+```
+
+El sufijo `all` describe código Python independiente de CPU. La aceptación local
+se limita a x86_64: ciclo APT aislado en Ubuntu 24.04/26.04 y GTK/WebKit real en
+Ubuntu 26.04. No certifica ARM, otra distribución, la integración real de otra
+sesión ni una release pública. Los nombres Debian locales todavía no son los
+assets de publicación del actualizador. El helper de aplicación de actualizaciones
+y la distribución con autenticidad del editor siguen pendientes.
+
 ## Arquitectura
 
 Linux utiliza el router Python existente y los mismos archivos HTML/CSS/JavaScript
@@ -14,7 +64,7 @@ avisos de reinicio y sonda de cancelación de Windows. La adaptación 0.5.0 cons
 la política 7 y esos controles. Los cambios automáticos entre fases dependen del
 checkpoint y de las restricciones nativas; no se fuerza una transición rechazada.
 
-## Requisitos y preparación
+## Modo repositorio: requisitos y preparación
 
 Validado en Ubuntu 24.04, GNOME/Wayland, x86_64, Python 3.12.3 y Desktop
 26.924.22138 con backend 0.158.0-alpha.2.1. Las otras distribuciones/arquitecturas

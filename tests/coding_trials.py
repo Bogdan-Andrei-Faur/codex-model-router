@@ -62,6 +62,11 @@ def source_contract(source):
 class SandboxUnavailable(RuntimeError):pass
 
 
+def require_memory_result(result):
+    if result.returncode == 78:
+        raise SandboxUnavailable('hard_grader_memory_budget_unavailable')
+
+
 def profile(root):
     if sys.platform!='darwin' or not shutil.which('sandbox-exec'):
         raise SandboxUnavailable('verified_macos_grader_required')
@@ -79,7 +84,10 @@ def profile(root):
 
 
 def sandbox_command(root,*args):
-    return ['/usr/bin/sandbox-exec','-p',profile(root),os.path.realpath(sys.executable),'-I','-S','-B',*args]
+    sandbox_profile = profile(root)
+    guard = Path(root) / 'grader_limits.py'
+    guard.write_bytes((HERE / 'grader_limits.py').read_bytes())
+    return ['/usr/bin/sandbox-exec','-p',sandbox_profile,os.path.realpath(sys.executable),'-I','-S','-B',str(guard),*args]
 
 
 def sandbox_controls():
@@ -90,8 +98,11 @@ def sandbox_controls():
         code="import json,socket\nchecks={}\n"
         code+="for key,call in [(\"read_blocked\",lambda:open("+repr(str(secret))+")),(\"write_blocked\",lambda:open("+repr(str(inside/'write'))+",'w')),(\"network_blocked\",lambda:socket.socket().bind(('127.0.0.1',0)))]:\n"
         code+=" try:call();checks[key]=False\n except OSError:checks[key]=True\nprint(json.dumps(checks))\n"
-        result=subprocess.run(sandbox_command(inside,'-c',code),env={'PATH':'/usr/bin:/bin'},cwd=inside,
+        control = inside / 'controls.py'
+        control.write_text(code, encoding='utf-8')
+        result=subprocess.run(sandbox_command(inside,str(control)),env={'PATH':'/usr/bin:/bin'},cwd=inside,
                               capture_output=True,timeout=5)
+        require_memory_result(result)
         try:checks=json.loads(result.stdout) if result.returncode==0 else {}
         except ValueError:checks={}
         if checks!={'read_blocked':True,'write_blocked':True,'network_blocked':True}:
@@ -108,6 +119,7 @@ def grade_source(case_id,source):
         try:
             result=subprocess.run(sandbox_command(root,str(worker),case_id,str(candidate)),
                 cwd=root,env={'PATH':'/usr/bin:/bin'},capture_output=True,timeout=4)
+            require_memory_result(result)
             response=decode(result.stdout) if result.returncode==0 else None
             if not isinstance(response,dict) or not isinstance(response.get('checks'),dict):
                 return {'source_contract':True,'execution':False}

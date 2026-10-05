@@ -167,7 +167,8 @@ Mac empaquetado usa por defecto
 `~/Library/Application Support/codex-model-router`; modo repositorio conserva
 su raíz de datos anterior. No moverla manualmente con un puente activo. La
 importación offline conserva los archivos originales y rechaza destino ocupado,
-symlinks, procesos activos y cambios concurrentes; todavía no es una opción GUI.
+symlinks, procesos activos y cambios concurrentes; Ubuntu ya la integra en su
+primer inicio gráfico. La integración GUI de Mac sigue pendiente.
 Keychain/DPAPI/Secret Service no son intercambiables entre equipos por copiar blobs.
 
 Para comparar instalaciones, exportar metadatos saneados con `evidence.py export`
@@ -177,8 +178,10 @@ registros privados para rellenar una muestra incompleta.
 
 ## Pendientes en orden de continuación
 
-1. Integrar migración gráfica y activación segura, preservando preferencias,
-   historia, namespaces y propiedad del puente sin interrumpir trabajo activo.
+1. Completar la integración gráfica de migración en Mac y Windows. Ubuntu ya
+   está migrado al paquete 0.8.1-8 y validado tras reiniciar Desktop: un monitor,
+   un puente empaquetado y telemetría autenticada sin rechazos. Los datos de
+   origen se conservaron. La aceptación nativa de los otros equipos sigue pendiente.
 2. Añadir aplicación de actualización con autenticidad del editor, revalidación
    de bytes, bloqueo, recuperación/rollback y relanzamiento del monitor; mostrar
    por separado la activación pendiente del puente/Desktop.
@@ -187,13 +190,13 @@ registros privados para rellenar una muestra incompleta.
    `codex-model-router-releases` es una propuesta; no se ha creado. El propietario
    no tiene Apple Developer. No crear cuentas de pago, claves de firma, releases
    públicas ni otro repositorio sin autorización concreta.
-4. Completar paquetes GUI Windows/Ubuntu sobre el layout común, y QA real de
+4. Completar el instalador GUI Windows sobre el layout común, y QA real de
    instalación limpia/upgrade/cancelación/fallo/recuperación/desinstalación en cada
    OS. El ZIP Windows existente no es el nuevo instalador `-setup.exe`.
 5. Recoger parejas representativas de calidad/consumo con identidad suficiente
    antes de calibrar JEV o activar candidata 9; conservar resultados fallidos.
    Ver [cobertura](EVIDENCE-COVERAGE.md) y [esfuerzo](EFFORT-TRIALS.md).
 
-Consultar Atlas para saber qué controles de aprobación, cancelación y
-reinicio/reanudación de Desktop siguen abiertos en la revisión nativa actual.
-Las sondas aisladas e históricas no completan automáticamente esa aceptación.
+Owner instruction: do not use Atlas or contact the Mac/Windows agents. Each
+machine's agent is independent; coordinate through the repository or the owner.
+Isolated and historical probes do not complete native acceptance on other hosts.

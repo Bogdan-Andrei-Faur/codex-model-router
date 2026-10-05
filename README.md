@@ -64,9 +64,10 @@ nativa realizada y las pendientes figuran en [VALIDATION.md](docs/VALIDATION.md)
 ### Instaladores y actualizaciones
 
 Ajustes permite consultar versiones y preparar descargas compatibles. Hay un
-constructor de `.pkg` local para Mac con runtime incluido y datos separados del
-código. La distribución firmada, el canal público de descargas, los instaladores
-Windows/Ubuntu y la instalación/reapertura desde la aplicación siguen pendientes.
+constructor de `.pkg` local para Mac y un `.deb` para Ubuntu, con datos separados
+del código. Ubuntu integra la importación gráfica y gestiona las dependencias
+mediante APT. La distribución firmada, el canal público de descargas, el instalador
+Windows y la aplicación automática de actualizaciones siguen pendientes.
 Estado y límites: [INSTALLATION-UPDATES.md](docs/INSTALLATION-UPDATES.md).
 
 ### Evidencia comparable y evaluación

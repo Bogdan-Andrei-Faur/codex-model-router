@@ -43,8 +43,8 @@ Staging currently uses the existing data root's `state/updates` directory.
 `application_layout.py` separates immutable resources from per-user data while
 preserving legacy checkout mode. Packaged Mac defaults to
 `~/Library/Application Support/codex-model-router`; Windows/Linux user-data paths
-are defined and tested, but their native installers are not implemented by this
-slice. Existing configuration is never replaced by bootstrap. Packaged identity
+are defined and tested. Ubuntu packaging is described below; Windows setup remains
+pending. Existing configuration is never replaced by bootstrap. Packaged identity
 comes from the embedded build stamp, not a VERSION file in the data directory.
 
 `package_macos.py` builds a fresh local `.pkg` with an AppKit/WebKit host, native
@@ -71,8 +71,9 @@ coordination lock files may be created. Active bridge snapshots, occupied target
 symlinks, cross-platform config and changing files are rejected. Keychain/Secret
 Service namespace is retained without retrieving/decrypting keys. Build trees,
 unknown state, caches, status snapshots and Desktop registration are not copied.
-Import is currently a guarded library, not an integrated GUI migration or live
-handoff. The existing source-based installation has not been migrated.
+On macOS import is currently a guarded library. Ubuntu now integrates it in its
+first-run GUI, with a separately requested connection transfer. The existing live
+source-based installation has not been migrated by the package validation.
 
 The owner confirms no Apple Developer account. No Developer ID signing identity
 was found locally. The canonical source repository is confirmed private: its
@@ -82,6 +83,30 @@ a proposal, not a created repository or published release. Publisher trust,
 notarization or an explicitly chosen alternative distribution experience remain
 owner decisions. No signing account, certificate, persistent signing key, hosting
 purchase or public release was created.
+
+## Ubuntu native package implemented — 2026-10-05
+
+`build_linux_package.py` creates a `.deb` with the shared Python engine, monitor
+assets and `linux-deb-v1` manifest. Runtime dependencies are installed by APT;
+there is no development interpreter, virtualenv, checkout or pip requirement.
+The application lives in `/usr/lib/codex-model-router`, with independent XDG user
+data. Unlike the macOS runtime freeze, Ubuntu uses distribution-maintained Python
+and GTK/WebKit libraries. No official Codex engine is shipped or modified.
+
+The GTK first-run dialog supports cancel, new configuration and offline import.
+Import keeps original files and credential namespaces; activation through Settings
+verifies and transfers an owned Desktop shortcut separately. User launchers fall
+back to the original Desktop command when APT removes the package. No maintainer
+scripts read/write user homes, stop applications or register Desktop automatically.
+
+The real package is tested through APT in disposable Ubuntu 24.04 and 26.04 x86_64
+containers, using unprivileged runtime/IPC and synthetic configuration/history.
+Install, upgrade, remove, purge and reinstall retain user data. Extracted package
+tests run GTK onboarding and the shared WebKit preview under Xvfb on Ubuntu 26.04.
+CI includes these lifecycle cases plus Ubuntu native UI readiness. These checks
+do not certify a full GNOME session, ARM, publisher identity or live migration of
+the owner's installation. Local artifacts use Debian version/revision names;
+mapping tested targets to public update assets remains part of release delivery.
 
 ## Required next delivery stages
 
