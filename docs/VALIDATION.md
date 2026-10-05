@@ -16,6 +16,14 @@ simulada no es ejecución Linux nativa. Nueva fuente build `dd696111d3ce2381`,
 motor `de67953b7ece48ce`; el paquete Mac anterior sigue siendo histórico.
 El resultado de CI posterior debe consultarse por el SHA de la corrección.
 
+La [segunda CI](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37266282702)
+ya pasa Python 3.9/3.14 en Ubuntu. Reveló una comprobación de bits POSIX usada
+en Windows (no representa ACL) y una espera fija de 260 ms para un cierre de
+hover de 220 ms, insuficiente bajo carga de CI. La comprobación de bits queda
+solo en POSIX y el test de hover espera el estado oculto con límite de dos
+segundos; no cambia el comportamiento del producto. Las matrices ya no cancelan
+los demás sistemas ante un fallo, para conservar todos los diagnósticos.
+
 - Fuente 0.8.1, huella `065bd68c49e922f0`: 439 pruebas Python en 24 s,
   seis omisiones por plataforma; 26 pruebas JS y siete grupos de navegador.
 - Corpus de routing 27/27 y seis casos JEV offline correctos, sin proveedor.

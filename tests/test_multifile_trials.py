@@ -164,7 +164,8 @@ class MultifileTests(unittest.TestCase):
             self.assertEqual(len(report['attempts']),6);self.assertEqual(report['passed'],4)
             self.assertFalse(report['complete_design']);self.assertFalse(report['policy_activation_eligible'])
             self.assertNotIn('private-error',(output/'report.json').read_text())
-            self.assertEqual((output/'report.json').stat().st_mode & 0o777,0o600)
+            if sys.platform!='win32':
+                self.assertEqual((output/'report.json').stat().st_mode & 0o777,0o600)
 
     def test_prior_preflight_failures_retained_and_total_inference_bound_enforced(self):
         with tempfile.TemporaryDirectory() as tmp:
