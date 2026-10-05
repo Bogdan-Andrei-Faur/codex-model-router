@@ -21,6 +21,20 @@ from state_store import atomic_json
 
 @unittest.skipUnless(sys.platform == 'linux', 'Linux launchers and permissions')
 class LinuxPackageTests(unittest.TestCase):
+    def test_smoke_cleanup_reaps_helpers_in_independent_sessions(self):
+        worker = ('import subprocess,sys,time\n'
+                  'helper=subprocess.Popen([sys.executable,"-c","import time; time.sleep(30)"],start_new_session=True)\n'
+                  'print(helper.pid,flush=True)\ntime.sleep(30)\n')
+        check = ('import subprocess,sys\nfrom pathlib import Path\n'
+                 'from tests.smoke_package_linux import adopt_worker_descendants,stop_worker_tree\n'
+                 'adopt_worker_descendants()\n'
+                 f'worker=subprocess.Popen([sys.executable,"-c",{worker!r}],start_new_session=True,stdout=subprocess.PIPE,text=True)\n'
+                 'try:\n helper=int(worker.stdout.readline())\n'
+                 'finally:\n stop_worker_tree(worker)\n worker.stdout.close()\n'
+                 'assert not Path("/proc/"+str(helper)).exists()\n')
+        subprocess.run([sys.executable, '-c', check], check=True, timeout=15,
+                       cwd=Path(__file__).resolve().parent.parent)
+
     def test_onboarding_explains_known_failures_without_leaking_unknown_exception(self):
         error=MigrationError('active_bridge','Codex sigue abierto.')
         self.assertEqual(error_detail(error),'Codex sigue abierto.')

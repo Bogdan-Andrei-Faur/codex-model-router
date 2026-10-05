@@ -16,6 +16,41 @@ import shlex
 import signal
 
 
+def adopt_worker_descendants():
+    # WebKit helpers can start their own sessions. Become their nearest
+    # subreaper so killing the worker group cannot orphan a cache writer.
+    import ctypes
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(36, 1, 0, 0, 0) != 0:  # PR_SET_CHILD_SUBREAPER
+        raise OSError(ctypes.get_errno(), 'Unable to own smoke-test descendants')
+
+
+def stop_worker_tree(child):
+    try:
+        os.killpg(child.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    child.wait()
+    children = Path('/proc/self/task') / str(os.getpid()) / 'children'
+    deadline = time.monotonic() + 5
+    while True:
+        owned = [int(pid) for pid in children.read_text().split()]
+        if not owned:
+            return
+        for pid in owned:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            try:
+                os.waitpid(pid, os.WNOHANG)
+            except ChildProcessError:
+                pass
+        if time.monotonic() >= deadline:
+            raise RuntimeError('Smoke-test descendants did not exit before cache cleanup')
+        time.sleep(0.01)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('package', type=Path)
@@ -25,8 +60,9 @@ def main():
         exercise(args.package, args.worker_root)
         return
     # GTK/WebKit and Mesa retain background processes after Gtk.Application.quit.
-    # Let the UI process exit, then reap its private process group before removing
+    # Let the UI process exit, then reap its private process tree before removing
     # its cache. Never suppress cleanup errors or touch the user's monitor group.
+    adopt_worker_descendants()
     with tempfile.TemporaryDirectory(prefix='router-native-package-') as folder:
         child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()),
                                   str(args.package.resolve()), '--worker-root', folder],
@@ -34,11 +70,7 @@ def main():
         try:
             code = child.wait(timeout=120)
         finally:
-            try:
-                os.killpg(child.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            child.wait()
+            stop_worker_tree(child)
         if code:
             raise SystemExit(code)
 

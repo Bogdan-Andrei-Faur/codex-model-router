@@ -1933,3 +1933,14 @@ owner's Windows and Mac remain pending; hosted Linux containers and native
 monitor compilation do not certify those host integrations. No official engine
 was modified, no live model evaluation was run, and no Desktop restart or local
 runtime reinstall is required for this evaluator-only change.
+
+Follow-up CI exposed host temporary-directory aliases (`/var` vs `/private/var`
+on Mac and Windows short paths). The adapter now canonicalizes both root and
+absolute arguments, with an ancestor-alias and traversal regression. The next
+run passed both real Docker architectures and the native Python host adapters.
+Its Ubuntu GUI checks passed but cache cleanup raced again: killing a process
+group does not wait for helpers that create separate sessions. The smoke parent
+now acts as a Linux child subreaper, kills/reaps its owned descendants, then
+removes the directory. A real separate-session descendant regression and the
+revision-8 package GTK/WebKit smoke test both passed locally. This changes only
+the test harness, never the running user's monitor or Desktop processes.
