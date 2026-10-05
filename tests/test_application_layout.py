@@ -18,11 +18,13 @@ ROOT=Path(__file__).resolve().parents[1]
 
 class ApplicationLayoutTests(unittest.TestCase):
     def test_user_roots_and_relative_xdg_are_bounded(self):
-        home=Path('/synthetic/home')
+        fixture=Path.cwd().anchor
+        home=Path(fixture)/'synthetic/home'
+        local=Path(fixture)/'synthetic/local';xdg=Path(fixture)/'synthetic/xdg'
         self.assertEqual(layout.user_data_root('darwin',home,{}),home/'Library/Application Support/codex-model-router')
-        self.assertEqual(layout.user_data_root('win32',home,{'LOCALAPPDATA':'/synthetic/local'}),Path('/synthetic/local/codex-model-router'))
+        self.assertEqual(layout.user_data_root('win32',home,{'LOCALAPPDATA':str(local)}),local/'codex-model-router')
         self.assertEqual(layout.user_data_root('linux',home,{'XDG_DATA_HOME':'relative'}),home/'.local/share/codex-model-router')
-        self.assertEqual(layout.user_data_root('linux',home,{'XDG_DATA_HOME':'/synthetic/xdg'}),Path('/synthetic/xdg/codex-model-router'))
+        self.assertEqual(layout.user_data_root('linux',home,{'XDG_DATA_HOME':str(xdg)}),xdg/'codex-model-router')
 
     def test_source_layout_and_explicit_data_override_remain_compatible(self):
         with tempfile.TemporaryDirectory() as folder,patch.dict(os.environ,{},clear=True):
@@ -67,7 +69,7 @@ class ApplicationLayoutTests(unittest.TestCase):
     def test_offline_import_preserves_source_bytes_modes_and_credential_identity(self):
         with tempfile.TemporaryDirectory() as folder:
             source=Path(folder)/'source';target=Path(folder)/'data';self.legacy(source)
-            before={str(p.relative_to(source)):p.read_bytes() for p in source.rglob('*') if p.is_file()}
+            before={p.relative_to(source).as_posix():p.read_bytes() for p in source.rglob('*') if p.is_file()}
             result=import_legacy(source,target)
             self.assertTrue(result['sourcePreserved']);self.assertTrue(result['integrationPending'])
             for name,body in before.items():self.assertEqual((source/name).read_bytes(),body)

@@ -16,6 +16,9 @@ revisión. Estado de continuación: [HANDOFF.md](docs/HANDOFF.md).
   incluido, recursos/datos separados e importación offline protegida.
 - Guías y pruebas para las tres plataformas. La publicación no implica
   activación, mejora causal del routing, firma ni instalación nativa aceptada.
+- Correcciones de CI multiplataforma: fixtures con LF estable, paths sintéticos
+  nativos, shim Chromium/WebView2 y omisiones explícitas de evaluadores Seatbelt
+  fuera de macOS; se conserva el rechazo de ejecución sin sandbox.
 
 ## 0.8.1 — Compilación del indicador en Windows, 01/10/2026
 

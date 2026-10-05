@@ -2,6 +2,7 @@ import copy
 import json
 from pathlib import Path
 import tempfile
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -22,6 +23,7 @@ class ReviewGraderTests(unittest.TestCase):
             self.assertEqual(set(schema['enum']),set(case['files']))
             for path in case['files']:self.assertIn(path,case['request'])
 
+    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
     def test_known_counterexamples_pass_and_empty_submissions_miss_defects(self):
         for case,findings in zip(grading.cases(),(INTERVAL,ORDERED)):
             with self.subTest(case=case['id']):
@@ -32,6 +34,7 @@ class ReviewGraderTests(unittest.TestCase):
                 self.assertEqual(empty['missed_defects'],len(findings))
                 self.assertFalse(empty['checks']['all_defects_found'])
 
+    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
     def test_false_positive_duplicate_and_invalid_witness_are_distinct(self):
         case=grading.cases()[0]
         positive=grading.grade(case,INTERVAL+[{'function':'A','args':{'intervals':[[1,3]]}}])
@@ -45,6 +48,7 @@ class ReviewGraderTests(unittest.TestCase):
         score=grading.grade(case,invalid)
         self.assertEqual(score['invalid_witnesses'],1);self.assertEqual(score['missed_defects'],1)
 
+    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
     def test_domain_bounds_and_bool_do_not_count_as_counterexamples(self):
         case=grading.cases()[0]
         for args in ({'count':True,'size':3},{'count':0,'size':0},{'count':101,'size':1},
@@ -52,11 +56,13 @@ class ReviewGraderTests(unittest.TestCase):
             score=grading.grade(case,[{'function':'F','args':args}])
             self.assertEqual(score['verified_defects'],0);self.assertEqual(score['invalid_witnesses'],1)
 
+    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
     def test_unsubmitted_and_foreign_case_do_not_pass(self):
         case=grading.cases()[0]
         self.assertFalse(grading.grade(case,None)['checks']['submission_contract'])
         with self.assertRaises(ValueError):grading.grade(dict(case,id='foreign'),INTERVAL)
 
+    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
     def test_read_only_receipt_has_no_grader_feedback_or_archived_findings(self):
         case=grading.cases()[0];original=copy.deepcopy(case);owned=grading.Workspace(case)
         try:
@@ -137,7 +143,7 @@ class ReviewRunnerTests(unittest.TestCase):
             self.assertEqual(report['native_turn_requests'],6);self.assertEqual(report['passed'],6)
             self.assertTrue(report['complete_design']);self.assertFalse(report['policy_activation_eligible'])
             self.assertEqual(calls[0][1],'gpt-6-luna');self.assertEqual(calls[3][1],'gpt-6.1-sol')
-            with self.assertRaises(FileExistsError):run_trials(output)
+            with patch('tests.run_review_trials.sandbox_controls',return_value={}),self.assertRaises(FileExistsError):run_trials(output)
 
     def test_quality_failure_continues_but_oracle_failure_stops_and_is_excluded(self):
         sample={'status':'finished','terminal':'completed','quality_admissible':True,'inference_requests':1}

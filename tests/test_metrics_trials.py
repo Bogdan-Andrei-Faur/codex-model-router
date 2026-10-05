@@ -1,4 +1,5 @@
 import copy
+import sys
 import unittest
 
 from tests import metrics_trials as grading
@@ -6,6 +7,7 @@ from tests.run_metrics_trials import admissible
 
 
 class MetricsTrialTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
     def test_frozen_vectors_reject_regressions_and_accept_reference(self):
         for case in grading.manifest()['cases']:
             with self.subTest(case=case['id']):

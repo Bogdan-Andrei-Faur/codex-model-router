@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import tempfile
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -13,6 +14,7 @@ class ToolEvidenceTests(unittest.TestCase):
     def workspace(self,grade=None):
         return tracing.Workspace(grading.cases()[0],grade or grading.grade,grading.CHECKS)
 
+    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
     def test_failed_seed_then_repaired_test_links_revision_and_keeps_receipts(self):
         owned=self.workspace()
         try:

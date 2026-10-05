@@ -99,7 +99,11 @@ npm run test:layout
 La CI ejecuta Python 3.9/3.14 y frontend en las tres plataformas, compila AppKit
 y Windows, e intenta el self-test WebView2. Sus resultados corresponden al SHA
 del run, no a revisiones futuras. Un fixture de navegador no acredita una ventana
-nativa. No añadir `--live` a ensayos sin revisar alcance/coste: los pilotos pueden
+nativa. Los evaluadores que ejecutan código generado requieren el sandbox Seatbelt
+de macOS; esas pruebas se omiten explícitamente en Windows/Ubuntu, conservando las
+pruebas portables de contratos, guardas, metadatos y campañas. No hay fallback sin
+sandbox. `.gitattributes` conserva LF para no alterar hashes de fixtures al clonar
+en Windows. No añadir `--live` a ensayos sin revisar alcance/coste: los pilotos pueden
 crear chats y consumir Codex/JEV. No habilitar clases de política 9 ni inventar
 un recibo `state/policy-validation.json` a partir de esta publicación.
 

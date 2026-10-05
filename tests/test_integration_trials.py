@@ -2,6 +2,7 @@ import copy
 import json
 from pathlib import Path
 import tempfile
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -78,12 +79,14 @@ def apply_events(state,events):
 
 
 class IntegrationGraderTests(unittest.TestCase):
+    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
     def test_frozen_references_pass_and_seeds_fail(self):
         for case,reference in zip(grading.cases(),(TELEMETRY,CANCELLATION)):
             with self.subTest(case=case['id']):
                 self.assertTrue(all(grading.grade(case,reference).values()))
                 self.assertFalse(all(grading.grade(case,case['files']).values()))
 
+    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
     def test_telemetry_known_defects_are_detected(self):
         case=grading.cases()[0]
         mutants=[('records.py',"any(record.get(k)!=target[k] for k in scope)","False"),
@@ -95,6 +98,7 @@ class IntegrationGraderTests(unittest.TestCase):
             source=dict(TELEMETRY);source[name]=source[name].replace(old,new)
             with self.subTest(defect=old):self.assertFalse(all(grading.grade(case,source).values()))
 
+    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
     def test_cancellation_known_ordering_defects_are_detected(self):
         case=grading.cases()[1]
         mutants=[('rules.py',"if state['status'] in ('cancelled','completed','failed'):return 'ignore'","if False:return 'ignore'"),
@@ -107,6 +111,7 @@ class IntegrationGraderTests(unittest.TestCase):
             source=dict(CANCELLATION);source[name]=source[name].replace(old,new)
             with self.subTest(defect=old):self.assertFalse(all(grading.grade(case,source).values()))
 
+    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
     def test_workspace_three_files_and_final_revision_checks(self):
         case=grading.cases()[0];original=copy.deepcopy(case)
         with tempfile.TemporaryDirectory() as parent:
@@ -150,7 +155,7 @@ class IntegrationRunnerTests(unittest.TestCase):
             self.assertEqual(report['native_turn_requests'],6);self.assertEqual(report['passed'],6)
             self.assertTrue(report['complete_design']);self.assertFalse(report['policy_activation_eligible'])
             self.assertEqual(calls[0][1],'gpt-6-luna');self.assertEqual(calls[3][1],'gpt-6.1-sol')
-            with self.assertRaises(FileExistsError):run_trials(output)
+            with patch('tests.run_integration_trials.sandbox_controls',return_value={}),self.assertRaises(FileExistsError):run_trials(output)
 
     def test_infrastructure_stops_and_quality_failure_is_retained(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -11,6 +11,7 @@ const assert=require('node:assert/strict');
     const errors=[];page.on('pageerror',e=>errors.push(String(e)));
     await page.addInitScript(()=>{
       window.nativeMessages=[];
+      window.chrome=window.chrome||{};
       window.chrome.webview={postMessage:m=>{
         window.nativeMessages.push(m);
         if(m.action==='mode')queueMicrotask(()=>window.receiveUI({mode:m.value,modeRequest:m.request}));

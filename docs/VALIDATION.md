@@ -2,6 +2,20 @@
 
 ## Comprobaciones para publicación y traspaso — 05/10/2026
 
+La [primera CI de la publicación](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37265778417)
+detectó evaluadores Seatbelt ejecutados fuera de macOS, conversión CRLF de
+fixtures en Windows, dos supuestos de paths POSIX en pruebas y un shim que
+asumía `window.chrome` en Chromium. Corregidos con omisiones explícitas solo
+para ejecución nativa, `.gitattributes` LF, paths sintéticos del host y creación
+del objeto del shim. No se añade ejecución sin sandbox. La comprobación de
+destino ya existente en dos tests de campañas mantiene el control simulado.
+Tras corregir: 439 pruebas Python (6 omitidas) en Mac; 57 pruebas de estos
+módulos con selección Linux simulada (20 omisiones Seatbelt), y los siete
+grupos de interfaz con el Chromium de Playwright correctos. La selección
+simulada no es ejecución Linux nativa. Nueva fuente build `dd696111d3ce2381`,
+motor `de67953b7ece48ce`; el paquete Mac anterior sigue siendo histórico.
+El resultado de CI posterior debe consultarse por el SHA de la corrección.
+
 - Fuente 0.8.1, huella `065bd68c49e922f0`: 439 pruebas Python en 24 s,
   seis omisiones por plataforma; 26 pruebas JS y siete grupos de navegador.
 - Corpus de routing 27/27 y seis casos JEV offline correctos, sin proveedor.

@@ -83,7 +83,7 @@ def import_legacy(source, destination, platform=None):
                 if directory.is_symlink(): raise ValueError('La instalación contiene enlaces no compatibles.')
                 if not directory.exists():continue
                 for path in directory.iterdir():
-                    if path.is_symlink() or not re.fullmatch('[0-9a-f]{64}\.json',path.name):
+                    if path.is_symlink() or not re.fullmatch(r'[0-9a-f]{64}\.json',path.name):
                         raise ValueError('La instalación contiene datos de tareas no compatibles.')
                     copy_stable(path,temporary/'state'/name/path.name);count+=1
             # Retain Keychain/Secret Service identity without ever retrieving keys.

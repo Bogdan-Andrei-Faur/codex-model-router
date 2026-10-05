@@ -1,0 +1,6 @@
+# Frozen fixtures and grader source hashes must survive Windows checkouts.
+* text=auto eol=lf
+*.png -text
+*.ico -text
+*.zip -text
+*.pkg -text
