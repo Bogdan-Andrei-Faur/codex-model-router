@@ -78,3 +78,9 @@ native monitor checks on Windows/macOS/Linux. GitHub's macOS ARM runners cannot
 run nested virtualization, so they do not run Docker Desktop integration. Actual
 Docker Desktop setup/file-sharing on the user's Mac/Windows remains a separate
 host smoke test; Linux CI is not evidence that it has been performed.
+
+Follow the DKR section of [NATIVE-VALIDATION.md](NATIVE-VALIDATION.md) on each
+real host. It documents the pinned image, local engine checks, full integration
+suite, cleanup criteria and safe reporting. Record a receipt and update
+[the acceptance ledger](native-validation/STATUS.md); no external memory service
+or previous chat is required.

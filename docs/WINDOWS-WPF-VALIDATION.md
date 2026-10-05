@@ -135,10 +135,11 @@ Queda por aceptar el comportamiento conectado a Desktop después del reinicio
 que controle el usuario, especialmente foco, bandeja y cambios reales de DPI.
 No bloquea el uso del router ni del monitor nativo de macOS.
 
-Un agente nuevo debe empezar leyendo `AGENTS.md` y recuperando Atlas con la
-identidad canónica del proyecto `codex-model-router` y el repositorio
-`https://github.com/Bogdan-Andrei-Faur/codex-model-router.git`. Después debe
-recuperar la revisión vigente de la tarea y del checkpoint antes de escribir.
+Un agente nuevo debe leer [AGENTS.md](../AGENTS.md),
+[NATIVE-VALIDATION.md](NATIVE-VALIDATION.md) y el
+[registro por equipo](native-validation/STATUS.md). La guía incluye comandos
+actuales, resultados esperados y límites; este documento conserva pruebas
+históricas. No se necesita Atlas, Knowledge, memoria personal ni otro agente.
 
 En Windows:
 
@@ -152,8 +153,10 @@ En Windows:
    de telemetría, fases y cancelación.
 5. Registrar por separado compilación, prueba automatizada y aceptación visual.
    Ninguna de las dos primeras sustituye la revisión visual en Windows.
-6. Actualizar Atlas con versiones, comandos, resultados y límites observados,
-   usando siempre las revisiones actuales de tarea, checkpoint y memoria.
+6. Crear un recibo saneado con
+   [la plantilla](native-validation/REPORT-TEMPLATE.md), registrar versiones,
+   comandos, resultados y límites, y enlazarlo desde el registro por equipo.
+   Publicarlo en Git mediante el flujo autorizado por el propietario.
 
 No se deben copiar credenciales, prompts, títulos, salidas de herramientas ni
-cargas OTLP crudas a Atlas. La validación puede usar únicamente metadatos seguros.
+cargas OTLP crudas al repositorio. La validación puede usar únicamente metadatos seguros.

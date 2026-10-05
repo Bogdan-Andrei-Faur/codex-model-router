@@ -1944,3 +1944,15 @@ now acts as a Linux child subreaper, kills/reaps its owned descendants, then
 removes the directory. A real separate-session descendant regression and the
 revision-8 package GTK/WebKit smoke test both passed locally. This changes only
 the test harness, never the running user's monitor or Desktop processes.
+
+## Repository-owned real-machine validation plan — 2026-10-05
+
+[NATIVE-VALIDATION.md](NATIVE-VALIDATION.md) now provides the complete host
+procedure for macOS, Windows and Ubuntu: prerequisites, commands, expected
+results, installed/loaded identity, Docker Desktop, authenticated telemetry,
+native UI fixtures and physical display/input/sleep/startup checks.
+[STATUS.md](native-validation/STATUS.md) records the historical baseline and
+remaining host gates; [REPORT-TEMPLATE.md](native-validation/REPORT-TEMPLATE.md)
+defines sanitized receipts. This documentation change performs no new physical
+acceptance, installation or restart. CI and historical probes remain separate
+from acceptance of a specific owner's installed artifact.

@@ -97,6 +97,12 @@ node tests/test_usage_layout.cjs
 
 ## Aceptación pendiente en el monitor instalado
 
+El procedimiento vigente está en [NATIVE-VALIDATION.md](NATIVE-VALIDATION.md).
+Incluye la sonda AppKit, clic físico/foco, varios monitores, escalado y suspensión;
+registrar cada resultado con [la plantilla](native-validation/REPORT-TEMPLATE.md)
+y enlazarlo desde [el estado por equipo](native-validation/STATUS.md).
+Las observaciones siguientes son históricas y no acreditan un artefacto nuevo.
+
 Hover y primer clic fueron confirmados por el propietario tras la primera
 corrección. Comprobar la respuesta del despliegue con la segunda corrección y
 mantener esa interacción con otra aplicación seleccionada. Comprobar también

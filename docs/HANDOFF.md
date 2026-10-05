@@ -8,22 +8,19 @@ actualización ni cambia el puente cargado por un Desktop abierto. La revisión
 exacta se obtiene con `git rev-parse HEAD`; `VERSION=0.8.1` no identifica por sí
 sola estos cambios acumulados. No mover las etiquetas existentes para adaptarlas.
 
-Antes de inspeccionar código o ejecutar comandos de proyecto, leer `AGENTS.md`
-y recuperar contexto de Atlas con **ambos valores exactos**:
+Antes de ejecutar comandos de proyecto, leer [AGENTS.md](../AGENTS.md).
+La identidad canónica es `codex-model-router`, repositorio
+`https://github.com/Bogdan-Andrei-Faur/codex-model-router.git`.
+La continuidad vigente está en este repositorio: no consultar Atlas ni depender
+de Knowledge, memoria personal o chats anteriores. Preservar cambios locales
+ajenos. No reiniciar Desktop ni interrumpir tareas para comprobar activación.
 
-- `projectKey`: `codex-model-router`
-- `repository`: `https://github.com/Bogdan-Andrei-Faur/codex-model-router.git`
-
-Atlas incluye contexto global en la búsqueda de ámbito actual. Recuperar las
-revisiones vigentes de tareas/checkpoints antes de modificarlos; los IDs siguientes
-son referencias, nunca sustituyen esa lectura. Preservar cambios locales ajenos.
-No reiniciar Desktop ni interrumpir tareas para comprobar activación.
-
-| Trabajo abierto | Tarea Atlas | Checkpoint |
-| --- | --- | --- |
-| Instaladores y ciclo de vida gráfico | `54f8ba74-4c0d-4585-9219-93d749d432ef` | `baa928a7-73a5-4922-9016-920654638c4e` |
-| Routing, telemetría y calidad medida | `553801c0-d5a1-45fe-8c5c-ee5d535ec492` | Recuperar por el ámbito exacto de la tarea |
-| Publicación de este trabajo y traspaso | `a18072e4-10b1-4549-abdf-05b250b3a552` | Recuperar si existe; cierre registrado en la tarea |
+Para validar equipos reales, seguir [NATIVE-VALIDATION.md](NATIVE-VALIDATION.md),
+consultar [el estado por equipo](native-validation/STATUS.md) y copiar
+[la plantilla de resultados](native-validation/REPORT-TEMPLATE.md).
+Cada agente realiza y publica sus propias comprobaciones desde su equipo;
+no contactar al agente de otro ordenador. Las pruebas de CI no sustituyen
+la aceptación física de la instalación del propietario.
 
 ## Estado del producto y mapa del código
 
@@ -50,7 +47,13 @@ forzar un salto. Separar solicitud, decisión aceptada e inferencia identificada
 
 ## Obtener y verificar el código
 
-Comprobaciones de esta publicación ejecutadas el 05/10/2026 en macOS:
+Baseline posterior: `02d0be1efe98c9f2c30751b4ee4a532a0c5ed1fb` pasó
+[los 13 jobs de CI](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37315933675),
+incluidos 482 tests sin omisiones en cada arquitectura Docker Linux.
+El [registro de aceptación](native-validation/STATUS.md) separa ese resultado
+de las pruebas pendientes en los equipos físicos.
+
+Comprobaciones históricas de la publicación previa ejecutadas el 05/10/2026 en macOS:
 439 pruebas Python, con seis omisiones por plataforma; 26 pruebas JS; siete
 grupos de interfaz; corpus de routing 27/27 y seis casos JEV offline correctos.
 También pasan la sonda AppKit aislada, la compilación cruzada Windows contra

@@ -152,6 +152,11 @@ capacidades se calculan según el backend real del monitor, no según el tipo de
 sesión Ubuntu. Varios monitores, escalado fraccional y suspensión necesitan
 aceptación adicional en sus respectivos equipos.
 
+Seguir [la guía de equipos reales](NATIVE-VALIDATION.md) para esas pruebas,
+con IDs `UI-DISPLAY`, `UI-SCALE` y `UI-SLEEP`. Registrar resultados y límites en
+[el estado por equipo](native-validation/STATUS.md) mediante su plantilla;
+la sonda de ventanas no cierra esas comprobaciones físicas.
+
 La regresión nativa se comprueba con `xprop` (paquete `x11-utils`) y el Python
 del sistema, después de `setup`, desde una sesión gráfica con GNOME/XWayland:
 

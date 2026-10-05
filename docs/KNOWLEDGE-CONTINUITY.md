@@ -2,7 +2,10 @@
 
 ## Punto de entrada vigente — 05/10/2026
 
-Consulta primero [HANDOFF.md](HANDOFF.md) y recupera el estado actual de Atlas.
+Consulta primero [HANDOFF.md](HANDOFF.md). Para equipos reales, seguir
+[NATIVE-VALIDATION.md](NATIVE-VALIDATION.md) y el
+[registro de aceptación](native-validation/STATUS.md). La continuidad vigente
+está en Git y no requiere consultar Atlas, Knowledge ni memoria personal.
 Las secciones siguientes son un registro histórico: sus versiones, cifras,
 disponibilidad de Atlas y reglas de compatibilidad no describen necesariamente
 el código actual ni una instalación nueva. La publicación de código no activa

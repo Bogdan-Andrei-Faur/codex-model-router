@@ -6,6 +6,12 @@ Para continuar desde otro equipo o con un agente nuevo, empieza por
 [la guía de traspaso y pendientes](docs/HANDOFF.md). Distingue el código publicado,
 la instalación activa, las pruebas locales y la aceptación nativa pendiente.
 
+Para validar un Mac, Windows o Ubuntu real, sigue el
+[procedimiento autosuficiente](docs/NATIVE-VALIDATION.md), consulta el
+[estado por equipo](docs/native-validation/STATUS.md) y registra la evidencia con
+[la plantilla](docs/native-validation/REPORT-TEMPLATE.md). No requiere Knowledge,
+Atlas, memoria personal ni el chat original.
+
 ## Versión
 
 El producto usa versiones semánticas. La versión actual es **0.8.1**:
