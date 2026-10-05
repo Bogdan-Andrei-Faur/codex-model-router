@@ -1,4 +1,5 @@
 """Bounded regressions for the four October 2026 security findings."""
+from tests.grader_sandbox import INTEGRATION, run_sandbox
 import json
 import os
 from pathlib import Path
@@ -190,6 +191,10 @@ class GraderLimitTests(unittest.TestCase):
     def test_missing_memory_capability_is_explicit_and_stops_candidate(self):
         with self.assertRaisesRegex(SandboxUnavailable,'hard_grader_memory_budget_unavailable'):
             require_memory_result(subprocess.CompletedProcess([],78))
+        with self.assertRaisesRegex(SandboxUnavailable,'hard_grader_memory_budget_unavailable:set_limit$'):
+            require_memory_result(subprocess.CompletedProcess([],78,stderr=b'grader_memory_guard: {"phase":"set_limit","reason":"private text"}'))
+        with self.assertRaisesRegex(SandboxUnavailable,'hard_grader_memory_budget_unavailable$'):
+            require_memory_result(subprocess.CompletedProcess([],78,stderr=b'grader_memory_guard: {"phase":"private text"}'))
         if os.name == 'nt':
             return
         from tests import grader_limits
@@ -197,18 +202,50 @@ class GraderLimitTests(unittest.TestCase):
             self.assertEqual(grader_limits.main(),78)
             run.assert_not_called()
 
-    @unittest.skipUnless(sys.platform.startswith('linux'), 'Linux kernel quota validation')
+    @unittest.skipIf(os.name == 'nt', 'POSIX quota validation')
+    def test_guard_diagnoses_rejected_limit_and_requires_positive_probe(self):
+        from tests import grader_limits as limits
+        with patch.object(limits.resource,'setrlimit',side_effect=ValueError('private detail')):
+            self.assertEqual(limits.memory_budget_status(),
+                             {'verified':False,'phase':'set_limit','reason':'ValueError'})
+        with patch.object(limits.resource,'setrlimit'),patch.object(limits.resource,'getrlimit',return_value=(limits.MEMORY_BYTES,limits.MEMORY_BYTES)):
+            for code,body in ((0,b'{}'),(91,b'{"phase":"mmap","reason":"allocation_failed_for_other_reason"}'),
+                              (-9,b''),(0,b'[]')):
+                with patch.object(limits.subprocess,'run',return_value=subprocess.CompletedProcess([],code,body)):
+                    self.assertFalse(limits.memory_budget_status()['verified'])
+
+    @unittest.skipUnless(INTEGRATION or sys.platform.startswith('linux'), 'Linux quota or Docker integration')
     def test_real_quota_blocks_large_heap_and_mmap_preserves_small_work(self):
+        MEMORY_BYTES = 256 * 1024 * 1024
         guard=ROOT/'tests/grader_limits.py'
         with tempfile.TemporaryDirectory() as tmp:
-            worker=Path(tmp)/'worker.py'
-            worker.write_text('import mmap\nassert sum(range(10))==45\n'
-                'for allocate in (lambda:bytearray(512*1024*1024),lambda:mmap.mmap(-1,512*1024*1024)):\n'
-                ' try:value=allocate()\n except (MemoryError,OSError):continue\n'
-                ' raise AssertionError("memory_quota_bypassed")\nprint("bounded_worker_pass")\n')
-            result=subprocess.run([sys.executable,'-I','-S','-B',str(guard),str(worker)],capture_output=True,text=True,timeout=10)
+            root=Path(tmp).resolve();worker=root/'worker.py'
+            worker.write_text('import errno,mmap,resource\nassert sum(range(10))==45\n'
+                f'limit={MEMORY_BYTES}\nassert resource.getrlimit(resource.RLIMIT_AS)==(limit,limit)\n'
+                'with mmap.mmap(-1,1024*1024) as small:small[0]=1\n'
+                'for allocate in (lambda:mmap.mmap(-1,limit+1024*1024),lambda:bytearray(limit+1024*1024),\n'
+                ' lambda:[str(i).zfill(16384) for i in range(limit//16384+1)]):\n'
+                ' try:value=allocate()\n except MemoryError:continue\n'
+                ' except OSError as exc:\n  if exc.errno==errno.ENOMEM:continue\n  raise\n'
+                ' raise AssertionError("memory_quota_bypassed")\n'
+                'try:resource.setrlimit(resource.RLIMIT_AS,(limit*2,limit*2))\n'
+                'except (OSError,ValueError):pass\nelse:raise AssertionError("hard_limit_raised")\n'
+                'print("bounded_worker_pass")\n')
+            if INTEGRATION:
+                result=run_sandbox(root,str(worker),timeout=15)
+                result.stdout=result.stdout.decode();result.stderr=result.stderr.decode()
+            else:
+                result=subprocess.run([sys.executable,'-I','-S','-B',str(guard),str(worker)],
+                    env={'PATH':'/usr/bin:/bin'},capture_output=True,text=True,timeout=15)
             self.assertEqual(result.returncode,0,result.stderr)
             self.assertEqual(result.stdout.strip(),'bounded_worker_pass')
+
+    @unittest.skipUnless(INTEGRATION,'Docker candidate loading')
+    def test_candidate_cannot_allocate_past_quota_in_default_argument(self):
+        MEMORY_BYTES = 256 * 1024 * 1024
+        from tests.coding_trials import grade_source
+        source=f"def confidence(response, data='x'*{MEMORY_BYTES+1}):\n return 0\n"
+        self.assertFalse(grade_source('confidence-repair',source)['execution'])
 
 
 if __name__=='__main__':

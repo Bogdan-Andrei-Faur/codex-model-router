@@ -1,3 +1,4 @@
+from tests.grader_sandbox import INTEGRATION
 import hashlib
 import json
 from pathlib import Path
@@ -24,7 +25,7 @@ REFERENCE = '''def available_routes(routes, catalog):
 
 
 class RepositoryOracleTests(unittest.TestCase):
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_snapshot_function_provenance_and_original_failure_are_explicit(self):
         manifest = grading.manifest(); case = manifest['cases'][0]
         source = case['files']['catalog.py']
@@ -36,7 +37,7 @@ class RepositoryOracleTests(unittest.TestCase):
         self.assertIs(checks['compatible_fallback'], False)
         self.assertIs(checks['no_mutation'], True)
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_reference_passes_and_targeted_mutants_are_not_free_successes(self):
         case = grading.cases()[0]
         self.assertTrue(all(grading.grade(case, {'catalog.py': REFERENCE}).values()))
@@ -54,7 +55,7 @@ class RepositoryOracleTests(unittest.TestCase):
                 self.assertNotIn('execution', checks)
                 self.assertFalse(all(checks.values()))
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_source_guards_and_workspace_trace_keep_generated_payloads_ephemeral(self):
         case = grading.cases()[0]
         self.assertEqual(grading.grade(case, {'catalog.py': 'import os'}), {'source_contract': False})

@@ -1895,3 +1895,41 @@ memory check refuses execution before candidate code loads. No tests have been
 removed, skipped or relaxed to conceal this result. A verified macOS-compatible
 memory isolation mechanism is still required for those optional evaluators.
 The native macOS monitor build and shared UI checks passed independently.
+
+## Common optional Docker grader — 2026-10-05
+
+The owner approved an extra dependency only for experimental evaluations.
+`tests/grader_sandbox.py` now owns create/start/state inspection/removal for all
+eight grader families; normal router/monitor runtime is unchanged. The shared
+Linux image is pinned to the Python 3.14.7 multi-architecture digest recorded in
+that module. [Setup and controls](GRADER-SANDBOX.md) replace the native Seatbelt
+availability gate described above; there is no unsandboxed fallback.
+
+Hosted Mac diagnostics on Python 3.9/3.14 rejected both 256 MiB and 2 GiB with
+EINVAL. A trusted coarse probe first accepted a 512 GiB virtual-space ceiling;
+that is not an acceptable substitute for a 256 MiB allocation budget. No
+generated candidate was run during those probes. Temporary diagnostic workflow
+and script were removed from the delivered tree.
+
+The new guard verifies actual cgroup memory/swap/PID/CPU limits and uid,
+capabilities, no-new-privileges and seccomp state. It stacks socket denial over
+Docker's default filter, then verifies heap/mmap quota enforcement before loading
+the original frozen scoring workers. Regression tests also cover aggregate
+allocations, allocating function defaults, small legitimate computations,
+read-only staging, absence of host credentials, paths with spaces/commas and
+real timeout cleanup. An independent review identified Docker start exit 1 and
+create timeouts being misclassified as candidate failures; state inspection and
+explicit infrastructure exceptions correct both paths.
+
+Local syntax/Python 3.9 parsing and diff checks passed; the focused sandbox and
+quota suite passed 13 tests with real containers. Full unittest discovery with
+`ROUTER_TEST_DOCKER_GRADERS=1` passed 480 tests with no skips; routing passed 27/27.
+CI adds dedicated real-container
+jobs on Linux x86_64 and ARM64, while retaining the full native three-platform
+matrix. Each CI result applies only to its recorded SHA.
+
+Actual Docker Desktop file-sharing/setup and native telemetry checks on the
+owner's Windows and Mac remain pending; hosted Linux containers and native
+monitor compilation do not certify those host integrations. No official engine
+was modified, no live model evaluation was run, and no Desktop restart or local
+runtime reinstall is required for this evaluator-only change.

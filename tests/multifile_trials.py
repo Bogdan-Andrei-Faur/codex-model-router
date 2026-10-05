@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-from tests.coding_trials import require_memory_result, source_contract, sandbox_command, decode
+from tests.coding_trials import require_memory_result, source_contract, run_sandbox, decode
 
 HERE=Path(__file__).resolve().parent
 CASE_HASH='9ab6c4241f3a91acc9d064e92ad2bdf2f85ed497be5e49cc19039b593fec0ecd'
@@ -51,8 +51,7 @@ def grade(case,sources):
         worker.write_bytes((HERE/'multifile_worker.py').read_bytes())
         candidate.write_text(json.dumps(modules),encoding='utf-8')
         try:
-            result=subprocess.run(sandbox_command(root,str(worker),case['id'],str(candidate)),
-                cwd=root,env={'PATH':'/usr/bin:/bin'},capture_output=True,timeout=4)
+            result=run_sandbox(root,str(worker),case['id'],str(candidate), timeout=4)
             require_memory_result(result)
             checks=decode(result.stdout) if result.returncode==0 else {}
             safe={k:v for k,v in checks.items() if k in CHECKS and type(v) is bool} if isinstance(checks,dict) else {}

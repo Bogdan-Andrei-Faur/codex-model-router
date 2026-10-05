@@ -38,14 +38,13 @@ todos los intentos; no hay reintentos ocultos. Una ejecución menor de nueve
 turnos queda marcada como diseño incompleto.
 
 El código devuelto se valida antes de ejecutarse y se limita a funciones puras
-con builtins acotados y `math`. Se ejecuta en un proceso macOS Seatbelt con
-lectura limitada a Python/sistema/área temporal, sin escritura ni red, entorno
-sin credenciales heredadas y límites de CPU/tiempo. Los controles negativos
-verifican bloqueo de lectura de un sentinel sintético externo, escritura y red
-antes de enviar solicitudes. No hay fallback sin aislamiento en otra plataforma.
-Los perfiles tienen en cuenta los directorios antecesores y el segundo binario
-de lanzamiento de Python de Xcode. Referencia de diseño: [perfil Seatbelt de
-Codex](https://github.com/openai/codex/blob/main/codex-rs/sandboxing/src/seatbelt_base_policy.sbpl).
+con builtins acotados y `math`. Las ocho familias de evaluadores usan ahora el
+[mismo contenedor Docker aislado](GRADER-SANDBOX.md) en Linux, macOS y Windows.
+La dependencia solo se necesita para estas evaluaciones experimentales. Los
+controles negativos verifican lectura externa, escritura y sockets bloqueados;
+el guard verifica límites efectivos de memoria/CPU/PID antes de cargar código.
+No hay fallback sin aislamiento. Las rúbricas y los workers congelados conservan
+sus hashes; los resultados históricos Seatbelt corresponden al backend anterior.
 
 El código generado solo existe en archivos temporales del comprobador que se
 eliminan al finalizar. No se archivan prompts, respuestas, código, errores

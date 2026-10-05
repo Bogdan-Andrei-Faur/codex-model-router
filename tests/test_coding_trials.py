@@ -1,3 +1,4 @@
+from tests.grader_sandbox import INTEGRATION
 import json
 from pathlib import Path
 import sys
@@ -66,25 +67,25 @@ class CodingTrialTests(unittest.TestCase):
         self.assertFalse(report['policy_activation_eligible'])
         self.assertEqual(report['complete_inference_cost_coverage'],'unknown')
 
-    @unittest.skipUnless(sys.platform=='darwin','Native Seatbelt grader requires macOS')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_sandbox_blocks_sentinel_read_writes_and_network(self):
         self.assertTrue(all(grading.sandbox_controls().values()))
 
-    @unittest.skipUnless(sys.platform=='darwin','Native Seatbelt grader requires macOS')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_confidence_reference_passes_and_buggy_probability_rounding_fails(self):
         self.assertTrue(all(grading.grade_source('confidence-repair',CONFIDENCE_REFERENCE).values()))
         bad="def confidence(response):\n    return round(response.get('confidence', response['choices'][0]['probability']),1)\n"
         checks=grading.grade_source('confidence-repair',bad)
         self.assertFalse(checks['edge_cases']);self.assertFalse(checks['probability_not_confidence'])
 
-    @unittest.skipUnless(sys.platform=='darwin','Native Seatbelt grader requires macOS')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_transition_reference_passes_and_removed_boundary_fails(self):
         self.assertTrue(all(grading.grade_source('transition-implementation',TRANSITION_REFERENCE).values()))
         bad="def transition(current,target,effort,active_turn,catalog):\n    return {'action':'apply','reason':'allowed'}\n"
         checks=grading.grade_source('transition-implementation',bad)
         self.assertFalse(checks['astra_boundary']);self.assertFalse(checks['review_boundary'])
 
-    @unittest.skipUnless(sys.platform=='darwin','Native Seatbelt grader requires macOS')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_nonterminating_candidate_has_bounded_execution(self):
         result=grading.grade_source('confidence-repair','def confidence(response):\n    while True:pass\n')
         self.assertFalse(result['execution'])

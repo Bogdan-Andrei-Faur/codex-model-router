@@ -2,17 +2,16 @@
 
 Model-generated source exists only in disposable grader directories. Reports
 contain checks and safe native metadata, never prompts, code, errors or outputs.
-Live source execution requires a verified restrictive macOS Seatbelt profile.
+Live source execution requires the optional, verified Docker grader sandbox.
 """
 import ast
 import hashlib
 import json
-import os
 from pathlib import Path
-import shutil
 import subprocess
-import sys
 import tempfile
+
+from tests.grader_sandbox import SandboxUnavailable, run_sandbox
 
 HERE=Path(__file__).resolve().parent
 CASE_HASH='4ec462a97e2d62c3b5cd03fad8e9c754479538becaee1e7b87b47b869d08e062'
@@ -59,35 +58,27 @@ def source_contract(source):
     return True
 
 
-class SandboxUnavailable(RuntimeError):pass
-
 
 def require_memory_result(result):
+    if result.returncode == 79:
+        raise SandboxUnavailable('docker_grader_controls_unavailable')
     if result.returncode == 78:
-        raise SandboxUnavailable('hard_grader_memory_budget_unavailable')
-
-
-def profile(root):
-    if sys.platform!='darwin' or not shutil.which('sandbox-exec'):
-        raise SandboxUnavailable('verified_macos_grader_required')
-    roots=['/System','/usr','/Library',str(Path(sys.base_prefix).resolve()),str(root.resolve())]
-    ancestors=sorted({str(p) for r in roots for p in Path(r).parents})
-    reads=''.join('(subpath '+json.dumps(r)+')' for r in roots)
-    reads+=''.join('(literal '+json.dumps(p)+')' for p in ancestors)
-    reads+='(literal "/dev/null")(literal "/dev/urandom")'
-    executables=[os.path.realpath(sys.executable)]
-    framework=Path(sys.base_prefix)/'Resources/Python.app/Contents/MacOS/Python'
-    if framework.is_file():executables.append(str(framework.resolve()))
-    executable_rules=''.join('(literal '+json.dumps(p)+')' for p in executables)
-    return ('(version 1)(deny default)(allow process-exec '+executable_rules+')(allow process-fork)'
-            '(allow process-info* (target same-sandbox))(allow sysctl-read)(allow mach-lookup)(allow file-read* '+reads+')')
-
-
-def sandbox_command(root,*args):
-    sandbox_profile = profile(root)
-    guard = Path(root) / 'grader_limits.py'
-    guard.write_bytes((HERE / 'grader_limits.py').read_bytes())
-    return ['/usr/bin/sandbox-exec','-p',sandbox_profile,os.path.realpath(sys.executable),'-I','-S','-B',str(guard),*args]
+        reason = 'hard_grader_memory_budget_unavailable'
+        stderr = result.stderr or b''
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode('utf-8', errors='replace')
+        phases = {'set_limit', 'read_limit', 'allocation_probe', 'probe_setup', 'heap', 'mmap'}
+        for line in stderr[:4096].splitlines():
+            if not line.startswith('grader_memory_guard: '):
+                continue
+            try:
+                diagnostic = json.loads(line[len('grader_memory_guard: '):])
+            except ValueError:
+                continue
+            if isinstance(diagnostic, dict) and isinstance(diagnostic.get('phase'), str) and diagnostic['phase'] in phases:
+                reason += ':' + diagnostic['phase']
+                break
+        raise SandboxUnavailable(reason)
 
 
 def sandbox_controls():
@@ -96,12 +87,11 @@ def sandbox_controls():
         root=Path(tmp).resolve();inside=root/'allowed';inside.mkdir()
         secret=root/'sentinel';secret.write_text('synthetic-private-value')
         code="import json,socket\nchecks={}\n"
-        code+="for key,call in [(\"read_blocked\",lambda:open("+repr(str(secret))+")),(\"write_blocked\",lambda:open("+repr(str(inside/'write'))+",'w')),(\"network_blocked\",lambda:socket.socket().bind(('127.0.0.1',0)))]:\n"
+        code+="for key,call in [(\"read_blocked\",lambda:open("+repr(str(secret))+")),(\"write_blocked\",lambda:open("+repr('write')+",'w')),(\"network_blocked\",lambda:socket.socket().bind(('127.0.0.1',0)))]:\n"
         code+=" try:call();checks[key]=False\n except OSError:checks[key]=True\nprint(json.dumps(checks))\n"
         control = inside / 'controls.py'
         control.write_text(code, encoding='utf-8')
-        result=subprocess.run(sandbox_command(inside,str(control)),env={'PATH':'/usr/bin:/bin'},cwd=inside,
-                              capture_output=True,timeout=5)
+        result=run_sandbox(inside,str(control), timeout=5)
         require_memory_result(result)
         try:checks=json.loads(result.stdout) if result.returncode==0 else {}
         except ValueError:checks={}
@@ -117,8 +107,7 @@ def grade_source(case_id,source):
         worker.write_bytes((HERE/'coding_grader_worker.py').read_bytes())
         candidate.write_text(source,encoding='utf-8')
         try:
-            result=subprocess.run(sandbox_command(root,str(worker),case_id,str(candidate)),
-                cwd=root,env={'PATH':'/usr/bin:/bin'},capture_output=True,timeout=4)
+            result=run_sandbox(root,str(worker),case_id,str(candidate), timeout=4)
             require_memory_result(result)
             response=decode(result.stdout) if result.returncode==0 else None
             if not isinstance(response,dict) or not isinstance(response.get('checks'),dict):

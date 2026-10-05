@@ -553,3 +553,8 @@ la derecha. Actividad y su tarea destacada utilizan los mismos avatares.
 El círculo identifica el modelo; el punto inferior derecho identifica el nivel
 de razonamiento con el color de su etiqueta. Sin un nivel confirmado, el punto
 es neutro. El aro gira únicamente mientras se observa actividad.
+
+### Experimental code evaluations
+
+Generated-code evaluations use an optional [Docker sandbox](docs/GRADER-SANDBOX.md)
+shared by Linux, macOS and Windows. Docker is not a monitor/router dependency.

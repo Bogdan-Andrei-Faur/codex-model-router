@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 
 from tests import multifile_trials as base
-from tests.coding_trials import require_memory_result, decode, sandbox_command
+from tests.coding_trials import require_memory_result, decode, run_sandbox
 
 HERE = Path(__file__).resolve().parent
 CASE_HASH = '5ae098d4fdf46e659944226be0949c6dfcf8fca22a1f3c8e998baa5c5f832960'
@@ -43,8 +43,7 @@ def grade(case, sources):
         candidate.write_text(json.dumps({'sources': {Path(p).stem: s for p, s in sources.items()},
             'alternatives': data['scaffolding']['ALTERNATIVES']}), encoding='utf-8')
         try:
-            result = subprocess.run(sandbox_command(root, str(worker), str(candidate)),
-                cwd=root, env={'PATH': '/usr/bin:/bin'}, capture_output=True, timeout=4)
+            result = run_sandbox(root, str(worker), str(candidate), timeout=4)
             require_memory_result(result)
             checks = decode(result.stdout) if result.returncode == 0 else {}
             if (not isinstance(checks, dict) or set(checks) != CHECKS-{'source_contract', 'execution'}

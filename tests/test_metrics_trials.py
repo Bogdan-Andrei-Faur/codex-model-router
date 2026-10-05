@@ -1,3 +1,4 @@
+from tests.grader_sandbox import INTEGRATION
 import copy
 import sys
 import unittest
@@ -7,7 +8,7 @@ from tests.run_metrics_trials import admissible
 
 
 class MetricsTrialTests(unittest.TestCase):
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_frozen_vectors_reject_regressions_and_accept_reference(self):
         for case in grading.manifest()['cases']:
             with self.subTest(case=case['id']):

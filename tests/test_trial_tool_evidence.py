@@ -1,3 +1,4 @@
+from tests.grader_sandbox import INTEGRATION
 import json
 from pathlib import Path
 import tempfile
@@ -14,7 +15,7 @@ class ToolEvidenceTests(unittest.TestCase):
     def workspace(self,grade=None):
         return tracing.Workspace(grading.cases()[0],grade or grading.grade,grading.CHECKS)
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Requires Docker grader integration')
     def test_failed_seed_then_repaired_test_links_revision_and_keeps_receipts(self):
         owned=self.workspace()
         try:

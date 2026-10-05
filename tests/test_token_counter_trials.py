@@ -1,3 +1,4 @@
+from tests.grader_sandbox import INTEGRATION
 import hashlib
 import json
 from pathlib import Path
@@ -12,7 +13,7 @@ from tests.run_token_counter_trials import PAIRS, run_trials, safe_choice
 REFERENCE = "import math\n\ndef token_count(value):\n    if type(value) is int:\n        count = value\n    elif type(value) is float:\n        if not math.isfinite(value) or not value.is_integer():\n            return None\n        count = int(value)\n    elif type(value) is str:\n        text = value.strip()\n        if text.startswith('+'):\n            text = text[1:]\n        if not 1 <= len(text) <= 10 or any(c not in '0123456789' for c in text):\n            return None\n        count = int(text)\n    else:\n        return None\n    return count if 0 <= count <= 1000000000 else None\n"
 
 class TokenOracleTests(unittest.TestCase):
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_exact_reserved_snapshot_and_original_malformed_failure(self):
         manifest = grading.manifest(); case = manifest['cases'][0]
         source = case['files']['counter.py']
@@ -22,7 +23,7 @@ class TokenOracleTests(unittest.TestCase):
         self.assertTrue(checks['valid_counters']); self.assertFalse(checks['malformed_unknown'])
         self.assertTrue(checks['no_mutation'])
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_reference_and_mutants(self):
         case = grading.cases()[0]
         self.assertTrue(all(grading.grade(case, {'counter.py': REFERENCE}).values()))
@@ -38,7 +39,7 @@ class TokenOracleTests(unittest.TestCase):
             checks = grading.grade(case, {'counter.py': source})
             self.assertNotIn('execution', checks); self.assertFalse(all(checks.values()))
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_workspace_fail_repair_pass_without_payload_retention(self):
         case = grading.cases()[0]
         self.assertEqual(grading.grade(case, {'counter.py': 'import os'}), {'source_contract': False})

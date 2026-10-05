@@ -1,3 +1,4 @@
+from tests.grader_sandbox import INTEGRATION
 import json
 from pathlib import Path
 import queue
@@ -82,13 +83,13 @@ class MultifileTests(unittest.TestCase):
                        'def f():return open("secret")','import snapshots as __x\ndef f():return 1'):
             self.assertFalse(grading.module_contract(source,{'snapshots'}))
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native Seatbelt')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_independent_grader_detects_both_original_bugs_and_reference_passes(self):
         for case,reference in zip(grading.cases(),(USAGE,TRANSITION)):
             self.assertTrue(all(grading.grade(case,reference).values()))
             self.assertFalse(all(grading.grade(case,case['files']).values()))
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native Seatbelt')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_host_allowlist_revision_and_tool_budget(self):
         workspace=grading.Workspace(grading.cases()[0])
         try:

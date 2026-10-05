@@ -1,3 +1,4 @@
+from tests.grader_sandbox import INTEGRATION
 import copy
 import json
 from pathlib import Path
@@ -23,7 +24,7 @@ class ReviewGraderTests(unittest.TestCase):
             self.assertEqual(set(schema['enum']),set(case['files']))
             for path in case['files']:self.assertIn(path,case['request'])
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_known_counterexamples_pass_and_empty_submissions_miss_defects(self):
         for case,findings in zip(grading.cases(),(INTERVAL,ORDERED)):
             with self.subTest(case=case['id']):
@@ -34,7 +35,7 @@ class ReviewGraderTests(unittest.TestCase):
                 self.assertEqual(empty['missed_defects'],len(findings))
                 self.assertFalse(empty['checks']['all_defects_found'])
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_false_positive_duplicate_and_invalid_witness_are_distinct(self):
         case=grading.cases()[0]
         positive=grading.grade(case,INTERVAL+[{'function':'A','args':{'intervals':[[1,3]]}}])
@@ -48,7 +49,7 @@ class ReviewGraderTests(unittest.TestCase):
         score=grading.grade(case,invalid)
         self.assertEqual(score['invalid_witnesses'],1);self.assertEqual(score['missed_defects'],1)
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_domain_bounds_and_bool_do_not_count_as_counterexamples(self):
         case=grading.cases()[0]
         for args in ({'count':True,'size':3},{'count':0,'size':0},{'count':101,'size':1},
@@ -56,13 +57,13 @@ class ReviewGraderTests(unittest.TestCase):
             score=grading.grade(case,[{'function':'F','args':args}])
             self.assertEqual(score['verified_defects'],0);self.assertEqual(score['invalid_witnesses'],1)
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_unsubmitted_and_foreign_case_do_not_pass(self):
         case=grading.cases()[0]
         self.assertFalse(grading.grade(case,None)['checks']['submission_contract'])
         with self.assertRaises(ValueError):grading.grade(dict(case,id='foreign'),INTERVAL)
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_read_only_receipt_has_no_grader_feedback_or_archived_findings(self):
         case=grading.cases()[0];original=copy.deepcopy(case);owned=grading.Workspace(case)
         try:

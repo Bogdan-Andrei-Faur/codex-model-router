@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 
 from tests import multifile_trials as base
-from tests.coding_trials import require_memory_result, sandbox_command, decode
+from tests.coding_trials import require_memory_result, run_sandbox, decode
 
 HERE=Path(__file__).resolve().parent
 CASE_HASH='aa84339814dc1cd365b488357633cf9fc40b275e63a329038f9472857a403c78'
@@ -34,8 +34,7 @@ def grade(case,findings):
         (root/'multifile_worker.py').write_bytes((HERE/'multifile_worker.py').read_bytes())
         data.write_text(json.dumps({'sources':modules,'findings':findings},allow_nan=False),encoding='utf-8')
         try:
-            result=subprocess.run(sandbox_command(root,str(worker),case['id'],str(data)),cwd=root,
-                env={'PATH':'/usr/bin:/bin'},capture_output=True,timeout=4)
+            result=run_sandbox(root,str(worker),case['id'],str(data), timeout=4)
             require_memory_result(result)
             value=decode(result.stdout) if result.returncode==0 else {}
             checks=value.get('checks') if isinstance(value,dict) else None

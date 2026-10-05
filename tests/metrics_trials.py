@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 
 from tests import multifile_trials as base
-from tests.coding_trials import require_memory_result, decode, sandbox_command
+from tests.coding_trials import require_memory_result, decode, run_sandbox
 
 HERE = Path(__file__).resolve().parent
 CASE_HASH = 'a365aeabf5ee3b493b9449cbfbc294a490f025b7be5e39b51f8bbafc3ddf7dcc'
@@ -34,8 +34,7 @@ def grade(case, sources):
         (root/'multifile_worker.py').write_bytes((HERE/'multifile_worker.py').read_bytes())
         (root/'sources.json').write_text(json.dumps({'subject': sources['subject.py']}))
         try:
-            value = subprocess.run(sandbox_command(root, str(root/'worker.py'), case['id'], str(root/'sources.json')),
-                                   cwd=root, env={'PATH': '/usr/bin:/bin'}, capture_output=True, timeout=4)
+            value = run_sandbox(root, str(root/'worker.py'), case['id'], str(root/'sources.json'), timeout=4)
             require_memory_result(value)
             checks = decode(value.stdout) if value.returncode == 0 else {}
             if set(checks) != CHECKS-{'source_contract', 'execution'} or any(type(v) is not bool for v in checks.values()):

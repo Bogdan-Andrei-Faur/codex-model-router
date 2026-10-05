@@ -1,3 +1,4 @@
+from tests.grader_sandbox import INTEGRATION
 import json
 from pathlib import Path
 import tempfile
@@ -66,13 +67,13 @@ def run(stock,records):
 
 
 class CausalGraderTests(unittest.TestCase):
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_reference_passes_all_categories_and_seed_fails(self):
         case=grading.cases()[0]
         self.assertTrue(all(grading.grade(case,REFERENCE).values()))
         self.assertFalse(all(grading.grade(case,case['files']).values()))
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_cross_module_defects_are_detected(self):
         case=grading.cases()[0]
         mutants=[('canonical.py',"type(row['amount']) is not int","not isinstance(row['amount'],int)"),
@@ -99,7 +100,7 @@ class CausalGraderTests(unittest.TestCase):
         source=dict(REFERENCE);source['graph.py']='import os\ndef order(events):return {}\n'
         self.assertEqual(grading.grade(case,source),{'source_contract':False})
 
-    @unittest.skipUnless(sys.platform=='darwin','Requires native macOS Seatbelt grader')
+    @unittest.skipUnless(INTEGRATION, 'Set ROUTER_TEST_DOCKER_GRADERS=1 with the pinned image')
     def test_four_files_final_revision_and_tool_paths(self):
         case=grading.cases()[0];owned=grading.workspace(case)
         try:
