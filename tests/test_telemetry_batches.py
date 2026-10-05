@@ -120,12 +120,12 @@ class TelemetryBatchTests(unittest.TestCase):
 
     def test_native_monitor_bridges_forward_all_public_counters(self):
         root = Path(__file__).resolve().parents[1]
-        for name in ('MonitorMac.swift', 'MonitorWpf.cs'):
-            source = (root / name).read_text()
-            aggregation = source[source.index('"requests","records_scanned"'):] if name.endswith('swift') else source[source.index('"requests", "records_scanned"'):]
-            aggregation = aggregation[:aggregation.index('telemetry[key]')]
-            fields = set(re.findall(r'"([a-z0-9_]+)"', aggregation))
-            self.assertEqual(set(self.collector.snapshot()) - {'enabled'} - fields, set(), name)
+        from monitor_state import TELEMETRY_COUNTERS
+        self.assertEqual(set(self.collector.snapshot()) - {'enabled'} - set(TELEMETRY_COUNTERS), set())
+        for name in ('MonitorMac.swift', 'MonitorWindows.cs'):
+            self.assertIn('monitor_service.py', (root / name).read_text())
+        self.assertIn('self.model.payload(', (root / 'monitor_linux.py').read_text())
+
 
 
 if __name__ == '__main__':

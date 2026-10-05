@@ -1,0 +1,24 @@
+{
+  "schema": "repository-function-cases/1",
+  "origin_scope": "public_repository_function_snapshot_reserved_before_model_outcomes_not_full_project_trial",
+  "origin": {
+    "repository": "https://github.com/Bogdan-Andrei-Faur/codex-model-router.git",
+    "commit": "e13236d364c5453cf46aa2af7e4b03d906560e82",
+    "path": "decision_engines.py",
+    "git_blob": "2ca027e5e5f2a0313e36c12af6e13695ae6126db",
+    "file_sha256": "1621bf2881ea3af7bb9d2d90148ecb949eb45efd5cdb52fe53cd052941bbe941",
+    "extraction": "ast.get_source_segment token_count; exact source without surrounding module",
+    "function_sha256": "5e3fd90be04a8c512dca38448a1f85b6548371119d8613fd3a8b3ab9a6790860"
+  },
+  "scaffolding": {},
+  "cases": [
+    {
+      "id": "strict-token-counter",
+      "split": "held_out",
+      "request": "Repara la función acotada token_count de counter.py, extraída exactamente de un snapshot del repositorio, y compruébala con trial_test. Usa solo trial_read/trial_write/trial_test; lee y escribe counter.py y ejecuta trial_test tras la última edición. Contrato reservado: acepta int no booleano y float finito con valor ENTERO en [0,1000000000], sin truncar decimales. Acepta también str con whitespace exterior opcional, un signo + opcional y de1a10 dígitos ASCII; convierte a entero solo si está en ese mismo rango. Rechaza con None booleanos, valores negativos, strings con signo menos incluso -0, fracciones, exponentes, Unicode numérico, strings vacíos o demasiado largos, infinitos, NaN, contenedores y cualquier otro tipo. No lances excepciones ni mutaciones, no conviertas objetos arbitrarios con int, no generes cero para valores desconocidos. Puedes importar math; no hay helpers/globales propios. El evaluador externo es inmutable.",
+      "files": {
+        "counter.py": "def token_count(value):\n    \"\"\"Normalize provider token counters without retaining request or response content.\"\"\"\n    try:\n        value = int(value)\n        return value if value >= 0 else None\n    except (TypeError, ValueError):\n        return None\n"
+      }
+    }
+  ]
+}

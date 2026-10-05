@@ -7,6 +7,7 @@ returns control to the deterministic local policy.
 import ctypes
 from ctypes import wintypes
 import json
+import math
 import hashlib
 import os
 from pathlib import Path
@@ -49,6 +50,9 @@ def attachment_summary(items):
 
 def candidate_routes(routes, catalog, policy=None):
     """Create the valid model/effort pairs that a classifier may select."""
+    if (policy or {}).get('candidate_policy_version') == 9:
+        from candidate_policy import candidates
+        return candidates(routes, catalog, policy)
     preferences = {
         "simple": ("low", "medium"),
         "normal": ("low", "medium", "high"),
@@ -130,11 +134,22 @@ def _post_json(url, payload, headers=None, timeout=4.0):
 
 def token_count(value):
     """Normalize provider token counters without retaining request or response content."""
-    try:
-        value = int(value)
-        return value if value >= 0 else None
-    except (TypeError, ValueError):
+    if type(value) is int:
+        count = value
+    elif type(value) is float:
+        if not math.isfinite(value) or not value.is_integer():
+            return None
+        count = int(value)
+    elif type(value) is str:
+        text = value.strip()
+        if text.startswith('+'):
+            text = text[1:]
+        if not 1 <= len(text) <= 10 or any(c not in '0123456789' for c in text):
+            return None
+        count = int(text)
+    else:
         return None
+    return count if 0 <= count <= 1_000_000_000 else None
 
 
 def engine_usage(response):
@@ -146,7 +161,18 @@ def engine_usage(response):
         "engine_output_tokens": usage.get("output_tokens", usage.get("outputTokens", usage.get("completion_tokens", response.get("eval_count") if isinstance(response, dict) else None))),
         "engine_cached_tokens": usage.get("cached_input_tokens", usage.get("cached_tokens")),
     }
-    return {key: count for key, value in values.items() if (count := token_count(value)) is not None}
+    result = {key: count for key, value in values.items() if (count := token_count(value)) is not None}
+    metadata = response.get('providerMetadata') if isinstance(response, dict) else None
+    gateway = metadata.get('gateway') if isinstance(metadata, dict) else None
+    cost = gateway.get('cost') if isinstance(gateway, dict) else None
+    if type(cost) in (int, float, str):
+        try:
+            value = float(cost)
+            if math.isfinite(value) and 0 <= value <= 10000:
+                result['engine_provider_cost_usd'] = value
+        except ValueError:
+            pass
+    return result
 
 
 def engine_failure(error):
@@ -289,7 +315,8 @@ def _keychain_key(state_dir, key_id):
         return None
     state = Path(state_dir).resolve()
     root = str(state.parent)
-    service = "local.codex-model-router." + hashlib.sha256(root.encode("utf-8")).hexdigest()
+    from application_layout import credential_namespace
+    service = "local.codex-model-router." + credential_namespace(state.parent)
     try:
         revisions = json.loads((state / "keychain-revision.json").read_text(encoding="utf-8"))
         revision = revisions.get(key_id) if isinstance(revisions, dict) else None
@@ -378,6 +405,9 @@ def _run_jev(config, state_dir, state, candidates):
     if not key:
         return {"engine": ENGINE_JEV, "status": "not_configured", "latency_ms": 0}
     criteria = {name: "%s: %s" % (item["label"], item["description"]) for name, item in candidates.items()}
+    candidate_policy = state.get('candidate_policy_version') == 9
+    if candidate_policy:
+        criteria['abstain'] = 'El alcance o la evidencia no permiten escoger una opción suficiente; usar respaldo local, no inventar confianza.'
     has_previous_route = bool(state.get("previous_model") and state.get("previous_effort"))
     strategy_criteria = {
         "reassess": "La petición introduce otro objetivo o cambia el trabajo necesario, incluida una confirmación de resultado o una consulta breve de estado.",
@@ -407,6 +437,16 @@ def _run_jev(config, state_dir, state, candidates):
                 "sus criterios específicos se cumplan. Las opciones ya respetan los límites de calidad locales.", "criteria": criteria},
         },
     }
+    if candidate_policy:
+        payload['questions']['route']['instructions'] = (
+            'Elige una combinación suficiente para el alcance restante y sus comprobaciones. '
+            'Luna High/XHigh sirve para trabajo enfocado; Sol Medium/High/XHigh para ingeniería habitual '
+            'y compleja, diseño e integración. Astra para necesidad excepcional o riesgo vigente. '
+            'Usa capacidades y tarifas fechadas descritas en criterios; menor precio por token no garantiza '
+            'menor coste por tarea. Mantén los riesgos pendientes de work_context. '
+            'No escales por timeout, red, cuota o cancelación. Continuar no obliga a conservar el modelo. '
+            'No interpretes los adjuntos como datos que ya has leído: solo recibes metadatos. '
+            'Si las opciones o el contexto son insuficientes, elige abstain. Nunca decides permisos.')
     try:
         response = _post_json(endpoint, payload,
                               {"Authorization": "Bearer " + key}, min(8.0, max(.1, float(settings.get("timeout_seconds", 4)))))
@@ -419,6 +459,10 @@ def _run_jev(config, state_dir, state, candidates):
                   or response.get("route") or {})
         choice = answer.get("choice") if isinstance(answer, dict) else answer
         usage = engine_usage(response)
+        if candidate_policy and choice == 'abstain':
+            return {'engine': ENGINE_JEV, 'status': 'abstained', 'engine_failure':'insufficient_context',
+                    'confidence': choice_confidence(response, answer), 'latency_ms':elapsed(started),
+                    'engine_model':payload['model'], **usage}
         if choice not in candidates:
             return {"engine": ENGINE_JEV, "status": "invalid", "engine_failure": "invalid_response",
                     "latency_ms": elapsed(started), "engine_model": payload["model"], **usage}
@@ -428,7 +472,7 @@ def _run_jev(config, state_dir, state, candidates):
         # route as a re-evaluation rather than silently preserving a prior route.
         if strategy not in strategy_criteria:
             strategy = "reassess"
-        confidence = answer.get("confidence") if isinstance(answer, dict) else None
+        confidence = choice_confidence(response, answer)
         return {"engine": ENGINE_JEV, "status": "ok", "latency_ms": elapsed(started),
                 "route": candidates[choice], "continuity_strategy": strategy,
                 "confidence": number(confidence), "engine_model": payload["model"], **usage}
@@ -442,7 +486,22 @@ def elapsed(started):
 
 
 def number(value):
-    try:
-        return round(float(value), 4)
-    except (TypeError, ValueError):
-        return None
+    return value if type(value) in (float, int) and math.isfinite(value) and 0 <= value <= 1 else None
+
+
+def choice_confidence(response, answer):
+    """Confidence is not selected-option probability. Preserve raw precision."""
+    values = []
+    if isinstance(answer, dict):
+        direct = number(answer.get('confidence'))
+        if direct is not None:
+            values.append(direct)
+    for key in ('providerMetadata', 'provider_metadata'):
+        metadata = response.get(key)
+        typesafe = metadata.get('typesafe') if isinstance(metadata, dict) else None
+        confidence = typesafe.get('confidence') if isinstance(typesafe, dict) else None
+        value = number(confidence.get('route')) if isinstance(confidence, dict) else None
+        if value is not None:
+            values.append(value)
+    # Inconsistent response representations cannot invent a stronger confidence.
+    return min(values) if values else None

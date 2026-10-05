@@ -9,16 +9,22 @@
   const effortColors = {low:['#BECADD','#313843'], medium:['#ABDDDF','#293E42'], high:['#BCD0FF','#303952'], xhigh:['#D9C5F6','#3C334D'], max:['#F2CEB1','#48372F'], ultra:['#F0BBD5','#493041']};
   const neutral = ['#C5C8D3','#353741'];
   const identities = {
-    audit: ['Auditoría','M9,2 L15,2 L15,4 L20,4 L20,12 M12,22 L4,22 L4,4 L9,4 Z M8,8 L12,8 M8,12 L10,12 M16,12 A4,4 0 1 1 15.99,12 M19,19 L23,23'],
-    tests: ['Pruebas','M8,2 L16,2 M10,2 L10,9 L4,19 Q3,22 6,22 L18,22 Q21,22 20,19 L14,9 L14,2 M7,15 L17,15 M9,18 L10,18 M14,19 L15,19'],
-    architecture: ['Arquitectura','M9,2 L15,2 L15,8 L9,8 Z M2,16 L8,16 L8,22 L2,22 Z M16,16 L22,16 L22,22 L16,22 Z M12,8 L12,12 M5,16 L5,12 L19,12 L19,16'],
-    correction: ['Corrección','M8,7 L16,7 L17,11 L17,16 A5,5 0 0 1 7,16 L7,11 Z M9,7 L9,4 L15,4 L15,7 M9,4 L7,2 M15,4 L17,2 M3,10 L7,12 M17,12 L21,10 M3,16 L7,16 M17,16 L21,16 M5,22 L8,19 M16,19 L19,22 M12,8 L12,20'],
-    text: ['Textos','M4,3 L20,3 M12,3 L12,21 M8,21 L16,21 M4,3 L4,7 M20,3 L20,7'],
-    interface: ['Interfaces','M3,3 L21,3 L21,21 L3,21 Z M3,8 L21,8 M8,8 L8,21 M5,5.5 L6,5.5 M9,5.5 L10,5.5'],
-    research: ['Investigación','M10,2 A8,8 0 1 1 9.99,2 M16,16 L23,23 M6,10 L14,10 M10,6 L10,14'],
-    configuration: ['Configuración','M12,3 L14,6 L18,6 L19,10 L22,12 L19,14 L18,18 L14,18 L12,21 L10,18 L6,18 L5,14 L2,12 L5,10 L6,6 L10,6 Z M12,9 A3,3 0 1 1 11.99,9'],
-    automation: ['Automatización','M5,5 L10,5 L12,8 L14,5 L19,5 L19,10 L22,12 L19,14 L19,19 L14,19 L12,16 L10,19 L5,19 L5,14 L2,12 L5,10 Z M9,12 L15,12 M12,9 L12,15'],
-    general: ['Tarea','M12,2 A10,10 0 1 1 11.99,2 M12,7 L12,17 M7,12 L17,12']
+    audit: ['Auditoría','clipboard-check'],
+    tests: ['Pruebas','flask-conical'],
+    architecture: ['Arquitectura','network'],
+    correction: ['Corrección','bug'],
+    text: ['Textos','text'],
+    interface: ['Interfaces','panels-top-left'],
+    research: ['Investigación','search'],
+    configuration: ['Configuración','settings-2'],
+    automation: ['Automatización','workflow'],
+    general: ['Tarea','circle-plus'],
+    data: ['Datos','database'],
+    performance: ['Rendimiento','gauge'],
+    deployment: ['Despliegues','rocket'],
+    versioning: ['Versiones','git-branch'],
+    integration: ['Integraciones','plug'],
+    accessibility: ['Accesibilidad','accessibility']
   };
   const active = status => ['active','inProgress','running','pending'].includes(status);
   const status = value => ({active:'Trabajando',inProgress:'Trabajando',running:'Trabajando',pending:'Enviando',completed:'En espera',idle:'En espera',waiting:'Esperando tu respuesta',error:'Error',failed:'Error',interrupted:'Interrumpida'}[value] || 'Estado sin confirmar');
@@ -32,13 +38,14 @@
   function identity(row) {
     if (identities[row.agent_category]) return identities[row.agent_category];
     const text = (row.name || row.model_reason || row.reason || '').toLowerCase();
+    for(const [category,regex] of [['accessibility',/accesibilidad|accessibility|voiceover|lector de pantalla/],['data',/base de datos|database|\bsql\b|postgres|sqlite/],['performance',/rendimiento|performance|latencia|profiling/],['deployment',/desplieg|deploy|publicar versi/],['versioning',/\bgit\b|merge|rebase|conflictos de versi/],['integration',/integraci|integration|webhook|conector/]])if(regex.test(text))return identities[category];
     for (const [category, regex] of [['audit',/auditor|audit|seguridad|security|accesibilidad/],['tests',/\b(test|tests|prueba|pruebas|e2e)\b|comprobar|verificar|validar/],['architecture',/arquitect|architect|migraci|infraestructura/],['correction',/correg|corrig|error|fallo|bug|arregl|fix/],['text',/traduc|translat|texto|document|resum/],['interface',/interfaz|interfaces|frontend|diseñ|design|cápsula|capsula|\b(ui|ux)\b/],['research',/investig|research|analiz/]]) {
       if (regex.test(text)) return identities[category];
     }
     return identities.general;
   }
   function stableOrder(previous, rows) {
-    const keys = Object.keys(rows).filter(key => active(rows[key].status)).sort((a,b)=>(rows[b].updated||0)-(rows[a].updated||0));
+    const keys = Object.keys(rows).filter(key => liveAgent(rows[key])).sort((a,b)=>(rows[b].updated||0)-(rows[a].updated||0));
     return previous.filter(key => keys.includes(key)).concat(keys.filter(key => !previous.includes(key)));
   }
   function decisions(events, live = {}) {
@@ -47,6 +54,12 @@
       const id = event.decision_id;
       if (typeof id !== 'string' || !id) continue;
       const item = map.get(id) || {id,time:0,accepted:false,comparisons:{}};
+      // Thread totals are cumulative snapshots, not a decision's last call.
+      if(event.event==='decision_usage_total') {
+        item.native_total_usage={inputTokens:event.inputTokens,outputTokens:event.outputTokens,cachedInputTokens:event.cachedInputTokens};
+        map.set(id,item);continue;
+      }
+      if(event.event==='decision_usage')for(const key of ['inputTokens','outputTokens','cachedInputTokens','reasoningOutputTokens'])delete item[key];
       if(event.event==='inference_observed' && event.evidence_confidence==='confirmed' && event.estimate_basis==='standard_equivalent_not_billed' && event.inference_event_id) {
         (item.usage_estimates ||= {})[event.inference_event_id]={usd:event.estimated_api_standard_usd,credits:event.estimated_codex_standard_credits};
       }
@@ -54,19 +67,22 @@
         (item.phase_events ||= []).push({...event});
         if (event.phase_status === 'applied') {
           if (item.observed_model) (item.prior_inferences ||= []).push({model:item.observed_model,effort:item.observed_effort,phase_id:item.phase_id,confidence:item.evidence_confidence});
-          for (const key of ['observed_model','observed_effort','observed_candidate_model','observed_candidate_effort','evidence_confidence','inference_source']) delete item[key];
+          for (const key of ['observed_model','observed_effort','observed_candidate_model','observed_candidate_effort','evidence_confidence','inference_source','inference_model_mismatch','inference_effort_mismatch']) delete item[key];
           item.accepted_model=event.accepted_model || event.phase_model;
           item.accepted_effort=event.accepted_effort || event.phase_effort;
         }
       }
       if (['inference_metric','inference_observed','inference_probable'].includes(event.event)) {
-        const kind=(event.phase_id ? event.phase_id+':' : '')+(event.inference_event_name || 'unknown')+':'+(event.inference_event_kind || 'unknown');
+        const observedModel=event.observed_model || event.observed_candidate_model;
+        const observedEffort=event.observed_effort || event.observed_candidate_effort || '';
+        const kind=(event.phase_id ? event.phase_id+':' : '')+(event.inference_event_name || 'unknown')+':'+(event.inference_event_kind || 'unknown')+(observedModel ? ':'+observedModel+':'+observedEffort : '');
         const samples=item.inference_samples ||= {};
         const previous=samples[kind] || {count:0};
         samples[kind]={...event,count:previous.count+(event.inference_sample_count||1),failures:(previous.failures||0)+(event.inference_failure_count||0)};
-        for (const [key,value] of Object.entries(event)) if(key.startsWith('inference_'))item[key]=value;
+        for (const [key,value] of Object.entries(event)) if(key.startsWith('inference_') && !['inference_model_mismatch','inference_effort_mismatch'].includes(key))item[key]=value;
         // Request/stream metrics never replace inference identity evidence.
         if(event.event==='inference_metric'){map.set(id,item);continue;}
+        if(event.event==='inference_probable' && item.evidence_confidence==='confirmed'){map.set(id,item);continue;}
       }
       if (event.event === 'native_turn_error') {
         if (event.will_retry === true) item.native_retries = (item.native_retries || 0) + 1;
@@ -92,18 +108,22 @@
       }
       if (event.event === 'decision_routed') item.appliedEngine = item.routing_engine;
       for (const key of ['error_code','error_http_status','error_source']) if (Object.prototype.hasOwnProperty.call(event,key)) item[key] = event[key];
+      for(const key of ['inference_model_mismatch','inference_effort_mismatch'])if(Object.prototype.hasOwnProperty.call(event,key))item[key]=event[key];
       map.set(id,item);
     }
     for (const [id,row] of Object.entries(live)) {
       const item = map.get(row.decision_id);
       if (!item) continue; // Resuming a task is not a new decision.
-      if(row.phase_id && row.phase_id!==item.phase_id)for(const key of ['observed_model','observed_effort','evidence_confidence','inference_source'])delete item[key];
+      if(row.phase_id && row.phase_id!==item.phase_id)for(const key of ['observed_model','observed_effort','evidence_confidence','inference_source','inference_model_mismatch','inference_effort_mismatch'])delete item[key];
       if(row.phase_id)item.phase_id=row.phase_id;
       item.thread = id; item.title = row.name || item.title; item.status = row.status || item.status;
       for (const key of ['model','effort']) { const value = setting(row,key); if (value) item[key]=value; }
       for (const key of ['model_reason','effort_reason']) if (row[key]) item[key] = row[key];
       for (const key of ['phase_name','phase_status','phase_model','phase_effort','phase_transition','observed_model','observed_effort','configured_model','configured_effort','accepted_model','accepted_effort','pipeline_mode','phase_pipeline','inference_source','evidence_confidence']) if (row[key]) item[key] = row[key];
-      for (const key of ['inputTokens','outputTokens','cachedInputTokens','reasoningOutputTokens']) if (row.tokens?.[key] !== undefined) item[key] = row.tokens[key];
+      for(const key of ['inference_model_mismatch','inference_effort_mismatch'])if(Object.prototype.hasOwnProperty.call(row,key))item[key]=row[key];
+      if(row.tokens)for(const key of ['inputTokens','outputTokens','cachedInputTokens','reasoningOutputTokens']) {
+        delete item[key];if(row.tokens[key]!==undefined)item[key]=row.tokens[key];
+      }
     }
     return [...map.values()].sort((a,b)=>b.time-a.time);
   }
@@ -138,7 +158,29 @@
     if(usage.ordinary_usage_allowed===false)lines.push('Codex informa que el uso incluido no está disponible.');
     return {percent,label,details:[label,...lines,...(!fresh && lines.length?['Última lectura; pendiente de actualizar.']:[])].join('\n')};
   }
-  const api = {models,efforts,effortColors,neutral,identities,active,status,setting,model,family,identity,stableOrder,decisions,featuredThread,errorLabel,contextGauge,quotaGauge};
+  function liveAgent(row) { return active(row.status) || contextGauge(row).compacting === true; }
+  function usageSample(row) {
+    const source=row.tokens || row;
+    const valid=value=>Number.isSafeInteger(value)&&value>=0;
+    const input=valid(source.inputTokens)?source.inputTokens:null,output=valid(source.outputTokens)?source.outputTokens:null;
+    const total=input!==null&&output!==null&&valid(input+output)?input+output:null;
+    return {input,output,total};
+  }
+  function quotaWindows(usage={},connected=true,now=Date.now()/1000) {
+    const fresh=connected && Number.isFinite(usage.valid_until) && now<usage.valid_until;
+    return (Array.isArray(usage.windows)?usage.windows:[]).map(w=>{
+      const value=w.remaining_percent,percent=fresh&&Number.isFinite(value)&&value>=0&&value<=100?value:null;
+      const minutes=w.duration_minutes,label=minutes===10080?'Cuota semanal':minutes===300?'Ventana de 5 horas':minutes&&minutes%1440===0?`Ventana de ${minutes/1440} días`:minutes&&minutes%60===0?`Ventana de ${minutes/60} h`:minutes?`Ventana de ${minutes} min`:'Ventana sin confirmar';
+      return {...w,percent,label};
+    });
+  }
+  function weeklyQuota(usage={},connected=true,now=Date.now()/1000) {
+    const windows=quotaWindows(usage,connected,now).filter(w=>w.duration_minutes===10080),known=windows.filter(w=>w.percent!==null);
+    const percent=known.length===windows.length&&known.length?Math.min(...known.map(w=>w.percent)):null;
+    const label=percent===null?'Cuota semanal restante: sin datos actuales':`Cuota semanal restante: ${percent} % disponible`;
+    return {percent,label,details:label+'\nCuota compartida de la cuenta.'+windows.map(w=>`\n${w.limit_id||'Codex'} · semanal: ${w.percent===null?'sin datos actuales':w.percent+' % disponible'}${Number.isFinite(w.resets_at)?' · se renueva '+new Date(w.resets_at*1000).toLocaleString('es-ES'):''}`).join('')};
+  }
+  const api = {models,efforts,effortColors,neutral,identities,active,status,setting,model,family,identity,stableOrder,decisions,featuredThread,errorLabel,contextGauge,quotaGauge,liveAgent,usageSample,quotaWindows,weeklyQuota};
   if (typeof module !== 'undefined') module.exports = api;
   else scope.MonitorCore = api;
 })(globalThis);

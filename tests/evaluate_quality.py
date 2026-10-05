@@ -6,9 +6,11 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from state_store import read_records
+from outcome_evaluation import evaluate_checks
 
 
 def evaluate(records):
+    records = list(records)
     decisions = {}
     for event in records:
         key = event.get('decision_id')
@@ -41,6 +43,7 @@ def evaluate(records):
             'confirmed_inference_decisions': sum(bool(r.get('confirmed_inference')) for r in rows)}
     rated = sum(sum(g['quality_ratings'].values()) for g in groups.values())
     return {'groups': groups, 'quality_status': 'descriptive_only' if rated else 'not_evaluated',
+            'objective_checks': evaluate_checks(records),
             'causal_savings_demonstrated': False,
             'limitations': ['Completion is not correctness.', 'Ratings are subjective and selected, not a controlled comparison.',
                             'Mixed-model turn tokens cannot establish per-model cost or quota savings.']}

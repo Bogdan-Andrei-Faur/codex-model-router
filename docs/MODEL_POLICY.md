@@ -1,5 +1,9 @@
 # Política de modelos y razonamiento
 
+> Documento histórico del 21/09/2026. Los nombres y límites siguientes no
+> describen el catálogo actual. Véanse la [revisión actual](MODEL-ROUTING-REVIEW.md)
+> y la [política candidata 9](POLICY9-VALIDATION.md). La referencia vigente es la 8.
+
 Revisada el 21 de septiembre de 2026. Objetivo: conservar calidad y reducir gasto
 respecto al hábito personal de usar Astra/Muy alto casi siempre. La selección no
 usa otro modelo: las reglas no añaden una llamada de clasificación.

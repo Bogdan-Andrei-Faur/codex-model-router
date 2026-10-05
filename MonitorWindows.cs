@@ -1,0 +1,326 @@
+// Windows owns the window/tray/DPAPI only. monitor-ui and Python own the product.
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Web.Script.Serialization;
+using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Threading;
+using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.Wpf;
+using Forms = System.Windows.Forms;
+
+sealed class MonitorPipe : IDisposable
+{
+    readonly string root, codeRoot;
+    readonly bool preview;
+    readonly object gate = new object();
+    readonly JavaScriptSerializer json = new JavaScriptSerializer { MaxJsonLength = 64 * 1024 * 1024 };
+    Process child;
+    int sequence;
+    public MonitorPipe(string root, string codeRoot, bool preview) { this.root=root; this.codeRoot=codeRoot; this.preview=preview; }
+    internal static string Quote(string value)
+    {
+        // Windows CommandLineToArgvW quoting, including trailing backslashes.
+        var result = new StringBuilder("\""); int slashes=0;
+        foreach (char c in value) {
+            if (c=='\\') { slashes++; continue; }
+            result.Append('\\', c=='"' ? slashes*2+1 : slashes); result.Append(c); slashes=0;
+        }
+        result.Append('\\', slashes*2); return result.Append('"').ToString();
+    }
+    public Dictionary<string,object> Request(Dictionary<string,object> request)
+    {
+        lock(gate) {
+            if(child==null || child.HasExited) {
+                Stop();
+                var config=RouterMonitorWindow.Read(Path.Combine(root,"config.local.json"));
+                string frozen=RouterMonitorWindow.Text(config,"monitor_runtime","");
+                if(String.IsNullOrEmpty(frozen) && File.Exists(Path.Combine(codeRoot,"bin","codex-monitor-core.exe"))) frozen=Path.Combine("bin","codex-monitor-core.exe");
+                string program=String.IsNullOrEmpty(frozen) ? RouterMonitorWindow.Text(config,"python","python.exe") : Path.GetFullPath(Path.Combine(codeRoot,frozen));
+                string arguments=(String.IsNullOrEmpty(frozen) ? "-u "+Quote(Path.Combine(codeRoot,"monitor_service.py"))+" " : "")+
+                    "--root "+Quote(root)+" --code-root "+Quote(codeRoot)+" --platform windows"+(preview ? " --preview" : "");
+                child=new Process { StartInfo=new ProcessStartInfo(program,arguments) {
+                    WorkingDirectory=codeRoot,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,
+                    RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=Encoding.UTF8 } };
+                // Drain without logging or forwarding private diagnostics.
+                child.ErrorDataReceived += delegate { };
+                child.Start(); child.BeginErrorReadLine();
+            }
+            sequence=sequence>=2147483646 ? 1 : sequence+1; request["requestId"]=sequence;
+            string encoded=json.Serialize(request);
+            if(Encoding.UTF8.GetByteCount(encoded)+1>65536) throw new InvalidDataException();
+            var current=child;
+            using(var watchdog=new System.Threading.Timer(delegate { try { if(!current.HasExited)current.Kill(); }catch{} },null,
+                RouterMonitorWindow.Text(request,"action","")=="connection" ? 110000 : 15000,Timeout.Infinite)) {
+                try {
+                    child.StandardInput.WriteLine(encoded); child.StandardInput.Flush();
+                    // Bound the response before JSON parsing; do not log pipe content.
+                    var response=new StringBuilder(); int c;
+                    while((c=child.StandardOutput.Read())>=0 && c!='\n') {
+                        if(response.Length>=64*1024*1024)throw new InvalidDataException();
+                        response.Append((char)c);
+                    }
+                    if(c<0)throw new EndOfStreamException();
+                    var reply=json.Deserialize<Dictionary<string,object>>(response.ToString());
+                    if(!reply.ContainsKey("requestId") || Convert.ToInt32(reply["requestId"])!=sequence)throw new InvalidDataException();
+                    return reply;
+                }catch{Stop();throw;}
+            }
+        }
+    }
+    void Stop() { if(child!=null){try{if(!child.HasExited)child.Kill();}catch{} child.Dispose();child=null;} }
+    public void Dispose() { lock(gate){Stop();} }
+}
+
+sealed class RouterMonitorWindow : Window
+{
+    const string Origin="https://monitor.local/", Page=Origin+"index.html";
+    internal static JavaScriptSerializer Json {get{return new JavaScriptSerializer { MaxJsonLength=64*1024*1024 };}}
+    readonly string root, codeRoot;
+    readonly bool preview, selfTest;
+    readonly MonitorPipe service;
+    readonly EventWaitHandle reveal;
+    readonly WebView2CompositionControl web=new WebView2CompositionControl();
+    readonly Dictionary<string,bool> keys=new Dictionary<string,bool> {{"jev-typesafe",false},{"jev-vercel",false}};
+    readonly Dictionary<string,double> heights=new Dictionary<string,double>();
+    readonly DispatcherTimer poll=new DispatcherTimer(), pointer=new DispatcherTimer();
+    Forms.NotifyIcon tray;
+    HwndSource source;
+    Rect hit=Rect.Empty;
+    string mode="Compact", lastSnapshot="";
+    bool ready, busy, actionBusy, pending, quitting, testStarted;
+    int journalRevision=-1;
+    bool historyRequested;
+    object modeRequest=null;
+    double panelHeight=760;
+    Point? previousPointer;
+    bool previousActive;
+    string UiPath {get{return Path.Combine(root,"state","monitor-ui.json");}}
+    public RouterMonitorWindow(string root,string codeRoot,bool preview,bool selfTest,EventWaitHandle reveal,bool hidden)
+    {
+        this.root=root;this.codeRoot=codeRoot;this.preview=preview;this.selfTest=selfTest;this.reveal=reveal;
+        service=new MonitorPipe(root,codeRoot,preview);
+        Title="Codex automático";WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;AllowsTransparency=true;
+        Background=Brushes.Transparent;ShowInTaskbar=false;Topmost=true;Content=web;
+        web.DefaultBackgroundColor=System.Drawing.Color.Transparent;
+        var saved=Read(UiPath);string savedMode=Text(saved,"mode","Compact");
+        if(new[]{"Compact","Expanded","Hidden"}.Contains(savedMode))mode=savedMode;
+        if(saved.ContainsKey("topmost") && saved["topmost"] is bool)Topmost=(bool)saved["topmost"];
+        foreach(var item in Dict(Get(saved,"panelHeights"))) {double value=Numeric(item.Value);if(value>0&&value<=1)heights[item.Key]=value;}
+        if(hidden)mode="Hidden";
+        if(!preview)foreach(string provider in keys.Keys.ToArray())keys[provider]=File.Exists(Path.Combine(root,"state",provider+".secret"));
+        SourceInitialized += delegate {source=HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);source.AddHook(Hook);};
+        Loaded += async delegate {await Initialize();};
+        Closing += delegate(object sender,System.ComponentModel.CancelEventArgs e){if(!quitting&&!preview){e.Cancel=true;SetMode("Hidden");}};
+        Closed += delegate {poll.Stop();pointer.Stop();if(tray!=null)tray.Dispose();web.Dispose();Task.Run((Action)service.Dispose);};
+        poll.Interval=TimeSpan.FromSeconds(2);poll.Tick += delegate {if(reveal!=null&&reveal.WaitOne(0)){SetMode(mode=="Hidden"?"Compact":mode);Activate();}Refresh();};
+        pointer.Interval=TimeSpan.FromSeconds(1.0/30);pointer.Tick += delegate {UpdatePointer();};
+        Position();
+    }
+    internal static Dictionary<string,object> Read(string path) {try{return Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(path,Encoding.UTF8))??new Dictionary<string,object>();}catch{return new Dictionary<string,object>();}}
+    internal static object Get(Dictionary<string,object> data,string key){object value;return data.TryGetValue(key,out value)?value:null;}
+    internal static Dictionary<string,object> Dict(object value){return value as Dictionary<string,object>??new Dictionary<string,object>();}
+    internal static string Text(Dictionary<string,object> data,string key,string fallback){return Get(data,key) as string??fallback;}
+    static double Numeric(object value){try{double number=Convert.ToDouble(value);return Double.IsNaN(number)||Double.IsInfinity(number)?0:number;}catch{return 0;}}
+    static void Atomic(string path,byte[] bytes){Directory.CreateDirectory(Path.GetDirectoryName(path));string temp=path+"."+Guid.NewGuid().ToString("N")+".tmp";File.WriteAllBytes(temp,bytes);if(File.Exists(path))File.Replace(temp,path,null);else File.Move(temp,path);}
+    async Task Initialize()
+    {
+        try {
+            var environment=await CoreWebView2Environment.CreateAsync(null,Path.Combine(root,"state","monitor-webview2"));
+            var options=environment.CreateCoreWebView2ControllerOptions();options.IsInPrivateModeEnabled=true;
+            await web.EnsureCoreWebView2Async(environment,options);
+            var core=web.CoreWebView2;
+            core.Settings.AreDevToolsEnabled=false;core.Settings.AreDefaultContextMenusEnabled=false;core.Settings.AreHostObjectsAllowed=false;
+            core.Settings.IsStatusBarEnabled=false;core.Settings.IsPasswordAutosaveEnabled=false;core.Settings.IsGeneralAutofillEnabled=false;
+            core.SetVirtualHostNameToFolderMapping("monitor.local",Path.Combine(codeRoot,"dist","windows-ui"),CoreWebView2HostResourceAccessKind.DenyCors);
+            core.NavigationStarting += delegate(object sender,CoreWebView2NavigationStartingEventArgs e){if(e.Uri!=Page)e.Cancel=true;};
+            core.FrameNavigationStarting += delegate(object sender,CoreWebView2NavigationStartingEventArgs e){e.Cancel=true;};
+            core.NewWindowRequested += delegate(object sender,CoreWebView2NewWindowRequestedEventArgs e){e.Handled=true;};
+            core.PermissionRequested += delegate(object sender,CoreWebView2PermissionRequestedEventArgs e){e.State=CoreWebView2PermissionState.Deny;};
+            core.DownloadStarting += delegate(object sender,CoreWebView2DownloadStartingEventArgs e){e.Cancel=true;};
+            core.AddWebResourceRequestedFilter("*",CoreWebView2WebResourceContext.All);
+            core.WebResourceRequested += delegate(object sender,CoreWebView2WebResourceRequestedEventArgs e){
+                Uri uri; bool valid=Uri.TryCreate(e.Request.Uri,UriKind.Absolute,out uri)&&uri.Scheme=="https"&&uri.Host=="monitor.local"&&uri.Port==443&&String.IsNullOrEmpty(uri.Query)&&String.IsNullOrEmpty(uri.UserInfo);
+                string[] assets={"/index.html","/monitor.css","/icons.js","/core.js","/monitor.js","/codex.png"};
+                if(!valid||!assets.Contains(uri.AbsolutePath))e.Response=environment.CreateWebResourceResponse(new MemoryStream(),403,"Blocked","");
+            };
+            core.WebMessageReceived += delegate(object sender,CoreWebView2WebMessageReceivedEventArgs e){
+                if(e.Source!=Page||e.WebMessageAsJson.Length>20000)return;
+                try{var data=Json.Deserialize<Dictionary<string,object>>(e.WebMessageAsJson);if(data!=null)Action(data);}catch{Feedback("No se pudo procesar la acción.");}
+            };
+            core.ProcessFailed += delegate {ready=false;lastSnapshot="";journalRevision=-1;try{core.Reload();}catch{if(selfTest)FinishTest(false,"WebView2 process unavailable.");else{MessageBox.Show("La interfaz se ha detenido. Vuelve a abrir el monitor; tus tareas siguen abiertas.","Codex automático");Quit();}}};
+            MakeTray();core.Navigate(Page);poll.Start();pointer.Start();if(mode=="Hidden")Hide();
+        }catch{
+            if(selfTest){FinishTest(false,"WebView2 initialization failed; install Evergreen runtime.");return;}
+            MessageBox.Show("No se pudo iniciar la interfaz. Instala Microsoft Edge WebView2 Runtime (Evergreen) y vuelve a abrir el monitor.","Codex automático");
+            Quit();
+        }
+    }
+    void MakeTray()
+    {
+        if(preview)return;
+        tray=new Forms.NotifyIcon {Icon=new System.Drawing.Icon(Path.Combine(codeRoot,"assets","codex.ico")),Text="Codex automático",Visible=true};
+        var menu=new Forms.ContextMenuStrip();
+        menu.Items.Add("Cápsula",null,delegate{SetMode("Compact");});menu.Items.Add("Panel lateral",null,delegate{SetMode("Expanded");});
+        menu.Items.Add("Ocultar",null,delegate{SetMode("Hidden");});menu.Items.Add("Mantener delante",null,delegate{Topmost=!Topmost;SaveUi();PublishUi();});
+        menu.Items.Add("Pausar / reanudar selector",null,delegate{var config=Read(Path.Combine(root,"config.local.json"));Perform(new Dictionary<string,object>{{"action","config"},{"key","enabled"},{"value",!(Get(config,"enabled") as bool? ?? true)}});});
+        menu.Items.Add("Salir",null,delegate{Quit();});tray.ContextMenuStrip=menu;tray.DoubleClick += delegate{SetMode("Expanded");};
+    }
+    Forms.Screen Screen(){return Forms.Screen.FromHandle(new WindowInteropHelper(this).Handle);}
+    void Position()
+    {
+        var screen=Screen();var area=screen.WorkingArea;
+        var transform=source==null?Matrix.Identity:source.CompositionTarget.TransformFromDevice;
+        var topLeft=transform.Transform(new Point(area.Left,area.Top));var bottomRight=transform.Transform(new Point(area.Right,area.Bottom));
+        double available=bottomRight.Y-topLeft.Y;Width=Math.Min(432,Math.Max(1,bottomRight.X-topLeft.X-20));Height=Math.Max(1,available-20);
+        double ratio;panelHeight=Math.Min(Height,Math.Max(560,available*(heights.TryGetValue(screen.DeviceName,out ratio)?ratio:.9)));
+        Left=bottomRight.X-Width-10;Top=topLeft.Y+10;
+    }
+    Dictionary<string,object> Ui(){return new Dictionary<string,object>{{"mode",mode},{"topmost",Topmost},{"panelHeight",panelHeight},{"reduced",!SystemParameters.ClientAreaAnimation},{"lazyHistory",true},{"acknowledgesMode",true},{"modeRequest",modeRequest},{"nativeGlass",false}};}
+    async Task<bool> Script(string function,object value){if(!ready||web.CoreWebView2==null)return false;try{await web.CoreWebView2.ExecuteScriptAsync("window."+function+"("+Json.Serialize(value)+")");return true;}catch{lastSnapshot="";journalRevision=-1;return false;}}
+    async void PublishUi(){await Script("receiveUI",Ui());}
+    async void Feedback(string message){await Script("monitorFeedback",message);}
+    void SetMode(string value)
+    {
+        if(!new[]{"Compact","Expanded","Hidden"}.Contains(value))return;mode=value;
+        if(mode=="Hidden")Hide();else{Position();Show();}
+        // Acknowledge immediately; never wait for the Python journal or a provider.
+        PublishUi();SaveUi();lastSnapshot="";Refresh();
+    }
+    void SaveUi(){if(preview)return;try{Atomic(UiPath,Encoding.UTF8.GetBytes(Json.Serialize(new Dictionary<string,object>{{"mode",mode},{"topmost",Topmost},{"panelHeights",heights}})));}catch{Feedback("No se pudo guardar la vista.");}}
+    void Action(Dictionary<string,object> data)
+    {
+        string action=Text(data,"action","");
+        switch(action){
+            case "ready":ready=true;journalRevision=-1;lastSnapshot="";Position();PublishUi();Refresh();break;
+            case "mode":modeRequest=Get(data,"request") is int?Get(data,"request"):null;SetMode(Text(data,"value",""));break;
+            case "topmost":if(Get(data,"value") is bool){Topmost=(bool)data["value"];SaveUi();PublishUi();}break;
+            case "history":if(Get(data,"value") is bool){historyRequested=(bool)data["value"];lastSnapshot="";Refresh();}break;
+            case "bounds":
+                double x=Numeric(Get(data,"x")),y=Numeric(Get(data,"y")),w=Numeric(Get(data,"width")),h=Numeric(Get(data,"height"));
+                if(w>0&&h>0){hit=Rect.Intersect(new Rect(x,y,w,h),new Rect(0,0,Width,Height));ApplyRegion();}break;
+            case "resizeEnd":
+                double height=Numeric(Get(data,"height"));if(height>0){heights[Screen().DeviceName]=Math.Min(1,Math.Max(.1,height/Math.Max(1,Height+20)));Position();SaveUi();PublishUi();}break;
+            case "resizeReset":heights.Remove(Screen().DeviceName);Position();SaveUi();PublishUi();break;
+            case "resizeStart":break;
+            case "secret":StoreKey(Text(data,"provider",""),Text(data,"value",""));break;
+            case "config":case "quality":case "taskMode":case "connection":case "update":Perform(data);break;
+        }
+    }
+    async void Perform(Dictionary<string,object> data)
+    {
+        if(preview||actionBusy){Feedback("Vista previa o una operación todavía en curso.");return;}
+        actionBusy=true;
+        try{var reply=await Task.Run(()=>service.Request(data));Feedback(Text(reply,"feedback","Guardado."));}
+        catch{Feedback("No se pudo completar la operación. Tus tareas siguen abiertas.");}
+        finally{actionBusy=false;lastSnapshot="";Refresh();}
+    }
+    void StoreKey(string provider,string value)
+    {
+        if(preview||!keys.ContainsKey(provider)||String.IsNullOrWhiteSpace(value)||Encoding.UTF8.GetByteCount(value)>=16384)return;
+        try{byte[] cipher=ProtectedData.Protect(Encoding.UTF8.GetBytes(value.Trim()),null,DataProtectionScope.CurrentUser);Atomic(Path.Combine(root,"state",provider+".secret"),cipher);keys[provider]=true;lastSnapshot="";Refresh();Feedback("Clave guardada con Windows DPAPI.");}
+        catch{Feedback("No se pudo guardar la clave.");}
+    }
+    async void Refresh()
+    {
+        if(!ready)return;if(busy){pending=true;return;}busy=true;
+        try{
+            bool needs=mode=="Expanded"&&historyRequested;int sent=journalRevision;
+            var reply=await Task.Run(()=>service.Request(new Dictionary<string,object>{{"action","snapshot"},{"history",needs},{"revision",sent}}));
+            if(!(Get(reply,"ok") as bool? ?? false)){Feedback(Text(reply,"feedback","No se pudo leer el estado."));return;}
+            var payload=Dict(Get(reply,"payload"));bool history=payload.ContainsKey("history")&&mode=="Expanded"&&historyRequested;
+            if(!history)payload.Remove("history");payload["historyLoaded"]=journalRevision>=0||history;payload["keys"]=keys;payload["ui"]=Ui();
+            var small=new Dictionary<string,object>(payload);small.Remove("history");string encoded=Json.Serialize(small);
+            if(encoded!=lastSnapshot||history){if(await Script("receive",payload)){lastSnapshot=encoded;if(history)journalRevision=Convert.ToInt32(payload["journalRevision"]);}}
+            if(selfTest&&!testStarted){testStarted=true;RunSelfTest();}
+        }catch{Feedback("No se pudo leer el estado. Se conserva la última vista.");}
+        finally{busy=false;if(pending){pending=false;Refresh();}}
+    }
+    void Quit(){quitting=true;Close();Application.Current.Shutdown();}
+    [StructLayout(LayoutKind.Sequential)] struct NativePoint {public int X,Y;}
+    [DllImport("user32.dll")]static extern bool GetCursorPos(out NativePoint p);
+    [DllImport("gdi32.dll")]static extern IntPtr CreateRoundRectRgn(int left,int top,int right,int bottom,int width,int height);
+    [DllImport("gdi32.dll")]static extern bool DeleteObject(IntPtr handle);
+    [DllImport("user32.dll")]static extern int SetWindowRgn(IntPtr hwnd,IntPtr region,bool redraw);
+    void ApplyRegion()
+    {
+        if(source==null||hit.IsEmpty)return;var matrix=source.CompositionTarget.TransformToDevice;
+        var a=matrix.Transform(hit.TopLeft);var b=matrix.Transform(hit.BottomRight);int radius=(int)(26*matrix.M11);
+        var region=CreateRoundRectRgn((int)Math.Floor(a.X),(int)Math.Floor(a.Y),(int)Math.Ceiling(b.X)+1,(int)Math.Ceiling(b.Y)+1,radius*2,radius*2);
+        if(SetWindowRgn(source.Handle,region,true)==0)DeleteObject(region); // Successful transfer belongs to Windows.
+    }
+    IntPtr Hook(IntPtr hwnd,int message,IntPtr wParam,IntPtr lParam,ref bool handled)
+    {
+        if(message==0x0084&&!hit.IsEmpty){long raw=lParam.ToInt64();var p=PointFromScreen(new Point((short)(raw&65535),(short)((raw>>16)&65535)));if(!hit.Contains(p)){handled=true;return new IntPtr(-1);}}
+        // WM_MOUSEACTIVATE defaults to activation without eating the first click.
+        if(message==0x02E0||message==0x007E)Dispatcher.BeginInvoke(new Action(delegate{Position();PublishUi();}));
+        return IntPtr.Zero;
+    }
+    async void UpdatePointer()
+    {
+        if(!ready||mode=="Hidden"||source==null)return;NativePoint native;if(!GetCursorPos(out native))return;
+        var point=PointFromScreen(new Point(native.X,native.Y));if(previousPointer.HasValue&&previousPointer.Value==point&&previousActive==IsActive)return;previousPointer=point;previousActive=IsActive;
+        var data=hit.Contains(point)?new Dictionary<string,object>{{"x",point.X},{"y",point.Y}}:null;
+        try{await web.CoreWebView2.ExecuteScriptAsync("window.monitorPointer("+Json.Serialize(data)+","+(IsActive?"false":"true")+")");}catch{}
+    }
+    async Task AssertScript(string expression,string check)
+    {
+        for(int i=0;i<80;i++){if(await web.CoreWebView2.ExecuteScriptAsync("Boolean("+expression+")")=="true")return;await Task.Delay(100);}
+        throw new InvalidOperationException(check);
+    }
+    async void RunSelfTest()
+    {
+        try{
+            await AssertScript("document.querySelectorAll('#agents .avatar').length===1","capsule active-only fixture");
+            await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('#expand').click()");
+            await AssertScript("state.ui.mode==='Expanded' && document.querySelectorAll('.task-row').length===1","native mode ACK and shared agent list");
+            await AssertScript("document.querySelector('#activity').textContent.includes('Sol 6.1') && document.querySelector('#activity').textContent.includes('Alto')","shared model and effort pills");
+            await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-tab=history]').click()");
+            await AssertScript("state.historyLoaded===true && document.querySelectorAll('.history-row').length===1","private Python lazy journal");
+            using(var image=File.Create(Path.Combine(codeRoot,"state","review-webview2-history.png")))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
+            await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('#collapse').click()");
+            await AssertScript("state.ui.mode==='Compact'","native compact ACK");
+            if(hit.IsEmpty||File.Exists(UiPath)||File.Exists(Path.Combine(root,"config.local.json")))throw new InvalidOperationException("preview isolation and native bounds");
+            FinishTest(true,"Shared WebView2 capsule/agents/pills/history; private Python IPC; native mode ACK/bounds; isolated preview. First-click/hover/DPI/DPAPI visual acceptance still requires Windows owner QA.");
+        }catch{FinishTest(false,"Shared WebView2 native fixture failed. No private data was captured.");}
+    }
+    void FinishTest(bool success,string evidence)
+    {
+        Directory.CreateDirectory(Path.Combine(codeRoot,"state"));File.WriteAllText(Path.Combine(codeRoot,"state","ui-review-checks.txt"),(success?"PASS: ":"FAIL: ")+evidence+Environment.NewLine);
+        Environment.ExitCode=success?0:1;Quit();
+    }
+}
+
+static class RouterMonitorProgram
+{
+    [STAThread]static int Main(string[] args)
+    {
+        string codeRoot=Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,".."));
+        string root=codeRoot;int index=Array.IndexOf(args,"--root");if(index>=0&&index+1<args.Length)root=Path.GetFullPath(args[index+1]);
+        bool selfTest=args.Contains("--self-test"),preview=selfTest||args.Contains("--preview");
+        if(selfTest){root=Path.Combine(codeRoot,"state","windows-monitor-probe-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(Path.Combine(root,"state"));
+            File.WriteAllText(Path.Combine(root,"preview.json"),"{\"threads\":{\"fixture\":{\"name\":\"Synthetic fixture\",\"status\":\"active\",\"model\":\"gpt-6.1-sol\",\"effort\":\"high\"},\"idle\":{\"status\":\"idle\"}}}");
+            File.WriteAllText(Path.Combine(root,"state","history.jsonl"),"{\"event\":\"decision_created\",\"decision_id\":\"fixture-decision\",\"thread\":\"fixture\",\"time\":1,\"title\":\"Synthetic fixture\",\"model\":\"gpt-6.1-sol\",\"effort\":\"high\"}\n");
+        }
+        Directory.CreateDirectory(Path.Combine(root,"state"));
+        string hash;using(var sha=SHA256.Create())hash=BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(root.ToUpperInvariant()))).Replace("-","");
+        bool created;using(var mutex=new Mutex(true,"Local\\CodexRouterMonitor-"+hash,out created))
+        using(var reveal=new EventWaitHandle(false,EventResetMode.AutoReset,"Local\\CodexRouterMonitorReveal-"+hash)) {
+            if(!created){reveal.Set();return 0;}
+            try{
+                var app=new Application();var window=new RouterMonitorWindow(root,codeRoot,preview,selfTest,reveal,args.Contains("--tray"));
+                if(selfTest){var deadline=new DispatcherTimer {Interval=TimeSpan.FromSeconds(50)};deadline.Tick+=delegate{File.WriteAllText(Path.Combine(codeRoot,"state","ui-review-checks.txt"),"FAIL: native fixture timeout");Environment.ExitCode=1;app.Shutdown();};deadline.Start();}
+                app.Run(window);return Environment.ExitCode;
+            }finally{mutex.ReleaseMutex();}
+        }
+    }
+}

@@ -21,7 +21,7 @@ const {pathToFileURL}=require('node:url');
       });
       await page.clock.fastForward(500);
       assert.equal(await page.locator('#quota').innerText(),'76%');
-      assert.match(await page.locator('#quota').getAttribute('aria-label'),/Cuota disponible: 76 %/);
+      assert.match(await page.locator('#quota').getAttribute('aria-label'),/Cuota semanal restante: 76 %/);
       assert.equal(await page.locator('#count').count(),0,'Task count must not occupy the compact capsule');
       const centers=await page.locator('#agents,#quota,#compact .logo').evaluateAll(nodes=>nodes.map(n=>{const r=n.getBoundingClientRect();return r.y+r.height/2;}));
       assert.ok(centers.every(y=>Math.abs(y-centers[0])<.1),'Compact agents, quota and logo are not vertically aligned');
@@ -47,55 +47,45 @@ const {pathToFileURL}=require('node:url');
       assert.equal(await page.locator('#agents .overflow').innerText(),'+'+(7-visible));
       for(const font of ['sans-serif','serif','monospace','Lato Black','C059']) {
         await page.evaluate(font=>{
-          for(const id of ['quota','quota-panel'])document.getElementById(id).style.fontFamily=font;
+          document.getElementById('quota').style.fontFamily=font;
           window.receive({});
         },font);
         const offset=await page.locator('#quota .quota-number').evaluate(n=>{const bounds=n.getBBox();return bounds.x+bounds.width/2-22;});
         assert.ok(Math.abs(offset)<.1,`Glyph overhang shifted quota center for ${font}: ${offset}`);
       }
-      await page.evaluate(()=>{for(const id of ['quota','quota-panel'])document.getElementById(id).style.fontFamily='';window.receive({});});
+      await page.evaluate(()=>{document.getElementById('quota').style.fontFamily='';window.receive({});});
       await page.locator('#quota').click();
       assert.match(await page.locator('#peek').innerText(),/CUOTA DE LA CUENTA.*\n.*semanal/s);
       await page.clock.fastForward(12000);
       assert.equal(await page.locator('#quota').innerText(),'—','Expired quota stayed current without incoming snapshot');
       for(const percent of [0,100,null]) {
         await page.evaluate(percent=>window.receive({threads:{a0:{name:'Agente 0',status:'active',model:'gpt-6.1-sol',context_window:percent===null?{}:{used_percent:percent,used_tokens:percent*1000,capacity_tokens:100000}}},
-          accountUsage:percent===null?{}:{remaining_percent:percent,valid_until:Date.now()/1000+60}}),percent);
+          accountUsage:percent===null?{}:{remaining_percent:percent,valid_until:Date.now()/1000+60,windows:[{duration_minutes:10080,remaining_percent:percent}]}}),percent);
         await page.clock.fastForward(500);
         assert.equal(await page.locator('#quota').innerText(),percent===null?'—':percent+'%');
-        assert.equal(await page.locator('#quota-panel').textContent(),percent===null?'—':percent+'%');
+
         const circle=page.locator('#agents .context-ring .usage-progress');
         assert.equal(await circle.count(),percent===null?0:1);
         if(percent===100)assert.equal(Number(await circle.getAttribute('stroke-dashoffset')),0);
         if(percent===0)assert.equal(await circle.getAttribute('visibility'),'hidden');
       }
-      await page.evaluate(()=>window.receive({threads:{a0:{name:'Diseñar el monitor',agent_category:'interface',status:'active',model:'gpt-6.1-sol',effort:'high',context_window:{used_percent:37,used_tokens:37000,capacity_tokens:100000}}},accountUsage:{remaining_percent:76,valid_until:Date.now()/1000+60}}));
+      await page.evaluate(()=>window.receive({threads:{a0:{name:'Diseñar el monitor',agent_category:'interface',status:'active',model:'gpt-6.1-sol',effort:'high',context_window:{used_percent:37,used_tokens:37000,capacity_tokens:100000}}},accountUsage:{remaining_percent:76,valid_until:Date.now()/1000+60,windows:[{duration_minutes:10080,remaining_percent:76}]}}));
       await avatar.click();
       assert.match(await page.locator('#peek').innerText(),/37 %.*37000 \/ 100000/);
       await page.keyboard.press('Escape');
       if(width===432 && deviceScaleFactor===2 && process.env.ROUTER_USAGE_SCREENSHOT)await page.locator('#surface').screenshot({path:process.env.ROUTER_USAGE_SCREENSHOT});
       await page.locator('#expand').click();
-      assert.equal(await page.locator('.featured-row .context-ring').count(),1);
-      const panelQuota=page.locator('#quota-panel');
-      assert.equal(await panelQuota.isVisible(),true,'Panel header does not include quota');
-      assert.equal(await panelQuota.textContent(),'76%');
-      const panelOffset=await panelQuota.locator('.quota-number').evaluate(n=>{const b=n.getBBox();return b.x+b.width/2-22;});
-      assert.ok(Math.abs(panelOffset)<.1,'Panel quota was measured while hidden and stayed off-center');
-      await panelQuota.click();
-      assert.equal(await panelQuota.getAttribute('aria-expanded'),'true');
-      assert.match(await page.locator('#quota-panel-details').innerText(),/Cuota disponible: 76 %/);
-      const headerFits=await page.locator('header').evaluate(n=>n.scrollWidth<=n.clientWidth);
-      assert.ok(headerFits,'New panel quota overlaps the header controls');
+      assert.equal(await page.locator('.task-row .context-ring').count(),1);
+      assert.equal(await page.locator('#expanded .quota-ring').count(),0,'Quota circle is capsule-only');
+      assert.match(await page.locator('.account-quota').innerText(),/76 % disponible/);
+      assert.ok(await page.locator('header').evaluate(n=>n.scrollWidth<=n.clientWidth),'Header overlaps controls');
       if(width===432 && deviceScaleFactor===2 && process.env.ROUTER_USAGE_PANEL_SCREENSHOT)await page.locator('#surface').screenshot({path:process.env.ROUTER_USAGE_PANEL_SCREENSHOT});
       await page.clock.fastForward(62000);
-      assert.equal(await panelQuota.textContent(),'—','Panel quota did not expire');
-      assert.match(await page.locator('#quota-panel-details').innerText(),/sin datos actuales/);
-      await panelQuota.click();
-      assert.equal(await page.locator('#quota-panel-details').isVisible(),false);
+      assert.match(await page.locator('.account-quota').innerText(),/Sin datos actuales/,'Panel quota did not expire');
       await page.locator('#collapse').click();
       await page.evaluate(()=>window.receive({threads:{a0:{name:'Diseñar el monitor',status:'active',model:'gpt-6.1-sol',effort:'high',agent_category:'interface',
         context_window:{used_percent:90,used_tokens:90000,capacity_tokens:100000},context_compaction:{state:'compacting'}}},
-        accountUsage:{remaining_percent:76,valid_until:Date.now()/1000+60},ui:{mode:'Compact',reduced:false}}));
+        accountUsage:{remaining_percent:76,valid_until:Date.now()/1000+60,windows:[{duration_minutes:10080,remaining_percent:76}]},ui:{mode:'Compact',reduced:false}}));
       await page.clock.fastForward(500);
       const compacting=page.locator('#agents .compacting-ring');
       assert.equal(await compacting.count(),1);
@@ -118,15 +108,15 @@ const {pathToFileURL}=require('node:url');
       assert.equal(await compacting.evaluate(n=>getComputedStyle(n).animationName),'none');
       assert.match(await avatar.getAttribute('aria-label'),/Compactando contexto/,'Reduced motion must still identify compaction');
       await page.locator('#expand').click();
-      assert.equal(await page.locator('.featured-row .compacting-ring').count(),1,'Panel lost the compaction state');
+      assert.equal(await page.locator('.task-row .compacting-ring').count(),1,'Panel lost the compaction state');
       await page.evaluate(()=>window.receive({threads:{a0:{name:'Diseñar el monitor',status:'active',model:'gpt-6.1-sol',context_compaction:{state:'awaiting_usage'}}}}));
       assert.equal(await page.locator('.compacting-ring').count(),0,'Compaction animation stayed after completion');
-      assert.match(await page.locator('.featured-row .avatar').getAttribute('aria-label'),/esperando nueva medición/);
+      assert.match(await page.locator('.task-row').getAttribute('aria-label'),/esperando nueva medición/);
       await page.evaluate(()=>window.receive({threads:{a0:{name:'Diseñar el monitor',status:'active',model:'gpt-6.1-sol',context_window:{used_percent:20,used_tokens:20000,capacity_tokens:100000}}}}));
-      assert.match(await page.locator('.featured-row .avatar').getAttribute('aria-label'),/Contexto usado: 20 %/);
+      assert.match(await page.locator('.task-row').getAttribute('aria-label'),/Contexto usado: 20 %/);
       await page.evaluate(()=>window.receive({connections:0,accountUsage:{}}));
       assert.equal(await page.locator('#quota').innerText(),'—');
-      assert.equal(await panelQuota.textContent(),'—');
+
       assert.deepEqual(errors,[]);
       await page.close();
     }

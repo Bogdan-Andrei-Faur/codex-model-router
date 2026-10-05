@@ -17,11 +17,14 @@ class BuildIdentityTests(unittest.TestCase):
             (root / 'routing.py').write_text('policy = 1')
             (root / 'monitor-ui').mkdir()
             before, backend = identity(root), router_identity(root)
-            for name in ('MonitorMac.swift', 'MonitorWpf.cs', 'monitor-ui/monitor.js', 'monitor-ui/monitor.css'):
+            for name in ('MonitorMac.swift', 'MonitorWpf.cs', 'MonitorWindows.cs', 'monitor_state.py', 'monitor_service.py', 'monitor_linux.py', 'updates.py', 'monitor-ui/monitor.js', 'monitor-ui/monitor.css'):
                 (root / name).write_text('changed')
                 self.assertNotEqual(identity(root), before)
                 self.assertEqual(router_identity(root), backend)
             (root / 'routing.py').write_text('policy = 2')
+            self.assertNotEqual(router_identity(root), backend)
+            backend = router_identity(root)
+            (root / 'BridgeMac.swift').write_text('native bridge changed')
             self.assertNotEqual(router_identity(root), backend)
             backend = router_identity(root)
             (root / 'build_stamp.py').write_text('generated = True')

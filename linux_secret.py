@@ -14,7 +14,8 @@ _CACHE = {}
 def attributes(root, provider):
     if provider not in PROVIDERS:
         raise ValueError('Unknown provider')
-    return {'installation': hashlib.sha256(str(Path(root).resolve()).encode()).hexdigest(), 'provider': provider}
+    from application_layout import credential_namespace
+    return {'installation': credential_namespace(root), 'provider': provider}
 
 
 def request(root, action, provider, value=None):

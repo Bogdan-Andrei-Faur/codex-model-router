@@ -20,12 +20,12 @@ internal sealed partial class ModernRouterMonitor
                 if (!target.ContainsKey("prior_inferences")) target["prior_inferences"] = new List<string>();
                 ((List<string>)target["prior_inferences"]).Add(Model(String(target, "observed_model")) + " · " + Effort(String(target, "observed_effort")) + " · " + String(target, "evidence_confidence"));
             }
-            foreach (string key in new[] { "observed_model", "observed_effort", "observed_candidate_model", "observed_candidate_effort", "evidence_confidence" }) target.Remove(key);
+            foreach (string key in new[] { "observed_model", "observed_effort", "observed_candidate_model", "observed_candidate_effort", "evidence_confidence", "inference_model_mismatch", "inference_effort_mismatch" }) target.Remove(key);
             if (source.ContainsKey("phase_model")) target["accepted_model"] = source["phase_model"];
             if (source.ContainsKey("phase_effort")) target["accepted_effort"] = source["phase_effort"];
         }
         foreach (string key in new[] { "status", "phase_id", "phase_name", "phase_model", "phase_effort", "phase_status", "phase_transition", "pipeline_mode", "phase_pipeline",
-            "accepted_model", "accepted_effort", "configured_model", "configured_effort", "observed_model", "observed_effort", "observed_candidate_model", "observed_candidate_effort", "evidence_confidence" })
+            "accepted_model", "accepted_effort", "configured_model", "configured_effort", "observed_model", "observed_effort", "observed_candidate_model", "observed_candidate_effort", "evidence_confidence", "inference_model_mismatch", "inference_effort_mismatch" })
             if (source.ContainsKey(key) && !(key == "phase_id" && String(source, "event") == "phase_checkpoint" && String(source, "phase_status") != "applied")) target[key] = source[key];
     }
 
@@ -90,7 +90,7 @@ internal sealed partial class ModernRouterMonitor
         var note = Txt(dynamic ? "Las etapas son un plan; solo la ejecución en Codex se confirma por eventos reales." :
             status == "" ? "Esta ejecución no tiene estados de fase registrados." : "La evidencia interna de esta ejecución es limitada.", 11, Muted);
         note.TextWrapping = TextWrapping.Wrap; note.Margin = new Thickness(0, 9, 0, 0); content.Children.Add(note);
-        return new Border { Background = Panel2, CornerRadius = new CornerRadius(16), Padding = new Thickness(12),
+        return new Border { Background = Panel2, CornerRadius = new CornerRadius(24), Padding = new Thickness(12),
             Margin = new Thickness(0, 10, 0, 0), Child = content };
     }
 
@@ -106,6 +106,9 @@ internal sealed partial class ModernRouterMonitor
             if (selected != "") lines.Add(entry[1] + " · " + Model(selected) + " · " + Effort(String(data, entry[0] + "_effort")));
         }
         if (String(data, "observed_model") == "") lines.Add("Inferencia real · sin confirmación disponible");
+        if ((data.ContainsKey("inference_model_mismatch") && data["inference_model_mismatch"] is bool && (bool)data["inference_model_mismatch"]) ||
+            (data.ContainsKey("inference_effort_mismatch") && data["inference_effort_mismatch"] is bool && (bool)data["inference_effort_mismatch"]))
+            lines.Add("La inferencia vinculada al turno difiere de los ajustes esperados.");
         if (String(data, "observed_candidate_model") != "") lines.Add("Coincidencia probable · " + Model(String(data, "observed_candidate_model")) + " · " + Effort(String(data, "observed_candidate_effort")));
         if (data.ContainsKey("prior_inferences")) foreach (string prior in (List<string>)data["prior_inferences"]) lines.Add("Inferencia de una fase anterior · " + prior);
         if (data.ContainsKey("phase_events"))

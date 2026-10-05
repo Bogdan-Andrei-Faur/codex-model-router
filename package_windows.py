@@ -36,15 +36,19 @@ def main():
     try:
         bin_dir = STAGE / "bin"; dist_dir = STAGE / "dist"; state_dir = STAGE / "state"
         bin_dir.mkdir(); dist_dir.mkdir(); state_dir.mkdir()
-        for entry, name in (("router.py", "codex-router-core"), ("desktop.py", "codex-desktop-core")):
+        for entry, name in (("router.py", "codex-router-core"), ("desktop.py", "codex-desktop-core"), ("monitor_service.py", "codex-monitor-core")):
             run(sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--name", name,
                 "--distpath", str(bin_dir), "--workpath", str(temporary / "work" / name),
                 "--specpath", str(temporary / "spec"), str(ROOT / entry))
         shutil.copy2(ROOT / "dist" / "codex-router-v19.exe", dist_dir / "codex-router.exe")
         shutil.copy2(ROOT / "dist" / "codex-monitor-v24.exe", dist_dir / "codex-monitor-v24.exe")
+        for name in ("Microsoft.Web.WebView2.Core.dll", "Microsoft.Web.WebView2.Wpf.dll"):
+            shutil.copy2(ROOT / "dist" / name, dist_dir / name)
+        shutil.copytree(ROOT / "dist/runtimes", dist_dir / "runtimes")
+        shutil.copytree(ROOT / "dist/windows-ui", dist_dir / "windows-ui")
         config = json.loads((ROOT / "config.example.json").read_text(encoding="utf-8"))
         config.pop("python", None)
-        config.update({"desktop_runtime": r"bin\\codex-desktop-core.exe", "router_runtime": r"bin\\codex-router-core.exe"})
+        config.update({"desktop_runtime": r"bin\\codex-desktop-core.exe", "router_runtime": r"bin\\codex-router-core.exe", "monitor_runtime": r"bin\\codex-monitor-core.exe"})
         (STAGE / "config.example.json").write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         shutil.copy2(ROOT / "VERSION", STAGE / "VERSION")
         shutil.copy2(ROOT / "BUILD.json", STAGE / "BUILD.json")
@@ -52,6 +56,8 @@ def main():
         shutil.copy2(ROOT / "README.md", STAGE / "README.md")
         shutil.copytree(ROOT / "docs", STAGE / "docs")
         (STAGE / "INSTALAR.txt").write_text(
+            "Requisitos: .NET Framework 4.8 y Microsoft Edge WebView2 Runtime (Evergreen).\n"
+            "Instala el runtime desde https://developer.microsoft.com/microsoft-edge/webview2/ si falta.\n"
             "1. Extrae esta carpeta en una ubicación permanente.\n"
             "2. Ejecuta dist\\codex-router.exe --install-integration.\n"
             "3. Cuando no haya tareas activas, reinicia ChatGPT Desktop desde su acceso habitual.\n"

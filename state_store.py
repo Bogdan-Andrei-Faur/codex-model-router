@@ -166,7 +166,7 @@ def persist_task(state, thread, row, only_if_missing=False):
         return
     key = hashlib.sha256(thread.encode()).hexdigest()
     fields = {k: row[k] for k in ("agent_category", "agent_confidence", "task_contract", "task_floor",
-                                  "pending_phase_floor", "pending_phase_name", "pending_phase_id") if k in row}
+                                  "pending_phase_floor", "pending_phase_name", "pending_phase_id", "candidate_contract") if k in row}
     with file_lock(Path(state) / "workloads.lock"):
         path = Path(state) / "workloads" / (key + ".json")
         if only_if_missing and path.exists():

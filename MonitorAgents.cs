@@ -25,8 +25,8 @@ internal sealed partial class ModernRouterMonitor
 
     sealed class AgentIdentity
     {
-        public string Name, Path;
-        public AgentIdentity(string name, string path) { Name = name; Path = path; }
+        public string Name, Path, Icon;
+        public AgentIdentity(string name, string icon) { Name = name; Icon = icon; Path = LucidePath(icon); }
     }
 
     readonly StackPanel agentStrip = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
@@ -72,7 +72,7 @@ internal sealed partial class ModernRouterMonitor
         RefreshQuota(new Dictionary<string, object>(), false);
         expandAgents = Btn("", delegate { SwitchMode(MonitorMode.Expanded, true); }, true);
         expandAgents.MinWidth = 28; expandAgents.VerticalAlignment = VerticalAlignment.Center;
-        expandAgents.Content = NavigationGlyph("M5,0 L0,5 L5,10", 6);
+        expandAgents.Content = LucideGlyph("panel-left-open", 18, Muted);
         expandAgents.ToolTip = "Desplegar panel lateral";
         System.Windows.Automation.AutomationProperties.SetName(expandAgents, "Desplegar panel lateral");
         var expandDivider = new Border { BorderBrush = Line, BorderThickness = new Thickness(1, 0, 0, 0),
@@ -99,23 +99,29 @@ internal sealed partial class ModernRouterMonitor
         string name = String(row, "name").ToLowerInvariant();
         var found = MatchAgentIdentity(name);
         return found ?? MatchAgentIdentity(String(row, "model_reason", String(row, "reason")).ToLowerInvariant())
-            ?? new AgentIdentity("Tarea", "M12,2 A10,10 0 1 1 11.99,2 M12,7 L12,17 M7,12 L17,12");
+            ?? new AgentIdentity("Tarea", "circle-plus");
     }
 
     static AgentIdentity IdentityFromCategory(string category)
     {
         switch (category)
         {
-            case "audit": return new AgentIdentity("Auditoría", "M9,2 L15,2 L15,4 L20,4 L20,12 M12,22 L4,22 L4,4 L9,4 Z M8,8 L12,8 M8,12 L10,12 M16,12 A4,4 0 1 1 15.99,12 M19,19 L23,23");
-            case "tests": return new AgentIdentity("Pruebas", "M8,2 L16,2 M10,2 L10,9 L4,19 Q3,22 6,22 L18,22 Q21,22 20,19 L14,9 L14,2 M7,15 L17,15 M9,18 L10,18 M14,19 L15,19");
-            case "architecture": return new AgentIdentity("Arquitectura", "M9,2 L15,2 L15,8 L9,8 Z M2,16 L8,16 L8,22 L2,22 Z M16,16 L22,16 L22,22 L16,22 Z M12,8 L12,12 M5,16 L5,12 L19,12 L19,16");
-            case "correction": return new AgentIdentity("Corrección", "M8,7 L16,7 L17,11 L17,16 A5,5 0 0 1 7,16 L7,11 Z M9,7 L9,4 L15,4 L15,7 M9,4 L7,2 M15,4 L17,2 M3,10 L7,12 M17,12 L21,10 M3,16 L7,16 M17,16 L21,16 M5,22 L8,19 M16,19 L19,22 M12,8 L12,20");
-            case "text": return new AgentIdentity("Textos", "M4,3 L20,3 M12,3 L12,21 M8,21 L16,21 M4,3 L4,7 M20,3 L20,7");
-            case "interface": return new AgentIdentity("Interfaces", "M3,3 L21,3 L21,21 L3,21 Z M3,8 L21,8 M8,8 L8,21 M5,5.5 L6,5.5 M9,5.5 L10,5.5");
-            case "research": return new AgentIdentity("Investigación", "M10,2 A8,8 0 1 1 9.99,2 M16,16 L23,23 M6,10 L14,10 M10,6 L10,14");
-            case "configuration": return new AgentIdentity("Configuración", "M12,3 L14,6 L18,6 L19,10 L22,12 L19,14 L18,18 L14,18 L12,21 L10,18 L6,18 L5,14 L2,12 L5,10 L6,6 L10,6 Z M12,9 A3,3 0 1 1 11.99,9");
-            case "automation": return new AgentIdentity("Automatización", "M5,5 L10,5 L12,8 L14,5 L19,5 L19,10 L22,12 L19,14 L19,19 L14,19 L12,16 L10,19 L5,19 L5,14 L2,12 L5,10 Z M9,12 L15,12 M12,9 L12,15");
-            case "general": return new AgentIdentity("Tarea", "M12,2 A10,10 0 1 1 11.99,2 M12,7 L12,17 M7,12 L17,12");
+            case "audit": return new AgentIdentity("Auditoría", "clipboard-check");
+            case "tests": return new AgentIdentity("Pruebas", "flask-conical");
+            case "architecture": return new AgentIdentity("Arquitectura", "network");
+            case "correction": return new AgentIdentity("Corrección", "bug");
+            case "text": return new AgentIdentity("Textos", "text");
+            case "interface": return new AgentIdentity("Interfaces", "panels-top-left");
+            case "research": return new AgentIdentity("Investigación", "search");
+            case "configuration": return new AgentIdentity("Configuración", "settings-2");
+            case "automation": return new AgentIdentity("Automatización", "workflow");
+            case "general": return new AgentIdentity("Tarea", "circle-plus");
+            case "data": return new AgentIdentity("Datos", "database");
+            case "performance": return new AgentIdentity("Rendimiento", "gauge");
+            case "deployment": return new AgentIdentity("Despliegues", "rocket");
+            case "versioning": return new AgentIdentity("Versiones", "git-branch");
+            case "integration": return new AgentIdentity("Integraciones", "plug");
+            case "accessibility": return new AgentIdentity("Accesibilidad", "accessibility");
             default: return null;
         }
     }
@@ -123,19 +129,19 @@ internal sealed partial class ModernRouterMonitor
     static AgentIdentity MatchAgentIdentity(string text)
     {
         if (Regex.IsMatch(text, @"auditor|audit|seguridad|security|accesibilidad"))
-            return new AgentIdentity("Auditoría", "M9,2 L15,2 L15,4 L20,4 L20,12 M12,22 L4,22 L4,4 L9,4 Z M8,8 L12,8 M8,12 L10,12 M16,12 A4,4 0 1 1 15.99,12 M19,19 L23,23");
+            return new AgentIdentity("Auditoría", "clipboard-check");
         if (Regex.IsMatch(text, @"\b(test|tests|prueba|pruebas|e2e)\b|comprobar|verificar|validar"))
-            return new AgentIdentity("Pruebas", "M8,2 L16,2 M10,2 L10,9 L4,19 Q3,22 6,22 L18,22 Q21,22 20,19 L14,9 L14,2 M7,15 L17,15 M9,18 L10,18 M14,19 L15,19");
+            return new AgentIdentity("Pruebas", "flask-conical");
         if (Regex.IsMatch(text, @"arquitect|architect|migraci|infraestructura"))
-            return new AgentIdentity("Arquitectura", "M9,2 L15,2 L15,8 L9,8 Z M2,16 L8,16 L8,22 L2,22 Z M16,16 L22,16 L22,22 L16,22 Z M12,8 L12,12 M5,16 L5,12 L19,12 L19,16");
+            return new AgentIdentity("Arquitectura", "network");
         if (Regex.IsMatch(text, @"correg|corrig|error|fallo|bug|arregl|fix"))
-            return new AgentIdentity("Corrección", "M8,7 L16,7 L17,11 L17,16 A5,5 0 0 1 7,16 L7,11 Z M9,7 L9,4 L15,4 L15,7 M9,4 L7,2 M15,4 L17,2 M3,10 L7,12 M17,12 L21,10 M3,16 L7,16 M17,16 L21,16 M5,22 L8,19 M16,19 L19,22 M12,8 L12,20");
+            return new AgentIdentity("Corrección", "bug");
         if (Regex.IsMatch(text, @"traduc|translat|texto|textos|document|resum"))
-            return new AgentIdentity("Textos", "M4,3 L20,3 M12,3 L12,21 M8,21 L16,21 M4,3 L4,7 M20,3 L20,7");
+            return new AgentIdentity("Textos", "text");
         if (Regex.IsMatch(text, @"interfaz|interfaces|frontend|front.end|diseñ|design|cápsula|capsula|\b(ui|ux)\b"))
-            return new AgentIdentity("Interfaces", "M3,3 L21,3 L21,21 L3,21 Z M3,8 L21,8 M8,8 L8,21 M5,5.5 L6,5.5 M9,5.5 L10,5.5");
+            return new AgentIdentity("Interfaces", "panels-top-left");
         if (Regex.IsMatch(text, @"investig|investiga|research|analiz"))
-            return new AgentIdentity("Investigación", "M10,2 A8,8 0 1 1 9.99,2 M16,16 L23,23 M6,10 L14,10 M10,6 L10,14");
+            return new AgentIdentity("Investigación", "search");
         return null;
     }
 
@@ -211,10 +217,7 @@ internal sealed partial class ModernRouterMonitor
         art.Children.Add(new System.Windows.Shapes.Path { Tag = "orbit-track",
             Data = new EllipseGeometry(new Point(22, 22), 20, 20), Stroke = color, StrokeThickness = 1,
             Opacity = .22, Width = 44, Height = 44, IsHitTestVisible = false });
-        var glyph = new System.Windows.Shapes.Path { Data = System.Windows.Media.Geometry.Parse(identity.Path), Stroke = color,
-            StrokeThickness = 1.5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
-            StrokeLineJoin = PenLineJoin.Round, Width = 19, Height = 19, Stretch = Stretch.Uniform,
-            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var glyph = LucideGlyph(identity.Icon, 19, color);
         art.Children.Add(glyph);
         if (compacting)
         {

@@ -18,8 +18,10 @@ import threading
 import time
 
 from desktop_runtime import discover, DiscoveryError
+from application_layout import code_root, data_root, manifest, installed_path, runtime_command
 
-ROOT = Path(os.environ.get("PERSONAL_CODEX_ROUTER_ROOT", Path(__file__).resolve().parent)).resolve()
+CODE_ROOT = code_root()
+ROOT = data_root(CODE_ROOT)
 CONFIG = ROOT / "config.local.json"
 STATE = ROOT / "state"
 VARIABLE = "CODEX_CLI_PATH"
@@ -59,6 +61,8 @@ def config():
 
 
 def wrapper_path():
+    if manifest(CODE_ROOT):
+        return installed_path(CODE_ROOT, 'bridge')
     return ROOT / "dist" / ("codex-router.exe" if sys.platform == "win32" else "codex-router")
 
 
@@ -114,7 +118,9 @@ def agent_path():
 
 
 def launch_agent_definition():
-    return {"Label": LABEL, "ProgramArguments": [sys.executable, str(ROOT / "desktop.py"), "restore-session"],
+    command = (runtime_command('desktop', CODE_ROOT, ROOT) if manifest(CODE_ROOT)
+               else [sys.executable, str(ROOT / 'desktop.py')])
+    return {"Label": LABEL, "ProgramArguments": command + ["restore-session"],
             "RunAtLoad": True, "ProcessType": "Background"}
 
 

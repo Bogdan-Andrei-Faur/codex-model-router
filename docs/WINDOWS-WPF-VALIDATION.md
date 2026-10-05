@@ -2,6 +2,65 @@
 
 **WPF solo necesita validación si vas a usar Windows.**
 
+La entrada activa de Windows es ahora `MonitorWindows.cs`: ventana WPF con
+WebView2 Composition que carga `monitor-ui/` y usa `MonitorState` mediante
+pipes privados. Ya comparte los componentes completos con Mac/Ubuntu;
+requiere **Framework 4.8 y WebView2 Runtime Evergreen**. El renderizador C#
+anterior queda preservado como fuente histórica, fuera de `build.ps1`.
+
+La [guía común](SHARED-MONITOR.md) describe build, límites, paquete y QA.
+Compilación cruzada de esta entrada no equivale a ejecución Windows, y la
+nueva revisión no hereda la aprobación de los self-tests antiguos. Pendientes:
+self-test real, primer clic/hover, bandeja, multi-DPI, transparencias y DPAPI.
+
+## Evidencia histórica: renderizador anterior
+
+### Revisión solicitada desde Mac — 02/10/2026
+
+El propietario pidió validar WPF también y confirmó que no tiene ahora un
+Windows accesible desde el Mac. Se completó la **compilación cruzada** del
+lanzador y de todos los archivos reales del monitor para .NET Framework
+**4.6.1 y 4.8**, con C# 5. Se usó Roslyn del SDK Microsoft .NET 10.0.401,
+descargado en una carpeta aislada de `state` y contrastado con su SHA-512
+oficial; referencias Microsoft NuGet 1.0.3. No se instaló globalmente.
+
+La compilación corresponde a producto 0.8.1, build `5865a2d08a969486`.
+Los hashes de fuentes y artefactos quedan en los informes locales de
+`tests/compile_wpf.py`; este script no descarga herramientas ni ejecuta WPF,
+y exige un destino nuevo. Compilador Roslyn y referencias de Framework
+verifican sintaxis, tipos y enlaces, pero no sustituyen el compilador nativo
+usado por `build.ps1` ni comprueban la ventana en Windows.
+
+La compilación 4.8 emitió dos avisos `CS0618` por el constructor antiguo de
+`FormattedText`; la 4.6.1 no emitió avisos. Se conserva el código compatible
+con 4.6.1. El comportamiento de texto y DPI sigue sujeto a la prueba nativa.
+
+Se corrigió una degradación de evidencia: un evento probable sin ID de fase
+podía sobrescribir la confianza confirmada en WPF. Las nuevas regresiones
+`--self-test` cubren ese caso, la separación de métricas por modelo/esfuerzo,
+el aviso de discrepancia y la limpieza de evidencia al aplicar otra fase.
+La CI Windows incorpora ahora `--self-test`, timeout de dos minutos e informes
+y PNG de fixtures como artefactos. El cambio está preparado en local:
+**no se ha ejecutado esta CI ni el self-test nativo de la nueva revisión**.
+
+Pruebas complementarias locales: 279 Python (6 omitidas), 21 JavaScript y
+seis casos JEV sin llamadas externas. El catálogo nativo se consultó sin
+inferencias. Sigue pendiente ejecutar `build.ps1 -BuildOnly` y `--self-test`
+en Windows, y comprobar allí foco, bandeja, DPI, renderizado e integración
+real. La evidencia histórica de abajo no cierra estos pendientes actuales.
+
+Para repetir la compilación cruzada con herramientas ya disponibles:
+
+```sh
+python3 tests/compile_wpf.py --dotnet /ruta/sdk/dotnet \
+  --compiler /ruta/sdk/sdk/VERSION/Roslyn/bincore/csc.dll \
+  --framework /ruta/referencias/build/.NETFramework/v4.8 \
+  --webview2 /ruta/cache-sdk-webview2 \
+  --output /ruta/destino-nuevo
+```
+
+Referencia de la limitación: [Microsoft: runtime de .NET Framework en Windows](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/migration/?view=netdesktop-8.0).
+
 ## Evidencia Windows — 28/09/2026, versión 0.4.4
 
 Base descargada: `2fc1b2d` (0.4.3). Equipo Windows real, Python 3.14,

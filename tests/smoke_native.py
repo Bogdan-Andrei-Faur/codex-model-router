@@ -147,21 +147,14 @@ def main():
         assert report["account_type"] == "chatgpt", "This test requires the existing ChatGPT subscription"
         print("Native handshake, model catalog and ChatGPT account: OK", flush=True)
         if args.live:
-            import tomllib  # Only the optional live test requires Python 3.11+.
-            overrides = {"features.shell_tool": False, "features.web_search": False,
-                         "features.code_mode": False, "features.code_mode_host": False}
-            # Read only server names; no credentials/values enter logs or reports.
-            home_config = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))) / "config.toml"
-            if home_config.exists():
-                settings = tomllib.loads(home_config.read_text(encoding="utf-8-sig"))
-                for name in settings.get("mcp_servers", {}):
-                    overrides["mcp_servers." + name + ".enabled"] = False
+            from tests.native_probe_profile import isolated_overrides
+            overrides = isolated_overrides()
             result = client.call("thread/start", {"ephemeral": False, "cwd": scratch.name,
                 "model": "gpt-6-astra", "modelProvider": "openai", "sandbox": "read-only",
                 "approvalPolicy": "never", "config": overrides,
-                "baseInstructions": "You are a minimal test assistant. Follow the requested output format. Use no tools except router_echo when asked. Do not access files, run commands, search or edit anything.",
+                "baseInstructions": "You are a minimal test assistant. Follow the requested output format. Use only router_echo when asked, through the provided Code Mode executor and its generated tool documentation. Do not access files, run commands, search or edit anything.",
                 "developerInstructions": "This is a synthetic routing smoke test, not project work.",
-                "dynamicTools": [{"type": "function", "name": "router_echo", "description": "Return the supplied value unchanged.",
+                "dynamicTools": [{"type": "function", "name": "router_echo", "deferLoading": False, "description": "Return the supplied value unchanged.",
                     "inputSchema": {"type": "object", "properties": {"value": {"type": "integer"}}, "required": ["value"], "additionalProperties": False}}]})
             thread = result["thread"]["id"]
             first = client.turn(thread, "Traduce 'hola' al ingles. Responde solo con la palabra traducida. Recuerda que mi numero de prueba es 37.")

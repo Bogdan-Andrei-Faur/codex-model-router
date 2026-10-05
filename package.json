@@ -3,7 +3,9 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/test_monitor_core.cjs",
-    "test:layout": "node tests/test_monitor_layout.cjs && node tests/test_usage_layout.cjs"
+    "test:layout": "node tests/test_monitor_layout.cjs && node tests/test_usage_layout.cjs && node tests/test_monitor_interaction.cjs && node tests/test_monitor_lazy_history.cjs && node tests/test_monitor_glass.cjs && node tests/test_monitor_windows_bridge.cjs && node tests/test_monitor_updates.cjs"
   },
-  "devDependencies": { "playwright": "1.62.1" }
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
 }

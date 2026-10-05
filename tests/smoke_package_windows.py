@@ -28,7 +28,7 @@ def main():
             (output / name).resolve().relative_to(output)
         archive.extractall(output)
     root = output / 'Codex-automatico'
-    for name in ('assets/codex.ico', 'assets/codex-official.png', 'assets/codex-ui-1024.png', 'BUILD.json', 'VERSION', 'docs/AUDIT-REMEDIATION.md'):
+    for name in ('assets/codex.ico', 'assets/codex-official.png', 'assets/codex-ui-1024.png', 'BUILD.json', 'VERSION', 'docs/AUDIT-REMEDIATION.md', 'dist/windows-ui/index.html', 'dist/Microsoft.Web.WebView2.Core.dll', 'dist/Microsoft.Web.WebView2.Wpf.dll', 'dist/runtimes/win-x64/native/WebView2Loader.dll', 'bin/codex-monitor-core.exe'):
         assert (root / name).is_file(), name
     env = dict(os.environ)
     for name in ('PERSONAL_CODEX_ROUTER_ROOT', 'PERSONAL_CODEX_ROUTER_CONFIG', 'PERSONAL_CODEX_ROUTER_STATE'):
@@ -75,7 +75,7 @@ def main():
             assert snapshot['product_version'] == loaded['product_version']
         finally:
             client.close(); client.temp.cleanup()
-    monitor = subprocess.run([str(root / 'dist/codex-monitor-v24.exe'), '--self-test'], env=env, timeout=40,
+    monitor = subprocess.run([str(root / 'dist/codex-monitor-v24.exe'), '--self-test'], env=env, timeout=75,
                              capture_output=True, creationflags=creation_flags())
     assert monitor.returncode == 0, 'Packaged monitor self-test failed'
     report = {'artifact': args.archive.name, 'version': loaded['product_version'], 'build_id': loaded['build_id'],

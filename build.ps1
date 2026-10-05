@@ -1,6 +1,6 @@
 param(
     [switch]$BuildOnly,
-    [string]$FrameworkReferencePath = 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1'
+    [string]$FrameworkReferencePath = 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8'
 )
 $ErrorActionPreference = 'Stop'
 $routerRoot = $PSScriptRoot
@@ -27,8 +27,23 @@ $routerAttribute = '[assembly: System.Reflection.AssemblyInformationalVersion("'
 
 & $routerCompiler /nologo /target:winexe /optimize+ /r:System.Windows.Forms.dll /r:System.Web.Extensions.dll "/win32icon:$routerIcon" "/out:$routerOutput\codex-router-v19.exe" "$routerRoot\Launcher.cs"
 if ($LASTEXITCODE -ne 0) { throw 'Compilation failed' }
-& $routerCompiler /nologo /target:winexe /optimize+ /main:RouterMonitorProgram /r:System.Core.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Web.Extensions.dll /r:System.Security.dll "/r:$routerFramework\System.Xaml.dll" "/r:$routerFramework\WindowsBase.dll" "/r:$routerFramework\PresentationCore.dll" "/r:$routerFramework\PresentationFramework.dll" "/win32icon:$routerIcon" "/out:$routerOutput\codex-monitor-v24.exe" "$routerRoot\MonitorWpf.cs" "$routerRoot\MonitorAgents.cs" "$routerRoot\MonitorAnalytics.cs" "$routerRoot\MonitorPhases.cs" "$routerRoot\MonitorReviewTests.cs" $routerAssembly
+python (Join-Path $routerRoot 'tools\webview2_sdk.py')
+if ($LASTEXITCODE -ne 0) { throw 'WebView2 SDK verification failed' }
+$routerWebView = Join-Path $routerRoot 'state\webview2-sdk-1.0.4258.31'
+$routerWebRefs = Join-Path $routerWebView 'lib\net462'
+& $routerCompiler /nologo /target:winexe /optimize+ /main:RouterMonitorProgram /r:System.Core.dll /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Web.Extensions.dll /r:System.Security.dll "/r:$routerFramework\System.Xaml.dll" "/r:$routerFramework\WindowsBase.dll" "/r:$routerFramework\PresentationCore.dll" "/r:$routerFramework\PresentationFramework.dll" "/r:$routerWebRefs\Microsoft.Web.WebView2.Core.dll" "/r:$routerWebRefs\Microsoft.Web.WebView2.Wpf.dll" "/win32icon:$routerIcon" "/out:$routerOutput\codex-monitor-v24.exe" "$routerRoot\MonitorWindows.cs" $routerAssembly
 if ($LASTEXITCODE -ne 0) { throw 'Monitor compilation failed' }
+Copy-Item -LiteralPath (Join-Path $routerWebRefs 'Microsoft.Web.WebView2.Core.dll') -Destination $routerOutput -Force
+Copy-Item -LiteralPath (Join-Path $routerWebRefs 'Microsoft.Web.WebView2.Wpf.dll') -Destination $routerOutput -Force
+foreach ($routerArchitecture in @('win-x64','win-x86','win-arm64')) {
+    $routerLoaderOutput = Join-Path $routerOutput "runtimes\$routerArchitecture\native"
+    New-Item -ItemType Directory -Path $routerLoaderOutput -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $routerWebView "runtimes\$routerArchitecture\native\WebView2Loader.dll") -Destination $routerLoaderOutput -Force
+}
+$routerUi = Join-Path $routerOutput 'windows-ui'
+New-Item -ItemType Directory -Path $routerUi -Force | Out-Null
+Copy-Item -Path (Join-Path $routerRoot 'monitor-ui\*') -Destination $routerUi -Recurse -Force
+Copy-Item -LiteralPath (Join-Path $routerRoot 'assets\codex-ui-1024.png') -Destination (Join-Path $routerUi 'codex.png') -Force
 if ($BuildOnly) { Write-Output 'Compilación preparada sin cambiar los accesos.'; return }
 $routerStable = Join-Path $routerOutput 'codex-router.exe'
 Copy-Item -LiteralPath (Join-Path $routerOutput 'codex-router-v19.exe') -Destination ($routerStable + '.new') -Force

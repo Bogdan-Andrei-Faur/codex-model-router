@@ -8,6 +8,61 @@ import Darwin
 final class RouterPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+    override func sendEvent(_ event: NSEvent) {
+        // WebKit's hit view is a descendant. Make this nonactivating panel key
+        // before dispatching its first click, rather than swallowing that click.
+        if event.type == .leftMouseDown && !isKeyWindow { makeKey() }
+        super.sendEvent(event)
+    }
+}
+
+final class RouterWebView: WKWebView {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
+// Private JSON-line IPC; no local HTTP endpoint and no stored credentials.
+final class MonitorService {
+    let root:URL, codeRoot:URL, preview:Bool
+    var process:Process?, input:FileHandle?, output:FileHandle?, sequence=0
+    init(root:URL, codeRoot:URL, preview:Bool) {self.root=root;self.codeRoot=codeRoot;self.preview=preview}
+    func stop() { if let child=process,child.isRunning {child.terminate()};try? input?.close();try? output?.close();process=nil;input=nil;output=nil }
+    deinit {stop()}
+    func request(_ body:[String:Any]) throws -> [String:Any] {
+        if process?.isRunning != true {
+            stop()
+            let child=Process(),incoming=Pipe(),outgoing=Pipe()
+            let configURL=root.appendingPathComponent("config.local.json")
+            let config=(try? Data(contentsOf:configURL)).flatMap{try? JSONSerialization.jsonObject(with:$0) as? [String:Any]} ?? [:]
+            if Bundle.main.object(forInfoDictionaryKey:"RouterPackaged") as? Bool == true {
+                child.executableURL=Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/RouterRuntime.app/Contents/MacOS/router-runtime")
+                child.arguments=["--data-root",root.path,"monitor-service"]+(preview ? ["--preview"] : [])
+            } else {
+                child.executableURL=URL(fileURLWithPath:config["python"] as? String ?? "/usr/bin/python3")
+                child.arguments=["-u",codeRoot.appendingPathComponent("monitor_service.py").path,"--root",root.path,"--code-root",codeRoot.path,"--platform","macos"]+(preview ? ["--preview"] : [])
+            }
+            child.standardInput=incoming;child.standardOutput=outgoing;child.standardError=FileHandle.nullDevice
+            try child.run();process=child;input=incoming.fileHandleForWriting;output=outgoing.fileHandleForReading
+        }
+        guard let child=process,let input=input,let output=output else {throw CocoaError(.fileReadUnknown)}
+        sequence = sequence >= 2147483646 ? 1 : sequence+1
+        var request=body;request["requestId"]=sequence
+        var bytes=try JSONSerialization.data(withJSONObject:request);bytes.append(10)
+        guard bytes.count<=65536 else {throw CocoaError(.fileWriteUnknown)}
+        let watchdog=DispatchWorkItem{if child.isRunning {child.terminate()}}
+        DispatchQueue.global(qos:.utility).asyncAfter(deadline:.now()+(body["action"] as? String == "connection" ? 110 : 15),execute:watchdog)
+        defer {watchdog.cancel()}
+        do {
+            try input.write(contentsOf:bytes)
+            var response=Data()
+            while response.last != 10 {
+                let chunk=output.availableData
+                guard !chunk.isEmpty,response.count+chunk.count<=64*1024*1024+1 else {throw CocoaError(.fileReadCorruptFile)}
+                response.append(chunk)
+            }
+            guard let reply=try JSONSerialization.jsonObject(with:response) as? [String:Any],reply["requestId"] as? Int == sequence else {throw CocoaError(.fileReadCorruptFile)}
+            return reply
+        } catch {stop();throw error}
+    }
 }
 
 // Native lifecycle and storage, with a local-only WebKit presentation surface.
@@ -21,16 +76,27 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     let routerBuildId: String = Bundle.main.object(forInfoDictionaryKey:"RouterEngineBuildId") as? String ?? ""
     var uiPath: URL { state.appendingPathComponent("monitor-ui-mac.json") }
     let resources = Bundle.main.resourceURL!.appendingPathComponent("ui")
-    var service: String { "local.codex-model-router." + SHA256.hash(data: Data(root.path.utf8)).map { String(format:"%02x",$0) }.joined() }
+    var service: String {
+        let stored=read(state.appendingPathComponent("credential-namespace.json"))["namespace"] as? String
+        let namespace=(stored?.range(of:"^[0-9a-f]{64}$",options:.regularExpression) != nil ? stored! : SHA256.hash(data:Data(root.path.utf8)).map{String(format:"%02x",$0)}.joined())
+        return "local.codex-model-router." + namespace
+    }
     var preview: Bool { CommandLine.arguments.contains("--preview") }
     var panel: RouterPanel!, web: WKWebView!, status: NSStatusItem!
-    var mode = "Compact", topmost = true, ready = false, busy = false
-    var panelHeights = [String:Double](), resizing = false
+    let glass = NSVisualEffectView(frame:.zero)
+    var mode = "Compact", topmost = true, ready = false, busy = false, refreshPending = false
+    var panelHeights = [String:Double](), resizing = false, historyRequested = false
     var panelHeight: Double = 760
     var lockFD: Int32 = -1
     var timer: Timer?, hitTimer: Timer?
     var hitRect = NSRect.zero
-    var lastPayload = Data(), journal = [[String: Any]](), journalSignature = ""
+    var lastPayload = Data(), sentJournalRevision = -1
+    lazy var dataService = MonitorService(root:root,codeRoot:codeRoot,preview:preview)
+    var codeRoot:URL {
+        if Bundle.main.object(forInfoDictionaryKey:"RouterPackaged") as? Bool == true {return Bundle.main.resourceURL!}
+        return URL(fileURLWithPath:ProcessInfo.processInfo.environment["PERSONAL_CODEX_MONITOR_CODE_ROOT"] ?? Bundle.main.object(forInfoDictionaryKey:"RouterCodeRoot") as? String ?? root.path)
+    }
+    var lastPointer: NSPoint?, lastModeRequest: Int?
     var keys = ["jev-typesafe": false, "jev-vercel": false]
     let io = DispatchQueue(label:"local.codex-model-router.monitor-data",qos:.utility)
     init(root: URL) { self.root = root.standardizedFileURL.resolvingSymlinksInPath(); super.init() }
@@ -51,25 +117,35 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         panelHeights = (saved["panelHeights"] as? [String:Double] ?? [:]).filter { $0.value.isFinite && $0.value > 0 && $0.value <= 1 }
         let configuration = WKWebViewConfiguration(); configuration.websiteDataStore = .nonPersistent()
         configuration.userContentController.add(self,name:"monitor")
-        web = WKWebView(frame:.zero,configuration:configuration); web.navigationDelegate = self
+        web = RouterWebView(frame:.zero,configuration:configuration); web.navigationDelegate = self
         web.setValue(false,forKey:"drawsBackground"); web.underPageBackgroundColor = .clear
         panel = RouterPanel(contentRect:.zero,styleMask:[.borderless,.nonactivatingPanel],backing:.buffered,defer:false)
         panel.title = "Codex automático · Monitor · v" + productVersion; panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = false
+        panel.acceptsMouseMovedEvents = true
         panel.hidesOnDeactivate = false; panel.isReleasedWhenClosed = false
-        panel.collectionBehavior = [.canJoinAllSpaces,.fullScreenAuxiliary]; panel.contentView = web
+        panel.collectionBehavior = [.canJoinAllSpaces,.fullScreenAuxiliary]
+        let content = NSView(frame:.zero)
+        glass.material = .hudWindow; glass.blendingMode = .behindWindow; glass.state = .active
+        glass.wantsLayer = true; glass.layer?.cornerRadius = 26; glass.layer?.masksToBounds = true
+        glass.isHidden = true
+        web.autoresizingMask = [.width,.height]
+        content.addSubview(glass);content.addSubview(web);panel.contentView = content
         panel.level = topmost ? .floating : .normal; position()
         status = NSStatusBar.system.statusItem(withLength:NSStatusItem.squareLength)
-        status.button?.image = NSImage(systemSymbolName:"circle.hexagongrid.fill",accessibilityDescription:"Codex automático")
+        let trayImage = NSImage(contentsOf:resources.appendingPathComponent("tray-route.png"))
+        trayImage?.size = NSSize(width:18,height:18);trayImage?.isTemplate = true
+        status.button?.image = trayImage;status.button?.setAccessibilityLabel("Codex automático")
         status.button?.target = self; status.button?.action = #selector(statusClick)
         status.button?.sendAction(on:[.leftMouseUp,.rightMouseUp])
         if !preview { for key in ["jev-typesafe", "jev-vercel"] { keys[key] = hasKey(key) } }
         loadPage()
         timer = Timer.scheduledTimer(timeInterval:2,target:self,selector:#selector(refresh),userInfo:nil,repeats:true)
-        hitTimer = Timer.scheduledTimer(withTimeInterval:1.0/30,repeats:true) { [weak self] _ in self?.updateHit() }
+        hitTimer = Timer(timeInterval:1.0/30,repeats:true) { [weak self] _ in self?.updateHit() }
+        RunLoop.main.add(hitTimer!,forMode:.common)
         NotificationCenter.default.addObserver(self,selector:#selector(displayChanged),name:NSApplication.didChangeScreenParametersNotification,object:nil)
         NSWorkspace.shared.notificationCenter.addObserver(self,selector:#selector(displayChanged),name:NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,object:nil)
     }
-    func loadPage() { journalSignature = ""; ready = false; web.loadFileURL(resources.appendingPathComponent("index.html"),allowingReadAccessTo:resources) }
+    func loadPage() { sentJournalRevision = -1; ready = false; web.loadFileURL(resources.appendingPathComponent("index.html"),allowingReadAccessTo:resources) }
     func position() {
         let screen = panel.screen ?? NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation,$0.frame,false) } ?? NSScreen.main
         guard let work = screen?.visibleFrame else { return }
@@ -92,12 +168,28 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         if finished {saveUI()}
         lastPayload = Data(); refresh()
     }
-    @objc func displayChanged() { position(); lastPayload = Data(); refresh() }
+    @objc func displayChanged() { position(); updateGlass(); publishUI(); lastPayload = Data(); refresh() }
+    func updateGlass() {
+        // Material follows only the rounded web surface, never the transparent
+        // click-through area of the full-height panel. Use public AppKit blur.
+        glass.frame = hitRect
+        glass.isHidden = mode == "Hidden" || hitRect.isEmpty || NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+    }
     func updateHit() {
         guard mode != "Hidden" else { return }
         if resizing {panel.ignoresMouseEvents = false; return}
         let inside = NSBezierPath(roundedRect:hitRect,xRadius:26,yRadius:26).contains(panel.convertPoint(fromScreen:NSEvent.mouseLocation))
         if panel.ignoresMouseEvents == inside { panel.ignoresMouseEvents = !inside }
+        // Inactive WebKit intentionally gates hover. Project only local pointer
+        // geometry into our trusted page; never activate/key the panel on hover.
+        let point = panel.convertPoint(fromScreen:NSEvent.mouseLocation)
+        let inactive = !panel.isKeyWindow || !NSApp.isActive
+        let projected = inside && inactive ? NSPoint(x:round(point.x),y:round(panel.frame.height-point.y)) : nil
+        if projected != lastPointer {
+            lastPointer=projected
+            let value:Any = projected.map { ["x":$0.x,"y":$0.y] } ?? NSNull()
+            if ready { web.callAsyncJavaScript("window.monitorPointer(point,inactive)",arguments:["point":value,"inactive":inactive],in:nil,in:.page,completionHandler:nil) }
+        }
     }
     @objc func statusClick() {
         if NSApp.currentEvent?.type == .rightMouseUp { showMenu() }
@@ -122,7 +214,14 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     func setMode(_ value:String) {
         guard ["Compact","Expanded","Hidden"].contains(value) else { return }; mode = value
         if value == "Hidden" { panel.orderOut(nil) } else { position(); panel.orderFrontRegardless() }
-        saveUI(); lastPayload = Data(); refresh()
+        updateGlass();publishUI(); saveUI(); lastPayload = Data(); refresh()
+    }
+    func uiSnapshot() -> [String:Any] {
+        return ["mode":mode,"topmost":topmost,"panelHeight":panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,"reduceTransparency":NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency,"nativeGlass":true,"acknowledgesMode":true,"lazyHistory":true,"modeRequest":lastModeRequest as Any? ?? NSNull()]
+    }
+    func publishUI() {
+        guard ready else {return}
+        web.callAsyncJavaScript("window.receiveUI(ui,request)",arguments:["ui":uiSnapshot(),"request":lastModeRequest as Any? ?? NSNull()],in:nil,in:.page,completionHandler:nil)
     }
     func setTopmost(_ value:Bool) { topmost = value; panel.level = value ? .floating : .normal; saveUI(); lastPayload = Data(); refresh() }
     func saveUI() { if preview {return}; do { try write(["mode":mode,"topmost":topmost,"panelHeights":panelHeights],uiPath) } catch { feedback("No se pudo guardar la vista.") } }
@@ -139,103 +238,38 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         case "bounds":
             if let x = data["x"] as? Double, let y = data["y"] as? Double, let width = data["width"] as? Double, let height = data["height"] as? Double,
                x.isFinite,y.isFinite,width.isFinite,height.isFinite {
-                hitRect = NSRect(x:x,y:panel.frame.height-y-height,width:max(0,width),height:max(0,height)).intersection(NSRect(origin:.zero,size:panel.frame.size)); updateHit()
+                hitRect = NSRect(x:x,y:panel.frame.height-y-height,width:max(0,width),height:max(0,height)).intersection(NSRect(origin:.zero,size:panel.frame.size)); updateGlass();updateHit()
             }
-        case "mode": if let value = data["value"] as? String { setMode(value) }
+        case "mode": if let value = data["value"] as? String { lastModeRequest=data["request"] as? Int; setMode(value) }
+        case "history":
+            if let requested=data["value"] as? Bool, requested != historyRequested {
+                historyRequested=requested;lastPayload=Data();refresh()
+            }
         case "resizeStart": resizing = true
         case "resizeEnd": resizing = false; resizePanel(data["height"] as? Double,finished:true)
         case "resizeReset": resizePanel(nil,finished:true)
         case "topmost": if let value = data["value"] as? Bool { setTopmost(value) }
-        case "config": if let key = data["key"] as? String, let value = data["value"] { configure(key,value) }
-        case "quality": saveQuality(data)
-        case "taskMode": if let id=data["thread"] as? String,let mode=data["value"] as? String { setTaskMode(id,mode) }
-        case "connection": if let value = data["value"] as? String, ["doctor","install","uninstall"].contains(value) { manageConnection(value) }
+        case "config", "quality", "taskMode", "connection", "update": performAction(data)
         case "secret": if let provider = data["provider"] as? String, ["jev-typesafe", "jev-vercel"].contains(provider), let value = data["value"] as? String, !value.isEmpty,value.utf8.count<16384 { storeKey(provider,value) }
         default: break
         }
     }
-    func taskModePath(_ id:String)->URL {
-        let key=SHA256.hash(data:Data(id.utf8)).map{String(format:"%02x",$0)}.joined()
-        return state.appendingPathComponent("task-modes").appendingPathComponent(key+".json")
-    }
-    func taskMode(_ id:String)->String {
-        let path=taskModePath(id)
-        if !FileManager.default.fileExists(atPath:path.path) {return "automatic"}
-        let data=read(path)
-        return data["thread"] as? String == id && data["mode"] as? String == "automatic" ? "automatic" : "manual"
-    }
-    func setTaskMode(_ id:String,_ mode:String) {
-        guard !preview,!id.isEmpty,id.count<=200,["automatic","manual"].contains(mode) else{return}
-        do {
-            let path=taskModePath(id)
-            try FileManager.default.createDirectory(at:path.deletingLastPathComponent(),withIntermediateDirectories:true)
-            try write(["schema":1,"thread":id,"mode":mode],path)
-            lastPayload=Data();refresh();feedback("Modo guardado para el próximo mensaje de esta tarea.")
-        } catch {feedback("No se pudo guardar el modo de esta tarea.")}
-    }
-    var connectionBusy = false
-    func manageConnection(_ action:String) {
-        guard !preview,!connectionBusy,let python=read(configPath)["python"] as? String else {return}
-        connectionBusy=true;feedback("Comprobando conexión…")
-        DispatchQueue.global(qos:.utility).async {
-            let process=Process(),pipe=Pipe()
-            process.executableURL=URL(fileURLWithPath:python)
-            process.arguments=[self.root.appendingPathComponent("desktop.py").path,action]
-            process.standardOutput=pipe;process.standardError=pipe
-            var message="No se pudo completar la conexión. Tus tareas siguen abiertas."
-            do {
-                try process.run()
-                let output=pipe.fileHandleForReading.readDataToEndOfFile();process.waitUntilExit()
-                if let data=(try? JSONSerialization.jsonObject(with:output)) as? [String:Any] {
-                    if let error=data["error"] as? String {message=error}
-                    else if let detail=data["message"] as? String {message=detail}
-                    else if data["connection"] as? String == "desktop_connected" {message="Desktop conectado al selector."}
-                    else if data["connection"] as? String == "bridge_observed" {message="Hay un puente activo; falta confirmar la conexión de Desktop."}
-                    else if data["registered"] as? Bool == true {message="Conexión instalada. Falta observar el nuevo arranque de Desktop."}
-                    else {message="Desktop detectado. El inicio habitual todavía no está conectado."}
-                }
-            } catch {}
-            DispatchQueue.main.async {self.connectionBusy=false;self.feedback(message);self.refresh()}
-        }
-    }
-    func configure(_ key:String,_ value:Any) {
-        var valid = false
-        switch key {
-        case "enabled", "inference_telemetry", "phase_routing", "prompt_logging": valid = CFGetTypeID(value as CFTypeRef) == CFBooleanGetTypeID()
-        case "history_days": valid = [0,30,90,180].contains(value as? Int ?? -1)
-        case "routing_engine": valid = ["rules","jev"].contains(value as? String ?? "")
-        case "comparison_engines": if let values = value as? [String] { valid = values.count<=2 && Set(values).count==values.count && values.allSatisfy { ["rules","jev"].contains($0) } }
-        case "jev.connection": valid = ["vercel","typesafe"].contains(value as? String ?? "")
-        default: break
-        }
-        guard valid else { feedback("Ajuste no válido."); return }
-        var config = read(configPath); guard !config.isEmpty else { feedback("No se pudo leer la configuración."); return }
-        let parts = key.split(separator:".").map(String.init)
-        if parts.count==2 { var nested = config[parts[0]] as? [String:Any] ?? [:]; nested[parts[1]]=value; config[parts[0]]=nested }
-        else { config[key]=value }
-        do {
-            try write(config,configPath)
-            if ["phase_routing","inference_telemetry"].contains(key) {
-                try write(["phase_routing":config["phase_routing"] as? Bool ?? false,
-                           "inference_telemetry":config["inference_telemetry"] as? Bool ?? false],restartPath)
+    var actionBusy=false
+    func performAction(_ data:[String:Any]) {
+        guard !preview,!actionBusy else {feedback("Vista previa o una operación todavía en curso.");return}
+        actionBusy=true
+        io.async { [weak self] in
+            guard let self=self else{return}
+            let reply=try? self.dataService.request(data)
+            DispatchQueue.main.async {
+                self.actionBusy=false;self.lastPayload=Data()
+                self.feedback(reply?["feedback"] as? String ?? "No se pudo completar la operación. Tus tareas siguen abiertas.")
+                self.refresh()
             }
-            refresh()
-        } catch { feedback("No se pudo guardar el ajuste.") }
+        }
     }
-    func saveQuality(_ data:[String:Any]) {
-        guard let id = data["id"] as? String,let quality = data["value"] as? String,["","insufficient","adequate","excessive"].contains(quality),journal.contains(where:{$0["decision_id"] as? String == id}) else { feedback("Decisión no disponible.");return }
-        let aspect=data["aspect"] as? String ?? "overall",field=aspect == "model" ? "model_quality" : aspect == "effort" ? "effort_quality" : "quality"
-        let record:[String:Any] = ["schema":2,"event":"decision_quality","decision_id":id,field:quality,"time":Date().timeIntervalSince1970,"time_iso":ISO8601DateFormatter().string(from:Date())]
-        guard var bytes = try? JSONSerialization.data(withJSONObject:record) else {return};bytes.append(10)
-        let gate = Darwin.open(state.appendingPathComponent("history.lock").path,O_RDWR|O_CREAT,0o600)
-        guard gate>=0 else {feedback("No se pudo guardar la valoración.");return}
-        guard flock(gate,LOCK_EX|LOCK_NB)==0 else {Darwin.close(gate);feedback("Historial ocupado. Reintenta la valoración.");return}
-        defer {flock(gate,LOCK_UN);Darwin.close(gate)}
-        let fd = Darwin.open(state.appendingPathComponent("history.jsonl").path,O_WRONLY|O_CREAT|O_APPEND,0o600)
-        guard fd>=0 else {feedback("No se pudo guardar la valoración.");return}
-        let count = bytes.withUnsafeBytes {Darwin.write(fd,$0.baseAddress,$0.count)};Darwin.close(fd)
-        if count != bytes.count {feedback("No se pudo guardar la valoración.")} else {refresh()}
-    }
+    func configure(_ key:String,_ value:Any) {performAction(["action":"config","key":key,"value":value])}
+    func applicationWillTerminate(_ notification:Notification) {timer?.invalidate();hitTimer?.invalidate();dataService.stop();if lockFD>=0 {Darwin.close(lockFD)}}
     func keyQuery(_ provider:String)->[String:Any] { [kSecClass as String:kSecClassGenericPassword,kSecAttrService as String:service,kSecAttrAccount as String:provider] }
     func markKeyChanged(_ provider:String) throws {
         let path=state.appendingPathComponent("keychain-revision.json")
@@ -257,68 +291,40 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         keys[provider]=true;lastPayload=Data();refresh();feedback("Clave guardada en el llavero.")
     }
     @objc func refresh() {
-        guard ready,!busy else{return};busy=true
+        guard ready else{return}
+        guard !busy else{refreshPending=true;return};busy=true
+        let needsHistory = mode == "Expanded" && historyRequested, sentRevision = sentJournalRevision
         io.async { [weak self] in
             guard let self=self else{return}
-            let config=self.read(self.configPath)
-            var rows=[String:Any](),connections=0
-            var bridgeVersions=Set<String>()
-            var bridgeBuildMismatch=false
-            var bridgeBuildUnknown=false
-            var telemetry=[String:Any](dictionaryLiteral:("enabled",false))
-            var accountUsage=[String:Any]()
-            let files=(try? FileManager.default.contentsOfDirectory(at:self.state,includingPropertiesForKeys:nil)) ?? []
-            for file in files.sorted(by:{$0.lastPathComponent<$1.lastPathComponent}) where file.lastPathComponent.hasPrefix("status-") && file.pathExtension=="json" {
-                let data=self.read(file)
-                if data["client_name"] as? String == "other" {continue}
-                guard let heartbeat=data["heartbeat"] as? Double,abs(Date().timeIntervalSince1970-heartbeat)<12,let pid=data["pid"] as? Int32,kill(pid,0)==0,let threads=data["threads"] as? [String:[String:Any]] else{continue}
-                connections+=1
-                if let usage=data["account_usage"] as? [String:Any],(usage["updated"] as? Double ?? 0)>=(accountUsage["updated"] as? Double ?? 0) {accountUsage=usage}
-                bridgeVersions.insert(data["product_version"] as? String ?? "desconocida")
-                if let build=data["router_build_id"] as? String,!build.isEmpty,!self.routerBuildId.isEmpty {
-                    if build != self.routerBuildId {bridgeBuildMismatch=true}
-                } else {bridgeBuildUnknown=true}
-                if let health=data["telemetry"] as? [String:Any] {
-                    telemetry["enabled"] = (telemetry["enabled"] as? Bool ?? false) || (health["enabled"] as? Bool ?? false)
-                    for key in ["requests","records_scanned","eligible_records","events_without_model","unrecognized_records","invalid_requests","unexpected_path",
-                                "invalid_size","invalid_wire_size","invalid_decoded_size","invalid_length","invalid_encoding","invalid_payload","invalid_io","unauthorized_requests","rejected_connections","processing_busy",
-                                "completion_records","failure_records","api_request_records","stream_records",
-                                "size_wire_512k","size_wire_1m","size_wire_4m","size_wire_16m","size_wire_over16m",
-                                "size_decoded_512k","size_decoded_1m","size_decoded_4m","size_decoded_16m","size_decoded_over16m"] { telemetry[key]=(telemetry[key] as? Double ?? 0)+(health[key] as? Double ?? 0) }
-                    if let stats=data["stats"] as? [String:Any] { for key in ["telemetry_events","telemetry_confirmed","telemetry_probable","telemetry_unattributed"] { telemetry[key]=(telemetry[key] as? Double ?? 0)+(stats[key] as? Double ?? 0) } }
-                }
-                for (id,row) in threads {let old=rows[id] as? [String:Any] ?? [:];if (row["updated"] as? Double ?? 0)>=(old["updated"] as? Double ?? 0){rows[id]=row}}
-            }
-            if self.preview { let fixture=self.read(self.root.appendingPathComponent("preview.json"));rows=fixture["threads"] as? [String:Any] ?? [:];accountUsage=fixture["account_usage"] as? [String:Any] ?? [:];connections=1 }
-            let paths=["history.jsonl","history.recovered.jsonl"].map{self.state.appendingPathComponent($0)}
-            let signature=paths.map{path->String in let info=try? path.resourceValues(forKeys:[.contentModificationDateKey,.fileSizeKey]);return "\(info?.contentModificationDate?.timeIntervalSince1970 ?? 0):\(info?.fileSize ?? 0)"}.joined(separator:"|")
-            var records:[[String:Any]]?
-            if signature != self.journalSignature {
-                records=paths.flatMap{path->[[String:Any]] in guard let text=try? String(contentsOf:path,encoding:.utf8) else{return []};return text.split(separator:"\n").compactMap{(try? JSONSerialization.jsonObject(with:Data($0.utf8))) as? [String:Any]}}
-                self.journalSignature=signature
-            }
-            let currentJournal=records ?? self.journal
-            let ids=Set(rows.keys).union(currentJournal.compactMap{$0["thread"] as? String})
-            let taskModes=Dictionary(uniqueKeysWithValues:ids.map{($0,self.taskMode($0))})
+            let reply=try? self.dataService.request(["action":"snapshot","history":needsHistory,"revision":sentRevision])
+            let snapshot = reply?["ok"] as? Bool == true ? reply?["payload"] as? [String:Any] : nil
             DispatchQueue.main.async {
-                self.busy=false;if let records=records{self.journal=records}
-                var normalizedConfig=config
-                for (key,value) in ["inference_telemetry":true,"phase_routing":true,"prompt_logging":true] where normalizedConfig[key] == nil { normalizedConfig[key]=value }
-                if normalizedConfig["history_days"] == nil { normalizedConfig["history_days"]=0 }
-                let safeConfig=normalizedConfig.filter{["enabled","inference_telemetry","phase_routing","prompt_logging","history_days","routing_engine","comparison_engines","jev","routes"].contains($0.key)}
-                var payload:[String:Any]=["productVersion":self.productVersion,"bridgeVersions":Array(bridgeVersions).sorted(),"bridgeBuildMismatch":bridgeBuildMismatch,"bridgeBuildUnknown":bridgeBuildUnknown,"restartRequired":FileManager.default.fileExists(atPath:self.restartPath.path),"threads":rows,"connections":connections,"config":safeConfig,"taskModes":taskModes,"keys":self.keys,"telemetry":telemetry,"preview":self.preview,"ui":["mode":self.mode,"topmost":self.topmost,"panelHeight":self.panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]]
-                if records != nil {payload["history"]=self.journal}
-                payload["accountUsage"]=accountUsage
-                guard let encoded=try? JSONSerialization.data(withJSONObject:payload,options:[.sortedKeys]),encoded != self.lastPayload else{return}
+                self.busy=false
+                defer {if self.refreshPending {self.refreshPending=false;self.refresh()}}
+                guard var payload=snapshot else {self.feedback(reply?["feedback"] as? String ?? "No se pudo leer el estado. Se conserva la última vista.");return}
+                let deliverHistory=payload["history"] != nil && self.mode == "Expanded" && self.historyRequested
+                if !deliverHistory {payload.removeValue(forKey:"history")}
+                payload["historyLoaded"]=self.sentJournalRevision >= 0 || deliverHistory
+                payload["keys"]=self.keys;payload["ui"]=self.uiSnapshot()
+                var comparison=payload;comparison.removeValue(forKey:"history")
+                guard let encoded=try? JSONSerialization.data(withJSONObject:comparison,options:[.sortedKeys]),encoded != self.lastPayload || deliverHistory else{return}
                 self.lastPayload=encoded
-                self.web.callAsyncJavaScript("window.receive(payload)",arguments:["payload":payload],in:nil,in:.page){ result in if case .failure=result {self.lastPayload=Data()} }
+                let revision=payload["journalRevision"] as? Int ?? -1
+                self.web.callAsyncJavaScript("window.receive(payload)",arguments:["payload":payload],in:nil,in:.page){ result in
+                    if case .failure=result {self.lastPayload=Data();self.sentJournalRevision = -1}
+                    else if deliverHistory {self.sentJournalRevision=revision}
+                }
             }
         }
     }
+
 }
 let app=NSApplication.shared
 app.setActivationPolicy(.accessory)
-let defaultRoot=Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent().path
-let delegate=Monitor(root:URL(fileURLWithPath:CommandLine.arguments.dropFirst().first ?? defaultRoot))
+let defaultRoot: String
+if Bundle.main.object(forInfoDictionaryKey:"RouterPackaged") as? Bool == true {
+    defaultRoot=ProcessInfo.processInfo.environment["PERSONAL_CODEX_ROUTER_ROOT"] ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/codex-model-router").path
+} else {defaultRoot=Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent().path}
+let delegate=Monitor(root:URL(fileURLWithPath:CommandLine.arguments.dropFirst().first(where:{!$0.hasPrefix("--")}) ?? defaultRoot))
 app.delegate=delegate
 app.run()

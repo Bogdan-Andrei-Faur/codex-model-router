@@ -109,7 +109,7 @@ internal sealed partial class ModernRouterMonitor
         System.Windows.Automation.AutomationProperties.SetName(search, "Buscar en historial");
         var filters = new StackPanel { Margin = new Thickness(18, 7, 18, 4) };
         filters.Children.Add(Txt("Buscar por tarea, modelo, motor o estado", 11, Muted));
-        filters.Children.Add(new Border { Background = Panel2, CornerRadius = new CornerRadius(12), Margin = new Thickness(0, 4, 0, 0), Child = search });
+        filters.Children.Add(new Border { Background = Panel2, CornerRadius = new CornerRadius(20), Margin = new Thickness(0, 4, 0, 0), Child = search });
         search.TextChanged += delegate { historyQuery = search.Text; historyOffset = 0; RebuildHistory(); };
         Grid.SetRow(filters, 2); historyPage.Children.Add(filters);
         Grid.SetRow(listScroll, 3); historyPage.Children.Add(listScroll);
@@ -240,9 +240,15 @@ internal sealed partial class ModernRouterMonitor
             if (!item.PhaseEvidence.ContainsKey("inference_samples")) item.PhaseEvidence["inference_samples"] = new Dictionary<string, Dictionary<string, object>>();
             var samples = (Dictionary<string, Dictionary<string, object>>)item.PhaseEvidence["inference_samples"];
             string kind = String(data, "phase_id") + ":" + String(data, "inference_event_name") + ":" + String(data, "inference_event_kind");
+            string observedModel = String(data, "observed_model");
+            if (observedModel == "") observedModel = String(data, "observed_candidate_model");
+            string observedEffort = String(data, "observed_effort");
+            if (observedEffort == "") observedEffort = String(data, "observed_candidate_effort");
+            if (observedModel != "") kind += ":" + observedModel + ":" + observedEffort;
             double count = samples.ContainsKey(kind) ? Number(samples[kind], "count") : 0;
             samples[kind] = new Dictionary<string, object>(data); samples[kind]["count"] = count + (data.ContainsKey("inference_sample_count") ? Number(data, "inference_sample_count") : 1);
             if (eventName == "inference_metric") return;
+            if (eventName == "inference_probable" && String(item.PhaseEvidence, "evidence_confidence") == "confirmed") return;
         }
         if (eventName == "native_turn_error")
         {
@@ -362,7 +368,7 @@ internal sealed partial class ModernRouterMonitor
     static ControlTemplate RowButtonTemplate()
     {
         var border = new FrameworkElementFactory(typeof(Border));
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(16));
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(24));
         border.SetBinding(Border.BackgroundProperty, new System.Windows.Data.Binding("Background") { RelativeSource =
             new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent) });
         border.SetBinding(Border.PaddingProperty, new System.Windows.Data.Binding("Padding") { RelativeSource =
@@ -559,7 +565,7 @@ internal sealed partial class ModernRouterMonitor
         var stack = new StackPanel(); stack.Children.Add(titleText); stack.Children.Add(text);
         var rail = modelChoice ? Accent : effortChoice ? Good : Line;
         var card = new Border { Background = Panel2, BorderBrush = rail, BorderThickness = new Thickness(3, 0, 0, 0),
-            CornerRadius = new CornerRadius(16), Padding = new Thickness(10, 9, 11, 9), Margin = new Thickness(0, 10, 0, 0), Child = stack };
+            CornerRadius = new CornerRadius(24), Padding = new Thickness(10, 9, 11, 9), Margin = new Thickness(0, 10, 0, 0), Child = stack };
         panel.Children.Add(card);
     }
 
@@ -616,6 +622,16 @@ internal sealed partial class ModernRouterMonitor
             AddMetric("Finalizaciones recibidas", Telemetry("telemetry_events").ToString("N0"), Math.Min(1, Telemetry("telemetry_events") / Math.Max(1, Telemetry("eligible_records"))), Accent);
             AddMetric("Inferencias asociadas", Telemetry("telemetry_confirmed").ToString("N0"), Math.Min(1, Telemetry("telemetry_confirmed") / Math.Max(1, Telemetry("telemetry_events"))), Good);
             AddMetric("Coincidencias sin ID de turno", Telemetry("telemetry_probable").ToString("N0"), Math.Min(1, Telemetry("telemetry_probable") / Math.Max(1, Telemetry("telemetry_events"))), Muted);
+            statisticsContent.Children.Add(Txt("Diagnósticos por etapa; un evento puede contar en varios motivos.", 11, Muted));
+            foreach (var pair in new[] {
+                new[] { "telemetry_missing_thread_id", "Sin ID de chat" }, new[] { "telemetry_missing_turn_id", "Sin ID de turno" },
+                new[] { "telemetry_missing_timestamp", "Sin fecha nativa" }, new[] { "telemetry_duplicates", "Eventos duplicados" },
+                new[] { "telemetry_unknown_thread", "Chat desconocido" }, new[] { "telemetry_turn_mismatch", "Turno distinto" },
+                new[] { "telemetry_stale", "Fuera de plazo" }, new[] { "telemetry_invalid_timestamp", "Fecha nativa inválida" },
+                new[] { "telemetry_missing_model", "Sin modelo nativo" }, new[] { "telemetry_inactive", "Turno inactivo" },
+                new[] { "telemetry_no_candidate", "Sin turno candidato" }, new[] { "telemetry_ambiguous", "Atribución ambigua" },
+                new[] { "telemetry_model_mismatch", "Modelo distinto del esperado" }, new[] { "telemetry_effort_mismatch", "Esfuerzo distinto del esperado" } })
+                AddMetric(pair[1], Telemetry(pair[0]).ToString("N0"), 0, Muted);
             double invalidRequests = Telemetry("invalid_requests");
             AddMetric("Conexiones rechazadas por capacidad", Telemetry("rejected_connections").ToString("N0"), Telemetry("rejected_connections") > 0 ? 1 : 0, Warning);
             AddMetric("Incidencias del receptor", invalidRequests.ToString("N0"), invalidRequests > 0 ? 1 : 0, invalidRequests > 0 ? Warning : Good);
@@ -720,8 +736,8 @@ internal sealed partial class ModernRouterMonitor
         settingsContent.Children.Add(SettingsAction("Conectar al inicio habitual", "Se aplicará al volver a abrir Desktop; conserva las tareas en curso.", delegate { ManageConnection("install"); }));
         settingsContent.Children.Add(SettingsAction("Desconectar integración", "Restaura el inicio habitual sin borrar ajustes ni historial.", delegate { ManageConnection("uninstall"); }));
         if (!System.String.IsNullOrEmpty(connectionMessage)) AddSettingsNote(connectionMessage);
-        settingsContent.Children.Add(SettingsAction(ReadEnabled() ? "Ⅱ  Pausar selección automática" : "▶  Activar selección automática",
-            ReadEnabled() ? "Codex automático decide en cada nuevo mensaje." : "Se respeta la selección manual de Codex.", delegate { TogglePause(); RefreshSettings(); }));
+        settingsContent.Children.Add(SettingsAction(ReadEnabled() ? "Pausar selección automática" : "Activar selección automática",
+            ReadEnabled() ? "Codex automático decide en cada nuevo mensaje." : "Se respeta la selección manual de Codex.", delegate { TogglePause(); RefreshSettings(); }, ReadEnabled() ? "pause" : "play"));
         settingsContent.Children.Add(SettingsAction(Topmost ? "Desactivar Mantener delante" : "Activar Mantener delante",
             Topmost ? "El monitor permanece sobre otras ventanas." : "El monitor puede quedar detrás de otras ventanas.", delegate { Topmost = !Topmost; SaveUiState(); UpdateTray(); RefreshSettings(); }));
         settingsContent.Children.Add(AnalyticsHeading("CONSERVAR HISTORIAL"));
@@ -924,7 +940,8 @@ internal sealed partial class ModernRouterMonitor
 
     static Button ChoiceButton(string label, bool selected, RoutedEventHandler click, bool multiple = false)
     {
-        var button = Btn((multiple ? (selected ? "✓  " : "+  ") : (selected ? "●  " : "○  ")) + label, click, false);
+        var button = Btn(label, click, false);
+        button.Content = LucideLabel(multiple ? (selected ? "check" : "plus") : (selected ? "circle-check" : "circle"), label, selected ? Accent : Ink);
         button.MinWidth = 0; button.Margin = new Thickness(0, 0, 6, 6);
         button.Padding = new Thickness(9, 4, 9, 4);
         button.Background = selected ? Brush("#373343") : Brush("#292A31");
@@ -950,7 +967,7 @@ internal sealed partial class ModernRouterMonitor
         var input = new PasswordBox { Height = 34, Background = TransparentBrush, Foreground = Ink,
             BorderThickness = new Thickness(0), Padding = new Thickness(10, 7, 10, 7), FontSize = 13 };
         System.Windows.Automation.AutomationProperties.SetName(input, "Clave API de " + name);
-        var field = new Border { Background = Panel, CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1), BorderBrush = Line, Child = input };
+        var field = new Border { Background = Panel, CornerRadius = new CornerRadius(20), BorderThickness = new Thickness(1), BorderBrush = Line, Child = input };
         input.GotKeyboardFocus += delegate { field.BorderBrush = Accent; };
         input.LostKeyboardFocus += delegate { field.BorderBrush = Line; };
         editor.Children.Add(field);
@@ -979,13 +996,13 @@ internal sealed partial class ModernRouterMonitor
         return stack;
     }
 
-    UIElement SettingsAction(string title, string description, Action action)
+    UIElement SettingsAction(string title, string description, Action action, string iconName = null)
     {
         var button = new Button { Background = Panel2, BorderBrush = Line, BorderThickness = new Thickness(1),
             Padding = new Thickness(12), Margin = new Thickness(0, 10, 0, 0), Template = RowButtonTemplate(), Cursor = Cursors.Hand };
-        var copy = new StackPanel(); copy.Children.Add(Txt(title, 13, Ink, FontWeights.SemiBold));
+        var copy = new StackPanel(); copy.Children.Add(iconName == null ? (UIElement)Txt(title, 13, Ink, FontWeights.SemiBold) : LucideLabel(iconName, title, Ink));
         var detail = Txt(description, 11, Muted); detail.TextWrapping = TextWrapping.Wrap; detail.Margin = new Thickness(0, 4, 0, 0); copy.Children.Add(detail);
-        button.Content = copy; button.Click += delegate { action(); }; return button;
+        button.Content = copy; System.Windows.Automation.AutomationProperties.SetName(button, title); button.Click += delegate { action(); }; return button;
     }
 
     void AddPolicy(string model, string use, string effort)

@@ -2,12 +2,17 @@
 
 Catálogo, tarifas, migración y evidencia de compatibilidad: [modelos 0.6.0](docs/MODEL-CATALOG.md).
 
+Para continuar desde otro equipo o con un agente nuevo, empieza por
+[la guía de traspaso y pendientes](docs/HANDOFF.md). Distingue el código publicado,
+la instalación activa, las pruebas locales y la aceptación nativa pendiente.
+
 ## Versión
 
 El producto usa versiones semánticas. La versión actual es **0.8.1**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en la esquina inferior derecha del
-panel procede del archivo común `VERSION`. Cada entrega se registra en
+panel procede del archivo común `VERSION` en modo repositorio y del sello
+incluido en la compilación en modo empaquetado. Cada entrega se registra en
 [CHANGELOG.md](CHANGELOG.md) y una etiqueta Git anotada `v<versión>` apunta a su
 commit. La huella de compilación y la versión de política son identificadores
 técnicos independientes; no sustituyen a la versión del producto.
@@ -48,10 +53,69 @@ los tres minutos sin refresco. Una desconexión invalida el indicador. Son lectu
 sin inferencia, compras ni canjes. Los snapshots solo guardan porcentajes,
 ventanas y tiempos; no identificadores de cuenta ni credenciales.
 
-Windows, macOS y Linux comparten estos datos y significados; Mac/Linux comparten
-además el dibujo web y Windows utiliza WPF. Las tareas que ya estaban ejecutándose
+Windows, macOS y Linux comparten el contrato Python de datos/acciones y la
+interfaz web. Windows usa WebView2 en una ventana WPF; Mac usa AppKit/WebKit
+y Ubuntu GTK/WebKitGTK. Cada host conserva solo integración nativa y llavero.
+Windows requiere .NET Framework 4.8 y WebView2 Runtime Evergreen. Véase
+[la arquitectura compartida y sus límites de validación](docs/SHARED-MONITOR.md). Las tareas que ya estaban ejecutándose
 necesitan volver a abrir Desktop para cargar el nuevo puente. La validación
 nativa realizada y las pendientes figuran en [VALIDATION.md](docs/VALIDATION.md).
+
+### Instaladores y actualizaciones
+
+Ajustes permite consultar versiones y preparar descargas compatibles. Hay un
+constructor de `.pkg` local para Mac con runtime incluido y datos separados del
+código. La distribución firmada, el canal público de descargas, los instaladores
+Windows/Ubuntu y la instalación/reapertura desde la aplicación siguen pendientes.
+Estado y límites: [INSTALLATION-UPDATES.md](docs/INSTALLATION-UPDATES.md).
+
+### Evidencia comparable y evaluación
+
+`python3 evidence.py export --source state --output muestra.zip --platform macos`
+genera el formato común `router-evidence/2`. En Ubuntu/Windows usa `--platform
+ubuntu` o `--platform windows`; `--source` también admite los ZIP históricos y
+`--version 0.8.1` limita la muestra. El destino debe ser nuevo. Exporta metadatos
+permitidos y pseudónimos consistentes dentro del archivo; excluye prompts,
+títulos, respuestas, credenciales, cuotas de cuenta y OTLP crudo. Las capturas
+son secuenciales, los contadores acumulativos por proceso y el equipo histórico
+de ejecución permanece desconocido cuando no se registró. Los nuevos eventos
+incluyen plataforma e instancia de ejecución; los anteriores no se rellenan.
+
+El monitor muestra motivos de atribución: IDs o fecha ausentes, evento tardío,
+turno distinto, ambigüedad, duplicado y discrepancia de modelo/esfuerzo. Los
+motivos pueden solaparse. Una identidad nativa completa permite observar una
+discrepancia; una coincidencia sin IDs permanece probable. Los ajustes aceptados
+y los cambios de modelo se contabilizan por separado de la inferencia posterior.
+
+Para registrar el resultado de una comprobación **ya ejecutada**:
+
+```sh
+python3 evidence.py record-check --decision-id ID_DE_LA_DECISION \
+  --evaluation-id comparacion-01 --workload-id fixture-01 --check-id tests \
+  --arm candidate --result passed --origin synthetic
+```
+
+Usa identificadores de fixtures sin datos personales. La decisión debe tener un
+evento terminal. Repite con el brazo `baseline` de otra decisión para la misma
+evaluación, fixture y conjunto de comprobaciones. El registro es un resultado
+externo aportado, no ejecuta pruebas ni lo certifica de forma independiente.
+`python3 tests/evaluate_quality.py` y el exportador muestran parejas comparables,
+última medición nativa de tokens, reintentos y cobertura del clasificador. Los
+tokens de actualizaciones sucesivas no se suman; los costes estándar estimados
+no son facturación. Completar un turno no demuestra corrección y estas parejas
+descriptivas no demuestran por sí solas ahorro causal.
+Los pseudónimos cambian entre exportaciones: las parejas se calculan con las
+decisiones reunidas en una misma muestra, no enlazando IDs de archivos separados.
+
+WPF solo necesita validación si vas a usar Windows.
+
+La [revisión de Luna, Sol, Astra y JEV](docs/MODEL-ROUTING-REVIEW.md) documenta
+las tarifas, límites de la política actual y propuestas de evaluación.
+La [política candidata 9](docs/POLICY9-VALIDATION.md) añade comparación reversible,
+candidatos comunes para reglas/JEV y evaluación de todos los intentos por tarea.
+La comparación mantiene las rutas actuales y no acredita ahorro ni activa clases.
+La [validación WPF](docs/WINDOWS-WPF-VALIDATION.md) distingue compilación cruzada,
+pruebas nativas automatizadas y aceptación visual en Windows.
 
 Elige modelo y razonamiento antes de cada nuevo mensaje enviado a Codex. Sigue
 usando la app y la suscripción actuales. Puede decidir mediante reglas locales

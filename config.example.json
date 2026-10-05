@@ -1,12 +1,16 @@
 {
   "installation_mode": "auto",
   "enabled": true,
+  "updates_auto_check": false,
   "sync_picker": true,
   "inference_telemetry": true,
   "prompt_logging": true,
   "phase_routing": true,
   "history_days": 0,
   "routing_engine": "rules",
+  "policy_mode": "compare",
+  "policy_classes": [],
+  "candidate_jev_comparison": false,
   "comparison_engines": [
     "rules"
   ],

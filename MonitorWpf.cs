@@ -168,7 +168,9 @@ internal sealed partial class ModernRouterMonitor : Window
         Content = surface;
 
         BuildCompact();
-        pauseButton = Btn("Ⅱ  Pausar selección", delegate { TogglePause(); }, false);
+        pauseButton = Btn("Pausar selección", delegate { TogglePause(); }, false);
+        pauseButton.Content = LucideLabel("pause", "Pausar selección", Ink);
+        System.Windows.Automation.AutomationProperties.SetName(pauseButton, "Pausar selección");
         BuildExpanded();
         Closing += OnClosing;
         if (!preview)
@@ -243,15 +245,23 @@ internal sealed partial class ModernRouterMonitor : Window
         return image;
     }
 
-    static FrameworkElement NavigationGlyph(string path, double width)
+    static FrameworkElement LucideGlyph(string name, double size, Brush color)
     {
-        return new System.Windows.Shapes.Path {
-            Data = System.Windows.Media.Geometry.Parse(path), Stroke = Muted,
-            StrokeThickness = 1.6, StrokeStartLineCap = PenLineCap.Round,
-            StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round,
-            Width = width, Height = 10, Stretch = Stretch.Uniform,
-            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center
-        };
+        var canvas = new Canvas { Width = 24, Height = 24, IsHitTestVisible = false };
+        canvas.Children.Add(new System.Windows.Shapes.Path {
+            Data = System.Windows.Media.Geometry.Parse(LucidePath(name)), Stroke = color, StrokeThickness = 2,
+            StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round,
+            StrokeLineJoin = PenLineJoin.Round, IsHitTestVisible = false });
+        return new Viewbox { Child = canvas, Width = size, Height = size, Stretch = Stretch.Uniform,
+            HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false, Tag = "lucide:" + name };
+    }
+
+    static UIElement LucideLabel(string name, string label, Brush color)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, IsHitTestVisible = false };
+        var glyph = LucideGlyph(name, 15, color); glyph.Margin = new Thickness(0, 0, 6, 0);
+        row.Children.Add(glyph); row.Children.Add(Txt(label, 12, color, FontWeights.Medium));return row;
     }
 
     void BuildCompact() { BuildAgentCapsule(); }
@@ -285,14 +295,14 @@ internal sealed partial class ModernRouterMonitor : Window
         panelQuotaButton.Content = QuotaArt(null);
         System.Windows.Automation.AutomationProperties.SetName(panelQuotaButton, "Cuota de Codex");
         Grid.SetColumn(panelQuotaButton, 2); header.Children.Add(panelQuotaButton);
-        var collapse = Btn("›", delegate { SwitchMode(MonitorMode.Compact, true); }, true);
+        var collapse = Btn("", delegate { SwitchMode(MonitorMode.Compact, true); }, true);
         collapse.ToolTip = "Volver a vista compacta"; Grid.SetColumn(collapse, 3); header.Children.Add(collapse);
-        collapse.Content = NavigationGlyph("M0,0 L5,5 L0,10", 6);
+        collapse.Content = LucideGlyph("panel-left-close", 18, Muted);
         collapse.VerticalAlignment = VerticalAlignment.Center;
         System.Windows.Automation.AutomationProperties.SetName(collapse, "Volver a vista compacta");
-        var hide = Btn("×", delegate { SwitchMode(MonitorMode.Hidden, true); }, true);
+        var hide = Btn("", delegate { SwitchMode(MonitorMode.Hidden, true); }, true);
         hide.ToolTip = "Ocultar monitor"; Grid.SetColumn(hide, 4); header.Children.Add(hide);
-        hide.Content = NavigationGlyph("M0,0 L10,10 M10,0 L0,10", 10);
+        hide.Content = LucideGlyph("x", 18, Muted);
         hide.VerticalAlignment = VerticalAlignment.Center;
         System.Windows.Automation.AutomationProperties.SetName(hide, "Ocultar monitor");
         var headerStack = new StackPanel(); headerStack.Children.Add(header);
@@ -491,7 +501,7 @@ internal sealed partial class ModernRouterMonitor : Window
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.Children.Add(Txt(label, 13, Ink, FontWeights.Medium));
-        var value = Txt(state == "" && selected ? "✓" : state, 12, selected ? Accent : Muted, FontWeights.SemiBold);
+        UIElement value = state == "" && selected ? (UIElement)LucideGlyph("check", 14, Accent) : Txt(state, 12, selected ? Accent : Muted, FontWeights.SemiBold);
         Grid.SetColumn(value, 1); row.Children.Add(value); item.Header = row;
         item.IsChecked = selected;
         System.Windows.Automation.AutomationProperties.SetName(item, label + (state == "" ? "" : ", " + state));
@@ -637,7 +647,8 @@ internal sealed partial class ModernRouterMonitor : Window
         try
         {
             bool enabled = ReadEnabled();
-            pauseButton.Content = enabled ? "Ⅱ  Pausar selección" : "▶  Activar selección";
+            pauseButton.Content = LucideLabel(enabled ? "pause" : "play", enabled ? "Pausar selección" : "Activar selección", Ink);
+            System.Windows.Automation.AutomationProperties.SetName(pauseButton, enabled ? "Pausar selección" : "Activar selección");
             var rows = new Dictionary<string, Dictionary<string, object>>();
             var telemetry = new Dictionary<string, double>();
             var accountUsage = new Dictionary<string, object>();
@@ -676,12 +687,14 @@ internal sealed partial class ModernRouterMonitor : Window
                     telemetryAvailable |= String(health, "enabled") == "True" || String(health, "enabled") == "true";
                     foreach (var key in new[] { "requests", "records_scanned", "eligible_records", "events_without_model", "unrecognized_records", "invalid_requests", "unexpected_path",
                         "invalid_size", "invalid_wire_size", "invalid_decoded_size", "invalid_length", "invalid_encoding", "invalid_payload", "invalid_io", "unauthorized_requests", "rejected_connections", "processing_busy",
-                        "completion_records", "failure_records", "api_request_records", "stream_records",
+                        "completion_records", "failure_records", "api_request_records", "stream_records", "identity_conflicts",
                         "size_wire_512k", "size_wire_1m", "size_wire_4m", "size_wire_16m", "size_wire_over16m",
                         "size_decoded_512k", "size_decoded_1m", "size_decoded_4m", "size_decoded_16m", "size_decoded_over16m" })
                         telemetry[key] = telemetry.ContainsKey(key) ? telemetry[key] + Number(health, key) : Number(health, key);
                     var stats = Dict(data.ContainsKey("stats") ? data["stats"] : null);
-                    foreach (var key in new[] { "telemetry_events", "telemetry_confirmed", "telemetry_probable", "telemetry_unattributed" })
+                    foreach (var key in new[] { "telemetry_events", "telemetry_confirmed", "telemetry_probable", "telemetry_unattributed",
+                        "telemetry_records", "telemetry_duplicates", "telemetry_missing_model", "telemetry_missing_thread_id", "telemetry_missing_turn_id", "telemetry_missing_timestamp",
+                        "telemetry_unknown_thread", "telemetry_turn_mismatch", "telemetry_stale", "telemetry_inactive", "telemetry_no_candidate", "telemetry_ambiguous", "telemetry_model_mismatch", "telemetry_effort_mismatch", "telemetry_invalid_timestamp" })
                         telemetry[key] = telemetry.ContainsKey(key) ? telemetry[key] + Number(stats, key) : Number(stats, key);
                 }
                 if (data.ContainsKey("threads"))

@@ -85,6 +85,7 @@ def setup(app_path=None):
                       "CFBundleShortVersionString": version,
                       "RouterBuildId": identity(ROOT)[1],
                       "RouterEngineBuildId": router_identity(ROOT),
+                      "RouterCodeRoot": str(ROOT),
                       "LSMinimumSystemVersion": "12.0", "LSUIElement": True}, stream)
     save_config(config)
     wrapper(DIST / "codex-router", [sys.executable, ROOT / "router.py"])

@@ -23,6 +23,9 @@ MODELS = frozenset(REVIEWED_MODELS)
 EFFORTS = frozenset(("low", "medium", "high", "xhigh", "max", "ultra"))
 EVENT_NAMES = frozenset(("codex.api_request", "codex.sse_event", "codex.websocket_event"))
 EVENT_KINDS = frozenset(("response.created", "response.completed", "response.failed"))
+IDENTITY_FIELDS = {**dict.fromkeys(("conversation.id", "thread.id", "thread_id", "threadId"), "thread_id"),
+                   **dict.fromkeys(("turn.id", "turn_id", "turnId"), "turn_id"),
+                   **dict.fromkeys(("response.id", "response_id", "responseId"), "response_id")}
 MAX_WIRE_BYTES = 4 * 1024 * 1024
 MAX_DECODED_BYTES = 16 * 1024 * 1024
 # Fixed bins are counters, not samples of private payloads. The last decoded
@@ -31,7 +34,7 @@ SIZE_BINS = ((512 * 1024, "512k"), (1024 * 1024, "1m"),
              (4 * 1024 * 1024, "4m"), (16 * 1024 * 1024, "16m"))
 RECORD_COUNTERS = ("records_scanned", "eligible_records", "events_without_model",
                    "unrecognized_records", "completion_records", "failure_records",
-                   "api_request_records", "stream_records")
+                   "api_request_records", "stream_records", "identity_conflicts")
 MAX_CONNECTIONS = 8
 CONNECTION_TIMEOUT = 2
 PROCESSING_WAIT_TIMEOUT = CONNECTION_TIMEOUT / 2
@@ -56,13 +59,30 @@ def attribute_value(value):
 
 
 def bounded_number(value, maximum, integer=False):
+    if type(value) not in (str, int, float):
+        return None
+    if integer and isinstance(value, str):
+        # OTLP intValue is decimal text. Do not silently round float counters,
+        # accept booleans as one token, or parse an unbounded integer string.
+        value = value.strip()
+        if not re.fullmatch(r"[+]?[0-9]{1,16}", value):
+            return None
     try:
-        number = int(value) if integer else float(value)
+        number = float(value)
     except (TypeError, ValueError, OverflowError):
         return None
     if not math.isfinite(number) or number < 0 or number > maximum:
         return None
-    return number
+    if integer and not number.is_integer():
+        return None
+    return int(number) if integer else number
+
+
+def timestamp_nanos(value):
+    value = str(value) if type(value) in (str, int) else ""
+    if re.fullmatch(r"[0-9]{1,20}", value) and 0 < int(value) <= 2**64-1:
+        return int(value)
+    return None
 
 
 class BoundedServer(ThreadingHTTPServer):
@@ -110,6 +130,7 @@ def safe_records(payload, health=None):
                 if health is not None:
                     health["records_scanned"] += 1
                 record = {}
+                identity_conflicts = set()
                 for attribute in log.get("attributes", []):
                     key = attribute.get("key")
                     value = attribute_value(attribute.get("value"))
@@ -121,8 +142,10 @@ def safe_records(payload, health=None):
                         record["event_name"] = value
                     elif key == "event.kind" and value in EVENT_KINDS:
                         record["event_kind"] = value
-                    elif key in ("conversation.id", "thread.id", "thread_id", "turn.id", "turn_id", "response.id", "response_id") and isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_-]{8,160}", value):
-                        field = "thread_id" if key in ("conversation.id", "thread.id", "thread_id") else "turn_id" if key.startswith("turn") else "response_id"
+                    elif key in IDENTITY_FIELDS and isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_-]{8,160}", value):
+                        field = IDENTITY_FIELDS[key]
+                        if field in record and record[field] != value:
+                            identity_conflicts.add(field)
                         record[field] = value
                     elif key in COUNT_FIELDS:
                         number = bounded_number(value, 1_000_000_000, integer=True)
@@ -142,11 +165,25 @@ def safe_records(payload, health=None):
                             record["inference_http_status"] = number
                     elif key == "success" and type(value) is bool:
                         record["inference_success"] = value
-                stamp = log.get("timeUnixNano")
-                if stamp and str(stamp).isdigit():
-                    record["timestamp"] = int(stamp) / 1e9
+                # Contradictory native identifiers cannot become exact proof.
+                if identity_conflicts:
+                    if health is not None:
+                        health["identity_conflicts"] += 1
+                    continue
+                stamp = timestamp_nanos(log.get("timeUnixNano"))
+                source = "event"
+                if stamp is None:
+                    # Native26.930.31730 emits zero event timestamps with a
+                    # real observed timestamp. Zero is absent, not epoch1970.
+                    stamp = timestamp_nanos(log.get("observedTimeUnixNano"))
+                    source = "observed"
+                if stamp is not None:
+                    record["timestamp"] = stamp / 1e9
+                    record["timestamp_source"] = source
                 if record.get("response_id") or stamp:
-                    identity = (record.get("thread_id"), record.get("turn_id"), record.get("response_id"), stamp, record.get("event_kind"), record.get("model"))
+                    # Deduplicate the safe event, not merely its timestamp:
+                    # API/stream records or effort/usage changes can coexist.
+                    identity = (stamp, sorted(record.items()))
                     record["event_id"] = hashlib.sha256(repr(identity).encode()).hexdigest()
                 if record.get("event_name") and record.get("model"):
                     if health is not None:
@@ -185,7 +222,7 @@ class LocalInferenceTelemetry:
                        "unauthorized_requests": 0, "unexpected_path": 0,
                        "rejected_connections": 0,
                        "completion_records": 0, "failure_records": 0,
-                       "api_request_records": 0, "stream_records": 0}
+                       "api_request_records": 0, "stream_records": 0, "identity_conflicts": 0}
         for stage in ("wire", "decoded"):
             for label in [item[1] for item in SIZE_BINS] + ["over16m"]:
                 self.health["size_" + stage + "_" + label] = 0

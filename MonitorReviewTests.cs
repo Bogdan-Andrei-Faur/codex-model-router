@@ -63,6 +63,48 @@ internal sealed partial class ModernRouterMonitor
         return c[0] * .2126 + c[1] * .7152 + c[2] * .0722;
     }
 
+    static void CheckInferenceProjection()
+    {
+        var item = new DecisionRecord { Id = "attribution-fixture" };
+        ApplyHistoryEvent(item, new Dictionary<string, object> {
+            { "event", "inference_observed" }, { "phase_id", "p" },
+            { "observed_model", "gpt-6-luna" }, { "observed_effort", "high" },
+            { "evidence_confidence", "confirmed" }, { "inference_model_mismatch", true }
+        });
+        foreach (string phase in new[] { "p", "" })
+        {
+            var weak = new Dictionary<string, object> {
+                { "event", "inference_probable" }, { "observed_candidate_model", "gpt-6.1-sol" },
+                { "evidence_confidence", "probable" }, { "inference_model_mismatch", false }
+            };
+            if (phase != "") weak["phase_id"] = phase;
+            ApplyHistoryEvent(item, weak);
+            Check(String(item.PhaseEvidence, "evidence_confidence") == "confirmed" &&
+                String(item.PhaseEvidence, "observed_model") == "gpt-6-luna" &&
+                (bool)item.PhaseEvidence["inference_model_mismatch"], "Weak event overwrote confirmed inference");
+        }
+        var metrics = new DecisionRecord { Id = "metrics-fixture" };
+        foreach (string model in new[] { "gpt-6-luna", "gpt-6.1-sol" })
+            ApplyHistoryEvent(metrics, new Dictionary<string, object> {
+                { "event", "inference_metric" }, { "phase_id", "p" },
+                { "inference_event_name", "codex.api_request" }, { "inference_event_kind", "response.failed" },
+                { "observed_candidate_model", model }, { "observed_candidate_effort", "high" },
+                { "inference_sample_count", 2 }, { "inference_model_mismatch", true }
+            });
+        var samples = (Dictionary<string, Dictionary<string, object>>)metrics.PhaseEvidence["inference_samples"];
+        Check(samples.Count == 2 && samples.Values.All(sample => Number(sample, "count") == 2), "Different model metrics were merged");
+        Check(!metrics.PhaseEvidence.ContainsKey("observed_model") && !metrics.PhaseEvidence.ContainsKey("inference_model_mismatch"),
+            "Request metric was promoted to completion identity");
+        Check(ExecutionEvidence(item.PhaseEvidence, "Sol 6.1", "Alto", "automatic").Contains("difiere de los ajustes esperados"),
+            "Confirmed model mismatch warning is missing");
+        ApplyHistoryEvent(item, new Dictionary<string, object> {
+            { "event", "phase_checkpoint" }, { "phase_id", "q" }, { "phase_status", "applied" },
+            { "phase_model", "gpt-6.1-sol" }, { "phase_effort", "high" }
+        });
+        Check(!item.PhaseEvidence.ContainsKey("observed_model") && !item.PhaseEvidence.ContainsKey("inference_model_mismatch") &&
+            String(item.PhaseEvidence, "accepted_model") == "gpt-6.1-sol", "Applied phase retained previous inference identity");
+    }
+
     void PaintFixtures()
     {
         connection.Text = "4 tareas activas"; connection.Foreground = Good;
@@ -218,11 +260,21 @@ internal sealed partial class ModernRouterMonitor
         Check(IdentifyAgent(activeAgentRows["ui"]).Name == "Interfaces" && IdentifyAgent(activeAgentRows["fix"]).Name == "Corrección", "Task icon catalog is not differentiated");
         var catalog = new Dictionary<string, string> { { "interface", "Interfaces" }, { "correction", "Corrección" },
             { "tests", "Pruebas" }, { "audit", "Auditoría" }, { "architecture", "Arquitectura" }, { "text", "Textos" },
-            { "research", "Investigación" }, { "configuration", "Configuración" }, { "automation", "Automatización" }, { "general", "Tarea" } };
+            { "research", "Investigación" }, { "configuration", "Configuración" }, { "automation", "Automatización" }, { "general", "Tarea" },
+            { "data", "Datos" }, { "performance", "Rendimiento" }, { "deployment", "Despliegues" },
+            { "versioning", "Versiones" }, { "integration", "Integraciones" }, { "accessibility", "Accesibilidad" } };
+        foreach (var icon in LucidePaths)
+        {
+            var geometry = System.Windows.Media.Geometry.Parse(icon.Value);
+            Check(!geometry.Bounds.IsEmpty, "Lucide geometry missing: " + icon.Key);
+            Check(geometry.Bounds.Left >= 0 && geometry.Bounds.Top >= 0 && geometry.Bounds.Right <= 24 && geometry.Bounds.Bottom <= 24,
+                "Lucide geometry escapes source viewport: " + icon.Key);
+        }
         foreach (var entry in catalog)
         {
             var row = Fixture("Título genérico", "gpt-5.6-terra", "medium", "active"); row["agent_category"] = entry.Key;
             Check(IdentifyAgent(row).Name == entry.Value, "Stored agent category did not select " + entry.Value);
+            Check(LucidePaths.ContainsKey(IdentifyAgent(row).Icon), "Agent pictogram is not from Lucide");
         }
         var original = agentAvatars["ui"];
         // Check the rendered arc against the face center at every rotation quadrant.
@@ -328,6 +380,8 @@ internal sealed partial class ModernRouterMonitor
         var results = new List<string>();
         try
         {
+            CheckInferenceProjection();
+            results.Add("PASS: confirmed/weak inference separation, missing phase ID, per-model request metrics, mismatch warning and phase reset");
             Check(!ContextPercent(new Dictionary<string, object>()).HasValue, "Missing context must not become zero");
             foreach (double percent in new[] { 0.0, 37.0, 100.0 })
             {

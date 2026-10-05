@@ -1,5 +1,577 @@
 # Validation and integration notes
 
+## Comprobaciones para publicación y traspaso — 05/10/2026
+
+- Fuente 0.8.1, huella `065bd68c49e922f0`: 439 pruebas Python en 24 s,
+  seis omisiones por plataforma; 26 pruebas JS y siete grupos de navegador.
+- Corpus de routing 27/27 y seis casos JEV offline correctos, sin proveedor.
+- Sonda AppKit/WebKit con servicio y fixtures aislados correcta; no captura
+  privada ni nueva aceptación visual del propietario.
+- Fuentes activas `MonitorWindows.cs`/`Launcher.cs` compiladas desde Mac contra
+  Framework 4.8 y SDK WebView2 1.0.4258.31, lenguaje C#5. No ejecución WPF.
+- Revalidado el `.pkg` local del 04/10: extracción/reubicación, firma ad-hoc,
+  runtime/IPC sin Python de desarrollo, monitor embebido listo, preferencias
+  retenidas y forwarding de versión correctos. No instalación en el sistema.
+- Guía [HANDOFF.md](HANDOFF.md), enlaces locales y whitespace revisados.
+  Sin patrones de credenciales detectados entre archivos publicables; datos
+  privados/builds ignorados permanecen locales. La CI se consulta por SHA tras
+  publicar; no hereda el éxito de la base `e13236d`.
+
+## Paquete Mac portable local — 04/10/2026
+
+- Layout común de recursos inmutables/datos de usuario, bootstrap sin sustituir
+  preferencias, identidad embebida y compatibilidad con checkout/paquete Windows
+  anterior. Importador offline conserva datos e identidad de llavero; rechaza
+  escritores vivos, destino ocupado, enlaces y plataforma incorrecta. No se ha
+  migrado la instalación real ni integrado el asistente gráfico de importación.
+- `.pkg` arm64 local0.8.1 build`065bd68c49e922f0`, motor`a7704c8e12c7b6fe`,
+  4.5MiB, en `release/macos-package-377uax__/`. SHA-256:
+  `9fb20d004cffea9e0a4dbac81bf6aa8e6e5810d7c4ccf11bcd0741d910e4abfe`.
+  Contiene AppKit/WebKit, lanzador Swift nativo y runtime PyInstaller6.22.3 en un
+  bundle auxiliar con consola/IPC. Firma ad-hoc; sin identidad del editor.
+- `tests/smoke_package_macos.py`: extracción real del pkg, traslado fuera del repo,
+  firma deep/strict válida, runtime/IPC con PATH vacío, bootstrap repetido conserva
+  ajustes, monitor nativo exacto listo con hijo embebido y datos sintéticos. El
+  launcher reenvía `--version` al Codex original con utilidades estándar de Mac.
+  Sin inferencias, claves, registro de Desktop ni ejecución del instalador del SO.
+- 439 pruebas Python (6 omitidas), 26 JS y siete grupos de navegador correctos;
+  sonda AppKit/WebKit aislada anterior correcta. No se prueba una instalación
+  mediante Installer en equipo limpio, Gatekeeper, ACL reales de llavero, upgrade
+  del sistema, rollback, Windows/Ubuntu nativos ni aceptación visual del dueño.
+- Dueño sin Apple Developer; cero identidades Developer ID Application observadas.
+  Repositorio fuente privado confirmado: pendiente canal accesible de artefactos.
+  No publicación, cuenta/certificado/clave de firma nueva, commit/push o reinicio
+  de Desktop. Se conserva la instalación activa y todas las entregas previas.
+
+## Comprobación y descarga de actualizaciones — 04/10/2026
+
+- Ajustes compartidos: versión instalada/última estable, comprobación manual,
+  comprobación diaria opcional, descarga, progreso y cancelación. La consulta y
+  descarga son asíncronas; las vistas previas no hacen peticiones.
+- GitHub público sin token ni datos de tareas. Selección exacta por sistema y
+  arquitectura, SemVer sin downgrade/prerelease, límites de tamaño, redirecciones
+  HTTPS acotadas, SHA-256 y limpieza de parciales/respuestas tardías. Un404 o un
+  error de red es desconocido, nunca «actualizada».
+- Doce pruebas offline nuevas para contrato/cancelación/integridad/IPC y un grupo
+  de navegador para controles, progreso y límites de instalación. Compilación
+  Mac y Windows/Framework4.8 desde Mac y sonda AppKit/WebKit aislada correctas.
+- 432 pruebas Python correctas (6 omitidas), 26 JS y siete grupos de navegador.
+  Consulta real anónima: `release_unavailable`; no demuestra que esté actualizada.
+  Monitor Mac0.8.1 build`63cfa5d7d3e40ede` instalado: una instancia/un hijo, UI
+  coincidente; configuración, preferencias y lanzador del puente intactos.
+  Copia de recuperación privada en `state/monitor-update-install-uvc_cqdz`.
+  Desktop no se ha reiniciado.
+- No se ejecuta ningún instalador. SHA-256 verifica integridad, no autenticidad
+  independiente del editor. Faltan paquetes sin repositorio/intérprete de
+  desarrollo, firma/distribución, aplicación segura, rollback y reapertura.
+  No se ha publicado ninguna entrega ni validado instalación nativa Windows/Ubuntu.
+  Contrato y plan: [INSTALLATION-UPDATES.md](INSTALLATION-UPDATES.md).
+
+## Monitor compartido — 03/10/2026
+
+- Interfaz única `monitor-ui/` y contrato Python `MonitorState` para Mac,
+  Windows y Ubuntu. Windows pasa a `WebView2CompositionControl` en una ventana
+  WPF; el dibujo C# anterior queda fuera del build, preservado en el árbol local.
+  Requiere Framework4.8 y WebView2 Runtime Evergreen. SDK1.0.4258.31 fijado por
+  SHA-256; build/paquete/CI incorporan UI, loaders y servicio congelado.
+- Cache incremental común de historial: fixture35.000 registros, apéndices,
+  líneas parciales/incorrectas, rotación, truncado, cambio de igual tamaño,
+  borrado y error transitorio. Agentes no carga historial; Historial/Consumo lo
+  solicitan por revisión, con ACK de modo inmediato. Los tres módulos Python
+  del monitor quedan fuera de la huella del motor para cambios futuros de UI.
+- IPC privado JSONL sin sockets/credenciales, acciones validadas y límites
+  64KiB/64MiB. `requestId` de transporte es independiente del `id` de decisión;
+  una prueba con hijo real verifica que se guarda la valoración correcta.
+- 420 pruebas Python:414 correctas y6 omitidas por plataforma. 26 pruebas JS
+  y seis grupos de navegador correctos; incluyen canal Windows, layouts,
+  interacción, cristal y37.000 registros. Corpus27/27 y seis casos Jev locales,
+  sin llamadas externas. No nuevas inferencias ni gasto de proveedor.
+- Sondas Mac aisladas AppKit/WebKit: cristal/acotación/Agentes/ocultación con
+  servicio real, y entrega de primer clic, correctas. No prueban la entrega
+  física del ratón por el sistema ni la aceptación visual del propietario.
+- Fuentes Windows activas compiladas contra Framework4.8 y SDK fijado con C#5,
+  desde Mac. Informe privado `state/windows-shared-compile-5/compilation.json`.
+  No se ha ejecutado WebView2/Windows, el self-test nuevo, la CI ni el ZIP aquí.
+- Monitor Mac0.8.1 build`ebc4825554ee25ef` instalado y arrancado: una instancia,
+  un hijo privado, Info.plist coincidente con fuentes y configuración/preferencias
+  idénticas. Motor preparado`1e5cbd7f791c1832`; el puente ya activo difiere y no
+  se ha reiniciado Desktop. Preparación no equivale a activación o inferencia.
+- Pendientes: Windows real (self-test, primer clic/hover, bandeja, multi-DPI y
+  DPAPI); Ubuntu real (GTK, X11/Wayland, bandeja y Secret Service). **WPF solo
+  necesita validación si vas a usar Windows.** Guía: [SHARED-MONITOR.md](SHARED-MONITOR.md).
+
+
+## Corrección de métricas y esfuerzo por fase — 03/10/2026
+
+- El mínimo de modelo conserva la capacidad exigida, pero el esfuerzo procede
+  de la complejidad de la fase y su mínimo explícito. Una fase realmente crítica
+  sigue elevando el esfuerzo; Manual, selección explícita y fronteras nativas
+  Astra/Luna6→Sol6.1 se conservan. Se registra `phase_complexity`.
+- Sonda nativa Desktop26.930.31730: 17/17 registros con `timeUnixNano=0` y
+  `observedTimeUnixNano` válido. Se corrige la fecha1970 y la deduplicación que
+  podía colapsar eventos distintos. La hora de observación queda identificada
+  y nunca confirma una inferencia posterior a un cambio de fase por sí sola.
+- Identificadores camelCase revisados, rechazo de identidades contradictorias
+  con contador visible en Mac/Linux/WPF, y contadores sin truncamiento de
+  fracciones ni conversión de booleanos. La incertidumbre heredada conserva
+  su mínimo, sin transformarse en supuesto riesgo observado.
+- 415 pruebas Python, seis omitidas, sin fallos; Swift y compilaciones WPF4.6.1
+  y4.8 correctas. No ejecución nativa Windows. WPF solo necesita validación si
+  vas a usar Windows. La interfaz visual y sus estilos se conservan.
+- Cuatro comparaciones admisibles correctas en dos funciones con regresiones
+  sembradas; un intento previo excluido y una sonda se conservan. Cuota consumida:
+  seis turnos nativos y dos llamadas Jev. [Resultados y límites](EVIDENCE-COVERAGE.md#remediación-de-la-auditoría-diaria-y-nuevas-comparaciones).
+- Preparado0.8.1/política8, build`f802090cc14df3f2`, router`e5c72c5dcca79105`.
+  Monitor relanzado, una instancia, preferencias/configuración conservadas.
+  Puentes activos aún`b53e607ef4669bc9`: **falta reiniciar Desktop** para cargar
+  el backend. Política9 sigue en comparación; no activación por estos pilotos.
+  Recibos locales `state/metrics-remediation-install-final-20261003.json` y
+  `state/metrics-remediation-evaluation-20261003.json`. Sin commit/push/reset.
+
+
+## Formas redondeadas y catálogo Lucide — 03/10/2026
+
+- Píldoras en navegación, etiquetas de modelo/esfuerzo y selectores; tarjetas
+  de 24 px. Se conservan colores, círculos y anillos de contexto/actividad.
+- 27 SVG originales Lucide 1.51.0, integridad SHA-512 del paquete y licencia
+  vendorizadas; catálogo offline común a categorías/controles, bandeja Mac y WPF.
+  Las conversiones son mecánicas, sin pictogramas inventados ni CDN en ejecución.
+- Pasan 26 pruebas JS, cinco suites de navegador, integridad del catálogo,
+  Swift y ambas sondas nativas aisladas. Las pruebas contrastan las primitivas
+  SVG renderizadas y las píldoras. Captura compuesta opcional final correcta;
+  dos intentos previos de esa sonda agotaron 15 s sin causa raíz demostrada.
+- Compilación cruzada WPF real para Framework 4.6.1 y 4.8 correcta, siete fuentes;
+  4.8 conserva dos avisos de FormattedText. Self-tests nativos nuevos compilados,
+  sin ejecutar Windows. El layout completo glass sigue sin portar a WPF.
+- Monitor `c8c95b67eeb994c9` instalado y relanzado, una instancia; recibo
+  `state/mac-monitor-lucide-20261003.json`. Backend `b53e607ef4669bc9`,
+  preferencias y lanzadores conservados. No hace falta reiniciar Desktop.
+  Pendiente aceptación visual/física del propietario; sin commit/push.
+
+## Ajustes visuales tras feedback — 03/10/2026
+
+- Pestañas arriba, etiquetas de modelo/esfuerzo restauradas con paletas originales,
+  tarjetas con borde/color por modelo, estados y barras con acentos diferenciados.
+- Material HUD nativo y menor velo HTML; accesibilidad conservada. Capturas
+  compuestas de dos fondos sintéticos verifican respuesta visible y desenfoque:
+  diferencia media RGB 75,79/255 en una región sin contenido. No se capturan
+  conversaciones ni el resto de la pantalla. El aspecto sobre fondo uniforme
+  y la aceptación estética real siguen sujetos a la revisión del propietario.
+- Cinco suites de navegador y ambas sondas nativas pasan; Swift compila.
+  Monitor `00fec4cc03a60e69` instalado, backend `b53e607ef4669bc9`, preferencias
+  y lanzadores conservados. Desktop no se reinicia. La sección siguiente
+  conserva la evidencia de la primera entrega del rediseño.
+
+## Rediseño del monitor integrado — 03/10/2026
+
+- [Contrato y evidencia de la interfaz](MONITOR-UI.md): Agentes activos/compactando,
+  cuota arriba, Historial/Consumo y Ajustes mediante botón; círculos reales y
+  cuota semanal solo en cápsula. Material nativo Mac y temas/accesibilidad.
+- 26 pruebas JS, cinco suites de navegador y tres Python específicas pasan.
+  Las sondas nativas verifican el ciclo real del cristal en preview aislado y
+  primer clic mediante despacho sintético AppKit. Compilación Swift correcta.
+- Monitor `5fceb8cdd1f83e28` instalado y relanzado. Backend `b53e607ef4669bc9`,
+  preferencias y lanzadores conservados; Desktop continúa sin reinicio.
+- La latencia anterior fue aceptada por el propietario antes de este rediseño.
+  Queda la aceptación visual/física de la nueva interfaz con actividad real.
+  No se ha trasladado el diseño a WPF ni ejecutado su UI en Windows.
+
+## Latencia al desplegar el monitor macOS — 03/10/2026
+
+- El propietario confirma hover/primer clic; la latencia percibida seguía pendiente.
+- [Segunda corrección instalada](MAC-MONITOR-INTERACTION.md): Actividad/Ajustes
+  no leen ni proyectan el historial; Historial/Estadísticas lo cargan cuando se
+  necesitan, sin eliminar datos. Transición geométrica de 420 a 180 ms.
+- Prueba controlada de 37.000 registros: proyecciones al abrir Actividad de 1 a 0,
+  trabajo síncrono de 24 a 5 ms; no es medición de extremo a extremo del Mac.
+  Swift compila; 3 pruebas Python específicas, 2 regresiones de interacción y
+  las 2 suites de layout pasan. No se repite la batería completa sin cambios Python.
+- Monitor actual `1b26964fde26e9ac` relanzado en una instancia. Backend
+  `b53e607ef4669bc9` y preferencias conservados; Desktop no se reinicia.
+  Queda la aceptación perceptiva del despliegue corregido.
+
+## Interacción de la cápsula macOS — 03/10/2026
+
+- [Corrección, pruebas y aceptación pendiente](MAC-MONITOR-INTERACTION.md): hover
+  local sin activar la aplicación, primer clic, acuses de vista independientes,
+  protección contra actualizaciones atrasadas y lectura incremental del historial.
+- 400 pruebas Python (6 omitidas), 21 del núcleo JS, dos suites de layout y la
+  regresión de interacción pasan; Swift compila. La sonda AppKit/WebKit entrega
+  un clic desde un panel no-key. Ratón físico/foco externo pendientes de aceptación.
+- Monitor compilado y relanzado, una instancia: build `e9171d306ba871d1`.
+  Router `b53e607ef4669bc9` permanece activo con handshake completo; la activación
+  del build anterior ya se verificó tras el reinicio del propietario. Estos cambios
+  de interfaz no requieren reiniciar Desktop. Preferencias conservadas.
+- La siguiente sección conserva el resultado histórico de la campaña previa;
+  sus informes y huellas congeladas no se reescribieron.
+
+## Contadores estrictos, alcance numérico y primer caso reservado — 03/10/2026
+
+- [Parser local corregido y validación](TOKEN-COUNTER-VALIDATION.md): booleanos,
+  decimales e infinitos no fabrican tokens ni excepciones; valores válidos siguen
+  admitidos. «Float integral» deja de confundirse con integración entre servicios
+  en candidata9, conservando integración real y riesgo pendiente.
+- Snapshot exacto de una función pública reservado antes de resultados, oráculo
+  fijo, referencia pasa y seis variantes defectuosas fallan. Luna/High y Sol/High
+  pasan con tres herramientas/cuatro respuestas cada uno; no es ingeniería
+  completa ni evidencia de ahorro. Jev elige Luna antes, confianza0,65; ahora
+  dos positivos con varios modelos, cero negativos finales para calibrar.
+- Dos turnos/una Jev prospectivos, cuota agotada. Ocho respuestas/tokens
+  reconciliados.35específicas/399Python completas correctas, seis omitidas;
+  doce informes históricos intactos y huellas anteriores preservadas.
+- Bundles locales0.8.1 preparados: build6f7092d90f4930e0/routerb53e607ef4669bc9;
+  preferencias y campos de launcher idénticos. Activación pendiente de reiniciar
+  ChatGPT Desktop; sin nueva categoría activa ni commit/push.
+
+## Primer resultado Jev con elección real entre modelos — 03/10/2026
+
+- [Piloto de snapshot de una función real](REPOSITORY-TRIALS.md): procedencia Git
+  exacta, adaptación declarada y requisitos nuevos, una tarea de ajuste, no
+  reservada ni trabajo completo sobre el proyecto vivo. Dos solicitudes nativas
+  y una Jev prospectivas, sin reintentos; política y bundles intactos.
+- Luna/High y Sol/High pasan. Luna: tres herramientas/cuatro respuestas; Sol:
+  ocho herramientas/nueve respuestas y dos pruebas funcionales intermedias
+  negativas seguidas de éxito. No son tareas finales negativas independientes.
+- Jev eligió Luna/High antes de los resultados, confianza0,24; primer resultado
+  medido con varias opciones de modelo. Una elección correcta no calibra umbral
+  ni demuestra óptimo, identidad por respuesta o ahorro.13respuestas/tokens
+  reconciliados con ambos totales; coste nativo completo pendiente.
+- Seis regresiones nuevas/390 Python completas, seis omitidas, diff correcto.
+  Siete artefactos/tres rúbricas y once informes históricos verificados.
+
+## Inventario de cobertura sin inflar la muestra — 03/10/2026
+
+- [Auditoría offline reproducible](EVIDENCE-COVERAGE.md): 38 comparaciones
+  correctas sobre diez ejercicios distintos, una aceptación del instrumento
+  separada y doce intentos inválidos conservados (nueve solicitudes nativas).
+  Snapshots acumulativos no se cuentan varias veces; huellas originales fijadas.
+- Jev: seis observaciones, dos resultados positivos enlazados con Sol como
+  único modelo y cero resultados medidos de elecciones entre varios modelos.
+  No hay negativos para calibrar ni prueba de selección óptima por calidad/coste.
+- Totales disponibles para 47 de 48 solicitudes incluidas; reconciliación por
+  respuesta en 38. Modelo/esfuerzo por respuesta e importe completo pendientes.
+  Nueve regresiones nuevas, 39 pruebas específicas y 384 Python completas
+  correctas (seis omitidas); once informes originales intactos y diff correcto.
+  Cero llamadas, activaciones o reinicio.
+
+## Pruebas intermedias y rechazos con evidencia segura — 03/10/2026
+
+- [Nuevo protocolo aislado](TOOL-EVIDENCE.md): orden de llamadas, revisiones,
+  resultados booleanos de pruebas y categorías fijas de rechazo/error. Recibos
+  anteriores preservados; un resultado malformado queda desconocido. Diario
+  limitado con contabilidad explícita de pérdida; no se guardan datos de llamadas.
+- Una solicitud prospectiva Luna/High sobre un caso conocido valida el registro:
+  once eventos completos, dos escrituras rechazadas por contrato de código y una
+  prueba funcional correcta en la revisión final. No es una comparación nueva
+  ni recupera resultados intermedios antiguos. Seis respuestas enlazadas a turno,
+  tokens suman el total RPC, importe/modelo-esfuerzo por respuesta pendientes.
+- Nueve artefactos/plan y seis informes históricos auditados, originales intactos.
+  Ocho regresiones nuevas, 38 pruebas específicas y 375 Python completas,
+  seis omitidas. Cero Jev/activación/reinicio; banco anterior congelado intacto.
+
+## Reparación causal de cuatro módulos — 02/10/2026
+
+- [Un caso con más interacciones](CAUSAL-TRIALS.md): normalización/tombstones,
+  orden causal con ciclos/prerrequisitos ausentes, atomicidad y bloqueo propagado.
+  Referencia pasa y doce variantes defectuosas fallan; 512 grafos de tres nodos
+  exhaustivos y 471 replays, sin presentar las permutaciones como nuevos problemas.
+- Tres rutas High-solicitado, tres reparaciones correctas dentro de la cuota de
+  tres turnos. Sol/Astra: tres respuestas y nueve herramientas cada uno. Luna:
+  diez respuestas y diecinueve herramientas, dos rechazadas; consumo conservado.
+  No hay ventaja de calidad observada para Astra aquí, equivalencia general ni
+  ahorro facturado. Resultado de cada prueba intermedia no registrado.
+- 16 respuestas enlazadas a turno; tokens suman tres totales RPC. Ocho huellas y
+  cinco informes históricos auditados. Ocho regresiones nuevas; 56 pruebas
+  específicas y 367 Python completas, seis omitidas. Cero Jev/activación/reinicio.
+
+## Segundo ejercicio y comparación de revisiones completa — 02/10/2026
+
+- [Dos casos ciegos](REVIEW-TRIALS.md): seis revisiones válidas High-solicitado;
+  cada ruta Luna/Sol/Astra detecta los cinco defectos, sin omisiones ni falsas
+  alarmas. Dos problemas independientes, no seis; no se observa ventaja de
+  calidad para Astra aquí ni se afirma equivalencia general o ahorro facturado.
+- Nueva cuota prospectiva de tres solicitudes, solo el segundo ejercicio;
+  nueve solicitudes totales incluyendo tres inválidas históricas de instrumento.
+  Selector conserva orden y separa finalización del caso/conjunto. Informes
+  históricos intactos, matriz conjunta sin duplicados, corpus/comprobador comunes.
+- 18 herramientas válidas, 20 respuestas enlazadas a sus turnos; tokens suman
+  seis totales RPC. Siete artefactos actuales verificados; runner histórico
+  atestiguado por auditoría previa, no contra código modificado.
+- Tres regresiones nuevas; 53 pruebas específicas y 359 pruebas Python completas,
+  seis omitidas. Cero nuevas llamadas Jev/categorías activadas, sin reinicio.
+
+## Revisión ciega con contraejemplos — 02/10/2026
+
+- [Primer ejercicio válido](REVIEW-TRIALS.md): Luna/Sol/Astra con High solicitado
+  detectan los tres defectos, sin omisiones ni falsas alarmas, sin feedback del
+  comprobador. Nueve herramientas válidas; diez respuestas enlazadas a turno,
+  sus tokens suman los tres totales RPC. Modelo/esfuerzo por respuesta e importe
+  completo siguen pendientes; no demuestra ventaja de Astra ni ahorro facturado.
+- El instrumento inicial ocultaba los nombres de archivos permitidos: tres
+  solicitudes excluidas de calidad, una interrumpida, informe original intacto.
+  Prompt/esquema corregidos y una regresión adicional antes de gastar las tres
+  solicitudes restantes. Total seis, dentro del límite inicial; segundo ejercicio
+  sin ejecutar, diseño completo explícitamente pendiente.
+- Once regresiones nuevas; 50 pruebas específicas y 356 pruebas Python completas,
+  seis omitidas. Siete huellas, plan e integridad histórica comprobados. Cero
+  llamadas nuevas a Jev, categorías activadas o cambios de backend; sin reinicio.
+
+## Luna/Alto y Sol/Medio solicitados — 02/10/2026
+
+- [Diseño repetido](EFFORT-TRIALS.md): dos casos congelados × dos rutas × dos
+  repeticiones independientes, orden alternado, ocho turnos y todos correctos.
+  Sin reintentos ni llamadas nuevas a Jev. 58 herramientas válidas, cero rechazos.
+- Sol/Medio genera tres respuestas por ejecución; Luna/Alto, 4/10/8/8. Ambos
+  pasan, pero pasos/caché varían: no demuestra ahorro facturado o calidad general.
+- 42 respuestas enlazadas a turno, sus tokens suman los ocho totales RPC;
+  identidad posterior de modelo/esfuerzo por respuesta y coste completo pendientes.
+- Diseño y ocho huellas verificados; cuatro regresiones nuevas. 345 pruebas
+  Python, seis omitidas. Backend y política activa sin cambios; no hay reinicio.
+
+## Reparaciones de tres módulos — 02/10/2026
+
+- [Campaña nueva](INTEGRATION-TRIALS.md): telemetría con conflictos de identidad
+  y cancelación con eventos fuera de orden, dos casos × tres modelos, todos
+  correctos con High solicitado. Corpus/comprobador congelados antes de llamadas;
+  referencias pasan y once variantes defectuosas fallan.
+- Seis turnos independientes, cero reintentos, 42 herramientas válidas y cero
+  solicitudes denegadas. 27 respuestas enlazadas a turno; sus tokens suman todos
+  los totales RPC. Etiquetas posteriores coincidentes, coste/modelo por respuesta
+  aún desconocidos; no confirma operación ni cancelación del Desktop real.
+- Luna genera 7–8 respuestas por brazo frente a tres de Sol/Astra; hay que medir
+  coste por tarea, incluyendo pasos y caché. No se prueba ahorro ni equivalencia
+  general, ni se calibra JEV. Cero llamadas nuevas a JEV.
+- 341 pruebas Python, seis omitidas; diff correcto. Backend sin cambios, sin
+  reinicio necesario. Referencia8/comparación9 sin nuevas categorías activadas.
+
+## Enlace JEV sin selección parcial de resultados — 02/10/2026
+
+- El evaluador offline ya no escoge el primer intento coincidente: conserva
+  todos los contadores y deja duplicados/reintentos ambiguos sin calidad medida.
+- Exige origen congelado y evidencia tipada coherente; separa fallos externos
+  de ejecuciones incompletas. Importes booleanos, no finitos o inválidos no
+  completan cobertura. Seis regresiones nuevas; 22 pruebas específicas pasan.
+- Nuevo enlace de los seis resultados originales: dos positivos y cuatro sin
+  medición, cero llamadas nativas/JEV. Informes originales intactos; sin umbral
+  calibrado ni nueva categoría activada. Cambios de evaluador/documentación,
+  sin actualización del backend ni reinicio necesario.
+
+## Perfil Code Mode y comparación multifichero válida — 02/10/2026
+
+- [Resultados](MULTIFILE-TRIALS.md): el catálogo de los tres modelos declara
+  `code_mode_only`. El perfil anterior desactivaba su ejecutor; se corrigió
+  exclusivamente en sondas propias. Echo Luna/Low confirmado, seguido de seis
+  reparaciones High solicitado, dos casos × tres modelos, todos correctos.
+- Cada brazo lee y modifica ambos módulos y supera comprobaciones externas
+  sobre la revisión final. 30 llamadas válidas, cero rechazos/solicitudes
+  denegadas, sin reintentos de turno. Orden rotado, conversaciones/procesos
+  efímeros separados. Los intentos incompatibles anteriores se conservan.
+- 22 respuestas con identidad propia; tokens por respuesta suman los seis
+  totales RPC. Etiquetas posteriores de modelo coincidentes. Falta modelo por
+  respuesta e importe nativo: aún sin coste completo/ahorro/confirmación Desktop.
+- Dos selecciones JEV anteriores Sol/High vinculadas a ejecuciones correctas,
+  con confianza 0.82 y 0.35. Anotación offline, cero nuevas llamadas. Dos positivos
+  no calibran un umbral; cuatro observaciones siguen sin calidad medida.
+- Perfil compartido con la sonda nativa de herramientas; permisos nativos,
+  configuración del propietario y backend sin cambios. Referencia8/comparación9
+  sin categorías activadas. No hace falta reiniciar. WPF nativo queda pendiente
+  únicamente si se utiliza Windows.
+- 327 pruebas Python (6 omitidas), handshake nativo/catálogo/cuenta sin inferencias
+  adicionales y diff check correctos. Huella del backend `a5da97058b17d872`.
+
+## Multifichero, respuestas nativas y JEV — 02/10/2026
+
+- [Ensayo y límites](MULTIFILE-TRIALS.md): dos reparaciones congeladas con
+  comprobadores externos y herramientas acotadas. Seis solicitudes nativas en
+  total, cinco turnos completados, uno interrumpido; tres rechazos de preparación
+  adicionales sin inferencia. No hubo invocaciones: comparación de calidad no
+  válida, sin atribuir esos fallos de contrato/disponibilidad a los modelos.
+- La emisión experimental interna entrega 16 respuestas con IDs propios de
+  conversación/turno/respuesta. Sus tokens suman los totales RPC de los cinco
+  turnos completados. No hay campo de modelo por respuesta ni importe nativo;
+  sigue sin probar atribución/coste completo de Desktop. Solo sondas efímeras,
+  sin habilitar esa captura en los chats del propietario.
+- Seis llamadas JEV sintéticas: seis rutas coherentes con las etiquetas de
+  alcance; cinco tenían el modelo restringido por elegibilidad. Confianza cruda
+  0.35–0.90, cero resultados de calidad admisibles vinculados, sin umbral
+  calibrado. USD 0.000251496 informados para esas llamadas, no factura ni ahorro.
+- Informes privados solo de metadatos: `state/multifile-namespace-20261002/report.json`
+  y `state/jev-descriptive-20261002/report.json`. Backend y política sin cambios.
+  325 pruebas Python (6 omitidas), controles de aislamiento y diff check correctos.
+  Pendientes: roundtrip de herramientas, comparación real, modelo por respuesta,
+  todos los intentos/costes, calibración JEV y WPF nativo si se usa Windows.
+
+## Programación aislada — 02/10/2026
+
+- [Tres ejercicios de programación](CODING-TRIALS.md) congelados antes de las
+  solicitudes: corrección de confianza (20 entradas), implementación de fronteras
+  (60 combinaciones/entradas) y revisión de cuatro defectos de telemetría.
+- Nueve turnos separados, High solicitado, orden rotado y sin reintentos:
+  Luna, Sol y Astra superan los tres casos. Etiquetas posteriores de modelo
+  coincidentes y totales RPC con identidad de turno en los nueve casos.
+- Comprobador macOS aislado verificado con controles negativos de lectura,
+  escritura y red, referencias positivas, versiones defectuosas y bucle infinito.
+  Los modelos no tienen herramientas ni MCP; el código se ejecuta únicamente
+  en áreas temporales del comprobador y no se archiva.
+- 311 pruebas Python (6 omitidas) y diff check correctos. Informe privado de
+  metadatos: `state/coding-trials-20261002/report.json`. Backend sin cambio.
+- Es evidencia de programación acotada, no una evaluación integral de agentes.
+  Falta el enlace nativo de inferencia a turno/respuesta y el coste completo.
+  No hay ahorro demostrado ni categorías activadas. Próximo paso: tareas con
+  herramientas e integración multifichero, calibración JEV y WPF nativo Windows.
+
+## Preflight experimental de tres modelos — 02/10/2026
+
+- Se amplió `tests/probe_inference_identity.py` para ejecutar un fixture congelado,
+  contar etiquetas de modelo de finalización posteriores y guardar el último
+  total nativo de tokens. Solo admite los tres modelos revisados, comprueba el
+  catálogo real y mantiene procesos/conversaciones efímeros separados. No suma
+  snapshots acumulativos ni cuenta logs duplicados como inferencias distintas.
+- Tres turnos, mismo caso reservado `bounded-4`, esfuerzo `high`, sin herramientas,
+  MCP, JEV ni cambios en los chats del propietario. Cada modelo superó los mismos
+  criterios `json_contract` y `expected_result`.
+
+| Modelo solicitado y etiqueta posterior observada | Entrada total | Entrada cacheada | Salida total | Razonamiento incluido en salida | Tiempo del turno |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `gpt-6-luna` | 18483 | 5888 | 68 | 50 | 4688 ms |
+| `gpt-6.1-sol` | 19179 | 10752 | 50 | 32 | 5847 ms |
+| `gpt-6-astra` | 19113 | 10624 | 45 | 27 | 6734 ms |
+
+- Los totales llegan por RPC con los IDs de la propia conversación y turno.
+  Las etiquetas de modelo provienen de logs posteriores del colector aislado,
+  con conversación coincidente; no se deducen de los ajustes solicitados.
+  Los logs siguen sin ID de turno/respuesta ni contexto de traza: **evidencia
+  experimental aislada, no confirmación de inferencia en Desktop**.
+- Una observación por modelo, entrada total y estado de caché diferentes: estos
+  tiempos no clasifican velocidad general. Un caso JSON no mide ingeniería,
+  seguridad o UX ni demuestra equivalencia general. La cobertura del coste
+  completo permanece desconocida; no se calcula ahorro ni se activa una categoría.
+- Informes privados sin contenido ni IDs:
+  `state/model-preflight-{luna,sol,astra}-20261002.json`.
+  Reproducción acotada: `python3 tests/probe_inference_identity.py --live
+  --model gpt-6-luna --effort high --fixture bounded-4 --output NUEVO.json`;
+  cambiar solo el modelo y usar otro archivo nuevo para cada brazo.
+- Dos nuevas regresiones verifican privacidad/deduplicación de etiquetas y
+  reemplazo de snapshots sin inventar identidad; 303 pruebas Python (6 omitidas)
+  y `git diff --check` correctos. No cambia el backend/build ni hace falta reiniciar.
+  Comparación activa, política 8 seleccionando, categorías nuevas desactivadas.
+
+## Diagnóstico de identidad nativa — 02/10/2026
+
+- `tests/probe_inference_identity.py` inspecciona únicamente nombres permitidos,
+  tipos/longitudes y coincidencias booleanas con IDs RPC de la propia sonda.
+  No guarda prompts, respuestas, valores de atributos, IDs ni payloads crudos.
+  Sin `--live` solo consulta configuración/catálogo; `--live` usa un turno
+  Luna/Ligero aislado y efímero. `--traces` habilita trazas solo en ese proceso.
+- Dos sondas nativas en Desktop 26.930.21537, un turno cada una, finalizaron y
+  superaron su comprobación. La primera recibió dos registros de finalización
+  con `conversation.id`, sin turno ni respuesta. La segunda recibió lo mismo y
+  638 spans: tres atributos `turn.id` y tres `turn_id` coincidieron con el turno
+  RPC, pero los logs no tenían `traceId`/`spanId`. Cero enlaces explícitos entre
+  finalización de inferencia y span de turno. Dos registros no prueban dos llamadas.
+- El problema se reproduce antes del parser: en esta versión y estas sondas,
+  el emisor no entrega el enlace requerido. Las trazas contienen `thread.id`
+  de otras longitudes/semánticas; no se pueden fusionar indiscriminadamente.
+  Activar trazas en los chats actuales no solucionaría este caso y no se hizo.
+- La [documentación oficial de observabilidad](https://learn.chatgpt.com/docs/config-file/config-advanced#observability-and-telemetry)
+  describe el ID de conversación y exportación asíncrona; no garantiza el enlace
+  de turno/respuesta necesario para nuestra atribución estricta.
+- Informes seguros: `state/native-identity-shapes-20261002.json` y
+  `state/native-identity-trace-shapes-20261002.json`. Tres regresiones de privacidad,
+  ausencia de enlace y cadena de contexto; suite completa 301 pruebas (6 omitidas).
+- Backend y build permanecen `a5da97058b17d872` / `6cca622333197979`.
+  No hace falta reiniciar por estas herramientas de diagnóstico. El modo
+  comparativo sigue activo. Para confirmar inferencias de Desktop hace falta
+  evidencia nativa adicional que una inequívocamente respuesta y turno; no se
+  fabricará ese enlace por tiempo, modelo aceptado o simple coincidencia.
+  Evaluaciones aisladas pueden aportar evidencia experimental diferenciada,
+  pero no cierran por sí solas la atribución real ni la validación por categoría.
+
+## Activación Desktop comparativa — 02/10/2026, 19:36 CEST
+
+- Reinicio verificado por heartbeat, handshake y huellas del proceso vivo:
+  producto 0.8.1, build `6cca622333197979`, backend `a5da97058b17d872`.
+  Cuatro comparaciones de candidata 9 y cuatro decisiones aceptadas desde el
+  inicio del puente. La política 8 sigue seleccionando; JEV adicional desactivado.
+- Corte 17:36:06 UTC: 51 peticiones OTLP, 26 registros elegibles, 19 duplicados
+  y siete finalizaciones únicas procesadas. Sin rechazos del receptor por tamaño,
+  autenticación, codificación, ruta o conexión.
+- Los siete registros procesados carecen de `turn_id` extraído; seis se descartan
+  por estado inactivo y uno por antigüedad. Son contadores que pueden solaparse,
+  no pruebas de que el emisor no incluya el dato en otra representación.
+  **Cero inferencias confirmadas**: el consumo completo sigue sin atribuir.
+- Diagnóstico local de metadatos seguros en
+  `state/policy9-desktop-restart-20261002.json`; ninguna llamada nueva al proveedor.
+  Pendientes: investigar la identidad de turno en la emisión/decodificación,
+  tareas reales comparables y calibración JEV. WPF nativo sigue pendiente Windows.
+
+## Implementación comparativa aprobada — 02/10/2026
+
+- [Política candidata 9](POLICY9-VALIDATION.md): elegibilidad común reglas/JEV,
+  contrato de trabajo restante, fallos tipados, abstención sin umbral calibrado,
+  cobertura del consumo y parejas con todos los intentos. Manual, órdenes
+  explícitas y fronteras nativas se conservan. `policy_control.py compare`
+  configurado; política 8 selecciona y no se activó ninguna categoría nueva.
+- 30 fixtures JSON congelados: 18 de ajuste y 12 reservados. El preflight no
+  representa ingeniería/UX/seguridad completas ni autoriza activación.
+- Se ejecutaron dos sondas de una misma pareja reservada (cuatro turnos):
+  Sol/Medio y Luna/Alto aceptados, las cuatro respuestas superaron los criterios.
+  La segunda sonda esperó la entrega tardía de telemetría antes de archivar.
+  No se obtuvo atribución de inferencia suficiente; el consumo completo sigue
+  desconocido. Se detuvo la ampliación a otras parejas: **no hay ahorro probado**.
+- Una consulta sintética JEV con candidatos nuevos devolvió Luna/Alto, confianza
+  0.46 sin redondeo y USD 0.000042756 informados por el proveedor. Es comprobación
+  de contrato, no calibración de calidad ni factura; no fija un umbral.
+- 298 pruebas Python (6 omitidas), 21 JavaScript, corpus 27/27, seis casos JEV offline y layout
+  correctos. Bundle Mac preparado y WPF recompilado para 4.6.1/4.8, build
+  `6cca622333197979`, backend `a5da97058b17d872`. Ejecución nativa WPF pendiente.
+- Reinicio de Desktop pendiente para cargar esta revisión. Después se deben
+  comprobar metadatos comparativos, atribución y tareas reales representativas;
+  faltan categorías verificadas y calibración JEV. WPF solo necesita validación
+  si vas a usar Windows. No se hicieron commit ni push.
+
+## Revisión de modelos y compilación cruzada WPF — 02/10/2026
+
+- [Revisión Luna/Sol/Astra y JEV](MODEL-ROUTING-REVIEW.md): fuentes oficiales,
+  tarifas, catálogo nativo y metadatos seguros de las tres instalaciones.
+  Últimas 50 decisiones Mac: 18 Astra, 0 diferencias de modelo entre JEV/local
+  y 19 de esfuerzo. No se midió calidad ni ahorro causal.
+- `python3 tests/review_model_policy.py`: 12 casos sintéticos de elegibilidad;
+  recomendaciones para ensayar, no cambio de política ni respuestas reales JEV.
+- [Validación WPF](WINDOWS-WPF-VALIDATION.md): compilación cruzada C# 5 para
+  Framework 4.6.1 y 4.8. Se añadieron regresiones de evidencia y ejecución
+  `--self-test` a la CI Windows; esa ejecución nativa aún no se ha realizado.
+- 279 pruebas Python (6 omitidas), 21 JavaScript y seis casos JEV sin llamadas
+  externas correctos. La política 8 permanece vigente; se conserva la frontera
+  Astra, Manual, elección explícita y las aprobaciones nativas.
+
+## Evidencia comparable y atribución — 02/10/2026
+
+- Se distingue la identidad nativa de la configuración esperada. Una finalización
+  vinculada por chat, turno y fecha conserva el modelo/esfuerzo observado aunque
+  difiera de lo aceptado. Sin identidades suficientes sigue siendo probable.
+  El monitor conserva la evidencia confirmada frente a señales posteriores débiles
+  y separa métricas de peticiones por modelo/esfuerzo, sin convertirlas en inferencias.
+- Los motivos de descarte y las ausencias de identificadores tienen contadores
+  específicos; son acumulativos por proceso y pueden solaparse.
+- `evidence.py` produce `router-evidence/2` desde estado local o los ZIP históricos
+  de Ubuntu/Windows. Se verificó la conversión de las tres muestras y sus checksums.
+  Exporta metadatos permitidos, con pseudónimos por archivo; no incluye contenido
+  privado, errores libres, cuotas, rutas ni OTLP crudo. La procedencia histórica
+  desconocida permanece desconocida.
+- `record-check` acepta resultados externos de comprobaciones ya ejecutadas.
+  Requiere una decisión terminal y cohortes coherentes; la comparación exige
+  baseline/candidate únicos y el mismo conjunto de comprobaciones. Los fixtures
+  sintéticos verifican el mecanismo, no demuestran calidad o ahorro reales.
+- Verificación local: 279 pruebas Python (6 omitidas), 21 pruebas JavaScript,
+  corpus de routing 27/27 y pruebas web de layout. Compilación/preparación macOS
+  mediante `python3 macos.py setup`.
+- Pendiente: reiniciar Desktop para cargar esta revisión, comprobar los nuevos
+  diagnósticos con telemetría real y evaluar cargas equivalentes etiquetadas.
+  No se ha medido ahorro causal ni coste facturado; una actualización aceptada
+  sigue sin probar por sí sola la inferencia posterior. La política y la frontera
+  Astra permanecen intactas. WPF solo necesita validación si vas a usar Windows.
+
 ## Corrección de compilación WPF 0.8.1 — 01/10/2026
 
 - La compilación Windows de 0.8.0 detectó `CS0119` en `MonitorAgents.cs`:

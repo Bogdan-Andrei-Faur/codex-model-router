@@ -1,0 +1,38 @@
+{
+  "schema": "repository-function-cases/1",
+  "origin_scope": "public_repository_function_snapshot_with_new_maintenance_requirement_not_full_project_trial",
+  "origin": {
+    "repository": "https://github.com/Bogdan-Andrei-Faur/codex-model-router.git",
+    "commit": "3d4c127c87052b4dad11b553a90f7a95b167be28",
+    "path": "model_catalog.py",
+    "git_blob": "39317db198030fbf32f7e1afd06a8a89d6c30ba3",
+    "file_sha256": "58f6d6ec2db77796da2ee4ee34e593a40df358810c06e76d2a7ff1d7af1ad045",
+    "extraction": "ast.get_source_segment available_routes; exact source without imports/global constants",
+    "function_sha256": "326405be1dd5f6edc82515e9fd2458a93ec9772a3a3e7afb3bfea954fb1553fe"
+  },
+  "scaffolding": {
+    "deepcopy": "trusted copy.deepcopy supplied at execution; not candidate source",
+    "ALTERNATIVES": {
+      "gpt-6-luna": [
+        "gpt-5.6-luna"
+      ],
+      "gpt-6.1-sol": [
+        "gpt-6-sol",
+        "gpt-5.6-sol"
+      ],
+      "gpt-6-sol": [
+        "gpt-5.6-sol"
+      ]
+    }
+  },
+  "cases": [
+    {
+      "id": "catalog-effort-fallback",
+      "split": "adjustment",
+      "request": "Repara la función acotada available_routes de catalog.py tomada de un snapshot del repositorio. Usa trial_read/trial_write/trial_test. El entorno proporciona deepcopy y ALTERNATIVES congelados como globals; no añadas imports ni constantes al nivel superior. routes es un mapa válido de rutas con model, effort y posibles campos adicionales; catalog es un mapa modelo→esfuerzos. Si el modelo original está presente como clave del catálogo, conserva la ruta: la validación de ese modelo pertenece a otro nivel. Si falta, escoge el primer ALTERNATIVES conocido cuyo valor de catálogo sea list/tuple/set y contenga EXACTAMENTE el esfuerzo solicitado. Una cadena, diccionario, None o conjunto vacío no ofrece esa capacidad. Si no hay alternativa compatible, conserva el modelo original; nunca reduzcas esfuerzo, inventes modelos ni cambies rutas personalizadas sin alternativa. Devuelve una copia profunda, conserva todos los campos y no modifiques routes, catalog ni ALTERNATIVES. Lee y escribe catalog.py y ejecuta trial_test después de la última edición.",
+      "files": {
+        "catalog.py": "def available_routes(routes, catalog):\n    result = deepcopy(routes)\n    for route in result.values():\n        model = route.get(\"model\")\n        if model not in catalog:\n            route[\"model\"] = next((m for m in ALTERNATIVES.get(model, ()) if m in catalog), model)\n    return result\n"
+      }
+    }
+  ]
+}

@@ -21,10 +21,33 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
       - name: Compile Windows native monitor
         if: runner.os == 'Windows'
         shell: pwsh
         run: ./build.ps1 -BuildOnly -FrameworkReferencePath 'C:\Program Files (x86)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8'
+      - name: Run shared WebView2 native self-tests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $routerReview = Start-Process -FilePath './dist/codex-monitor-v24.exe' -ArgumentList '--self-test' -PassThru
+          if (-not $routerReview.WaitForExit(120000)) {
+            $routerReview.Kill()
+            throw 'WebView2 self-test timed out'
+          }
+          Get-Content -LiteralPath './state/ui-review-checks.txt'
+          if ($routerReview.ExitCode -ne 0) { throw 'WebView2 self-test failed' }
+      - name: Save Windows WebView2 validation artifacts
+        if: runner.os == 'Windows' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-webview2-validation
+          path: |
+            state/ui-review-checks.txt
+            state/review-*.png
+          if-no-files-found: warn
       - name: Compile macOS native monitor
         if: runner.os == 'macOS'
         run: xcrun swiftc MonitorMac.swift -o "$RUNNER_TEMP/codex-monitor-mac" -framework AppKit -framework WebKit -framework Security -target "$(uname -m)-apple-macosx12.0"

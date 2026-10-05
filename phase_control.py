@@ -95,7 +95,9 @@ class PhaseController:
         self.router.record_history("phase_checkpoint", decision_id=job.get("decision_id"), thread=job["thread"],
             turn_id=job.get("turn_id"),
             phase_id=job.get("phase_id"), phase_source_model=job.get("source_model"),
+            phase_source_effort=job.get('source_effort'),
             phase_name=job["phase"], phase_status=status,
+            phase_complexity=job.get("complexity"),
             phase_model=job["model"], phase_effort=job["effort"],
             phase_transition=job["transition"], **accepted)
 
@@ -128,7 +130,8 @@ class PhaseController:
                     # Previous-phase inference evidence must not label the new
                     # accepted settings as already observed.
                     for key in ("observed_model", "observed_effort", "inference_source", "evidence_confidence",
-                                "observed_candidate_model", "observed_candidate_effort"):
+                                "observed_candidate_model", "observed_candidate_effort", 'expected_model', 'expected_effort',
+                                'inference_model_mismatch', 'inference_effort_mismatch'):
                         row.pop(key, None)
                 else:
                     self.disable_turn(job["thread"])
@@ -169,14 +172,20 @@ class PhaseController:
         tier = TIERS.index(args["complexity"])
         if args["phase"] != "summarize" and turn["floor"] in TIERS:
             tier = max(tier, TIERS.index(turn["floor"]))
-        route = available_routes(config.get("routes", DEFAULT_ROUTES), self.router.catalog).get(TIERS[tier], {})
-        model, effort = route.get("model"), route.get("effort")
+        routes = available_routes(config.get("routes", DEFAULT_ROUTES), self.router.catalog)
+        # Capability floors select the model, not the effort of every later
+        # phase. A genuine critical phase still requests its critical effort;
+        # an inherited critical floor must not undo Jev's High on normal work.
+        model = routes.get(TIERS[tier], {}).get("model")
+        effort = routes.get(args["complexity"], {}).get("effort")
         minimum = turn["min_effort"] if args["phase"] != "summarize" else None
         if minimum in EFFORTS and effort in EFFORTS and EFFORTS.index(effort) < EFFORTS.index(minimum):
             effort = minimum
         row = self.router.threads.get(tid, {})
         source = row.get("accepted_model") or row.get("model")
-        job = {"call": rid, "phase_id": uuid.uuid4().hex, "source_model": source, "thread": tid, "turn_id": turn["id"], "decision_id": turn.get("decision_id") or self.router.current_decisions.get(tid), "phase": args["phase"], "model": model,
+        job = {"call": rid, "phase_id": uuid.uuid4().hex, "source_model": source, "complexity": args["complexity"],
+            'source_effort': row.get('accepted_effort') or row.get('effort'),
+            "thread": tid, "turn_id": turn["id"], "decision_id": turn.get("decision_id") or self.router.current_decisions.get(tid), "phase": args["phase"], "model": model,
             "effort": effort, "tier": TIERS[tier], "transition": transition_kind(source, model), "deadline": self.clock() + 10}
         # A blocked escalation must not tell the smaller model to carry on with
         # work whose checkpoint established a higher capability requirement.

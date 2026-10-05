@@ -1,0 +1,238 @@
+{
+  "schema": "evidence-inventory-plan/1",
+  "campaigns": [
+    {
+      "id": "coding",
+      "purpose": "comparison",
+      "path": "state/coding-trials-20261002/report.json",
+      "sha256": "746aabbb60db21f5b1e1b9a46b4d404a7e362bb512ed8d651cb63f58f50e2577",
+      "schema": "isolated-coding-trials/1",
+      "case_sha256": "4ec462a97e2d62c3b5cd03fad8e9c754479538becaee1e7b87b47b869d08e062",
+      "grader_sha256": "5f8e7f3665ef5cb885db6f8c7837d819c1a17b0b6fe7533995da70f558669448",
+      "checks": {
+        "confidence-repair": [
+          "edge_cases",
+          "json_contract",
+          "nested_conflict",
+          "no_mutation",
+          "probability_not_confidence",
+          "source_contract"
+        ],
+        "transition-implementation": [
+          "astra_boundary",
+          "json_contract",
+          "no_mutation",
+          "review_boundary",
+          "source_contract",
+          "supported_routes"
+        ],
+        "telemetry-review": [
+          "all_defects_found",
+          "json_contract",
+          "no_duplicate_findings",
+          "no_false_positives"
+        ]
+      }
+    },
+    {
+      "id": "multifile-invalid",
+      "purpose": "invalid_harness",
+      "path": "state/multifile-namespace-20261002/report.json",
+      "sha256": "dec35dd5b43811ccfd0fefadb1697e3fd1481b1058a714a69c0a3f5a5ab51ff0",
+      "schema": "isolated-multifile-trials/1",
+      "case_sha256": "9ab6c4241f3a91acc9d064e92ad2bdf2f85ed497be5e49cc19039b593fec0ecd",
+      "grader_sha256": "a1d9724d0a361d116ea800ed9b2c53ff848a6dee49ecaea596d19e3475a575ab",
+      "checks": {
+        "usage-integration": [
+          "all_attempts_and_coverage",
+          "no_mutation",
+          "snapshot_contract",
+          "source_contract"
+        ],
+        "transition-integration": [
+          "caller_respects_decision",
+          "no_mutation",
+          "plan_contract",
+          "source_contract"
+        ]
+      },
+      "reviewed_exclusion": "initial_profile_did_not_enable_required_code_mode"
+    },
+    {
+      "id": "multifile",
+      "purpose": "comparison",
+      "path": "state/multifile-codemode-20261002/report.json",
+      "sha256": "9b320abf74f9445c02496c5a7d7b433fdb101c6e10b1a45940d5fc99b51ac306",
+      "schema": "isolated-multifile-trials/1",
+      "case_sha256": "9ab6c4241f3a91acc9d064e92ad2bdf2f85ed497be5e49cc19039b593fec0ecd",
+      "grader_sha256": "a1d9724d0a361d116ea800ed9b2c53ff848a6dee49ecaea596d19e3475a575ab",
+      "checks": {
+        "usage-integration": [
+          "all_attempts_and_coverage",
+          "no_mutation",
+          "snapshot_contract",
+          "source_contract"
+        ],
+        "transition-integration": [
+          "caller_respects_decision",
+          "no_mutation",
+          "plan_contract",
+          "source_contract"
+        ]
+      }
+    },
+    {
+      "id": "integration",
+      "purpose": "comparison",
+      "path": "state/integration-trials-20261002/report.json",
+      "sha256": "e0e46a6f2afa7e5551de3db93c4008da89acd59f3d522e02291eb9f6232abd55",
+      "schema": "isolated-integration-trials/1",
+      "case_sha256": "909ed83f877f452e69791e3a7f9922946e4d8d1f6897e11114c8c8304000cfad",
+      "grader_sha256": "f5ceec3be693d7c030586308f90d8b7a91cfbf0b9343afc1530c3fe8442c4281",
+      "checks": {
+        "telemetry-conflicts": [
+          "conflict_dedup",
+          "coverage_totals",
+          "no_mutation",
+          "normalization",
+          "source_contract"
+        ],
+        "cancellation-order": [
+          "cancellation_contract",
+          "no_mutation",
+          "source_contract",
+          "terminal_order"
+        ]
+      }
+    },
+    {
+      "id": "effort",
+      "purpose": "comparison",
+      "path": "state/effort-trials-20261002/report.json",
+      "sha256": "691a84405929ee63c647a3a38df7a4ed92c642352ef97a4d882e18f7a7f7d36f",
+      "schema": "isolated-integration-trials/1",
+      "case_sha256": "909ed83f877f452e69791e3a7f9922946e4d8d1f6897e11114c8c8304000cfad",
+      "grader_sha256": "f5ceec3be693d7c030586308f90d8b7a91cfbf0b9343afc1530c3fe8442c4281",
+      "checks": {
+        "telemetry-conflicts": [
+          "conflict_dedup",
+          "coverage_totals",
+          "no_mutation",
+          "normalization",
+          "source_contract"
+        ],
+        "cancellation-order": [
+          "cancellation_contract",
+          "no_mutation",
+          "source_contract",
+          "terminal_order"
+        ]
+      }
+    },
+    {
+      "id": "review-invalid",
+      "purpose": "invalid_harness",
+      "path": "state/review-trials-20261002/report.json",
+      "sha256": "d05945760eb8ac238c4156732043cae55ca93ecc940cd4e4782e005c13716678",
+      "schema": "isolated-review-trials/1",
+      "case_sha256": "ca4073ed0b706e9df51c8e0693f45fa5815f59241c3df38f814783b7836b9c04",
+      "grader_sha256": "bf94cbe6262dece304202ff5adad79b5371024c045546c1c90cac0f71dbf6191",
+      "checks": {
+        "interval-review": [
+          "all_defects_found",
+          "no_false_positives",
+          "oracle_consistent",
+          "submission_contract",
+          "valid_counterexamples"
+        ]
+      },
+      "reviewed_exclusion": "allowed_paths_not_exposed",
+      "exclusion_audit": {
+        "path": "state/review-trials-20261002/audit.json",
+        "sha256": "ef8b6d8ac4dadf04087c320334f25be42d7916d1e67ffbc8a0a05cbba82558c9"
+      }
+    },
+    {
+      "id": "review-first",
+      "purpose": "comparison",
+      "path": "state/review-corrected-20261002/report.json",
+      "sha256": "3a96921302734a3d2fe466cbae62bb4cad921973fcaef81ce3dfa34cfc07aa91",
+      "schema": "isolated-review-trials/1",
+      "case_sha256": "aa84339814dc1cd365b488357633cf9fc40b275e63a329038f9472857a403c78",
+      "grader_sha256": "bf94cbe6262dece304202ff5adad79b5371024c045546c1c90cac0f71dbf6191",
+      "checks": {
+        "interval-review": [
+          "all_defects_found",
+          "no_false_positives",
+          "oracle_consistent",
+          "submission_contract",
+          "valid_counterexamples"
+        ]
+      }
+    },
+    {
+      "id": "review-second",
+      "purpose": "comparison",
+      "path": "state/review-ordered-20261002/report.json",
+      "sha256": "649329051588d90f392270a41a18d8c594b3cfabf7bad6cfc96e7f1f192a3cb6",
+      "schema": "isolated-review-trials/1",
+      "case_sha256": "aa84339814dc1cd365b488357633cf9fc40b275e63a329038f9472857a403c78",
+      "grader_sha256": "bf94cbe6262dece304202ff5adad79b5371024c045546c1c90cac0f71dbf6191",
+      "checks": {
+        "ordered-review": [
+          "all_defects_found",
+          "no_false_positives",
+          "oracle_consistent",
+          "submission_contract",
+          "valid_counterexamples"
+        ]
+      }
+    },
+    {
+      "id": "causal",
+      "purpose": "comparison",
+      "path": "state/causal-trials-20261002/report.json",
+      "sha256": "7801c847d938dc438fab5f8f1a234c0bea44fc9ca637e31fae8181ad773009c4",
+      "schema": "isolated-causal-trials/1",
+      "case_sha256": "cb3be493bc0f2bceed667e2a8d4baae551b8bd371f2643cbfd822a6ec03c5c8f",
+      "grader_sha256": "d1df7b822f62aadaaec76076d4cf4573d2cee7986ac9c1a64e7d49ae71c33fc8",
+      "checks": {
+        "causal-stock": [
+          "atomic_operations",
+          "canonical_contract",
+          "causal_replay",
+          "conflict_tombstones",
+          "dependency_order",
+          "no_mutation",
+          "source_contract"
+        ]
+      }
+    },
+    {
+      "id": "tool-instrument",
+      "purpose": "instrument",
+      "path": "state/causal-tool-evidence-20261003/report.json",
+      "sha256": "8e3487dc509a1aafd4c9a25a5628e08665f9191dd90ef47860f95ace6b0583b8",
+      "schema": "isolated-causal-tools/2",
+      "case_sha256": "cb3be493bc0f2bceed667e2a8d4baae551b8bd371f2643cbfd822a6ec03c5c8f",
+      "grader_sha256": "d1df7b822f62aadaaec76076d4cf4573d2cee7986ac9c1a64e7d49ae71c33fc8",
+      "checks": {
+        "causal-stock": [
+          "atomic_operations",
+          "canonical_contract",
+          "causal_replay",
+          "conflict_tombstones",
+          "dependency_order",
+          "no_mutation",
+          "source_contract"
+        ]
+      }
+    }
+  ],
+  "coverage": "Explicit selected frozen campaigns; not all local or Desktop history. Multifile invalid report is the cumulative nine-attempt snapshot; earlier three/six-attempt snapshots must not be added. Separate echo/schema probes are outside this inventory.",
+  "jev": {
+    "path": "state/jev-descriptive-strict-20261002.json",
+    "sha256": "69201584949e326e89b5f537ef5902db63afc966ae2bfc5b69c1c380ddd16bb1",
+    "native_campaign": "multifile"
+  }
+}

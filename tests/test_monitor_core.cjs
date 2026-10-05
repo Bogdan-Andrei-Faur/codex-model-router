@@ -1,6 +1,57 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const C = require('../monitor-ui/core.js');
+test('capsule weekly quota never substitutes a restrictive short window',()=>{
+  const usage={remaining_percent:3,valid_until:200,windows:[{duration_minutes:300,remaining_percent:3},{duration_minutes:10080,remaining_percent:68}]};
+  assert.equal(C.weeklyQuota(usage,true,100).percent,68);
+  assert.match(C.weeklyQuota(usage,true,100).label,/semanal restante/);
+  assert.equal(C.weeklyQuota({...usage,windows:usage.windows.slice(0,1)},true,100).percent,null);
+  assert.equal(C.weeklyQuota(usage,false,100).percent,null);
+  assert.equal(C.weeklyQuota(usage,true,201).percent,null);
+  usage.windows[1].remaining_percent=0;assert.equal(C.weeklyQuota(usage,true,100).percent,0);
+  usage.windows[1].remaining_percent=101;assert.equal(C.weeklyQuota(usage,true,100).percent,null);
+});
+test('visible agents include compaction and exclude idle or waiting',()=>{
+  const rows={working:{status:'active'},idle:{status:'completed'},waiting:{status:'waiting'},compacting:{status:'completed',context_compaction:{state:'compacting'}}};
+  assert.deepEqual(C.stableOrder([],rows),['working','compacting']);
+});
+test('observed token samples distinguish zero from missing and invalid counters',()=>{
+  assert.deepEqual(C.usageSample({tokens:{inputTokens:0,outputTokens:0}}),{input:0,output:0,total:0});
+  for(const bad of [undefined,-1,1.5,'12',true,NaN,Infinity])assert.equal(C.usageSample({tokens:{inputTokens:bad,outputTokens:1}}).total,null);
+  assert.equal(C.usageSample({inputTokens:12,outputTokens:3}).total,15);
+});
+test('new category hints preserve explicit existing identities',()=>{
+  assert.equal(C.identity({agent_category:'tests',name:'Postgres performance'})[0],'Pruebas');
+  for(const [name,label] of [['Investigar latencia','Rendimiento'],['Migrar base de datos','Datos'],['Despliegue de aplicación','Despliegues'],['Resolver conflictos de git','Versiones'],['Configurar webhook','Integraciones'],['Auditar accesibilidad','Accesibilidad']])assert.equal(C.identity({name})[0],label);
+});
+test('last-call counters are never replaced by cumulative thread snapshots or mixed across updates',()=>{
+  const events=[{event:'decision_created',decision_id:'a',time:1},
+    {event:'decision_usage',decision_id:'a',inputTokens:12,outputTokens:3,time:2},
+    {event:'decision_usage_total',decision_id:'a',inputTokens:1200,outputTokens:300,time:2}];
+  assert.equal(C.usageSample(C.decisions(events)[0]).total,15);
+  assert.equal(C.decisions(events)[0].native_total_usage.inputTokens,1200);
+  events.push({event:'decision_usage',decision_id:'a',inputTokens:20,time:3});
+  assert.equal(C.usageSample(C.decisions(events)[0]).total,null);
+  assert.equal(C.usageSample(C.decisions(events,{t:{decision_id:'a',tokens:{outputTokens:4}}})[0]).total,null);
+});
+test('probable events never downgrade confirmed identity and phase changes clear mismatch',()=>{
+  const events=[{event:'decision_created',decision_id:'d',time:1},
+    {event:'inference_observed',decision_id:'d',phase_id:'p',observed_model:'gpt-6-luna',evidence_confidence:'confirmed',inference_model_mismatch:true,time:2},
+    {event:'inference_probable',decision_id:'d',phase_id:'p',observed_candidate_model:'gpt-6.1-sol',evidence_confidence:'probable',inference_model_mismatch:false,time:3}];
+  const row=C.decisions(events)[0];assert.equal(row.evidence_confidence,'confirmed');assert.equal(row.observed_model,'gpt-6-luna');
+  assert.equal(row.inference_model_mismatch,true);
+  events.push({event:'phase_checkpoint',decision_id:'d',phase_id:'q',phase_status:'applied',time:4});
+  assert.equal(C.decisions(events)[0].inference_model_mismatch,undefined);
+});
+
+test('request samples retain separate models without claiming completion mismatches',()=>{
+  const events=[{event:'decision_created',decision_id:'d',time:1},
+    ...['gpt-6-luna','gpt-6.1-sol'].map(model=>({event:'inference_metric',decision_id:'d',phase_id:'p',observed_candidate_model:model,inference_event_name:'codex.api_request',inference_model_mismatch:true}))];
+  const row=C.decisions(events)[0];
+  assert.equal(Object.keys(row.inference_samples).length,2);
+  assert.equal(row.inference_model_mismatch,undefined);
+  assert.equal(row.observed_model,undefined);
+});
 
 test('context gauges distinguish unknown, empty, full and latest measurement',()=>{
   assert.equal(C.contextGauge({}).percent,null);
@@ -130,8 +181,8 @@ test('active agent ordering remains stable through refresh and reactivation',()=
   rows.d={status:'pending'};assert.deepEqual(C.stableOrder(['a','b'],rows),['a','b','d']);
   rows.a.status='completed';assert.deepEqual(C.stableOrder(['a','b','d'],rows),['b','d']);
 });
-test('ten distinct task categories and all effort dots have explicit identity',()=>{
-  assert.equal(Object.keys(C.identities).length,10);assert.equal(new Set(Object.values(C.identities).map(x=>x[1])).size,10);
+test('sixteen distinct task categories and all effort dots have explicit identity',()=>{
+  assert.equal(Object.keys(C.identities).length,16);assert.equal(new Set(Object.values(C.identities).map(x=>x[1])).size,16);
   for(const key of Object.keys(C.efforts))assert.equal(C.effortColors[key].length,2);
   assert.equal(C.identity({agent_category:'interface',name:'Audit'})[0],'Interfaces');
   assert.equal(C.model('gpt-6-astra'),'Astra 6');assert.equal(C.status('waiting'),'Esperando tu respuesta');

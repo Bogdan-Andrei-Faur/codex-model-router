@@ -214,8 +214,12 @@ class TelemetryPipeline(unittest.TestCase):
                 script="const C=require("+json.dumps(str(Path(__file__).resolve().parents[1]/'monitor-ui/core.js'))+");process.stdout.write(JSON.stringify(C.decisions(JSON.parse(require('fs').readFileSync(0,'utf8')))[0]));"
                 row=json.loads(subprocess.run(['node','-e',script],input=json.dumps(rows),text=True,capture_output=True,check=True).stdout)
                 self.assertEqual(row['evidence_confidence'],'confirmed')
-                self.assertEqual(row['inference_samples']['codex.api_request:response.failed']['inference_http_status'],503)
-                self.assertEqual(row['inference_samples']['codex.sse_event:response.completed']['inference_input_tokens'],120)
+                samples=list(row['inference_samples'].values())
+                failed=[s for s in samples if s['inference_event_name']=='codex.api_request' and s['inference_event_kind']=='response.failed']
+                completed=[s for s in samples if s['inference_event_name']=='codex.sse_event' and s['inference_event_kind']=='response.completed']
+                self.assertEqual(len(failed),1); self.assertEqual(len(completed),1)
+                self.assertEqual(failed[0]['inference_http_status'],503)
+                self.assertEqual(completed[0]['inference_input_tokens'],120)
             finally:collector.close()
 
     def test_delayed_previous_phase_cannot_confirm_new_phase(self):

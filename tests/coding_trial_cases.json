@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "scope": "isolated_repository_inspired_coding_exercises_not_general_quality",
+  "cases": [
+    {
+      "id": "confidence-repair",
+      "kind": "bugfix",
+      "request": "Repair this buggy Python function: def confidence(response): return round(response.get('confidence', response['choices'][0]['probability']), 1). Return exactly JSON {\"source\":\"complete Python source\"}, no Markdown. Define confidence(response). Accept only int/float (never bool), finite values in [0,1] from response.confidence, response.answers.route.confidence, or response.providerMetadata.typesafe.confidence.route. Return the minimum valid value if sources conflict, None if none are valid. Malformed/missing containers and invalid values must not raise. Never use a choice probability as confidence; never round. Do not mutate input. Pure Python, only math may be imported, no tools, I/O, dynamic evaluation or introspection. Top level may contain only functions and optional math imports."
+    },
+    {
+      "id": "transition-implementation",
+      "kind": "implementation",
+      "request": "Implement transition(current, target, effort, active_turn, catalog) in Python. Models are exactly gpt-6-luna, gpt-6.1-sol, gpt-6-astra. catalog maps model names to lists of allowed effort strings. Return exactly a dict with action and reason. First reject unknown current/target, malformed catalog or target/effort absent from catalog: action reject, reason unsupported_route. Otherwise if active_turn is true and models differ, entering or leaving Astra returns defer/astra_boundary; crossing Luna and Sol returns defer/review_boundary. In all other valid cases return apply/allowed, including changing effort while staying in Astra. Do not mutate catalog. Return exactly JSON {\"source\":\"complete Python source\"}, no Markdown. Pure Python, no imports, tools, I/O, dynamic evaluation or introspection. Top level may contain only functions."
+    },
+    {
+      "id": "telemetry-review",
+      "kind": "review",
+      "request": "Review this telemetry summarizer. Context: events can include failed and completed attempts; native_total inputTokens is a cumulative snapshot; settings_updated is only settings acceptance; mismatched actual models must remain visible. Identify every independent defect in this code, no speculative findings. Return exactly JSON {\"findings\":[codes]}, no Markdown. Allowed codes: CONFIRM_FROM_SETTINGS, FILTER_EXPECTED_MODEL, SUM_CUMULATIVE, DROP_FAILED_ATTEMPTS, RAW_SECRET_PERSISTENCE, NATIVE_BOUNDARY_BYPASS, UNBOUNDED_NETWORK, DUPLICATE_JSON_KEYS. Source:\ndef summarize(events, expected_model):\n    usage = 0\n    confirmed = False\n    for event in events:\n        if event.get('status') != 'completed':\n            continue\n        if event.get('event') == 'settings_updated':\n            confirmed = True\n        if event.get('model') != expected_model:\n            continue\n        if event.get('event') == 'native_total':\n            usage += event['inputTokens']\n    return {'usage': usage, 'confirmed': confirmed}\nDo not use tools."
+    }
+  ]
+}

@@ -51,12 +51,16 @@ class Monitor(Gtk.Application):
         self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix='monitor')
         self.keys = dict.fromkeys(('jev-typesafe', 'jev-vercel'), False)
         self.last_payload = None
+        self.history_requested = False
+        self.history_revision = -1
+        self.mode_request = None
         self.page = (ROOT / 'dist/linux-ui/index.html').resolve().as_uri()
         self.panel_height = 760
         self.connect('activate', self.activate_window)
         self.connect('shutdown', self.shutdown)
 
     def shutdown(self, *_):
+        self.model.close()
         self.executor.shutdown(wait=False, cancel_futures=True)
 
     def activate_window(self, *_):
@@ -128,6 +132,7 @@ class Monitor(Gtk.Application):
 
     def reload_page(self, *_):
         self.ready = False
+        self.history_revision = -1
         self.web.load_uri(self.page)
         return True
 
@@ -204,6 +209,8 @@ class Monitor(Gtk.Application):
         else:
             self.window.show_all()
         self.save_ui()
+        if self.ready:
+            self.emit('receiveUI', self.ui_snapshot())
         self.last_payload = None
         self.refresh()
 
@@ -240,11 +247,17 @@ class Monitor(Gtk.Application):
         action = data.get('action')
         if action == 'ready':
             self.ready = True
+            self.history_revision = -1
             self.last_payload = None
             print('Monitor: interfaz compartida conectada.', flush=True)
             self.refresh()
         elif action == 'mode':
+            self.mode_request = data.get('request') if type(data.get('request')) is int else None
             self.set_mode(data.get('value'))
+        elif action == 'history' and type(data.get('value')) is bool:
+            self.history_requested = data['value']
+            self.last_payload = None
+            self.refresh()
         elif action == 'topmost':
             self.set_topmost(data.get('value'))
         elif action in ('resizeEnd', 'resizeReset'):
@@ -258,7 +271,7 @@ class Monitor(Gtk.Application):
             self.refresh()
         elif action == 'bounds':
             self.input_region(data)
-        elif action in ('config', 'quality', 'taskMode', 'secret', 'connection'):
+        elif action in ('config', 'quality', 'taskMode', 'secret', 'connection', 'update'):
             if self.preview or self.action_busy:
                 self.feedback('Vista previa: cambios desactivados.' if self.preview else 'Espera a que termine la operación actual.')
                 return
@@ -280,26 +293,15 @@ class Monitor(Gtk.Application):
         message = 'Guardado.'
         try:
             action = data['action']
-            if action == 'config':
-                self.model.configure(data.get('key'), data.get('value'))
-            elif action == 'taskMode':
-                self.model.task_mode(data.get('thread'), data.get('value'))
-                message = 'Modo guardado para el próximo mensaje.'
-            elif action == 'quality':
-                self.model.quality(data.get('id'), data.get('aspect', 'overall'), data.get('value'))
-            elif action == 'secret':
+            if action == 'secret':
                 from linux_secret import store_key
                 provider = data.get('provider')
                 if provider not in self.keys or not store_key(self.root, provider, data.get('value')):
                     raise ValueError('No se pudo guardar la clave. Desbloquea el llavero y vuelve a intentarlo.')
                 GLib.idle_add(self.keys_loaded, dict(self.keys, **{provider: True}))
                 message = 'Clave guardada en el llavero de Linux.'
-            elif action == 'connection':
-                if data.get('value') not in ('doctor', 'install', 'uninstall'):
-                    raise ValueError('Acción no válida.')
-                completed = subprocess.run([sys.executable, str(ROOT / 'desktop.py'), data['value']], capture_output=True, text=True, timeout=100)
-                result = json.loads(completed.stdout or completed.stderr)
-                message = result.get('error') or result.get('message') or ('Desktop conectado.' if result.get('connection') == 'desktop_connected' else 'Conexión instalada; pendiente de un nuevo arranque de Desktop.' if result.get('registered') else 'Desktop detectado; sin conexión registrada.')
+            else:
+                message = self.model.action(data)
         except ValueError as error:
             message = str(error) if type(error) is ValueError else 'No se pudo completar la operación.'
         except Exception:
@@ -321,7 +323,7 @@ class Monitor(Gtk.Application):
 
     def collect(self):
         try:
-            payload = self.model.payload()
+            payload = self.model.payload(self.mode == 'Expanded' and self.history_requested, self.history_revision)
             GLib.idle_add(self.received, payload)
         except Exception:
             GLib.idle_add(self.received, None)
@@ -331,15 +333,24 @@ class Monitor(Gtk.Application):
         if payload is None:
             self.feedback('No se pudo leer el estado. Se conserva la última vista.')
             return False
-        gtk_settings = Gtk.Settings.get_default()
-        payload.update(keys=self.keys, ui={'mode': self.mode, 'topmost': self.topmost, 'panelHeight': self.panel_height,
-                       'reduced': not gtk_settings.get_property('gtk-enable-animations')},
+        if self.mode != 'Expanded' or not self.history_requested:
+            payload.pop('history', None)
+        payload['historyLoaded'] = self.history_revision >= 0 or 'history' in payload
+        payload.update(keys=self.keys, ui=self.ui_snapshot(),
                        desktopCapabilities={'positioning': Gdk.Display.get_default().__gtype__.name == 'GdkX11Display', 'tray': self.tray is not None})
-        encoded = json.dumps(payload, sort_keys=True)
-        if encoded != self.last_payload:
+        comparison = {key: value for key, value in payload.items() if key != 'history'}
+        encoded = json.dumps(comparison, sort_keys=True)
+        if encoded != self.last_payload or 'history' in payload:
             self.emit('receive', payload)
             self.last_payload = encoded
+            if 'history' in payload:
+                self.history_revision = payload['journalRevision']
         return False
+
+    def ui_snapshot(self):
+        return {'mode': self.mode, 'topmost': self.topmost, 'panelHeight': self.panel_height,
+                'reduced': not Gtk.Settings.get_default().get_property('gtk-enable-animations'),
+                'lazyHistory': True, 'acknowledgesMode': True, 'modeRequest': self.mode_request}
 
 
 def main():

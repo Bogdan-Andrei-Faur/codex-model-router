@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "usage-integration",
+      "files": {
+        "snapshots.py": "def delta(before, after):\n    return {k: after[k] + before.get(k, 0) for k in ('inputTokens', 'outputTokens', 'cachedInputTokens')}\n",
+        "session.py": "from snapshots import delta\ndef aggregate(attempts):\n    totals = {'inputTokens': 0, 'outputTokens': 0, 'cachedInputTokens': 0}\n    for attempt in attempts:\n        if attempt['status'] != 'completed':\n            continue\n        change = delta(attempt['before'], attempt['after'])\n        for key in totals:\n            totals[key] += change[key]\n    return {'attempts': len(attempts), 'coverage_complete': True, 'tokens': totals}\n"
+      },
+      "request": "Repair the two existing modules using trial_read, trial_write and trial_test. You must read both files, edit both and run the integration checks successfully. snapshots.delta(before, after): both snapshots must be dicts containing inputTokens, outputTokens, cachedInputTokens, each nonnegative int but not bool, cached<=input. Return per-field after-before if no counter decreases; otherwise None. Missing/invalid snapshots return None. Equal snapshots give zero deltas. session.aggregate(attempts): include completed AND failed attempts, using each before/after delta. Return exactly {'attempts': len(attempts), 'coverage_complete': bool, 'tokens': totals-or-None}. Empty attempts or any unknown/invalid/reset delta mean incomplete coverage and tokens None; never present a partial sum as complete. Preserve input objects. Only modify snapshots.py and session.py. Pure Python: top level only functions and imports of math or these two sibling modules; no I/O/introspection/dynamic execution. Do not modify tests. Use only the three provided trial tools. Final answer can be brief; passing external checks and actual files determine success."
+    },
+    {
+      "id": "transition-integration",
+      "files": {
+        "policy.py": "def plan(current, target, effort, active_turn, catalog):\n    return {'action': 'apply', 'reason': 'allowed'}\n",
+        "executor.py": "from policy import plan\ndef apply_request(state, target, effort, catalog):\n    decision = plan(state['model'], target, effort, state['active_turn'], catalog)\n    updated = dict(state)\n    updated.update(model=target, effort=effort)\n    return {'state': updated, 'decision': decision}\n"
+      },
+      "request": "Repair policy.py and executor.py using trial_read, trial_write and trial_test. Read and edit both files and run integration checks successfully. policy.plan(current,target,effort,active_turn,catalog): known models exactly gpt-6-luna,gpt-6.1-sol,gpt-6-astra; catalog dict maps model to allowed effort lists. Unknown model, malformed target catalog/list or effort missing => {'action':'reject','reason':'unsupported_route'}. Otherwise in an active turn changing into/from Astra => defer/astra_boundary; changing Luna/Sol => defer/review_boundary. Other valid cases => apply/allowed; same-model effort change is allowed, including Astra. executor.apply_request(state,target,effort,catalog) calls plan. Return exactly {'state': new-dict, 'decision': plan-result}. Apply model/effort updates ONLY for action apply. For reject/defer keep every state value unchanged, but still return a new dict. Preserve all other state fields; never mutate input state/catalog. Only these two modules may change. Pure Python: top level only functions and imports of math or the sibling modules; no I/O/introspection/dynamic execution. Do not modify tests. Use only the three provided tools. Final answer can be brief; passing external checks and actual files determine success."
+    }
+  ]
+}

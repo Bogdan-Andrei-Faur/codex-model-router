@@ -1,5 +1,22 @@
 # Cambios
 
+## Trabajo acumulado publicado — 05/10/2026, sobre 0.8.1
+
+Esta entrega de código conserva `VERSION=0.8.1`; no crea ni mueve una etiqueta
+de versión ni publica instaladores. El commit y la huella identifican esta
+revisión. Estado de continuación: [HANDOFF.md](docs/HANDOFF.md).
+
+- Interfaz y modelo comunes para macOS, Windows y Ubuntu; Windows pasa a
+  WebView2 sobre WPF. Se preservan los archivos del renderizador anterior.
+- Agentes activos/compactando, historial incremental, consumo, ajustes,
+  iconos Lucide con licencia, etiquetas de modelo/esfuerzo y cristal AppKit.
+- Evidencia saneada, atribución y contadores estrictos; política 9 candidata
+  separada de la referencia, con evaluadores y fixtures reproducibles.
+- Comprobación y preparación de actualizaciones; paquete Mac local con runtime
+  incluido, recursos/datos separados e importación offline protegida.
+- Guías y pruebas para las tres plataformas. La publicación no implica
+  activación, mejora causal del routing, firma ni instalación nativa aceptada.
+
 ## 0.8.1 — Compilación del indicador en Windows, 01/10/2026
 
 - Referencia explícita a `System.Windows.Media.Geometry` en los arcos de

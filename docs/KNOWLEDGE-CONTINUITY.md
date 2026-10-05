@@ -1,5 +1,13 @@
 # Continuidad del proyecto: fases automáticas y validación multiplataforma
 
+## Punto de entrada vigente — 05/10/2026
+
+Consulta primero [HANDOFF.md](HANDOFF.md) y recupera el estado actual de Atlas.
+Las secciones siguientes son un registro histórico: sus versiones, cifras,
+disponibilidad de Atlas y reglas de compatibilidad no describen necesariamente
+el código actual ni una instalación nueva. La publicación de código no activa
+el puente de un Desktop que ya estaba abierto.
+
 ## Aceptación Ubuntu 0.6.0 — 30/09/2026
 
 Desktop `26.928.21956` / backend `0.159.2`: puente activo 0.6.0/política 8.

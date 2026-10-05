@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 
 POLICY_VERSION = 8
+MONITOR_MODULES = frozenset(('monitor_state.py', 'monitor_service.py', 'monitor_linux.py', 'updates.py'))
 
 
 def identity(root):
@@ -30,8 +31,8 @@ def router_identity(root):
         return ROUTER_BUILD_ID
     root = Path(root)
     digest = hashlib.sha256()
-    for path in sorted(root.glob("*.py")):
-        if path.is_file() and path.name != "build_stamp.py":
+    for path in sorted([*root.glob("*.py"), *root.glob("BridgeMac.swift")]):
+        if path.is_file() and path.name != "build_stamp.py" and path.name not in MONITOR_MODULES:
             digest.update(path.name.encode())
             digest.update(path.read_bytes())
     digest.update((root / "VERSION").read_text(encoding="utf-8").strip().encode())
