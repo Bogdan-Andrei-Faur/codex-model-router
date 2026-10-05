@@ -1875,3 +1875,23 @@ hard memory isolation mechanism is supplied; RSS polling is not an equivalent
 substitute. Native Windows/macOS telemetry checks are also separate from Ubuntu
 proof. Do not mark the original scan closed or claim a three-platform release
 from Linux-only results.
+
+
+## First delivery CI and native grader gate — 2026-10-05
+
+[Router checks #37](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37306907185)
+ran the complete 11-job matrix for `1efc979`. Both Ubuntu APT lifecycle jobs,
+Windows Python 3.9/3.14, Ubuntu Python 3.9/3.14 and native Windows/macOS monitor
+jobs passed. The Ubuntu GUI assertions all passed, but temporary-directory
+cleanup raced Mesa/WebKit cache writers. The smoke harness now owns the GUI in
+a separate process session and terminates that session before deleting its
+private directory. Xvfb also starts before D-Bus so activated portals inherit
+the display. The corrected harness passed locally against package 0.8.1-8.
+
+Both macOS Python jobs rejected generated-code graders with
+`hard_grader_memory_budget_unavailable`. This confirms an outstanding
+compatibility gate, not a successful macOS security remediation: the hard
+memory check refuses execution before candidate code loads. No tests have been
+removed, skipped or relaxed to conceal this result. A verified macOS-compatible
+memory isolation mechanism is still required for those optional evaluators.
+The native macOS monitor build and shared UI checks passed independently.
