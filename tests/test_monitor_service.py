@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 from monitor_service import dispatch, serve, MAX_REQUEST
 from monitor_state import MonitorState, TELEMETRY_COUNTERS
@@ -17,6 +18,38 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class MonitorServiceTests(unittest.TestCase):
+    def test_prepared_connection_has_persistent_restart_notice_until_bridge_is_observed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);atomic_json(root/'config.local.json',{})
+            model=MonitorState(root,ROOT,platform='windows')
+            try:
+                self.assertFalse(model.payload(False)['desktopRestartPending'])
+                atomic_json(root/'state/desktop-integration.json',{'status':'registered','wrapper':'PRIVATE_PATH'})
+                prepared=model.payload(False)
+                self.assertTrue(prepared['desktopRestartPending']);self.assertTrue(prepared['restartRequired'])
+                self.assertNotIn('PRIVATE_PATH',json.dumps(prepared))
+                atomic_json(root/'state/status-fixture.json',{'pid':os.getpid(),'heartbeat':time.time(),'threads':{}})
+                observed=model.payload(False)
+                self.assertFalse(observed['desktopRestartPending']);self.assertFalse(observed['restartRequired'])
+            finally:model.close()
+    def test_connection_feedback_uses_known_codes_without_echoing_stderr(self):
+        cases = [('source_bridge_active','cierra Desktop'),('source_monitor_open','monitor de la instalación anterior'),
+                 ('source_status_unreadable','leer el estado'),('source_connection_unverified','verificar la conexión')]
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);atomic_json(root/'config.local.json',{})
+            model=MonitorState(root,ROOT,platform='windows')
+            try:
+                for code,expected in cases:
+                    result=subprocess.CompletedProcess([],1,b'',json.dumps({'code':code,'error':'PRIVATE_SENTINEL'}).encode())
+                    with self.subTest(code=code), patch('monitor_state.subprocess.run',return_value=result):
+                        feedback=model.action({'action':'connection','value':'install'})
+                    self.assertIn(expected,feedback);self.assertNotIn('PRIVATE_SENTINEL',feedback)
+                for stderr in (b'PRIVATE_SENTINEL',b'[]',b'{"code":[],"error":"PRIVATE_SENTINEL"}',b'{"code":"unknown","error":"PRIVATE_SENTINEL"}'):
+                    with patch('monitor_state.subprocess.run',return_value=subprocess.CompletedProcess([],1,b'[]',stderr)):
+                        feedback=model.action({'action':'connection','value':'install'})
+                    self.assertEqual(feedback,'No se pudo completar la conexión. Tus tareas siguen abiertas.')
+            finally:model.close()
+
     def test_three_platform_projections_share_counters_and_custody_boundary(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)

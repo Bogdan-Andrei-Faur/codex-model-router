@@ -1,5 +1,68 @@
 # Cambios
 
+## 0.9.6 — Puente interactivo y conexión visible, 07/10/2026
+
+- El puente instalado vacía el búfer después de cada mensaje; la inicialización
+  y el catálogo responden con la entrada abierta, sin esperar al final del flujo.
+- El registro de una conexión importada y verificada prepara el próximo arranque
+  aunque Desktop siga abierto. La copia de datos conserva su comprobación de
+  procesos activos, y las conexiones ajenas siguen protegidas.
+- Las respuestas JSON de conexión son válidas también con tuberías ANSI de
+  Windows; los errores localizados llegan correctamente al monitor.
+- La cabecera y la esquina de versión conservan el aviso de reinicio pendiente
+  después de preparar la conexión.
+- Ajustes muestra «Conectando…», un indicador y controles deshabilitados durante
+  la operación. Los botones tienen bordes, flecha, hover y foco visibles.
+
+## 0.9.5 — Conexión tras migrar en Windows, 07/10/2026
+
+Piloto local Windows; no instala ni publica automáticamente.
+
+- Los registros antiguos de procesos cuyo identificador Windows ha reutilizado
+  dejan de bloquear la importación y el traspaso de conexión. Se consulta la
+  fecha de creación del proceso; una sesión real o de identidad incierta sigue
+  bloqueando el traspaso, aunque su último latido sea antiguo.
+- El monitor muestra instrucciones concretas cuando Desktop o el monitor anterior
+  siguen abiertos, o cuando no se puede verificar la instalación de origen.
+  Los mensajes privados de error no se muestran en la interfaz.
+
+## 0.9.4 — Desinstalación conectada en Windows, 07/10/2026
+
+Piloto local Windows; estos cambios no crean etiquetas ni publican instaladores.
+
+- Normalización de la ruta del puente al retirar una conexión propia; conserva
+  conexiones ajenas y restaura el valor y tipo anteriores del registro.
+- El fallo de 0.9.3 se reprodujo en una VM Windows limpia. La recuperación y
+  las 24 comprobaciones del ciclo completo pasan con el instalador 0.9.4.
+- Cinco regresiones nativas con registro aislado; 33 pruebas específicas y
+  pruebas de paquete, interfaz nativa, actualización, rollback y accesos pasan.
+- Guiones de QA reproducibles con medio oficial verificado y datos sintéticos.
+  [Evidencia y pendientes](docs/native-validation/2026-10-07-windows-installation-acceptance-host-a.md).
+
+## 0.9.3 — Cápsula visible al arrancar en Windows, 06/10/2026
+
+- Actualización de los límites de recorte al cambiar posición, viewport o
+  visibilidad, aunque el tamaño de la cápsula permanezca igual.
+- Self-test nativo de cápsula inicial, cambio de viewport y ocultar/mostrar.
+
+## 0.9.2 — Confirmación de importación, 06/10/2026
+
+- Pantalla de finalización integrada, con Abrir monitor y Cerrar explícitos.
+  Importar datos y conectar Desktop se presentan como pasos separados.
+
+## 0.9.1 — Importación de configuraciones Windows originales, 06/10/2026
+
+- Admite configuraciones antiguas sin marcador de plataforma y normaliza solo
+  la copia importada; rechaza plataformas ajenas y conserva la carpeta original.
+- Motivos de fallo seguros en la bienvenida, sin mostrar salida privada.
+
+## 0.9.0 — Instalador por usuario en Windows, 06/10/2026
+
+- Setup nativo con runtime incluido, versiones independientes, entrada estable,
+  recursos separados de datos, importación, conexión protegida y rollback.
+- Comprobación de Framework/WebView2, prerrequisito Microsoft verificado y
+  desinstalación que conserva datos. Distribución firmada/automática pendiente.
+
 ## Trabajo acumulado publicado — 05/10/2026, sobre 0.8.1
 
 Esta entrega de código conserva `VERSION=0.8.1`; no crea ni mueve una etiqueta

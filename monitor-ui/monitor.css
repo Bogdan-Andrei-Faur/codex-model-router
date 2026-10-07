@@ -76,3 +76,15 @@ nav{border-radius:999px}nav button,nav button.selected,.choice,.badge,.agent-mod
 /* Update progress belongs to the same shared settings surface on all hosts. */
 .update-card{padding:14px;border:1px solid var(--border,#ffffff20);border-radius:20px;background:#ffffff06}
 .update-card p{margin:8px 0}.update-card progress{width:100%;height:8px;accent-color:#b7a3ed}
+
+/* Settings actions are explicit controls, with persistent connection progress. */
+.settings-action{position:relative;padding-right:42px;border-color:#626370;box-shadow:0 1px 2px #00000018;transition:background .15s,border-color .15s,transform .15s}
+.settings-action:hover,.settings-action.native-hover{background:#3a3b45;border-color:var(--accent)}
+.settings-action:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.settings-action:active:not(:disabled){transform:translateY(1px)}
+.settings-action:disabled{cursor:wait;opacity:.6}.settings-action.busy{opacity:1;border-color:var(--accent);background:var(--panel2)}
+.settings-action>.action-affordance,.settings-action>.action-spinner{position:absolute;right:15px;top:50%;width:16px;height:16px;transform:translateY(-50%);color:var(--accent)}
+.action-spinner{display:none;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%}.settings-action.busy>.action-affordance{display:none}.settings-action.busy>.action-spinner{display:block;animation:connection-spin .8s linear infinite}
+@keyframes connection-spin{to{transform:translateY(-50%) rotate(360deg)}}
+.reduced .action-spinner{animation:none}
+@media(prefers-color-scheme:light){.settings-action{border-color:#9c98ac}.settings-action:hover,.settings-action.native-hover{background:#ebe5f4}}

@@ -6,6 +6,8 @@ Coordination lock files may be created in the source state directory.
 """
 from contextlib import ExitStack
 import json
+import hashlib
+import math
 import os
 from pathlib import Path
 import re
@@ -22,6 +24,14 @@ FILES = ('history.jsonl', 'history.recovered.jsonl', 'prompts.jsonl', 'jev-healt
 DIRECTORIES = ('task-modes', 'workloads')
 
 
+def linked(path):
+    """Reject Windows junctions/reparse points as well as POSIX symlinks."""
+    path=Path(path)
+    if path.is_symlink():return True
+    try:return bool(getattr(path.lstat(), 'st_file_attributes', 0) & 0x400)
+    except FileNotFoundError:return False
+
+
 class MigrationError(ValueError):
     """Fixed, user-safe diagnostics: never embed configuration or secret values."""
     def __init__(self, code, message):
@@ -29,10 +39,59 @@ class MigrationError(ValueError):
         self.code = code
 
 
+def windows_process_started_at(pid):
+    """Read creation time from the process handle; unknown ownership stays blocked."""
+    if os.name != 'nt':
+        return None
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.GetProcessTimes.argtypes = [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4
+    kernel.GetProcessTimes.restype = wintypes.BOOL
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not handle:
+        return None
+    try:
+        created, exited, kernel_time, user_time = (wintypes.FILETIME() for _ in range(4))
+        if not kernel.GetProcessTimes(handle, ctypes.byref(created), ctypes.byref(exited),
+                                      ctypes.byref(kernel_time), ctypes.byref(user_time)):
+            return None
+        return ((created.dwHighDateTime << 32) | created.dwLowDateTime) / 10000000 - 11644473600
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def snapshot_pid_reused(record):
+    """An expired heartbeat alone cannot dismiss a live, possibly stalled bridge."""
+    heartbeat = record.get('heartbeat')
+    if type(heartbeat) not in (int, float) or not math.isfinite(heartbeat) or heartbeat <= 0:
+        return False
+    started = windows_process_started_at(record['pid'])
+    # A new process cannot have written a snapshot from before it existed.
+    # Keep a one-second margin for timestamp precision; uncertainty stays blocked.
+    return started is not None and started > heartbeat + 1
+
+
 def reject_active(state):
+    if os.name=='nt':
+        # WPF owns a named mutex, rather than the Unix monitor lock files.
+        import ctypes
+        kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+        kernel.OpenMutexW.argtypes=[ctypes.c_ulong,ctypes.c_int,ctypes.c_wchar_p]
+        kernel.OpenMutexW.restype=ctypes.c_void_p;kernel.CloseHandle.argtypes=[ctypes.c_void_p]
+        name='Local\\CodexRouterMonitor-'+hashlib.sha256(str(Path(state).parent.resolve()).upper().encode('utf-8')).hexdigest().upper()
+        handle=kernel.OpenMutexW(0x100000,False,name)
+        if handle:
+            kernel.CloseHandle(handle)
+            raise MigrationError('busy_source','El monitor anterior sigue abierto. Ciérralo antes de importar; tus datos se conservan.')
+        if ctypes.get_last_error() not in (0,2):
+            raise MigrationError('busy_source','No se pudo comprobar el monitor anterior. Se han conservado los datos.')
     from monitor_state import alive
     for path in state.glob('status-*.json'):
-        if path.is_symlink(): raise ValueError('La instalación contiene enlaces no compatibles.')
+        if linked(path): raise ValueError('La instalación contiene enlaces no compatibles.')
         try:
             record = json.loads(path.read_text())
         except (OSError, ValueError):
@@ -44,12 +103,12 @@ def reject_active(state):
         # reused by Chrome or any other app; that is not an active router session.
         if isinstance(events, list) and events and isinstance(events[-1], dict) and events[-1].get('event') == 'bridge_stopped':
             continue
-        if alive(record['pid']):
+        if alive(record['pid']) and not snapshot_pid_reused(record):
             raise MigrationError('active_bridge', 'Codex todavía está usando la instalación anterior. Termina las tareas y cierra Codex antes de importar.')
 
 
 def copy_stable(source, destination):
-    if source.is_symlink() or not source.is_file():
+    if linked(source) or not source.is_file():
         raise ValueError('La instalación contiene enlaces o archivos no compatibles.')
     before = source.stat()
     destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -65,20 +124,24 @@ def copy_stable(source, destination):
 def import_legacy(source, destination, platform=None, record_source=False):
     source = Path(source).expanduser()
     destination = Path(destination).expanduser()
-    if source.is_symlink() or destination.is_symlink(): raise ValueError('La ruta de instalación no es válida.')
+    if linked(source) or linked(destination): raise ValueError('La ruta de instalación no es válida.')
     source, destination = source.resolve(), destination.resolve()
     if source == destination or source in destination.parents or destination in source.parents:
         raise ValueError('La instalación y el destino deben ser independientes.')
     if destination.exists(): raise MigrationError('occupied_destination', 'La instalación nueva ya contiene datos. Se han conservado; no se puede importar encima.')
     config_path=source/'config.local.json'; state=source/'state'
-    if config_path.is_symlink() or state.is_symlink(): raise ValueError('La instalación contiene enlaces no compatibles.')
+    if linked(config_path) or linked(state): raise ValueError('La instalación contiene enlaces no compatibles.')
     try:
         config=json.loads(config_path.read_text(encoding='utf-8-sig'))
     except FileNotFoundError:
         raise MigrationError('missing_config', 'La carpeta seleccionada no contiene config.local.json. Selecciona la carpeta de la instalación anterior, no Documents ni state.') from None
     except (json.JSONDecodeError, UnicodeError):
         raise MigrationError('invalid_config', 'config.local.json no contiene una configuración JSON válida. La instalación original se conserva.') from None
-    if not isinstance(config,dict) or config.get('platform') != (platform or sys.platform):
+    target_platform = platform or sys.platform
+    # The original Windows source installer predates the platform field.
+    # Mac/Linux source installers always wrote it; never infer their identity.
+    legacy_windows = isinstance(config, dict) and 'platform' not in config and target_platform == 'win32'
+    if not isinstance(config,dict) or (config.get('platform') != target_platform and not legacy_windows):
         raise MigrationError('foreign_platform', 'La configuración seleccionada pertenece a otro sistema. Selecciona la instalación de este ordenador.')
     reject_active(state)
     destination.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
@@ -91,16 +154,21 @@ def import_legacy(source, destination, platform=None, record_source=False):
                 locks.enter_context(file_lock(state/name,timeout=.1))
             reject_active(state)
             copy_stable(config_path,temporary/'config.local.json')
+            if legacy_windows:
+                copied_config=json.loads((temporary/'config.local.json').read_text(encoding='utf-8-sig'))
+                if copied_config != config:
+                    raise MigrationError('busy_source', 'La configuración cambió. Vuelve a importar cuando el monitor anterior esté cerrado.')
+                atomic_json(temporary/'config.local.json', dict(copied_config, platform='win32'))
             count=1
             for name in FILES:
                 path=state/name
-                if path.exists() or path.is_symlink(): copy_stable(path,temporary/'state'/name);count+=1
+                if path.exists() or linked(path): copy_stable(path,temporary/'state'/name);count+=1
             for name in DIRECTORIES:
                 directory=state/name
-                if directory.is_symlink(): raise ValueError('La instalación contiene enlaces no compatibles.')
+                if linked(directory): raise ValueError('La instalación contiene enlaces no compatibles.')
                 if not directory.exists():continue
                 for path in directory.iterdir():
-                    if path.is_symlink() or not re.fullmatch(r'[0-9a-f]{64}\.json',path.name):
+                    if linked(path) or not re.fullmatch(r'[0-9a-f]{64}\.json',path.name):
                         raise ValueError('La instalación contiene datos de tareas no compatibles.')
                     copy_stable(path,temporary/'state'/name/path.name);count+=1
             # Retain Keychain/Secret Service identity without ever retrieving keys.

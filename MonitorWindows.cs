@@ -48,6 +48,10 @@ sealed class MonitorPipe : IDisposable
                 string program=String.IsNullOrEmpty(frozen) ? RouterMonitorWindow.Text(config,"python","python.exe") : Path.GetFullPath(Path.Combine(codeRoot,frozen));
                 string arguments=(String.IsNullOrEmpty(frozen) ? "-u "+Quote(Path.Combine(codeRoot,"monitor_service.py"))+" " : "")+
                     "--root "+Quote(root)+" --code-root "+Quote(codeRoot)+" --platform windows"+(preview ? " --preview" : "");
+                if(WindowsLayout.Installed(codeRoot)) {
+                    program=WindowsLayout.Component(codeRoot,"runtime");
+                    arguments="--data-root "+Quote(root)+" monitor-service"+(preview?" --preview":"");
+                }
                 child=new Process { StartInfo=new ProcessStartInfo(program,arguments) {
                     WorkingDirectory=codeRoot,UseShellExecute=false,CreateNoWindow=true,RedirectStandardInput=true,
                     RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=Encoding.UTF8 } };
@@ -105,6 +109,7 @@ sealed class RouterMonitorWindow : Window
     Point? previousPointer;
     bool previousActive;
     string UiPath {get{return Path.Combine(root,"state","monitor-ui.json");}}
+    string ProbeDirectory {get{return Path.Combine(WindowsLayout.Installed(codeRoot)?root:codeRoot,"state");}}
     public RouterMonitorWindow(string root,string codeRoot,bool preview,bool selfTest,EventWaitHandle reveal,bool hidden)
     {
         this.root=root;this.codeRoot=codeRoot;this.preview=preview;this.selfTest=selfTest;this.reveal=reveal;
@@ -141,7 +146,7 @@ sealed class RouterMonitorWindow : Window
             var core=web.CoreWebView2;
             core.Settings.AreDevToolsEnabled=false;core.Settings.AreDefaultContextMenusEnabled=false;core.Settings.AreHostObjectsAllowed=false;
             core.Settings.IsStatusBarEnabled=false;core.Settings.IsPasswordAutosaveEnabled=false;core.Settings.IsGeneralAutofillEnabled=false;
-            core.SetVirtualHostNameToFolderMapping("monitor.local",Path.Combine(codeRoot,"dist","windows-ui"),CoreWebView2HostResourceAccessKind.DenyCors);
+            core.SetVirtualHostNameToFolderMapping("monitor.local",WindowsLayout.Installed(codeRoot)?Path.Combine(codeRoot,"ui"):Path.Combine(codeRoot,"dist","windows-ui"),CoreWebView2HostResourceAccessKind.DenyCors);
             core.NavigationStarting += delegate(object sender,CoreWebView2NavigationStartingEventArgs e){if(e.Uri!=Page)e.Cancel=true;};
             core.FrameNavigationStarting += delegate(object sender,CoreWebView2NavigationStartingEventArgs e){e.Cancel=true;};
             core.NewWindowRequested += delegate(object sender,CoreWebView2NewWindowRequestedEventArgs e){e.Handled=true;};
@@ -184,11 +189,16 @@ sealed class RouterMonitorWindow : Window
         double available=bottomRight.Y-topLeft.Y;Width=Math.Min(432,Math.Max(1,bottomRight.X-topLeft.X-20));Height=Math.Max(1,available-20);
         double ratio;panelHeight=Math.Min(Height,Math.Max(560,available*(heights.TryGetValue(screen.DeviceName,out ratio)?ratio:.9)));
         Left=bottomRight.X-Width-10;Top=topLeft.Y+10;
+        // A bottom-anchored capsule can move without a size change. Ask for
+        // fresh CSS bounds rather than retaining the initial native clip region.
+        PublishBounds();
     }
-    Dictionary<string,object> Ui(){return new Dictionary<string,object>{{"mode",mode},{"topmost",Topmost},{"panelHeight",panelHeight},{"reduced",!SystemParameters.ClientAreaAnimation},{"lazyHistory",true},{"acknowledgesMode",true},{"modeRequest",modeRequest},{"nativeGlass",false}};}
+    Dictionary<string,object> Ui(){return new Dictionary<string,object>{{"mode",mode},{"topmost",Topmost},{"panelHeight",panelHeight},{"reduced",!SystemParameters.ClientAreaAnimation},{"lazyHistory",true},{"acknowledgesMode",true},{"connectionProgress",true},{"modeRequest",modeRequest},{"nativeGlass",false}};}
     async Task<bool> Script(string function,object value){if(!ready||web.CoreWebView2==null)return false;try{await web.CoreWebView2.ExecuteScriptAsync("window."+function+"("+Json.Serialize(value)+")");return true;}catch{lastSnapshot="";journalRevision=-1;return false;}}
     async void PublishUi(){await Script("receiveUI",Ui());}
+    async void PublishBounds(){await Script("monitorBounds",null);}
     async void Feedback(string message){await Script("monitorFeedback",message);}
+    async void ConnectionProgress(bool pending){await Script("monitorConnectionState",new Dictionary<string,object>{{"pending",pending}});}
     void SetMode(string value)
     {
         if(!new[]{"Compact","Expanded","Hidden"}.Contains(value))return;mode=value;
@@ -220,9 +230,11 @@ sealed class RouterMonitorWindow : Window
     {
         if(preview||actionBusy){Feedback("Vista previa o una operación todavía en curso.");return;}
         actionBusy=true;
+        bool connection=Text(data,"action","")=="connection";
+        if(connection)await Script("monitorConnectionState",new Dictionary<string,object>{{"pending",true},{"value",Text(data,"value","")}});
         try{var reply=await Task.Run(()=>service.Request(data));Feedback(Text(reply,"feedback","Guardado."));}
         catch{Feedback("No se pudo completar la operación. Tus tareas siguen abiertas.");}
-        finally{actionBusy=false;lastSnapshot="";Refresh();}
+        finally{if(connection)ConnectionProgress(false);actionBusy=false;lastSnapshot="";Refresh();}
     }
     void StoreKey(string provider,string value)
     {
@@ -251,6 +263,8 @@ sealed class RouterMonitorWindow : Window
     [DllImport("gdi32.dll")]static extern IntPtr CreateRoundRectRgn(int left,int top,int right,int bottom,int width,int height);
     [DllImport("gdi32.dll")]static extern bool DeleteObject(IntPtr handle);
     [DllImport("user32.dll")]static extern int SetWindowRgn(IntPtr hwnd,IntPtr region,bool redraw);
+    [DllImport("user32.dll")]static extern int GetWindowRgn(IntPtr hwnd,IntPtr region);
+    [DllImport("gdi32.dll")]static extern bool PtInRegion(IntPtr region,int x,int y);
     void ApplyRegion()
     {
         if(source==null||hit.IsEmpty)return;var matrix=source.CompositionTarget.TransformToDevice;
@@ -281,21 +295,44 @@ sealed class RouterMonitorWindow : Window
     {
         try{
             await AssertScript("document.querySelectorAll('#agents .avatar').length===1","capsule active-only fixture");
+            await AssertNativeBounds();
+            Height=Math.Max(200,Height-64);
+            await AssertNativeBounds();
+            Position();await AssertNativeBounds();
+            SetMode("Hidden");SetMode("Compact");await AssertNativeBounds();
             await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('#expand').click()");
             await AssertScript("state.ui.mode==='Expanded' && document.querySelectorAll('.task-row').length===1","native mode ACK and shared agent list");
             await AssertScript("document.querySelector('#activity').textContent.includes('Sol 6.1') && document.querySelector('#activity').textContent.includes('Alto')","shared model and effort pills");
             await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-tab=history]').click()");
             await AssertScript("state.historyLoaded===true && document.querySelectorAll('.history-row').length===1","private Python lazy journal");
-            using(var image=File.Create(Path.Combine(codeRoot,"state","review-webview2-history.png")))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
+            using(var image=File.Create(Path.Combine(ProbeDirectory,"review-webview2-history.png")))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
             await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('#collapse').click()");
             await AssertScript("state.ui.mode==='Compact'","native compact ACK");
             if(hit.IsEmpty||File.Exists(UiPath)||File.Exists(Path.Combine(root,"config.local.json")))throw new InvalidOperationException("preview isolation and native bounds");
-            FinishTest(true,"Shared WebView2 capsule/agents/pills/history; private Python IPC; native mode ACK/bounds; isolated preview. First-click/hover/DPI/DPAPI visual acceptance still requires Windows owner QA.");
+            FinishTest(true,"Shared WebView2 capsule/agents/pills/history; private Python IPC; native mode ACK/bounds; compact startup/resize/hidden-show clip region; isolated preview. First-click/hover/DPI/DPAPI visual acceptance still requires Windows owner QA.");
         }catch{FinishTest(false,"Shared WebView2 native fixture failed. No private data was captured.");}
+    }
+    async Task AssertNativeBounds()
+    {
+        UpdateLayout();
+        await AssertScript("Math.abs(innerHeight-"+web.ActualHeight.ToString(System.Globalization.CultureInfo.InvariantCulture)+")<1","native viewport resize delivery");
+        for(int i=0;i<80;i++) {
+            var bounds=Json.Deserialize<Dictionary<string,object>>(await web.CoreWebView2.ExecuteScriptAsync("(()=>{const r=document.querySelector('#surface').getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()"));
+            double x=Numeric(Get(bounds,"x")),y=Numeric(Get(bounds,"y")),w=Numeric(Get(bounds,"width")),h=Numeric(Get(bounds,"height"));
+            if(!hit.IsEmpty && Math.Abs(hit.X-x)<1 && Math.Abs(hit.Y-y)<1 && Math.Abs(hit.Width-w)<1 && Math.Abs(hit.Height-h)<1) {
+                var region=CreateRoundRectRgn(0,0,1,1,0,0);
+                try {
+                    var center=source.CompositionTarget.TransformToDevice.Transform(new Point(x+w/2,y+h/2));
+                    if(IsVisible && GetWindowRgn(source.Handle,region)>0 && PtInRegion(region,(int)center.X,(int)center.Y))return;
+                }finally{DeleteObject(region);}
+            }
+            await Task.Delay(100);
+        }
+        throw new InvalidOperationException("compact bounds/visible native clip region");
     }
     void FinishTest(bool success,string evidence)
     {
-        Directory.CreateDirectory(Path.Combine(codeRoot,"state"));File.WriteAllText(Path.Combine(codeRoot,"state","ui-review-checks.txt"),(success?"PASS: ":"FAIL: ")+evidence+Environment.NewLine);
+        Directory.CreateDirectory(ProbeDirectory);File.WriteAllText(Path.Combine(ProbeDirectory,"ui-review-checks.txt"),(success?"PASS: ":"FAIL: ")+evidence+Environment.NewLine);
         Environment.ExitCode=success?0:1;Quit();
     }
 }
@@ -304,10 +341,11 @@ static class RouterMonitorProgram
 {
     [STAThread]static int Main(string[] args)
     {
-        string codeRoot=Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,".."));
-        string root=codeRoot;int index=Array.IndexOf(args,"--root");if(index>=0&&index+1<args.Length)root=Path.GetFullPath(args[index+1]);
+        string codeRoot=WindowsLayout.MonitorResources();
+        string root=WindowsLayout.Installed(codeRoot)?WindowsLayout.DataRoot:codeRoot;int index=Array.IndexOf(args,"--root");if(index>=0&&index+1<args.Length)root=Path.GetFullPath(args[index+1]);
         bool selfTest=args.Contains("--self-test"),preview=selfTest||args.Contains("--preview");
-        if(selfTest){root=Path.Combine(codeRoot,"state","windows-monitor-probe-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(Path.Combine(root,"state"));
+        if(!preview && WindowsLayout.Installed(codeRoot) && !WindowsOnboarding.Prepare(codeRoot,root))return 0;
+        if(selfTest){root=Path.Combine(root,"state","windows-monitor-probe-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(Path.Combine(root,"state"));
             File.WriteAllText(Path.Combine(root,"preview.json"),"{\"threads\":{\"fixture\":{\"name\":\"Synthetic fixture\",\"status\":\"active\",\"model\":\"gpt-6.1-sol\",\"effort\":\"high\"},\"idle\":{\"status\":\"idle\"}}}");
             File.WriteAllText(Path.Combine(root,"state","history.jsonl"),"{\"event\":\"decision_created\",\"decision_id\":\"fixture-decision\",\"thread\":\"fixture\",\"time\":1,\"title\":\"Synthetic fixture\",\"model\":\"gpt-6.1-sol\",\"effort\":\"high\"}\n");
         }
@@ -318,7 +356,7 @@ static class RouterMonitorProgram
             if(!created){reveal.Set();return 0;}
             try{
                 var app=new Application();var window=new RouterMonitorWindow(root,codeRoot,preview,selfTest,reveal,args.Contains("--tray"));
-                if(selfTest){var deadline=new DispatcherTimer {Interval=TimeSpan.FromSeconds(50)};deadline.Tick+=delegate{File.WriteAllText(Path.Combine(codeRoot,"state","ui-review-checks.txt"),"FAIL: native fixture timeout");Environment.ExitCode=1;app.Shutdown();};deadline.Start();}
+                if(selfTest){var deadline=new DispatcherTimer {Interval=TimeSpan.FromSeconds(50)};deadline.Tick+=delegate{File.WriteAllText(Path.Combine(WindowsLayout.Installed(codeRoot)?root:codeRoot,"state","ui-review-checks.txt"),"FAIL: native fixture timeout");Environment.ExitCode=1;app.Shutdown();};deadline.Start();}
                 app.Run(window);return Environment.ExitCode;
             }finally{mutex.ReleaseMutex();}
         }

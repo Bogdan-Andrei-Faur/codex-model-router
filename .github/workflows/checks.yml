@@ -105,3 +105,38 @@ jobs:
           python3 build_linux_package.py --output release/deb-v2 --revision 2
       - name: Validate install, import, upgrade, remove, purge and reinstall
         run: python3 tests/smoke_deb_lifecycle.py release/deb-v1/*.deb release/deb-v2/*.deb
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14.3'
+      - name: Prepare pinned isolated build environment
+        shell: pwsh
+        run: |
+          python -m venv state/windows-installer-venv
+          state/windows-installer-venv/Scripts/python.exe -m pip install -r requirements-build-windows.txt
+          python tools/prepare_windows_installer.py
+      - name: Build initial and upgrade fixtures
+        shell: pwsh
+        run: |
+          $tools = Get-Content state/installer-build-tools/tools-receipt.json -Raw | ConvertFrom-Json
+          $python = 'state/windows-installer-venv/Scripts/python.exe'
+          $original = Get-Content VERSION -Raw
+          try {
+            [IO.File]::WriteAllText((Join-Path $PWD 'VERSION'), "9.9.0`n")
+            & $python build_windows_installer.py --python $python --compiler $tools.compiler --webview2-bootstrapper $tools.webview2Bootstrapper --output release/initial
+            if ($LASTEXITCODE -ne 0) { throw 'Initial fixture build failed' }
+            [IO.File]::WriteAllText((Join-Path $PWD 'VERSION'), "9.9.1`n")
+            & $python build_windows_installer.py --python $python --compiler $tools.compiler --webview2-bootstrapper $tools.webview2Bootstrapper --output release/latest
+            if ($LASTEXITCODE -ne 0) { throw 'Upgrade fixture build failed' }
+          } finally { [IO.File]::WriteAllText((Join-Path $PWD 'VERSION'), $original) }
+      - name: Validate frozen native payload and isolated installer lifecycle
+        shell: pwsh
+        run: |
+          $tools = Get-Content state/installer-build-tools/tools-receipt.json -Raw | ConvertFrom-Json
+          $initial = (Get-ChildItem release/initial -Recurse -Filter build-result.json).FullName
+          $latest = (Get-ChildItem release/latest -Recurse -Filter build-result.json).FullName
+          python tests/smoke_windows_installer.py $latest --compiler $tools.compiler --webview2-bootstrapper $tools.webview2Bootstrapper --previous-receipt $initial
+          if ($LASTEXITCODE -ne 0) { throw 'Windows installer fixture validation failed' }

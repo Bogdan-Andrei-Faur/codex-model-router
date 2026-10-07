@@ -6,6 +6,7 @@ let dataSignature = '', history = [], avatars = new Map(), orbitSequence = 0;
 let selectedAgent = null;
 let quotaOpen = false, nativeHover = null, modeRequest = 0, pendingModeRequest = 0;
 let historyDirty = true, historyRevision = 0;
+let connectionPending = null;
 function requestHistory() {
   if(state.ui.lazyHistory)native({action:'history',value:state.ui.mode==='Expanded' && ['history','statistics'].includes(currentTab)});
 }
@@ -148,6 +149,7 @@ function setMode(mode,notify=true) {
   if(notify){const request=++modeRequest;pendingModeRequest=state.ui.acknowledgesMode?request:0;native({action:'mode',value:mode,request});}
   requestHistory();
   if(mode==='Expanded')renderPage();
+  window.monitorBounds();
 }
 function openPeek(id) {
   quotaOpen=false;
@@ -467,7 +469,29 @@ function statistics() {
   const durations=history.filter(d=>d.started&&d.finished>=d.started);if(durations.length)metric(content,'Duración media',Math.round(durations.reduce((n,d)=>n+d.finished-d.started,0)/durations.length)+' s');
   content.append(el('p','small','Estos datos no demuestran ahorro de cuota ni calidad comparativa por sí solos.'));page.scrollTop=scroll;
 }
-function actionCard(parent,title,description,action){const node=button('',action,'settings-action');node.append(el('strong','',title),el('span','',description));parent.append(node);}
+function actionCard(parent,title,description,action){const node=button('',action,'settings-action');node.disabled=!!connectionPending;node.append(el('strong','',title),el('span','',description),icon('chevron-right','ui-glyph action-affordance'));parent.append(node);return node;}
+const connectionLabels={doctor:'Comprobando conexión…',install:'Conectando…',uninstall:'Desconectando…'};
+function connectionControls() {
+  for(const node of $('settings').querySelectorAll('.settings-action')) {
+    node.disabled=!!connectionPending;
+    if(!node.dataset.connectionAction)continue;
+    const busy=node.dataset.connectionAction===connectionPending;
+    node.classList.toggle('busy',busy);node.setAttribute('aria-busy',String(busy));
+    node.querySelector('strong').textContent=busy?connectionLabels[connectionPending]:node.dataset.title;
+    node.querySelector('span').textContent=busy?'La operación está en curso. Espera el resultado; puede tardar unos segundos.':node.dataset.description;
+  }
+}
+function connectDesktop(value) {
+  if(connectionPending)return;
+  connectionPending=value;connectionControls();$('feedback').textContent=connectionLabels[value];
+  native({action:'connection',value});
+}
+function connectionCard(parent,value,title,description) {
+  const node=actionCard(parent,title,description,()=>connectDesktop(value));
+  Object.assign(node.dataset,{connectionAction:value,title,description});
+  const spinner=el('i','action-spinner');spinner.setAttribute('aria-hidden','true');node.append(spinner);
+  connectionControls();
+}
 function choices(parent,options,selected,action,disabled=[]) {const box=el('div','choices');for(const [key,label] of options){const chosen=Array.isArray(selected)?selected.includes(key):selected===key;const node=button('',()=>action(key),'choice'+(chosen?' selected':''));controlLabel(node,chosen?'circle-check':'circle',label);node.setAttribute('aria-pressed',String(chosen));node.disabled=disabled.includes(key);box.append(node);}parent.append(box);}
 const configure = (key,value) => native({action:'config',key,value});
 function keySettings(parent,id,label) {
@@ -503,9 +527,9 @@ function settings() {
   updateSettings(box);
   heading(box,'CONEXIÓN CON DESKTOP');
   box.append(el('p','small','La instalación se detecta al arrancar. Conecta el inicio habitual una vez. Cerrar el monitor no detiene el selector.'));
-  actionCard(box,'Comprobar conexión','Distingue instalación, registro y conexión observada.',()=>native({action:'connection',value:'doctor'}));
-  actionCard(box,'Conectar al inicio habitual','Se aplicará al volver a abrir Desktop; conserva las tareas en curso.',()=>native({action:'connection',value:'install'}));
-  actionCard(box,'Desconectar integración','Restaura el inicio habitual sin borrar ajustes ni historial.',()=>native({action:'connection',value:'uninstall'}));
+  connectionCard(box,'doctor','Comprobar conexión','Distingue instalación, registro y conexión observada.');
+  connectionCard(box,'install','Conectar al inicio habitual','Prepara el próximo arranque de Desktop. Puedes pulsarlo con tus tareas abiertas.');
+  connectionCard(box,'uninstall','Desconectar integración','Restaura el inicio habitual sin borrar ajustes ni historial.');
   actionCard(box,config.enabled?'Pausar selección automática':'Activar selección automática',config.enabled?'Codex automático decide en cada nuevo mensaje.':'Se respeta la selección manual de Codex.',()=>configure('enabled',!config.enabled));
   box.lastElementChild.querySelector('strong').prepend(icon(config.enabled?'pause':'play'));
   actionCard(box,state.ui.topmost?'Desactivar Mantener delante':'Activar Mantener delante',state.ui.topmost?(state.platform==='linux'?'Solicita al escritorio mantener el monitor delante.':'El monitor permanece sobre otras ventanas.'):'El monitor puede quedar detrás de otras ventanas.',()=>native({action:'topmost',value:!state.ui.topmost}));
@@ -558,7 +582,7 @@ window.receive = incoming => {
   document.body.classList.toggle('reduced',!!state.ui.reduced);
   if(!document.body.classList.contains(state.ui.mode.toLowerCase()))setMode(state.ui.mode,false);
   const active=Object.values(state.threads).filter(row=>C.liveAgent(row)).length;
-  $('connection').classList.toggle('disconnected',!state.connections);$('connection').querySelector('span').textContent=state.preview?'Vista previa · datos simulados':state.connections?`${active} ${active===1?'tarea activa':'tareas activas'}`:'Sin conexión';$('connection').querySelector('i').classList.toggle('working',active>0);
+  $('connection').classList.toggle('disconnected',!state.connections);$('connection').querySelector('span').textContent=state.preview?'Vista previa · datos simulados':state.connections?`${active} ${active===1?'tarea activa':'tareas activas'}`:state.desktopRestartPending?'Conexión preparada · reinicia Desktop':'Sin conexión';$('connection').querySelector('i').classList.toggle('working',active>0);
   controlLabel($('pause'),state.config.enabled?'pause':'play',state.config.enabled?'Pausar selección':'Activar selección');
   const bridgeMismatch=(state.bridgeVersions||[]).filter(v=>v!==state.productVersion);
   $('product-version').textContent='v'+(state.productVersion || '—')+(bridgeMismatch.length?' · puente '+bridgeMismatch.join(', '):state.bridgeBuildMismatch?' · router anterior':state.bridgeBuildUnknown?' · puente sin verificar':'')+(state.restartRequired?' · reinicio pendiente':'');
@@ -582,6 +606,7 @@ window.receiveUI = (ui,request=ui.modeRequest ?? null) => {
   document.body.classList.toggle('native-glass',!!state.ui.nativeGlass);document.body.classList.toggle('reduce-transparency',!!state.ui.reduceTransparency);
   if(!heightDrag && Number.isFinite(ui.panelHeight))panelHeight(ui.panelHeight-16);
   if(ui.mode!==undefined && !document.body.classList.contains(ui.mode.toLowerCase()))setMode(ui.mode,false);
+  window.monitorBounds();
 };
 function clearNativeHover() {
   nativeHover?.classList.remove('native-hover');nativeHover=null;
@@ -601,16 +626,27 @@ window.monitorPointer = (point,inactive=true) => {
     }
   }
 };
-window.monitorFeedback = text => { $('feedback').textContent=text;setTimeout(()=>{$('feedback').textContent='';},7000); };
+let feedbackTimer;
+window.monitorConnectionState = status => { connectionPending=status.pending?status.value:null;connectionControls(); };
+window.monitorFeedback = text => { if(!state.ui.connectionProgress){connectionPending=null;connectionControls();}clearTimeout(feedbackTimer);$('feedback').textContent=text;feedbackTimer=setTimeout(()=>{$('feedback').textContent='';},7000); };
 $('expand').onclick=()=>setMode('Expanded');$('collapse').onclick=()=>setMode('Compact');$('hide').onclick=()=>setMode('Hidden');$('pause').onclick=()=>configure('enabled',!state.config.enabled);
 $('quota').onclick=openQuota;
 $('quota').addEventListener('mouseenter',openQuota);$('quota').addEventListener('focus',openQuota);
-window.addEventListener('resize',capsule);
+window.addEventListener('resize',()=>{capsule();window.monitorBounds();});
 setInterval(refreshQuota,2000);
 for(const node of document.querySelectorAll('[data-tab]'))node.onclick=()=>showTab(node.dataset.tab);
 $('compact').addEventListener('mouseenter',()=>clearTimeout(peekTimer));$('compact').addEventListener('mouseleave',()=>{peekTimer=setTimeout(closePeek,220);});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'){if(peekId||quotaOpen)closePeek();else setMode('Compact');}});
-new ResizeObserver(()=>{const r=$('surface').getBoundingClientRect();native({action:'bounds',x:r.x,y:r.y,width:r.width,height:r.height});}).observe($('surface'));
+let boundsFrame=0;
+window.monitorBounds=()=>{
+  cancelAnimationFrame(boundsFrame);
+  boundsFrame=requestAnimationFrame(()=>{
+    boundsFrame=0;
+    const r=$('surface').getBoundingClientRect();
+    native({action:'bounds',x:r.x,y:r.y,width:r.width,height:r.height});
+  });
+};
+new ResizeObserver(window.monitorBounds).observe($('surface'));
 for(const node of document.querySelectorAll('[data-icon]'))node.replaceChildren(icon(node.dataset.icon));
 controlLabel($('pause'),'pause','Pausar selección');
 native({action:'ready'});

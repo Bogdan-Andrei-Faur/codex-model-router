@@ -8,6 +8,32 @@ pipes privados. Ya comparte los componentes completos con Mac/Ubuntu;
 requiere **Framework 4.8 y WebView2 Runtime Evergreen**. El renderizador C#
 anterior queda preservado como fuente histórica, fuera de `build.ps1`.
 
+## Instalador y VM Windows — 07/10/2026
+
+El instalador 0.9.4 pasa el paquete congelado, self-test nativo y 24 comprobaciones
+en una VM Windows limpia. Corrige una negativa incorrecta a desinstalar una
+conexión propia, reproducida con 0.9.3. La instalación del propietario sigue en
+0.9.3 y Desktop todavía usa el puente heredado; actualizar/conectar requiere su
+pausa elegida. [Recibo actual](native-validation/2026-10-07-windows-installation-acceptance-host-a.md).
+Las comprobaciones físicas y la aceptación en otros equipos siguen separadas.
+
+## Preparación Windows local — 06/10/2026
+
+Fuente `50e63b0` incorporada y monitor WebView2 ejecutado con éxito en el equipo
+Windows del propietario. El ZIP extraído también pasa doctor, catálogo con
+puente congelado, conservación de ajustes de prueba y self-test nativo.
+Resultados y límites en [el recibo de host-a](native-validation/2026-10-06-windows-host-a.md).
+Tras el reinicio del propietario, el puente ordinario coincide con la huella
+instalada y recibe telemetría autenticada. El ZIP no sustituye un instalador
+gráfico. El piloto `setup.exe` 0.9.0 está implementado y sus pruebas aisladas se
+documentan en [Windows Installer](WINDOWS-INSTALLER.md); su activación en la
+instalación del propietario y la aceptación física siguen pendientes.
+
+Si las referencias Framework 4.8 están en una carpeta de desarrollo aislada,
+`package_windows.py --framework-reference-path <carpeta-v4.8>` transmite esa
+ruta a `build.ps1`; el valor predeterminado no cambia. La opción no instala
+Framework ni descarga referencias automáticamente.
+
 La [guía común](SHARED-MONITOR.md) describe build, límites, paquete y QA.
 Compilación cruzada de esta entrada no equivale a ejecución Windows, y la
 nueva revisión no hereda la aprobación de los self-tests antiguos. Pendientes:

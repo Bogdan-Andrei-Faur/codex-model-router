@@ -14,7 +14,7 @@ Atlas, memoria personal ni el chat original.
 
 ## Versión
 
-El producto usa versiones semánticas. La versión actual es **0.8.1**:
+El producto usa versiones semánticas. La versión actual es **0.9.6**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en la esquina inferior derecha del
 panel procede del archivo común `VERSION` en modo repositorio y del sello
@@ -72,8 +72,9 @@ nativa realizada y las pendientes figuran en [VALIDATION.md](docs/VALIDATION.md)
 Ajustes permite consultar versiones y preparar descargas compatibles. Hay un
 constructor de `.pkg` local para Mac y un `.deb` para Ubuntu, con datos separados
 del código. Ubuntu integra la importación gráfica y gestiona las dependencias
-mediante APT. La distribución firmada, el canal público de descargas, el instalador
-Windows y la aplicación automática de actualizaciones siguen pendientes.
+mediante APT. Windows 0.9.0 añade un [instalador por usuario](docs/WINDOWS-INSTALLER.md),
+con runtime incluido, importación y datos independientes. La distribución firmada,
+el canal público de descargas y la aplicación automática de actualizaciones siguen pendientes.
 Estado y límites: [INSTALLATION-UPDATES.md](docs/INSTALLATION-UPDATES.md).
 
 ### Evidencia comparable y evaluación

@@ -10,13 +10,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data-root', type=Path)
     parser.add_argument('--resources', type=Path, help=argparse.SUPPRESS)
-    parser.add_argument('service', choices=('bootstrap', 'monitor-service', 'monitor', 'launch-native', 'desktop', 'bridge', 'identity'))
+    parser.add_argument('service', choices=('bootstrap', 'import-legacy', 'monitor-service', 'monitor', 'launch-native', 'desktop', 'bridge', 'identity'))
     args, remaining = parser.parse_known_args()
     if args.resources is not None and not getattr(sys, 'frozen', False):
         resources = args.resources.resolve()
     elif getattr(sys, 'frozen', False):
         resources = next((parent/'Resources' for parent in Path(sys.executable).resolve().parents
-                          if parent.name=='Contents' and (parent/'Resources/application.json').is_file()),None)
+                          if (parent/'Resources/application.json').is_file()),None)
         if resources is None:raise ValueError('No se encontraron los recursos de la aplicación.')
     else:
         resources = Path(__file__).resolve().parent
@@ -30,6 +30,17 @@ def main():
         from build_identity import identity, router_identity
         version, build = identity(resources)
         print(json.dumps({'version': version, 'build': build, 'routerBuild': router_identity(resources), 'packaged': bool(getattr(sys, 'frozen', False) or manifest(resources))}))
+        return 0
+    if args.service == 'import-legacy':
+        if sys.platform != 'win32' or len(remaining) != 1:
+            raise ValueError('Importación no compatible.')
+        from installation_migration import import_legacy, MigrationError
+        try:
+            result = import_legacy(remaining[0], root, platform='win32', record_source=True)
+        except MigrationError as error:
+            print(json.dumps({'error': {'code': error.code}}))
+            return 1
+        print(json.dumps(result))
         return 0
     if args.service == 'monitor' and '--preview' not in remaining and not (root / 'config.local.json').exists():
         from linux_onboarding import prepare

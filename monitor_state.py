@@ -183,8 +183,10 @@ class MonitorState:
         safe['jev'] = {key: value for key, value in (config.get('jev') or {}).items()
                        if key in ('connection', 'timeout_seconds', 'circuit_seconds', 'circuit_failures')}
         tids = set(threads) | {event['thread'] for event in self.history if needs_history and isinstance(event.get('thread'), str) and 0 < len(event['thread']) <= 200}
+        desktop_restart_pending = not self.preview and not connections and read_json(self.state / 'desktop-integration.json').get('status') == 'registered'
         payload = {'productVersion': self.version, 'bridgeVersions': sorted(versions), 'bridgeBuildMismatch': mismatch,
-                'bridgeBuildUnknown': unknown, 'restartRequired': (self.state / 'restart-required.json').exists(),
+                'bridgeBuildUnknown': unknown, 'restartRequired': (self.state / 'restart-required.json').exists() or desktop_restart_pending,
+                'desktopRestartPending': desktop_restart_pending,
                 'threads': threads, 'connections': connections, 'config': safe,
                 'taskModes': {tid: read_mode(self.state, tid) for tid in tids}, 'telemetry': telemetry,
                 'accountUsage': account_usage, 'updates': self.updater.snapshot(),
@@ -228,12 +230,27 @@ class MonitorState:
                     status = json.loads(result.stdout)
                 except (ValueError, UnicodeError):
                     status = {}
+                if not isinstance(status, dict):
+                    status = {}
                 if result.returncode or status.get('error'):
+                    try:
+                        failure = json.loads(result.stderr)
+                    except (ValueError, UnicodeError):
+                        failure = {}
+                    code = failure.get('code') if isinstance(failure, dict) else None
+                    messages = {
+                        'source_monitor_open': 'Cierra el monitor de la instalación anterior y vuelve a conectar desde este monitor.',
+                        'source_bridge_active': 'Desktop todavía usa la instalación anterior. Termina tus tareas, cierra Desktop por completo y vuelve a conectar.',
+                        'source_status_unreadable': 'No se puede leer el estado de la instalación anterior. Revisa su diagnóstico antes de volver a conectar.',
+                        'source_connection_unverified': 'No se pudo verificar la conexión anterior. Comprueba que importaste la instalación que estaba conectada a Desktop.',
+                    }
+                    if isinstance(code, str) and code in messages:
+                        return messages[code]
                     return 'No se pudo completar la conexión. Tus tareas siguen abiertas.'
                 if status.get('connection') == 'desktop_connected':
                     return 'Desktop conectado al selector.'
                 if status.get('registered') is True:
-                    return 'Conexión instalada. Falta observar el nuevo arranque de Desktop.'
+                    return 'Conexión preparada. Reinicia Desktop cuando terminen tus tareas.'
                 if data['value'] == 'uninstall':
                     return 'Conexión retirada. Reinicia Desktop para aplicarlo.'
                 return 'Desktop detectado; pendiente de confirmar su conexión.'

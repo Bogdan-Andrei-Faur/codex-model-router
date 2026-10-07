@@ -1,11 +1,67 @@
-# Continuar desde otro equipo — 05/10/2026
+# Continuar desde otro equipo — 07/10/2026
+
+Windows 0.9.6 is installed and active on the owner host (build
+`611981b0f2d8abd4`, router `b1f4bff15e1556ee`). After the owner's restart,
+read-only installed checks report one fresh Desktop handshake and matching
+router identity; authenticated telemetry advances without unauthorized requests
+or invalid payloads. The installed monitor sees one connection and both restart
+flags are false. **No further restart, import or registration is required.**
+Settings progress and exact initialize/catalog preflight also pass. Six retained
+owner data files were unchanged by setup. See the
+[0.9.6 connection repair and activation receipt](native-validation/2026-10-07-windows-connection-repair-host-a.md).
+
+The 0.9.5 stale-PID fix alone did not close the connection gate: an ANSI JSON
+response and unflushed native stdin also blocked connection. Version 0.9.6
+corrects both. Next-launch registration can adopt a verified owned source
+connection while Desktop is open; offline data import still rejects live or
+unknown processes. Foreign connections and concurrent changes remain protected.
+The exact artifact passes 50 scoped tests, seven Chromium UI groups and the
+frozen interactive protocol/installer lifecycle fixtures. Clean-VM acceptance
+remains historical 0.9.4; physical 0.9.6 gates remain open.
+
+Historical Windows results follow; the receipt above supersedes their owner
+installation and registration state, not their individual validation evidence.
+
+Windows 0.9.4 fixes a registered-uninstall failure reproduced in the clean QA VM:
+native path comparison now normalizes separators. The exact 0.9.4 artifact passes
+33 scoped tests, frozen/native/setup fixtures and all 24 production guest
+assertions, including non-administrator install/uninstall and retained DPAPI data.
+Recovery from the connected 0.9.3 failure also passes. The owner's subsequent
+installation/restart now shows installed 0.9.4 and its native monitor, while
+Desktop still uses the source wrapper/data root. That live source bridge also
+reports 0.9.4 and matching fingerprints, with authenticated telemetry advancing.
+Installed connection registration remains absent; no owner app was stopped or
+replaced by these validation checks. See the
+[owner restart check](native-validation/2026-10-07-windows-owner-restart-host-a.md).
+See the [Windows acceptance receipt](native-validation/2026-10-07-windows-installation-acceptance-host-a.md).
+
+Windows 0.9.0 adds a per-user native setup builder and isolated lifecycle fixtures.
+Windows 0.9.1 fixes import of original Windows configurations with no platform
+marker and surfaces safe failure reasons. Owner import with 0.9.0 exposed this
+gap; use the corrected installer and close the old monitor/Desktop before import.
+Owner import with 0.9.1 succeeded (read-only receipt checked). 0.9.2 adds an inline
+completion screen and explicit Open monitor/Close actions; do not re-import the
+owner's now occupied data root to demonstrate this UI.
+0.9.3 addresses the owner's invisible startup capsule: re-publish bounds on
+viewport/visibility changes and native repositioning, since size-only observation
+missed the capsule moving while retaining its dimensions. Validate the exact
+installed artifact before claiming physical startup acceptance.
+Owner subsequently installed the exact 0.9.3 artifact and confirmed capsule
+startup visibility. See the capsule receipt; broader physical/bridge gates remain
+separate from this specific accepted correction.
+The installed connection is now active with matching identity, fresh Desktop
+handshake and advancing authenticated telemetry. Do not repeat import or
+registration. Historical source/installed mismatch is documented in the receipts.
+Start with [WINDOWS-INSTALLER.md](WINDOWS-INSTALLER.md). Keep source, unsigned
+setup, installed artifact and loaded bridge identities separate. Trusted automatic
+update execution/signing/public distribution are still pending.
 
 ## Empezar aquí
 
 El repositorio privado conserva código, documentación, assets y fixtures;
 los datos del Mac original permanecen allí. Publicar código no instala una
 actualización ni cambia el puente cargado por un Desktop abierto. La revisión
-exacta se obtiene con `git rev-parse HEAD`; `VERSION=0.8.1` no identifica por sí
+exacta se obtiene con `git rev-parse HEAD`; `VERSION` no identifica por sí
 sola estos cambios acumulados. No mover las etiquetas existentes para adaptarlas.
 
 Antes de ejecutar comandos de proyecto, leer [AGENTS.md](../AGENTS.md).
@@ -32,7 +88,8 @@ la aceptación física de la instalación del propietario.
 | Evidencia | `evidence.py`, `inference_attribution.py`, evaluadores y contadores estrictos | ACK/`applied` no prueba inferencia posterior; coste estimado no es facturación |
 | Actualizaciones | `updates.py`: comprobación asíncrona, descarga exacta OS/arquitectura, integridad SHA-256 y cancelación | Solo preparación: `canInstall=false`; no ejecuta instaladores ni demuestra autenticidad del editor |
 | Mac portátil | `package_macos.py`, `packaged_main.py`, `BridgeMac.swift`, `application_layout.py` | `.pkg` local ad-hoc con runtime; no Installer/Gatekeeper en máquina limpia, firma de editor ni notarización |
-| Migración | `installation_migration.py`: copia offline de datos conocidos y namespace opaco de credenciales | Biblioteca protegida, todavía sin flujo gráfico ni activación del puente; no migra claves entre sistemas |
+| Windows instalado | `build_windows_installer.py`, `installer/windows.iss`, entrada estable y versiones independientes | Piloto 0.9.6 sin firma instalado; registro, puente instalado 0.9.6 y telemetría activos tras reinicio del propietario. VM limpia validada en 0.9.4 |
+| Migración | `installation_migration.py`: copia offline; bienvenida gráfica Ubuntu/Windows y traspaso separado de conexión | GUI Mac pendiente; no migra claves entre usuarios/sistemas |
 
 Detalles: [monitor compartido](SHARED-MONITOR.md), [diseño](MONITOR-UI.md),
 [instalación/actualizaciones](INSTALLATION-UPDATES.md),
@@ -183,7 +240,8 @@ registros privados para rellenar una muestra incompleta.
 
 ## Pendientes en orden de continuación
 
-1. Completar la integración gráfica de migración en Mac y Windows. Ubuntu ya
+1. Completar la integración gráfica de migración en Mac y aceptar físicamente la
+   migración/activación Windows desde el nuevo setup. Ubuntu ya
    está migrado al paquete 0.8.1-8 y validado tras reiniciar Desktop: un monitor,
    un puente empaquetado y telemetría autenticada sin rechazos. Los datos de
    origen se conservaron. La aceptación nativa de los otros equipos sigue pendiente.
@@ -195,7 +253,7 @@ registros privados para rellenar una muestra incompleta.
    `codex-model-router-releases` es una propuesta; no se ha creado. El propietario
    no tiene Apple Developer. No crear cuentas de pago, claves de firma, releases
    públicas ni otro repositorio sin autorización concreta.
-4. Completar el instalador GUI Windows sobre el layout común, y QA real de
+4. Completar QA físico/VM del instalador GUI Windows 0.9.0, y QA real de
    instalación limpia/upgrade/cancelación/fallo/recuperación/desinstalación en cada
    OS. El ZIP Windows existente no es el nuevo instalador `-setup.exe`.
 5. Recoger parejas representativas de calidad/consumo con identidad suficiente

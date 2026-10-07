@@ -3,6 +3,7 @@
 The resulting archive is per-user, discovers the current Desktop installation at
 runtime, and keeps history/keys out of the archive. It is not signed yet.
 """
+import argparse
 import json
 from pathlib import Path
 import shutil
@@ -23,9 +24,16 @@ def run(*args):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--framework-reference-path', type=Path,
+                        help='Use an existing .NET Framework 4.8 reference directory for the native build.')
+    args = parser.parse_args()
     if sys.platform != "win32":
         raise SystemExit("El paquete autocontenido de esta entrega se compila en Windows.")
-    run("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(ROOT / "build.ps1"), "-BuildOnly")
+    build = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(ROOT / "build.ps1"), "-BuildOnly"]
+    if args.framework_reference_path:
+        build += ["-FrameworkReferencePath", str(args.framework_reference_path.resolve())]
+    run(*build)
     run(sys.executable, str(ROOT / "build_identity.py"))
     RELEASE.mkdir(exist_ok=True)
     if STAGE.resolve().parent != RELEASE.resolve() or STAGE.name != "Codex-automatico":

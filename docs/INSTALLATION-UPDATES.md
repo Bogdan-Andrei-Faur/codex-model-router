@@ -43,8 +43,8 @@ Staging currently uses the existing data root's `state/updates` directory.
 `application_layout.py` separates immutable resources from per-user data while
 preserving legacy checkout mode. Packaged Mac defaults to
 `~/Library/Application Support/codex-model-router`; Windows/Linux user-data paths
-are defined and tested. Ubuntu packaging is described below; Windows setup remains
-pending. Existing configuration is never replaced by bootstrap. Packaged identity
+are defined and tested. Ubuntu packaging is described below; Windows setup is
+implemented in the 0.9.0 local pilot below. Existing configuration is never replaced by bootstrap. Packaged identity
 comes from the embedded build stamp, not a VERSION file in the data directory.
 
 `package_macos.py` builds a fresh local `.pkg` with an AppKit/WebKit host, native
@@ -109,6 +109,21 @@ the owner's installation. Local artifacts use Debian version/revision names;
 mapping tested targets to public update assets remains part of release delivery.
 
 ## Required next delivery stages
+
+Windows 0.9.6 has a per-user Inno setup builder with a frozen runtime,
+side-by-side version folders, independent user data, native first-run import,
+guarded legacy connection adoption, prerequisite/publisher checks for Microsoft's
+WebView2 bootstrapper and native disconnect/rollback. See [WINDOWS-INSTALLER.md](WINDOWS-INSTALLER.md)
+for build and acceptance evidence. Version 0.9.4 passes the production lifecycle
+in a clean Windows VM, including native connected uninstall. Version 0.9.5 fixes
+stale reused PIDs blocking connection migration and passes frozen/native/setup
+fixtures. Version 0.9.6 additionally passes interactive native protocol and UI
+progress fixtures. The unsigned setup is now installed on the owner host, with
+verified registration. After the owner's restart, the installed 0.9.6 Desktop
+handshake, matching identity and authenticated telemetry also pass. Physical
+input/display/sleep and latest clean-VM acceptance remain separate gates. See the [connection repair receipt](native-validation/2026-10-07-windows-connection-repair-host-a.md).
+The legacy ZIP builder remains available for backwards compatibility. This does
+not change the shared update boundary: no trusted automatic installer execution.
 
 1. Separate immutable application resources/runtime from per-user writable data.
    Remove installed launchers' dependence on the source checkout and developer

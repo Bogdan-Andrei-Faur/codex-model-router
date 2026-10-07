@@ -205,14 +205,20 @@ def install():
     desired = str(wrapper)
     previous = read_environment()
     record = read_registration()
+    transfer = None
     if record and (record.get("wrapper") != desired or record.get("platform") != sys.platform):
         raise DiscoveryError("Hay una conexión anterior de otra instalación. Desconéctala desde su instalación original.")
     if previous["value"] not in (None, "", desired):
-        raise DiscoveryError("Desktop ya usa otra conexión personalizada. No se ha sustituido.")
+        if sys.platform == 'win32' and manifest(CODE_ROOT) and not record:
+            from windows_connection import imported_connection
+            transfer = imported_connection(ROOT, previous)
+        if not transfer:
+            raise DiscoveryError("Desktop ya usa otra conexión personalizada. No se ha sustituido.")
     if not record:
-        record = {"schema": 1, "platform": sys.platform, "wrapper": desired, "previous": previous,
+        record = {"schema": 1, "platform": sys.platform, "wrapper": desired, "previous": transfer['previous'] if transfer else previous,
                   "installed_at": time.time(), "status": "preparing"}
-        atomic_json(registration_path(), record)
+        if not transfer:
+            atomic_json(registration_path(), record)
     # Preflight the exact launcher that Desktop will use. Config migration is
     # reversible on failure; do not register a bridge that cannot start.
     updated = dict(cfg, installation_mode="auto")
@@ -229,6 +235,14 @@ def install():
         raise
     if sys.platform == "darwin":
         ensure_login_agent()
+    if sys.platform == 'win32':
+        if read_environment() != previous:
+            raise DiscoveryError('La conexión cambió durante la comprobación. Se ha conservado.')
+        if transfer:
+            from windows_connection import imported_connection
+            if imported_connection(ROOT, previous) != transfer:
+                raise DiscoveryError('La instalación anterior cambió. Se ha conservado.')
+            record['importedConnection'] = True
     write_environment(desired)
     record.update(status="registered", registered_at=time.time(), protocol_checks=checks, desktop_version=installation.version)
     atomic_json(registration_path(), record)
@@ -361,11 +375,16 @@ def main():
             raise DiscoveryError("Esta conexión requiere Windows, macOS o Linux.")
         output = {"doctor": doctor, "install": install, "uninstall": uninstall,
                   "restore-session": restore_session, "open": open_app}[args.action]()
-        print(json.dumps(output, ensure_ascii=False, indent=2))
+        # ASCII JSON survives Windows ANSI pipes as well as UTF-8 pipes. The
+        # monitor decodes JSON bytes as UTF-8; localized messages must escape.
+        print(json.dumps(output, ensure_ascii=True, indent=2))
         return 0
     except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
         message = str(error) if isinstance(error, DiscoveryError) else "No se pudo completar la conexión. Ejecuta el diagnóstico; no se han cerrado tus tareas."
-        print(json.dumps({"error": message}, ensure_ascii=False), file=sys.stderr)
+        output = {"error": message}
+        if isinstance(error, DiscoveryError) and error.code:
+            output['code'] = error.code
+        print(json.dumps(output, ensure_ascii=True), file=sys.stderr)
         return 1
 
 

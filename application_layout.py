@@ -39,7 +39,7 @@ def manifest(resources):
     if not path.exists():
         return None
     value = json.loads(path.read_text(encoding='utf-8'))
-    if not isinstance(value, dict) or value.get('schema') != 1 or value.get('layout') not in ('macos-bundle-v1', 'linux-deb-v1'):
+    if not isinstance(value, dict) or value.get('schema') != 1 or value.get('layout') not in ('macos-bundle-v1', 'linux-deb-v1', 'windows-install-v1'):
         raise ValueError('Manifiesto de instalación no compatible.')
     return value
 
@@ -61,8 +61,14 @@ def installed_path(resources, key):
     relative = Path(value[key])
     if relative.is_absolute() or '..' in relative.parts:
         raise ValueError('Ruta de instalación no válida.')
-    destination = (resources.parent / relative).resolve()
-    destination.relative_to(resources.parent)
+    base = resources.parent
+    if value['layout'] == 'windows-install-v1' and key == 'bridge':
+        # Windows keeps an owned stable bridge above side-by-side versions.
+        if base.parent.name != 'versions' or relative != Path('bin/codex-router.exe'):
+            raise ValueError('Ruta del puente instalado no válida.')
+        base = base.parent.parent
+    destination = (base / relative).resolve()
+    destination.relative_to(base)
     if not destination.is_file():
         raise ValueError('La instalación está incompleta.')
     return destination

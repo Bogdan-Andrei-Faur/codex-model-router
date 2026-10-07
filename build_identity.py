@@ -31,7 +31,8 @@ def router_identity(root):
         return ROUTER_BUILD_ID
     root = Path(root)
     digest = hashlib.sha256()
-    for path in sorted([*root.glob("*.py"), *root.glob("BridgeMac.swift")]):
+    native=[root/name for name in ('BridgeMac.swift','Launcher.cs','InstalledLauncher.cs','WindowsLayout.cs') if (root/name).is_file()]
+    for path in sorted([*root.glob("*.py"), *native]):
         if path.is_file() and path.name != "build_stamp.py" and path.name not in MONITOR_MODULES:
             digest.update(path.name.encode())
             digest.update(path.read_bytes())

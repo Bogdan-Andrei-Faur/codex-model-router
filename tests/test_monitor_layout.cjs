@@ -16,6 +16,20 @@ const assert = require('node:assert/strict');
     });
     await page.route('**/codex.png',route=>route.fulfill({path:path.resolve(__dirname,'../assets/codex-official.png')}));
     await page.goto(pathToFileURL(path.resolve(__dirname,'../monitor-ui/index.html')).href);
+    // The native Windows clip region must follow position changes even when
+    // the bottom-anchored capsule keeps exactly the same width and height.
+    await page.setViewportSize({width:432,height:674});
+    await page.waitForFunction(()=>window.nativeMessages.some(m=>m.action==='bounds'));
+    await page.evaluate(()=>window.nativeMessages=[]);
+    await page.setViewportSize({width:432,height:1020});
+    await page.waitForFunction(()=>{
+      const bounds=window.nativeMessages.filter(m=>m.action==='bounds').at(-1);
+      const r=document.querySelector('#surface').getBoundingClientRect();
+      return bounds && Math.abs(bounds.y-r.y)<1 && Math.abs(bounds.height-r.height)<1;
+    },null,{timeout:3000});
+    await page.evaluate(()=>{window.receiveUI({mode:'Hidden'});window.nativeMessages=[];window.receiveUI({mode:'Compact'});});
+    await page.waitForFunction(()=>window.nativeMessages.some(m=>m.action==='bounds'),null,{timeout:3000});
+    console.log('PASS: compact native bounds refreshed after viewport resize and hidden/show');
     for (const [mismatch,unknown,restartRequired,label] of [[false,false,false,'v0.3.1'],[false,true,false,'v0.3.1 · puente sin verificar'],[true,true,false,'v0.3.1 · router anterior'],[false,false,true,'v0.3.1 · reinicio pendiente']]) {
       await page.evaluate(([bridgeBuildMismatch,bridgeBuildUnknown,restartRequired])=>window.receive({productVersion:'0.3.1',bridgeVersions:['0.3.1'],bridgeBuildMismatch,bridgeBuildUnknown,restartRequired}),[mismatch,unknown,restartRequired]);
       assert.equal(await page.locator('#product-version').innerText(),label);

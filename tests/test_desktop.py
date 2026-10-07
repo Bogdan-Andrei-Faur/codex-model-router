@@ -1,4 +1,6 @@
 import json
+import contextlib
+import io
 import os
 from pathlib import Path
 import plistlib
@@ -203,6 +205,72 @@ class IntegrationTests(unittest.TestCase):
         with patch.object(desktop,'probe_bridge',side_effect=runtime.DiscoveryError('incompatible')):
             with self.assertRaises(runtime.DiscoveryError):desktop.install()
         self.assertIsNone(self.env['value']);self.assertEqual(desktop.config(),self.cfg)
+
+    def test_cli_connection_failure_returns_actionable_code(self):
+        output=io.StringIO();error=io.StringIO()
+        with patch.object(sys,'argv',['desktop','install']), \
+             patch.object(desktop,'install',side_effect=runtime.DiscoveryError('Safe failure',code='source_bridge_active')), \
+             contextlib.redirect_stdout(output),contextlib.redirect_stderr(error):
+            self.assertEqual(desktop.main(),1)
+        self.assertEqual(output.getvalue(),'')
+        self.assertEqual(json.loads(error.getvalue()),{'error':'Safe failure','code':'source_bridge_active'})
+        self.assertIsNone(self.env['value']);self.assertIsNone(desktop.read_registration())
+
+    def test_localized_cli_error_is_valid_utf8_json_through_windows_ansi_pipe(self):
+        raw=io.BytesIO();error=io.TextIOWrapper(raw,encoding='cp1252')
+        with patch.object(sys,'argv',['desktop','install']), \
+             patch.object(desktop,'install',side_effect=runtime.DiscoveryError('No se pudo verificar la conexión anterior.',code='source_connection_unverified')), \
+             contextlib.redirect_stderr(error):
+            self.assertEqual(desktop.main(),1)
+        error.flush()
+        encoded=raw.getvalue()
+        self.assertTrue(encoded.isascii())
+        self.assertEqual(json.loads(encoded)['error'],'No se pudo verificar la conexión anterior.')
+        self.assertEqual(json.loads(encoded)['code'],'source_connection_unverified')
+        error.detach()
+
+    def imported_setup(self):
+        legacy=self.root/'legacy';(legacy/'dist').mkdir(parents=True);(legacy/'state').mkdir()
+        wrapper=legacy/'dist/codex-router.exe';wrapper.touch()
+        desktop.atomic_json(legacy/'state/desktop-integration.json',{'schema':1,'status':'registered','platform':'win32',
+                            'wrapper':str(wrapper.resolve()),'previous':{'value':None,'kind':1}})
+        desktop.atomic_json(desktop.STATE/'legacy-installation.json',{'schema':1,'root':str(legacy)})
+        self.env['value']=str(wrapper.resolve())
+        return wrapper
+
+    def test_imported_connection_transfer_and_disconnect_preserve_original_environment(self):
+        legacy=self.imported_setup();original=desktop.ROOT/'legacy/state/desktop-integration.json';before=original.read_bytes()
+        with patch.object(desktop,'manifest',return_value={'layout':'windows-install-v1'}),patch.object(desktop,'wrapper_path',return_value=self.root/'dist/codex-router.exe'):
+            self.assertTrue(desktop.install()['registered'])
+        self.assertEqual(desktop.read_registration()['previous'],{'value':None,'kind':1})
+        self.assertEqual(original.read_bytes(),before)
+        desktop.uninstall();self.assertIsNone(self.env['value'])
+
+    def test_active_imported_source_registration_only_selects_next_launch(self):
+        self.imported_setup();snapshot=desktop.ROOT/'legacy/state/status-fixture.json'
+        snapshot.write_text(json.dumps({'pid':os.getpid(),'heartbeat':time.time(),'events':[]}));before=snapshot.read_bytes()
+        with patch.object(desktop,'manifest',return_value={'layout':'windows-install-v1'}), \
+             patch.object(desktop,'wrapper_path',return_value=self.root/'dist/codex-router.exe'), \
+             patch('installation_migration.reject_active',side_effect=AssertionError('Do not import live data')):
+            self.assertTrue(desktop.install()['registered'])
+        self.assertEqual(self.env['value'],str((self.root/'dist/codex-router.exe').resolve()))
+        self.assertEqual(snapshot.read_bytes(),before)
+
+    def test_failed_transfer_can_be_retried_without_partial_registration(self):
+        legacy=self.imported_setup()
+        with patch.object(desktop,'manifest',return_value={'layout':'windows-install-v1'}),patch.object(desktop,'wrapper_path',return_value=self.root/'dist/codex-router.exe'):
+            with patch.object(desktop,'probe_bridge',side_effect=runtime.DiscoveryError('fixture failure')):
+                with self.assertRaises(runtime.DiscoveryError):desktop.install()
+            self.assertIsNone(desktop.read_registration());self.assertEqual(self.env['value'],str(legacy.resolve()))
+            self.assertTrue(desktop.install()['registered'])
+
+    def test_environment_changed_during_transfer_is_preserved(self):
+        legacy=self.imported_setup()
+        def concurrent_change(*args):
+            self.env['value']='foreign-changed-during-probe';return {'handshake':True}
+        with patch.object(desktop,'manifest',return_value={'layout':'windows-install-v1'}),patch.object(desktop,'wrapper_path',return_value=self.root/'dist/codex-router.exe'),patch.object(desktop,'probe_bridge',side_effect=concurrent_change):
+            with self.assertRaises(runtime.DiscoveryError):desktop.install()
+        self.assertEqual(self.env['value'],'foreign-changed-during-probe');self.assertIsNone(desktop.read_registration())
 
 
 if __name__=='__main__': unittest.main()

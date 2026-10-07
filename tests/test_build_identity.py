@@ -27,6 +27,10 @@ class BuildIdentityTests(unittest.TestCase):
             (root / 'BridgeMac.swift').write_text('native bridge changed')
             self.assertNotEqual(router_identity(root), backend)
             backend = router_identity(root)
+            for name in ('Launcher.cs', 'InstalledLauncher.cs', 'WindowsLayout.cs'):
+                (root/name).write_text('native Windows bridge changed')
+                self.assertNotEqual(router_identity(root),backend)
+                backend=router_identity(root)
             (root / 'build_stamp.py').write_text('generated = True')
             self.assertEqual(router_identity(root), backend)
             (root / 'VERSION').write_text('0.3.2')

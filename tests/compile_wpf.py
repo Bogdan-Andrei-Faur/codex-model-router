@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from build_identity import identity, router_identity
 
-SOURCES = ('MonitorWindows.cs',)
+SOURCES = ('MonitorWindows.cs', 'WindowsLayout.cs', 'WindowsOnboarding.cs')
 REFERENCES = ('mscorlib','System','System.Core','System.Windows.Forms','System.Drawing','System.Web.Extensions',
               'System.Security','System.Xaml','WindowsBase','PresentationCore','PresentationFramework')
 
