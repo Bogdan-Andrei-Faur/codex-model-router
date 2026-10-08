@@ -60,7 +60,7 @@ let timer=Timer.scheduledTimer(withTimeInterval:0.1,repeats:true) { timer in
         backdrop.setFrame(monitor.panel.frame,display:true);backdrop.orderFrontRegardless();monitor.panel.orderFrontRegardless()
         // Synthetic lifecycle, not physical hover: ignore the owner's pointer.
         phase=1
-        monitor.web.evaluateJavaScript("window.monitorPointer=()=>{}") { _,error in
+        monitor.web.evaluateJavaScript("window.monitorPointer=()=>{};void 0") { _,error in
             guard error==nil else {exit(3)}
             monitor.setMode("Expanded")
         }

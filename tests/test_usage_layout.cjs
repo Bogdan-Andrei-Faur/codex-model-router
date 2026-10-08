@@ -38,7 +38,23 @@ const {pathToFileURL}=require('node:url');
       assert.equal(await page.locator('#peek .quota-meter[aria-valuenow="76"]').count(),1);
       assert.ok(await page.locator('#peek').evaluate(n=>n.scrollHeight<=n.clientHeight),'Quota details should fit without scrolling when viewport height is sufficient');
       await page.clock.fastForward(12000);assert.equal(await page.locator('#quota .quota-number').innerText(),'—','Quota expiry must not require a new snapshot');
+      await page.evaluate(()=>{
+        const r=document.querySelector('#quota').getBoundingClientRect();
+        window.quotaPointerFixture={x:r.x+r.width/2,y:r.y+r.height/2};
+        window.monitorPointer(window.quotaPointerFixture);
+      });
       await page.keyboard.press('Escape');assert.equal(await page.locator('#peek').isVisible(),false,JSON.stringify(await page.evaluate(()=>({width:innerWidth,dpi:devicePixelRatio,focus:document.activeElement.id,mode:state.ui.mode,peekDismissed,quotaOpen,peekId,peekTimer,body:document.body.className}))));
+      // Layout updates can replay enter events without any physical movement.
+      await page.evaluate(()=>{
+        document.querySelector('#compact').dispatchEvent(new MouseEvent('mouseenter'));
+        document.querySelector('#quota').dispatchEvent(new MouseEvent('mouseenter'));
+      });
+      assert.equal(await page.locator('#peek').isVisible(),false,'Stationary enter events must not undo Escape dismissal');
+      await page.evaluate(()=>{window.monitorPointer(null);window.monitorPointer(window.quotaPointerFixture);});
+      assert.equal(await page.locator('#peek').isVisible(),false,'Native hit-target replay at the same coordinates must preserve dismissal');
+      await page.evaluate(()=>window.monitorPointer({...window.quotaPointerFixture,x:window.quotaPointerFixture.x-1}));
+      assert.equal(await page.locator('#peek').isVisible(),true,'A new pointer movement must restore quota hover');
+      await page.keyboard.press('Escape');
       for(const percent of [0,100,null]){
         await page.evaluate(percent=>window.receive({threads:{a0:{name:'Tarea segura',status:'active',model:'gpt-6-astra',effort:'ultra',agent_category:'audit',context_window:percent===null?{}:{used_percent:percent,used_tokens:percent*1000,capacity_tokens:100000}}}}),percent);
         await page.clock.fastForward(500);

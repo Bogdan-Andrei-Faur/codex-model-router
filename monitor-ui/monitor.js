@@ -7,7 +7,7 @@ let selectedWorkspaceAgent = null;
 let selectedAgent = null, compactOrder=[], agentDetailsOpen=false, quotaDetailsOpen=false;
 let avatarSerial=0, islandFrame=0;
 let peekDismissed=false;
-let quotaOpen = false, nativeHover = null, modeRequest = 0, pendingModeRequest = 0;
+let quotaOpen = false, nativeHover = null, lastHoverPoint = null, modeRequest = 0, pendingModeRequest = 0;
 let islandCloseTimer=null, islandPointerOutside=false;
 function cancelIslandClose() {clearTimeout(islandCloseTimer);islandCloseTimer=null;}
 function scheduleIslandClose() {
@@ -795,10 +795,16 @@ function clearNativeHover() {
 }
 window.monitorPointer = (point,inactive=true) => {
   if(!inactive){clearNativeHover();return;}
+  // Bounds changes can replace the hit target under a stationary cursor.
+  // Only actual pointer movement releases an Escape dismissal.
+  if(point){
+    if(!lastHoverPoint || point.x!==lastHoverPoint.x || point.y!==lastHoverPoint.y)peekDismissed=false;
+    lastHoverPoint={x:point.x,y:point.y};
+  }
   const target=point && state.ui.mode!=='Hidden' ? document.elementFromPoint(point.x,point.y) : null;
   islandPointer(!!target?.closest('#surface'));
   const button=target?.closest('button');
-  if(button!==nativeHover){peekDismissed=false;clearNativeHover();nativeHover=button;button?.classList.add('native-hover');}
+  if(button!==nativeHover){clearNativeHover();nativeHover=button;button?.classList.add('native-hover');}
   if(state.ui.mode==='Compact') {
     if(target?.closest('#compact'))cancelPeekClose();
     else schedulePeekClose();
@@ -819,12 +825,14 @@ $('quota').addEventListener('mouseenter',()=>openQuota());$('quota').addEventLis
 window.addEventListener('resize',()=>{capsule();fitIsland();window.monitorBounds();});
 setInterval(refreshQuota,2000);
 for(const node of document.querySelectorAll('[data-tab]'))node.onclick=()=>showTab(node.dataset.tab);
-$('compact').addEventListener('mouseenter',()=>{peekDismissed=false;cancelPeekClose();});$('compact').addEventListener('mouseleave',schedulePeekClose);
+$('compact').addEventListener('mouseenter',cancelPeekClose);$('compact').addEventListener('mouseleave',schedulePeekClose);
 document.documentElement.addEventListener('mouseleave',()=>{schedulePeekClose();islandPointer(false);});
 $('surface').addEventListener('mouseenter',()=>islandPointer(true));
 $('surface').addEventListener('mouseleave',()=>islandPointer(false));
 $('compact').addEventListener('focusout',event=>{if(!$('compact').contains(event.relatedTarget))schedulePeekClose();});
-$('compact').addEventListener('pointermove',event=>{if(event.movementX||event.movementY)peekDismissed=false;});
+$('compact').addEventListener('pointermove',event=>{
+  if(event.movementX||event.movementY){peekDismissed=false;window.monitorPointer({x:event.clientX,y:event.clientY});}
+});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'){if(peekId||quotaOpen){peekDismissed=true;closePeek();}else setMode('Compact');}});
 let boundsFrame=0;
 window.monitorBounds=()=>{

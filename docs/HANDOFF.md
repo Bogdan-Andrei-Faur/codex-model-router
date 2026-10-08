@@ -9,8 +9,14 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 
 ## Current source and delivery
 
+- Main integration on 2026-10-08 includes `cef7fee`, corrected quota dismissal
+  and the native Mac fixture. The owner authorized publication and installation.
+  The Mac monitor now runs notch build `840e7d1e86cceab6`; its ordinary Desktop
+  bridge uses matching router `80e86c3d7accf253`. One connection is observed,
+  mismatch/unknown and both restart flags are false. No further restart is
+  required for this observed connection. See the [Mac integration and installation receipt](native-validation/2026-10-08-macos-notch-integration.md).
 - Published implementation `30ad758`, native/preview follow-up `c5ff3d9`.
-  Working branch: `feature/dynamic-notch-monitor`, based on
+  Original delivery branch: `feature/dynamic-notch-monitor`, based on
   `48760d78e35c7bd31263308f74cbc39b8a501611`. Use `git rev-parse HEAD` and
   `git status --short --branch` for the published revision and local divergence.
 - Product baseline: `0.9.6`. Development Debian revisions `1~notchN` identify
