@@ -11,6 +11,10 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 
 - Main integration on 2026-10-08 includes `cef7fee`, corrected quota dismissal
   and the native Mac fixture. The owner authorized publication and installation.
+  Runtime commit `9bddadc` is published on `main`;
+  [CI 37812220808](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37812220808)
+  passes 13/14 jobs, including all three monitor/browser jobs. Only the existing
+  Windows frozen-installer protocol failure remains; no Actions quota block was observed.
   The Mac monitor now runs notch build `840e7d1e86cceab6`; its ordinary Desktop
   bridge uses matching router `80e86c3d7accf253`. One connection is observed,
   mismatch/unknown and both restart flags are false. No further restart is
@@ -56,21 +60,24 @@ Only the monitor restarted in the last iteration; Desktop was not restarted.
 See [ratings and spacing receipt](native-validation/2026-10-08-linux-notch-history-ratings.md).
 An installed artifact identity is not the source commit or future CI result.
 
-Current local delivery checks: 518 Python tests (37 skipped for optional/native
+Original Ubuntu branch delivery checks: 518 Python tests (37 skipped for optional/native
 requirements), 31 JS core tests, all 10 shared browser groups, routing corpus 27/27
 and six offline JEV constraint cases pass. Skips do not validate optional Docker
 execution or native platform behavior. Exact `1~notch43` isolated GTK/WebKit
 package smoke and Home opening metric regression also pass. The metric probe
 forces X11 to stay in Xvfb instead of inheriting the owner's Wayland compositor.
-The quota Escape group passed locally and on macOS CI, but failed the Ubuntu/
-Windows browser jobs on both follow-up CI attempts at different width/DPI cases.
-No root fix is demonstrated; shared fixture and physical/input gates remain open.
+The original quota Escape group failed Ubuntu/Windows branch CI at different
+width/DPI cases. The Mac integration reproduced stationary hover replay undoing
+dismissal and corrected it; runtime `9bddadc` now passes all three hosted monitor
+jobs. Physical/input acceptance remains separate from that source regression proof.
 
-Mac/Windows owner-host redesign execution and physical display/input/sleep
-acceptance remain separate. Hosted Windows native compilation/self-test and
+Mac installed/loaded identity is now verified in the receipt above; Windows
+owner-host redesign and physical display/input/sleep acceptance remain separate.
+Historical hosted Windows native compilation/self-test and
 macOS compilation/all ten browser groups pass for `c5ff3d9`; the delivery receipt
-records the complete matrix: 11/14 jobs PASS after one retry; Windows installer
-and Ubuntu/Windows quota Escape jobs FAIL. These gates remain open.
+records the earlier matrix: 11/14 jobs PASS after one retry; Windows installer
+and Ubuntu/Windows quota Escape jobs FAIL. The current 13/14 result supersedes
+the shared quota CI gate; the Windows installer gate remains open.
 Check the current published SHA's complete CI matrix; old runs
 cannot validate it. The previous baseline run had a Windows installer fixture
 failure (`Frozen bridge closed before protocol response`), documented in the

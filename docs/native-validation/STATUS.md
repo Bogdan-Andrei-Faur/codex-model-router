@@ -5,7 +5,7 @@ This ledger is repository-owned; no external knowledge/memory service is needed.
 
 ## Current dynamic notch — 2026-10-08
 
-Development source is `feature/dynamic-notch-monitor`, product baseline `0.9.6`.
+The notch is integrated into `main`; published runtime is `9bddadc`, product baseline `0.9.6`.
 The current implementation is in [NOTCH-MONITOR.md](../NOTCH-MONITOR.md);
 [HANDOFF.md](../HANDOFF.md) contains continuation steps and
 [NOTCH-CHANGELOG.md](../NOTCH-CHANGELOG.md) preserves all iteration notes.
@@ -16,9 +16,9 @@ The current implementation is in [NOTCH-MONITOR.md](../NOTCH-MONITOR.md);
 | Ubuntu installed pilot | `0.9.6-1~notch43`, monitor `2e0a5284b2aa9c8e`, connected router `2fec36051e3ccedb`; last readback PASS | Physical owner input/display/sleep/scaling acceptance remains open |
 | Ubuntu native fixture | Exact `1~notch43` full GTK/WebKit package smoke, History spacing/detail/ratings and Home opening metric probe PASS | Synthetic isolated windows do not accept physical input/compositor behavior |
 | History performance | Incremental transport/projection, parity/recovery and lazy/cached UI PASS; isolated measurements in receipt | Measurements exclude owner-perceived latency acceptance |
-| Intermittent quota Escape | Local/macOS browser group PASS; Ubuntu/Windows CI failed both follow-up attempts at different width/DPI cases | No demonstrated root fix; shared fixture and physical/input gates remain open |
-| macOS/Windows redesign | `c5ff3d9`: hosted Windows native self-test/font PASS; macOS compilation/all ten browser groups PASS. New execution on owner machines NOT_RUN | Hosted fixtures and physical owner receipts are separate |
-| Published delivery CI | `c5ff3d9`, complete 14-job matrix: 11 PASS, 3 FAIL after one retry; [delivery receipt](2026-10-08-documentation-delivery.md) | Windows installer protocol and Ubuntu/Windows quota Escape browser failures remain open |
+| Quota Escape | Stationary hover replay reproduced and corrected; `9bddadc` passes all three hosted monitor/browser jobs, including quota cases | Prior failures retained; physical/input acceptance remains separate |
+| macOS/Windows redesign | Mac isolated AppKit/WebKit and first-click fixtures PASS; installed monitor `840e7d1e86cceab6` and ordinary loaded router `80e86c3d7accf253` match. Windows hosted native self-test/font PASS | Windows owner-host redesign and physical input/display/sleep remain separate |
+| Published delivery CI | `9bddadc`, complete 14-job matrix: 13 PASS, 1 FAIL; [Mac delivery receipt](2026-10-08-macos-notch-integration.md) | Existing Windows installer frozen protocol failure remains; no usage-limit block observed |
 
 Current artifact details: [ratings/spacing](2026-10-08-linux-notch-history-ratings.md).
 Feature receipts: [detail cleanup](2026-10-08-linux-notch-history-detail.md),
@@ -48,10 +48,10 @@ Recheck the actual installed/loaded identities before extending its acceptance.
 
 | Check | macOS owner host | Windows owner host | Ubuntu owner host |
 | --- | --- | --- | --- |
-| ENV: source/installed/loaded identity for new receipt | NOT_RUN | PASS 07/10 owner restart: installed 0.9.6 manifest/monitor and fresh Desktop bridge with matching router build | NOT_RUN for next receipt |
+| ENV: source/installed/loaded identity for new receipt | PASS 08/10 notch source-mode monitor and fresh ordinary Desktop bridge match; [receipt](2026-10-08-macos-notch-integration.md) | PASS 07/10 owner restart: installed 0.9.6 manifest/monitor and fresh Desktop bridge with matching router build | NOT_RUN for next receipt |
 | DKR: local Docker Engine/Desktop full grader suite | NOT_RUN | BLOCKED: Docker CLI unavailable on host-a | PASS at historical local baseline; recheck if engine/runtime changes |
 | TEL: three native authenticated layouts | NOT_RUN for latest transport change | PASS: all three isolated layouts on host-a, 2026-10-06 | Historical three-layout probe on 2026-09-28; NOT_RUN for latest source receipt |
-| TEL-DESKTOP: active ordinary Desktop uses intended bridge | NOT_RUN for current artifact | PASS 07/10 installed 0.9.6 ordinary Desktop handshake; authenticated requests advance, unauthorized/invalid payloads zero | PASS at historical installed baseline |
+| TEL-DESKTOP: active ordinary Desktop uses intended bridge | PASS 08/10 ordinary Desktop handshake/router identity match, one connection, restart/mismatch flags false; no inference attribution claim | PASS 07/10 installed 0.9.6 ordinary Desktop handshake; authenticated requests advance, unauthorized/invalid payloads zero | PASS at historical installed baseline |
 | UI-INPUT/VIEWS: installed native focus/tray/views | NOT_RUN for current artifact | NOT_RUN for current artifact | Prior positioning/topmost fixes accepted; new receipt required for any new artifact |
 | UI-DATA: live context/compaction/quota observations | NOT_RUN for current artifact | NOT_RUN for current artifact | Record natural observations in new receipt |
 | UI-DISPLAY: two physical monitors/different scale | NOT_RUN | NOT_RUN | NOT_RUN |

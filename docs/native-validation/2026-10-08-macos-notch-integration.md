@@ -78,14 +78,31 @@ Desktop was not restarted by the agent; no additional restart is required for
 that observed connection. No model inference attribution or physical UI approval
 is inferred from these checks.
 
+## Published source and CI
+
+Runtime commit `9bddadc73d8d41e27d67b0ac84b07cd7b30f11eb` is published on
+remote `main`, including the three integrated notch commits and the corrections.
+[Run 37812220808](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37812220808)
+completed with 13 successful jobs and one failed Windows installer job.
+All six Python OS/version jobs, both Docker grader architectures, both Debian
+lifecycles and all three native-monitor/browser jobs pass. Thus the correcting
+source passes the previously failing Ubuntu/Windows quota groups as well as Mac.
+
+The sole failure remains `Frozen bridge closed before protocol response` in
+the frozen Windows payload/installer fixture. It predates this integration.
+All 14 jobs started; the failing step ran and exited 1, and its annotations
+show no billing/usage-limit block. This does not assert the account's remaining
+Actions allowance; it identifies the actual failure in this run.
+
+This documentation follow-up changes no runtime or fixture and skips duplicate CI.
+The complete runtime matrix above belongs to `9bddadc`, not to future code changes.
+
 ## Remaining boundaries
 
-- Publication is owner-authorized; record the published runtime SHA and its CI
-  result after push. Local installation/activation checks above do not prove CI.
 - Observe native-plan/catalog projection during ordinary work. Handshake/build
   agreement is not inference attribution or independent result validation.
-- Rerun hosted Windows/Ubuntu quota cases and the Windows installer fixture.
-  Physical owner UI/display/sleep acceptance remains separate.
+- Diagnose the Windows installer fixture's frozen protocol failure on its own
+  native setup. Physical owner UI/display/sleep acceptance remains separate.
 
 No prompts, titles, conversation identifiers, credentials, raw OTLP/logs or
 private filesystem paths are included in this receipt.
