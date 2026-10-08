@@ -1,4 +1,7 @@
-"""Actual Monitor lifecycle in an isolated preview bundle, with safe fixtures."""
+"""Opaque notch lifecycle in an isolated preview bundle, with safe fixtures.
+
+The historical script/capture names remain compatible; desktop blur is hidden.
+"""
 import json
 import os
 import argparse
@@ -52,16 +55,22 @@ let timer=Timer.scheduledTimer(withTimeInterval:0.1,repeats:true) { timer in
         assert(monitor.status.button?.image?.isTemplate==true,"Lucide tray template missing")
         assert(monitor.glass.frame==monitor.hitRect,"Glass escaped the interactive surface")
         assert(monitor.glass.blendingMode == .behindWindow && monitor.glass.material == .hudWindow)
-        assert(monitor.glass.isHidden==NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency)
+        assert(monitor.glass.isHidden,"Opaque notch must keep legacy material hidden")
         monitor.panel.level=NSWindow.Level(rawValue:NSWindow.Level.floating.rawValue+2)
         backdrop.setFrame(monitor.panel.frame,display:true);backdrop.orderFrontRegardless();monitor.panel.orderFrontRegardless()
-        phase=1;monitor.setMode("Expanded");return
+        // Synthetic lifecycle, not physical hover: ignore the owner's pointer.
+        phase=1
+        monitor.web.evaluateJavaScript("window.monitorPointer=()=>{}") { _,error in
+            guard error==nil else {exit(3)}
+            monitor.setMode("Expanded")
+        }
+        return
     }
     if phase==1 && monitor.hitRect.height>200 {
         assert(monitor.glass.frame==monitor.hitRect)
         phase=2
-        monitor.web.evaluateJavaScript("JSON.stringify({rows:document.querySelectorAll('.task-row').length,title:document.querySelector('#view-title').textContent,glass:document.body.classList.contains('native-glass')})") { value,error in
-            guard error==nil,let text=value as? String,let data=text.data(using:.utf8),let result=try? JSONSerialization.jsonObject(with:data) as? [String:Any],result["rows"] as? Int==1,result["title"] as? String=="Agentes",result["glass"] as? Bool==true else {exit(3)}
+        monitor.web.evaluateJavaScript("JSON.stringify({rows:document.querySelectorAll('.task-row').length,heroes:document.querySelectorAll('.companion-hero').length,title:document.querySelector('#view-title').textContent,glass:document.body.classList.contains('native-glass')})") { value,error in
+            guard error==nil,let text=value as? String,let data=text.data(using:.utf8),let result=try? JSONSerialization.jsonObject(with:data) as? [String:Any],result["rows"] as? Int==0,result["heroes"] as? Int==1,result["title"] as? String=="Inicio",result["glass"] as? Bool==true else {exit(3)}
             timer.invalidate()
             monitor.web.evaluateJavaScript("window.receiveUI({reduced:true},null)",completionHandler:nil)
             DispatchQueue.main.asyncAfter(deadline:.now()+0.5) {
@@ -70,7 +79,7 @@ let timer=Timer.scheduledTimer(withTimeInterval:0.1,repeats:true) { timer in
                 DispatchQueue.main.asyncAfter(deadline:.now()+0.5) {
                     capture("native-glass-backdrop-b")
                     monitor.setMode("Hidden");assert(monitor.glass.isHidden);backdrop.orderOut(nil)
-                    print("PASS: real isolated AppKit/WebKit lifecycle, resizing, clipped material, active list and hide")
+                    print("PASS: real isolated AppKit/WebKit lifecycle, resizing, opaque notch, Home principal without inactive rows and hide")
                     app.terminate(nil)
                 }
             }

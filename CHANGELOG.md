@@ -42,6 +42,9 @@ y documentación no crea una versión de producto ni un canal de instaladores.
 - Preview local de solo lectura con URL aleatoria, GET en loopback y acciones
   bloqueadas, separada de los hosts instalados. Nuevos fixtures, assets y recibos
   de instalación quedan documentados y versionados.
+- Revisión de CI: fuente Nunito permitida en el host WebView2, fixtures nativos
+  actualizados a Inicio/Agentes/Escape y preview loopback sin resolución DNS
+  inversa para evitar depender del resolver al arrancar.
 
 La política de selección y el motor oficial no se modifican. El puente añade
 catálogo/plan para el monitor; una instalación anterior los carga en su próximo

@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 from pathlib import Path
 import secrets
+from socketserver import TCPServer
 import sys
 from urllib.parse import parse_qs, urlsplit
 
@@ -18,6 +19,12 @@ from monitor_state import MonitorState
 
 
 class PreviewServer(HTTPServer):
+    def server_bind(self):
+        # This fixed loopback service needs no reverse DNS. HTTPServer's FQDN
+        # lookup can stall startup on hosts without a responsive resolver.
+        TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
     def __init__(self, model, port=0):
         self.model = model
         self.prefix = '/' + secrets.token_urlsafe(32) + '/'
@@ -84,7 +91,8 @@ def main():
     parser.add_argument('--port', type=int, default=0)
     args = parser.parse_args()
     model = MonitorState(user_data_root() if args.live else args.fixture_root,
-                         ROOT, preview=not args.live, read_only=True)
+                         ROOT, preview=not args.live, read_only=True,
+                         platform={'darwin': 'macos', 'win32': 'windows'}.get(sys.platform, 'linux'))
     server = PreviewServer(model, args.port)
     print(server.origin + server.prefix + 'index.html', flush=True)
     try:

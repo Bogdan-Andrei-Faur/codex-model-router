@@ -50,7 +50,8 @@ class NotchPreviewTests(unittest.TestCase):
     def test_loopback_token_allowlist_origin_and_no_mutation_endpoint(self):
         with tempfile.TemporaryDirectory() as directory:
             model = MonitorState(directory, ROOT, preview=True, read_only=True)
-            server = PreviewServer(model)
+            with patch('socket.getfqdn', side_effect=AssertionError('Loopback preview performed DNS lookup')):
+                server = PreviewServer(model)
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
             def request(path, method='GET', headers=None):

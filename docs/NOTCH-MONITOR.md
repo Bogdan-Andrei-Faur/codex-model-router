@@ -167,6 +167,7 @@ local to the browser preview and never saved to the installed preferences.
 
 The server binds only to `127.0.0.1`, uses a random URL token, validates host,
 origin and fetch site, serves an explicit file allowlist, and supports only GET.
+Startup uses the fixed loopback address directly, without reverse-DNS lookup.
 It has no mutation/credential endpoint. `MonitorState(read_only=True)` separately
 blocks configuration, task modes, ratings, connection actions and updates, and
 skips automatic update checks. The native monitor keeps its existing direct/

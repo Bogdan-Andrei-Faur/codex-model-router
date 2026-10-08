@@ -1,5 +1,11 @@
 # Interacción y actualización del monitor de macOS
 
+La sonda de ciclo de vida `tests/probe_mac_glass.py` conserva su nombre histórico
+pero ahora comprueba la isla opaca y el material anterior oculto, Inicio sin
+inactivos y los límites nativos. Su secuencia sintética ignora el puntero físico;
+hover/primer clic siguen en la sonda de interacción y aceptación del propietario.
+El rediseño necesita un recibo Mac nuevo; este host Ubuntu no lo ejecuta.
+
 Actualización posterior: el propietario confirmó que la segunda corrección es
 rápida y funciona. El [rediseño aprobado](MONITOR-UI.md) ya está integrado y
 conserva esos mecanismos; la aceptación visual de esa nueva interfaz sigue

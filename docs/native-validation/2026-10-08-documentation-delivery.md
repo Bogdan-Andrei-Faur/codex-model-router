@@ -74,6 +74,32 @@ failure was in frozen payload/isolated installer validation:
 `Frozen bridge closed before protocol response`. It predates this redesign and
 must not be hidden by citing the older successful 13-job matrix.
 
-Current branch publication and its complete 14-job matrix: pending push/readback.
+First published implementation: `30ad758cf1d0c95ea4bed546ea3aa95ebf410971`,
+remote branch identity verified, no uncommitted project files.
+[Run 37799063084](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37799063084)
+finished with 11 successful jobs and three failures: the previous frozen Windows
+installer failure, the Windows native monitor fixture, and macOS browser preview
+startup. Python on all six OS/version combinations, both real Docker grader
+architectures, both APT lifecycle variants and the Ubuntu monitor job passed.
+
+Follow-up corrections before final publication:
+
+- Windows permits the bundled Nunito file in its existing exact resource
+  allowlist. The native fixture checks an actually loaded font face, Home's
+  principal without inactive rows, the inactive Agents catalog and Escape ACK.
+  The obsolete collapse-button/list assertions are replaced. Its synthetic
+  DOM-driven sequence stops pointer polling, so the runner's unrelated mouse
+  cannot close the fixture; physical hover still requires owner QA.
+- The fixed loopback preview binds without `HTTPServer`'s reverse-DNS lookup,
+  which introduces an unnecessary resolver-dependent startup delay. The new
+  guard passes with DNS resolution forbidden; the existing browser adapter
+  fixture passes locally. This addresses the macOS 15-second startup timeout;
+  the next hosted execution must establish its result on macOS.
+- The Mac lifecycle fixture now expects opaque/hidden legacy material, Home's
+  principal and no inactive Home rows. Its historical script/capture names stay
+  compatible, and synthetic lifecycle ignores physical pointer projection.
+  It remains NOT_RUN on this Ubuntu host.
+
+Current follow-up publication and its complete 14-job matrix: pending push/readback.
 Native compilation/hosted fixtures are CI evidence for the tested SHA, not
 physical acceptance of the owner's installation.

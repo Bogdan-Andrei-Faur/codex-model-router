@@ -155,7 +155,7 @@ sealed class RouterMonitorWindow : Window
             core.AddWebResourceRequestedFilter("*",CoreWebView2WebResourceContext.All);
             core.WebResourceRequested += delegate(object sender,CoreWebView2WebResourceRequestedEventArgs e){
                 Uri uri; bool valid=Uri.TryCreate(e.Request.Uri,UriKind.Absolute,out uri)&&uri.Scheme=="https"&&uri.Host=="monitor.local"&&uri.Port==443&&String.IsNullOrEmpty(uri.Query)&&String.IsNullOrEmpty(uri.UserInfo);
-                string[] assets={"/index.html","/monitor.css","/icons.js","/core.js","/monitor.js","/codex.png"};
+                string[] assets={"/index.html","/monitor.css","/icons.js","/core.js","/monitor.js","/codex.png","/fonts/Nunito-variable.ttf"};
                 if(!valid||!assets.Contains(uri.AbsolutePath))e.Response=environment.CreateWebResourceResponse(new MemoryStream(),403,"Blocked","");
             };
             core.WebMessageReceived += delegate(object sender,CoreWebView2WebMessageReceivedEventArgs e){
@@ -311,19 +311,25 @@ sealed class RouterMonitorWindow : Window
     async void RunSelfTest()
     {
         try{
+            // This synthetic fixture drives DOM actions; the runner's unrelated
+            // mouse position must not collapse it. Physical hover remains owner QA.
+            pointer.Stop();
             await AssertScript("document.querySelectorAll('#agents .avatar').length===1","capsule active-only fixture");
+            await AssertScript("Array.from(document.fonts).some(face=>face.family==='Router Nunito' && face.status==='loaded')","bundled Nunito font in native allowlist");
             await AssertNativeBounds();
             Height=Math.Max(200,Height-64);
             await AssertNativeBounds();
             Position();await AssertNativeBounds();
             SetMode("Hidden");SetMode("Compact");await AssertNativeBounds();
             await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('#expand').click()");
-            await AssertScript("state.ui.mode==='Expanded' && document.querySelectorAll('.task-row').length===1","native mode ACK and shared agent list");
+            await AssertScript("state.ui.mode==='Expanded' && currentTab==='home' && document.querySelectorAll('.companion-hero').length===1 && document.querySelectorAll('.task-row').length===0","native mode ACK and Home principal without inactive rows");
             await AssertScript("document.querySelector('#activity').textContent.includes('Sol 6.1') && document.querySelector('#activity').textContent.includes('Alto')","shared model and effort pills");
+            await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-tab=activity]').click()");
+            await AssertScript("document.querySelectorAll('.agent-pick').length===2 && document.querySelectorAll('.agent-portrait').length===1","Agents catalog includes inactive fixture and portrait");
             await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('[data-tab=history]').click()");
             await AssertScript("state.historyLoaded===true && document.querySelectorAll('.history-row').length===1","private Python lazy journal");
             using(var image=File.Create(Path.Combine(ProbeDirectory,"review-webview2-history.png")))await web.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,image);
-            await web.CoreWebView2.ExecuteScriptAsync("document.querySelector('#collapse').click()");
+            await web.CoreWebView2.ExecuteScriptAsync("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))");
             await AssertScript("state.ui.mode==='Compact'","native compact ACK");
             if(hit.IsEmpty||File.Exists(UiPath)||File.Exists(Path.Combine(root,"config.local.json")))throw new InvalidOperationException("preview isolation and native bounds");
             FinishTest(true,"Shared WebView2 capsule/agents/pills/history; private Python IPC; native mode ACK/bounds; compact startup/resize/hidden-show clip region; isolated preview. First-click/hover/DPI/DPAPI visual acceptance still requires Windows owner QA.");
