@@ -175,7 +175,7 @@ sealed class RouterMonitorWindow : Window
         if(preview)return;
         tray=new Forms.NotifyIcon {Icon=new System.Drawing.Icon(Path.Combine(codeRoot,"assets","codex.ico")),Text="Codex automático",Visible=true};
         var menu=new Forms.ContextMenuStrip();
-        menu.Items.Add("Cápsula",null,delegate{SetMode("Compact");});menu.Items.Add("Panel lateral",null,delegate{SetMode("Expanded");});
+        menu.Items.Add("Cápsula",null,delegate{SetMode("Compact");});menu.Items.Add("Desplegar isla",null,delegate{SetMode("Expanded");});
         menu.Items.Add("Ocultar",null,delegate{SetMode("Hidden");});menu.Items.Add("Mantener delante",null,delegate{Topmost=!Topmost;SaveUi();PublishUi();});
         menu.Items.Add("Pausar / reanudar selector",null,delegate{var config=Read(Path.Combine(root,"config.local.json"));Perform(new Dictionary<string,object>{{"action","config"},{"key","enabled"},{"value",!(Get(config,"enabled") as bool? ?? true)}});});
         menu.Items.Add("Salir",null,delegate{Quit();});tray.ContextMenuStrip=menu;tray.DoubleClick += delegate{SetMode("Expanded");};
@@ -186,10 +186,10 @@ sealed class RouterMonitorWindow : Window
         var screen=Screen();var area=screen.WorkingArea;
         var transform=source==null?Matrix.Identity:source.CompositionTarget.TransformFromDevice;
         var topLeft=transform.Transform(new Point(area.Left,area.Top));var bottomRight=transform.Transform(new Point(area.Right,area.Bottom));
-        double available=bottomRight.Y-topLeft.Y;Width=Math.Min(432,Math.Max(1,bottomRight.X-topLeft.X-20));Height=Math.Max(1,available-20);
+        double available=bottomRight.Y-topLeft.Y;Width=Math.Min(800,Math.Max(1,bottomRight.X-topLeft.X-20));Height=Math.Max(1,available-20);
         double ratio;panelHeight=Math.Min(Height,Math.Max(560,available*(heights.TryGetValue(screen.DeviceName,out ratio)?ratio:.9)));
-        Left=bottomRight.X-Width-10;Top=topLeft.Y+10;
-        // A bottom-anchored capsule can move without a size change. Ask for
+        Left=topLeft.X+(bottomRight.X-topLeft.X-Width)/2;Top=topLeft.Y;
+        // A centered notch can move without a size change. Ask for
         // fresh CSS bounds rather than retaining the initial native clip region.
         PublishBounds();
     }
@@ -261,15 +261,27 @@ sealed class RouterMonitorWindow : Window
     [StructLayout(LayoutKind.Sequential)] struct NativePoint {public int X,Y;}
     [DllImport("user32.dll")]static extern bool GetCursorPos(out NativePoint p);
     [DllImport("gdi32.dll")]static extern IntPtr CreateRoundRectRgn(int left,int top,int right,int bottom,int width,int height);
+    [DllImport("gdi32.dll")]static extern IntPtr CreateRectRgn(int left,int top,int right,int bottom);
+    [DllImport("gdi32.dll")]static extern int CombineRgn(IntPtr target,IntPtr first,IntPtr second,int mode);
     [DllImport("gdi32.dll")]static extern bool DeleteObject(IntPtr handle);
     [DllImport("user32.dll")]static extern int SetWindowRgn(IntPtr hwnd,IntPtr region,bool redraw);
     [DllImport("user32.dll")]static extern int GetWindowRgn(IntPtr hwnd,IntPtr region);
     [DllImport("gdi32.dll")]static extern bool PtInRegion(IntPtr region,int x,int y);
     void ApplyRegion()
     {
-        if(source==null||hit.IsEmpty)return;var matrix=source.CompositionTarget.TransformToDevice;
-        var a=matrix.Transform(hit.TopLeft);var b=matrix.Transform(hit.BottomRight);int radius=(int)(26*matrix.M11);
-        var region=CreateRoundRectRgn((int)Math.Floor(a.X),(int)Math.Floor(a.Y),(int)Math.Ceiling(b.X)+1,(int)Math.Ceiling(b.Y)+1,radius*2,radius*2);
+        if(source==null||hit.IsEmpty)return;previousPointer=null;var matrix=source.CompositionTarget.TransformToDevice;
+        var a=matrix.Transform(hit.TopLeft);var b=matrix.Transform(hit.BottomRight);
+        var region=CreateRectRgn(0,0,0,0);double scale=matrix.M11;
+        double shoulder=Math.Min(20,hit.Width/2),radius=Math.Min(32,Math.Min(Math.Max(0,(hit.Width-2*shoulder)/2),hit.Height/2));
+        for(int line=(int)Math.Floor(a.Y);line<(int)Math.Ceiling(b.Y);line++){
+            double y=(line+.5-a.Y)/scale,inset=shoulder;
+            if(y<shoulder)inset=Math.Sqrt(Math.Max(0,shoulder*shoulder-Math.Pow(shoulder-y,2)));
+            if(y>hit.Height-radius)inset+=radius-Math.Sqrt(Math.Max(0,radius*radius-Math.Pow(y-hit.Height+radius,2)));
+            int end=line+1;
+            if(y>=shoulder && y<=hit.Height-radius)end=Math.Max(end,(int)Math.Floor(b.Y-radius*scale));
+            var strip=CreateRectRgn((int)Math.Ceiling(a.X+inset*scale),line,(int)Math.Floor(b.X-inset*scale),end);
+            CombineRgn(region,region,strip,2);DeleteObject(strip);line=end-1;
+        }
         if(SetWindowRgn(source.Handle,region,true)==0)DeleteObject(region); // Successful transfer belongs to Windows.
     }
     IntPtr Hook(IntPtr hwnd,int message,IntPtr wParam,IntPtr lParam,ref bool handled)
@@ -283,8 +295,13 @@ sealed class RouterMonitorWindow : Window
     {
         if(!ready||mode=="Hidden"||source==null)return;NativePoint native;if(!GetCursorPos(out native))return;
         var point=PointFromScreen(new Point(native.X,native.Y));if(previousPointer.HasValue&&previousPointer.Value==point&&previousActive==IsActive)return;previousPointer=point;previousActive=IsActive;
-        var data=hit.Contains(point)?new Dictionary<string,object>{{"x",point.X},{"y",point.Y}}:null;
-        try{await web.CoreWebView2.ExecuteScriptAsync("window.monitorPointer("+Json.Serialize(data)+","+(IsActive?"false":"true")+")");}catch{}
+        double y=point.Y-hit.Y,shoulder=Math.Min(20,hit.Width/2),radius=Math.Min(32,Math.Min(Math.Max(0,(hit.Width-2*shoulder)/2),hit.Height/2)),inset=shoulder;
+        if(y<shoulder)inset=Math.Sqrt(Math.Max(0,shoulder*shoulder-Math.Pow(shoulder-y,2)));
+        if(y>hit.Height-radius)inset+=radius-Math.Sqrt(Math.Max(0,radius*radius-Math.Pow(y-hit.Height+radius,2)));
+        bool inside=hit.Contains(point)&&point.X>=hit.Left+inset&&point.X<=hit.Right-inset;
+        var data=inside?new Dictionary<string,object>{{"x",point.X},{"y",point.Y}}:null;
+        // Project exits even while active; native clipping may suppress DOM leave.
+        try{await web.CoreWebView2.ExecuteScriptAsync("window.monitorPointer("+Json.Serialize(data)+",true)");}catch{}
     }
     async Task AssertScript(string expression,string check)
     {

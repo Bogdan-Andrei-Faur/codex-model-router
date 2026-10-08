@@ -1,3 +1,8 @@
+> Historical design record. The owner's 2026-10-08 approval replaces the
+> capsule/sidebar, ring components and model-based visual palette with the
+> shared dynamic notch and original companions. See [NOTCH-MONITOR.md](../NOTCH-MONITOR.md).
+> Earlier installation/validation statements below remain historical evidence.
+
 # Monitor: propuesta de experiencia, 2026-09-21
 
 Estado: estudio y prototipo navegable. No reemplaza la interfaz instalada y no

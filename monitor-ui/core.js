@@ -48,9 +48,14 @@
     const keys = Object.keys(rows).filter(key => liveAgent(rows[key])).sort((a,b)=>(rows[b].updated||0)-(rows[a].updated||0));
     return previous.filter(key => keys.includes(key)).concat(keys.filter(key => !previous.includes(key)));
   }
+  function companionOrder(previous,rows) {
+    const keys=Object.keys(rows).filter(id=>liveAgent(rows[id]) || ['waiting','error','failed'].includes(rows[id].status)).sort((a,b)=>(rows[b].updated||0)-(rows[a].updated||0));
+    return previous.filter(id=>keys.includes(id)).concat(keys.filter(id=>!previous.includes(id)));
+  }
   function decisions(events, live = {}) {
     const map = new Map();
     for (const event of events) {
+      if(event.event==='monitor_decision_snapshot' && typeof event.record?.id==='string' && event.record.id){map.set(event.record.id,{...event.record});continue;}
       const id = event.decision_id;
       if (typeof id !== 'string' || !id) continue;
       const item = map.get(id) || {id,time:0,accepted:false,comparisons:{}};
@@ -111,8 +116,13 @@
       for(const key of ['inference_model_mismatch','inference_effort_mismatch'])if(Object.prototype.hasOwnProperty.call(event,key))item[key]=event[key];
       map.set(id,item);
     }
+    return withLiveDecisions([...map.values()],live);
+  }
+  function withLiveDecisions(records,live={}) {
+    const map=new Map(records.map(item=>[item.id,item]));
     for (const [id,row] of Object.entries(live)) {
-      const item = map.get(row.decision_id);
+      const original = map.get(row.decision_id);
+      const item = original && {...original};
       if (!item) continue; // Resuming a task is not a new decision.
       if(row.phase_id && row.phase_id!==item.phase_id)for(const key of ['observed_model','observed_effort','evidence_confidence','inference_source','inference_model_mismatch','inference_effort_mismatch'])delete item[key];
       if(row.phase_id)item.phase_id=row.phase_id;
@@ -124,6 +134,7 @@
       if(row.tokens)for(const key of ['inputTokens','outputTokens','cachedInputTokens','reasoningOutputTokens']) {
         delete item[key];if(row.tokens[key]!==undefined)item[key]=row.tokens[key];
       }
+      map.set(item.id,item);
     }
     return [...map.values()].sort((a,b)=>b.time-a.time);
   }
@@ -180,7 +191,52 @@
     const label=percent===null?'Cuota semanal restante: sin datos actuales':`Cuota semanal restante: ${percent} % disponible`;
     return {percent,label,details:label+'\nCuota compartida de la cuenta.'+windows.map(w=>`\n${w.limit_id||'Codex'} · semanal: ${w.percent===null?'sin datos actuales':w.percent+' % disponible'}${Number.isFinite(w.resets_at)?' · se renueva '+new Date(w.resets_at*1000).toLocaleString('es-ES'):''}`).join('')};
   }
-  const api = {models,efforts,effortColors,neutral,identities,active,status,setting,model,family,identity,stableOrder,decisions,featuredThread,errorLabel,contextGauge,quotaGauge,liveAgent,usageSample,quotaWindows,weeklyQuota};
+  // Stable visual aliases depend on the conversation, never on routing choices.
+  function companion(id) {
+    let hash=2166136261;
+    for(const char of String(id)){hash^=char.codePointAt(0);hash=Math.imul(hash,16777619);}
+    const variants=[['coral','Milo','#ff9e88'],['mint','Lumi','#81d7bd'],['lilac','Nori','#c1a0f0']];
+    const [variant,name,color]=variants[(hash>>>0)%variants.length];
+    return {variant,name,color};
+  }
+  function companionState(row={},connected=true) {
+    if(!connected)return {kind:'offline',headline:'Sin noticias.',label:'Sin conexión · última lectura'};
+    if(row.catalog_only)return {kind:'idle',headline:'Un respiro.',label:'Sin actividad registrada'};
+    if(contextGauge(row).compacting)return {kind:'compacting',headline:'Poniendo orden.',label:'Compactando contexto'};
+    if(['waiting','error','failed'].includes(row.status))return {kind:row.status==='waiting'?'waiting':'error',headline:'Te necesita.',label:status(row.status)};
+    if(active(row.status))return {kind:'working',headline:'En ello.',label:status(row.status)};
+    if(row.status==='completed')return {kind:'done',headline:'Todo listo.',label:'Tarea terminada'};
+    if(row.status==='idle' || !row.status)return {kind:'idle',headline:'Un respiro.',label:'En reposo'};
+    return {kind:'unknown',headline:'A la espera.',label:status(row.status)};
+  }
+  function executionPipeline(row={},connected=true) {
+    const live=row.live_plan,ended=['completed','failed','error','interrupted'].includes(row.status);
+    const stopped=['failed','error','interrupted'].includes(row.status)||['failed','blocked','rejected'].includes(row.phase_status);
+    let steps,source;
+    if(row.status!=='pending' && live?.turn_id && live.turn_id===row.turn_id && Array.isArray(live.steps) && live.steps.length){
+      source='Plan del agente';
+      steps=live.steps.map(step=>({...step,state:step.state==='active'&&ended?(stopped?'stopped':'unknown'):step.state}));
+    }else{
+      if(row.catalog_only || (!row.model&&!row.accepted_model&&!row.phase_status&&!active(row.status)))return null;
+      source='Ejecución';
+      const accepted=!!row.accepted_model || ['accepted','active','observed','completed'].includes(row.phase_status);
+      const started=['active','inProgress','running','completed','failed','interrupted','waiting'].includes(row.status) || ['active','observed','completed'].includes(row.phase_status);
+      const finished=row.status==='completed';
+      steps=[
+        {label:'Selección',state:row.model?'completed':!accepted&&!started?'active':'unknown'},
+        {label:'Aceptación',state:accepted?'completed':!started?'active':'unknown'},
+        {label:'Ejecución',state:finished?'completed':stopped?'stopped':started?'active':'pending'},
+        {label:'Finalización',state:finished?'completed':stopped?'stopped':'pending'}
+      ];
+      if(!row.model && !accepted && !started)steps[1].state='pending';
+    }
+    const labels={completed:'Completado',active:'En curso',pending:'Pendiente',stopped:row.status==='interrupted'?'Interrumpido':'Con incidencia',unknown:'Sin confirmar'};
+    const waiting=row.status==='waiting';
+    return {source,steps:steps.map(step=>({...step,animate:connected&&!waiting&&step.state==='active',
+      statusLabel:!connected&&step.state==='active'?'Última lectura':waiting&&step.state==='active'?'En espera':labels[step.state]||'Sin confirmar'})),
+      status:!connected?'Sin conexión':row.status==='interrupted'?'Interrumpida':stopped?'Con incidencia':row.status==='completed'?'Turno terminado':waiting?'En espera':''};
+  }
+  const api = {withLiveDecisions,executionPipeline,companion,companionState,companionOrder,models,efforts,effortColors,neutral,identities,active,status,setting,model,family,identity,stableOrder,decisions,featuredThread,errorLabel,contextGauge,quotaGauge,liveAgent,usageSample,quotaWindows,weeklyQuota};
   if (typeof module !== 'undefined') module.exports = api;
   else scope.MonitorCore = api;
 })(globalThis);

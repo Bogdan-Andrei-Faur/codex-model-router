@@ -1,5 +1,6 @@
 """Platform-neutral monitor payload/actions using the existing macOS web contract."""
 import json
+import copy
 import math
 import os
 from pathlib import Path
@@ -59,6 +60,105 @@ class MonitorJournal:
                 pass
         return True
 
+FIELDS = ('thread title model effort model_reason effort_reason continuity_strategy source status signal error_type quality model_quality effort_quality routing_engine engine_model engine_status engine_confidence engine_latency_ms inputTokens outputTokens cachedInputTokens reasoningOutputTokens phase_name phase_status phase_model phase_effort phase_transition observed_model observed_effort observed_candidate_model observed_candidate_effort configured_model configured_effort accepted_model accepted_effort pipeline_mode phase_pipeline inference_source evidence_confidence').split()
+IDENTITY_FIELDS = ('observed_model observed_effort observed_candidate_model observed_candidate_effort evidence_confidence inference_source inference_model_mismatch inference_effort_mismatch').split()
+USAGE_FIELDS = ('inputTokens outputTokens cachedInputTokens reasoningOutputTokens').split()
+
+
+class HistoryProjection:
+    """Match MonitorCore.decisions without transferring/replaying raw telemetry."""
+    def __init__(self):
+        self.records = {}
+        self.events_processed = 0
+
+    def apply(self, events):
+        for event in events:
+            self.events_processed += 1
+            identifier = event.get('decision_id')
+            if not isinstance(identifier, str) or not identifier:
+                continue
+            item = self.records.setdefault(identifier, {'id': identifier, 'time': 0, 'accepted': False, 'comparisons': {}})
+            kind = event.get('event')
+            if kind == 'decision_usage_total':
+                item['native_total_usage'] = {key: event[key] for key in USAGE_FIELDS[:3] if key in event}
+                continue
+            if kind == 'decision_usage':
+                for key in USAGE_FIELDS:
+                    item.pop(key, None)
+            if kind == 'inference_observed' and event.get('evidence_confidence') == 'confirmed' and event.get('estimate_basis') == 'standard_equivalent_not_billed' and event.get('inference_event_id'):
+                item.setdefault('usage_estimates', {})[event['inference_event_id']] = {
+                    key: event[source] for key, source in [('usd', 'estimated_api_standard_usd'), ('credits', 'estimated_codex_standard_credits')] if source in event}
+            if kind == 'phase_checkpoint':
+                item.setdefault('phase_events', []).append(event.copy())
+                if event.get('phase_status') == 'applied':
+                    if item.get('observed_model'):
+                        previous = {key: item[source] for key, source in [('model', 'observed_model'), ('effort', 'observed_effort'), ('phase_id', 'phase_id'), ('confidence', 'evidence_confidence')] if source in item}
+                        item.setdefault('prior_inferences', []).append(previous)
+                    for key in IDENTITY_FIELDS:
+                        item.pop(key, None)
+                    for key, fallback in [('accepted_model', 'phase_model'), ('accepted_effort', 'phase_effort')]:
+                        value = event.get(key) or event.get(fallback)
+                        if value is not None:
+                            item[key] = value
+                        else:
+                            item.pop(key, None)
+            if kind in ('inference_metric', 'inference_observed', 'inference_probable'):
+                model = event.get('observed_model') or event.get('observed_candidate_model')
+                effort = event.get('observed_effort') or event.get('observed_candidate_effort') or ''
+                sample_key = ((str(event['phase_id']) + ':') if event.get('phase_id') else '') + (event.get('inference_event_name') or 'unknown') + ':' + (event.get('inference_event_kind') or 'unknown') + ((':' + model + ':' + effort) if model else '')
+                samples = item.setdefault('inference_samples', {})
+                previous = samples.get(sample_key, {})
+                samples[sample_key] = dict(event, count=previous.get('count', 0) + (event.get('inference_sample_count') or 1), failures=previous.get('failures', 0) + (event.get('inference_failure_count') or 0))
+                item.update({key: value for key, value in event.items() if key.startswith('inference_') and key not in ('inference_model_mismatch', 'inference_effort_mismatch')})
+                if kind == 'inference_metric' or (kind == 'inference_probable' and item.get('evidence_confidence') == 'confirmed'):
+                    continue
+            if kind == 'native_turn_error':
+                if event.get('will_retry') is True:
+                    item['native_retries'] = item.get('native_retries', 0) + 1
+                continue
+            if kind == 'decision_completed':
+                for key in ('error_type', 'error_code', 'error_http_status', 'error_source'):
+                    item.pop(key, None)
+            if event.get('phase_id') and (kind != 'phase_checkpoint' or event.get('phase_status') == 'applied'):
+                item['phase_id'] = event['phase_id']
+            if kind != 'decision_quality':
+                value = event.get('time', 0)
+                try:
+                    value = float(value or 0)
+                except (ValueError, TypeError):
+                    value = 0
+                item['time'] = max(item['time'], value)
+            if kind == 'decision_created':
+                item['started'] = value
+                for key in ('product_version', 'build_id', 'routing_policy_version', 'request_kind', 'quality_floor', 'min_effort'):
+                    if key in event:
+                        item[key] = event[key]
+                    else:
+                        item.pop(key, None)
+            if kind in ('decision_accepted', 'decision_recovered'):
+                item['accepted'] = True
+            if kind in ('decision_completed', 'decision_rejected', 'decision_error'):
+                item['finished'] = value
+            for key in FIELDS:
+                if kind == 'engine_comparison' and (key.startswith('engine_') or key in ('routing_engine', 'continuity_strategy')):
+                    continue
+                if key in event:
+                    item[key] = event[key]
+            if kind == 'engine_comparison':
+                item['comparisons'][event.get('routing_engine') or 'rules'] = event.copy()
+                item['routing_engine'] = item.get('appliedEngine') if 'appliedEngine' in item else event.get('routing_engine') if 'engine_active' not in event and event.get('engine_status') == 'ok' else 'rules'
+            if kind == 'decision_routed':
+                if 'routing_engine' in item:
+                    item['appliedEngine'] = item['routing_engine']
+            for key in ('error_code', 'error_http_status', 'error_source', 'inference_model_mismatch', 'inference_effort_mismatch'):
+                if key in event:
+                    item[key] = event[key]
+
+    def snapshot(self):
+        # A detached transport value is also safe across callers/revision caching.
+        return [{'event': 'monitor_decision_snapshot', 'record': copy.deepcopy(item)} for item in self.records.values()]
+
+
 CONFIG_KEYS = ('enabled', 'inference_telemetry', 'phase_routing', 'prompt_logging', 'history_days', 'routing_engine', 'comparison_engines', 'routes', 'policy_mode', 'policy_classes', 'candidate_jev_comparison', 'updates_auto_check')
 TELEMETRY_COUNTERS = (
     'requests', 'records_scanned', 'eligible_records', 'events_without_model', 'unrecognized_records',
@@ -108,14 +208,20 @@ def number(value):
 
 
 class MonitorState:
-    def __init__(self, root, code_root=None, preview=False, platform='linux'):
+    def __init__(self, root, code_root=None, preview=False, platform='linux', read_only=False):
         self.root = Path(root)
         self.state = self.root / 'state'
         self.code_root = Path(code_root or root)
         self.preview = preview
+        self.read_only = read_only
         self.version, self.build = identity(self.code_root)
         self.router_build = router_identity(self.code_root)
         self.history = []
+        self.ui_history = []
+        self.history_projection = HistoryProjection()
+        self.projected_primary = None
+        self.projected_count = 0
+        self.projected_recovered = False
         if platform not in ('linux', 'macos', 'windows'):
             raise ValueError('Plataforma no válida.')
         self.platform = platform
@@ -133,6 +239,16 @@ class MonitorState:
             changed |= journal.update(self.state / name)
         if changed:
             self.history = [row for journal in self.journals for row in journal.rows]
+            primary, recovered = self.journals
+            if self.projected_primary is primary.rows and not recovered.rows and not self.projected_recovered:
+                self.history_projection.apply(primary.rows[self.projected_count:])
+            else:
+                self.history_projection = HistoryProjection()
+                self.history_projection.apply(self.history)
+            self.projected_primary = primary.rows
+            self.projected_count = len(primary.rows)
+            self.projected_recovered = bool(recovered.rows)
+            self.ui_history = self.history_projection.snapshot()
             self.journal_revision += 1
 
     def payload(self, needs_history=True, history_revision=-1):
@@ -140,7 +256,7 @@ class MonitorState:
             return self._payload(needs_history, history_revision)
 
     def _payload(self, needs_history, history_revision):
-        threads, versions, connections = {}, set(), 0
+        threads, agent_threads, versions, connections = {}, {}, set(), 0
         telemetry = {'enabled': False}
         account_usage = {}
         mismatch = unknown = False
@@ -168,39 +284,45 @@ class MonitorState:
             for tid, row in data['threads'].items():
                 if isinstance(row, dict) and number(row.get('updated')) >= number(threads.get(tid, {}).get('updated')):
                     threads[tid] = row
+            for tid, row in (data.get('agent_threads') or data['threads']).items():
+                if isinstance(row, dict) and number(row.get('updated')) >= number(agent_threads.get(tid, {}).get('updated')):
+                    agent_threads[tid] = row
         if self.preview:
             threads = read_json(self.root / 'preview.json').get('threads', {})
+            agent_threads = threads
             account_usage = read_json(self.root / 'preview.json').get('account_usage', {})
             connections = 1
         if needs_history:
             self.load_history()
         config = migrate_config(read_json(self.root / 'config.local.json'))
-        if not self.preview:
+        if not self.preview and not self.read_only:
             self.updater.maybe_check(config.get('updates_auto_check') is True)
         safe = {key: config[key] for key in CONFIG_KEYS if key in config}
         for key, default in [('phase_routing', True), ('inference_telemetry', True), ('prompt_logging', True), ('history_days', 0)]:
             safe.setdefault(key, default)
         safe['jev'] = {key: value for key, value in (config.get('jev') or {}).items()
                        if key in ('connection', 'timeout_seconds', 'circuit_seconds', 'circuit_failures')}
-        tids = set(threads) | {event['thread'] for event in self.history if needs_history and isinstance(event.get('thread'), str) and 0 < len(event['thread']) <= 200}
+        tids = set(threads) | set(agent_threads) | {event['thread'] for event in self.history if needs_history and isinstance(event.get('thread'), str) and 0 < len(event['thread']) <= 200}
         desktop_restart_pending = not self.preview and not connections and read_json(self.state / 'desktop-integration.json').get('status') == 'registered'
         payload = {'productVersion': self.version, 'bridgeVersions': sorted(versions), 'bridgeBuildMismatch': mismatch,
                 'bridgeBuildUnknown': unknown, 'restartRequired': (self.state / 'restart-required.json').exists() or desktop_restart_pending,
                 'desktopRestartPending': desktop_restart_pending,
-                'threads': threads, 'connections': connections, 'config': safe,
+                'threads': threads, 'agentThreads': agent_threads, 'connections': connections, 'config': safe,
                 'taskModes': {tid: read_mode(self.state, tid) for tid in tids}, 'telemetry': telemetry,
                 'accountUsage': account_usage, 'updates': self.updater.snapshot(),
                 'historyLoaded': history_revision >= 0 or needs_history, 'journalRevision': self.journal_revision,
-                'preview': self.preview, 'platform': self.platform,
+                'preview': self.preview, 'readOnly': self.read_only, 'platform': self.platform,
                 'secretStorage': {'linux': 'el llavero de Linux (Secret Service)', 'macos': 'el llavero de macOS',
                                   'windows': 'Windows DPAPI (usuario actual)'}[self.platform]}
         if needs_history and history_revision != self.journal_revision:
-            payload['history'] = self.history
+            payload['history'] = self.ui_history
         return payload
 
     def action(self, data):
         """Only product actions; window geometry and credential custody stay native."""
         with self.lock:
+            if self.read_only:
+                raise ValueError('Vista previa de solo lectura.')
             action = data.get('action')
             if action == 'update':
                 if self.preview:
@@ -259,7 +381,7 @@ class MonitorState:
             return 'Guardado.'
 
     def configure(self, key, value):
-        if self.preview:
+        if self.preview or self.read_only:
             raise ValueError('Los cambios están desactivados en la vista previa.')
         valid = False
         if key in ('enabled', 'phase_routing', 'prompt_logging', 'inference_telemetry', 'updates_auto_check'):
@@ -294,7 +416,7 @@ class MonitorState:
                 atomic_json(self.state / 'restart-required.json', {k: config.get(k) is True for k in ('phase_routing', 'inference_telemetry')})
 
     def task_mode(self, thread, value):
-        if self.preview or value not in ('manual', 'automatic'):
+        if self.preview or self.read_only or value not in ('manual', 'automatic'):
             raise ValueError('Modo no válido o vista previa.')
         path = mode_path(self.state, thread)
         known = set(self.payload()['threads']) | {r.get('thread') for r in self.history}
@@ -303,7 +425,7 @@ class MonitorState:
         atomic_json(path, {'schema': 1, 'thread': thread, 'mode': value})
 
     def quality(self, identifier, aspect, value):
-        if self.preview or value not in ('', 'insufficient', 'adequate', 'excessive') or aspect not in ('overall', 'model', 'effort'):
+        if self.preview or self.read_only or value not in ('', 'insufficient', 'adequate', 'excessive') or aspect not in ('overall', 'model', 'effort'):
             raise ValueError('Valoración no válida o vista previa.')
         self.payload()
         if not any(r.get('decision_id') == identifier for r in self.history):
@@ -311,3 +433,14 @@ class MonitorState:
         field = {'overall': 'quality', 'model': 'model_quality', 'effort': 'effort_quality'}[aspect]
         append_record(self.state, {'schema': 2, 'event': 'decision_quality', 'decision_id': identifier,
                                   field: value, 'time': time.time(), 'time_iso': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())})
+
+
+def notch_inset(width, height, y):
+    shoulder = min(20, width / 2)
+    radius = min(32, max(0, (width - 2 * shoulder) / 2), height / 2)
+    inset = shoulder
+    if y < shoulder:
+        inset = math.sqrt(max(0, shoulder ** 2 - (shoulder - y) ** 2))
+    if y > height - radius:
+        inset += radius - math.sqrt(max(0, radius ** 2 - (y - height + radius) ** 2))
+    return inset

@@ -205,3 +205,49 @@ test('usage estimates deduplicate completions and exclude unconfirmed evidence',
   const row=C.decisions([event,event,{...event,event:'inference_probable',inference_event_id:'response2'}])[0];
   assert.deepEqual(row.usage_estimates,{response1:{usd:.02,credits:.5}});
 });
+
+test('companion identity is stable and independent of routing metadata',()=>{
+  const identities=Array.from({length:100},(_,i)=>C.companion('conversation-'+i));
+  assert.equal(new Set(identities.map(i=>i.variant)).size,3);
+  assert.deepEqual(C.companion('stable'),C.companion('stable'));
+  for(const item of identities){assert.match(item.color,/^#[a-f0-9]{6}$/);assert.ok(item.name);}
+});
+test('companion state distinguishes compaction, waiting, completion and disconnection',()=>{
+  assert.equal(C.companionState({status:'completed',context_compaction:{state:'compacting'}}).kind,'compacting');
+  assert.equal(C.companionState({status:'waiting'}).kind,'waiting');
+  assert.equal(C.companionState({status:'completed'}).kind,'done');
+  assert.equal(C.companionState({status:'active'},false).kind,'offline');
+  assert.equal(C.companionState({status:'interrupted'}).kind,'unknown');
+});
+test('compact companions keep waiting/error visible without treating them as live',()=>{
+  const rows={working:{status:'active'},waiting:{status:'waiting'},failed:{status:'error'},done:{status:'completed'}};
+  assert.deepEqual(C.stableOrder([],rows),['working']);
+  assert.deepEqual(C.companionOrder([],rows),['working','waiting','failed']);
+  assert.deepEqual(C.companionOrder(['waiting','working'],rows),['waiting','working','failed']);
+});
+
+test('live pipeline follows native steps, resets by turn and never completes a plan from turn end',()=>{
+ const row={turn_id:'one',status:'active',live_plan:{turn_id:'one',steps:[{label:'Investigar',state:'completed'},{label:'Implementar',state:'active'},{label:'Validar',state:'pending'}]}};
+ assert.deepEqual(C.executionPipeline(row).steps.map(s=>s.state),['completed','active','pending']);
+ assert.equal(C.executionPipeline(row).steps[1].animate,true);
+ assert.equal(C.executionPipeline(row,false).steps[1].animate,false);
+ assert.equal(C.executionPipeline({...row,status:'waiting'}).steps[1].statusLabel,'En espera');
+ assert.deepEqual(C.executionPipeline({...row,status:'completed'}).steps.map(s=>s.state),['completed','unknown','pending']);
+ assert.equal(C.executionPipeline({...row,status:'interrupted'}).steps[1].state,'stopped');
+ assert.equal(C.executionPipeline({...row,turn_id:'two'}).source,'Ejecución');
+ assert.equal(C.executionPipeline({catalog_only:true}),null);
+ assert.equal(C.executionPipeline({status:'completed',model:'gpt-6.1-sol',accepted_model:'gpt-6.1-sol'}).steps.at(-1).state,'completed');
+});
+
+test('live overlays never mutate cached historical evidence or token counters',()=>{
+  const base=C.decisions([{event:'decision_created',decision_id:'d',time:1,phase_id:'p',model:'gpt-6-luna'},
+    {event:'inference_observed',decision_id:'d',phase_id:'p',observed_model:'gpt-6-luna',evidence_confidence:'confirmed',time:2},
+    {event:'decision_usage',decision_id:'d',inputTokens:10,outputTokens:2,time:3}]);
+  const cached=structuredClone(base);
+  const live=C.withLiveDecisions(base,{t:{decision_id:'d',name:'Updated task',phase_id:'q',tokens:{outputTokens:0}}});
+  assert.equal(live[0].observed_model,undefined);
+  assert.equal(live[0].inputTokens,undefined);
+  assert.equal(live[0].outputTokens,0);
+  assert.deepEqual(base,cached);
+  assert.deepEqual(C.withLiveDecisions(base,{}),cached);
+});

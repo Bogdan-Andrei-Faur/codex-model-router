@@ -54,7 +54,7 @@ class MonitorServiceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)
             atomic_json(root/'config.local.json', {'enabled':True,'jev':{'connection':'typesafe','api_key':'PRIVATE_SENTINEL'},'python':'PRIVATE_PATH'})
-            atomic_json(root/'state/status-fixture.json', {'pid':os.getpid(),'heartbeat':time.time(),'threads':{'thread':{'updated':1,'status':'active'}},'telemetry':dict.fromkeys(TELEMETRY_COUNTERS,1)})
+            atomic_json(root/'state/status-fixture.json', {'pid':os.getpid(),'heartbeat':time.time(),'threads':{'thread':{'updated':1,'status':'active'}},'agent_threads':{'thread':{'updated':1,'status':'active'},'idle':{'status':'idle','catalog_only':True}},'telemetry':dict.fromkeys(TELEMETRY_COUNTERS,1)})
             projections=[]
             for platform in ('macos','windows','linux'):
                 payload=MonitorState(root, ROOT, platform=platform).payload(False)
@@ -63,7 +63,10 @@ class MonitorServiceTests(unittest.TestCase):
                 self.assertNotIn('PRIVATE_',json.dumps(payload))
                 self.assertTrue(all(payload['telemetry'][key]==1 for key in set(TELEMETRY_COUNTERS)))
                 self.assertEqual(payload['threads']['thread']['status'],'active')
-                projections.append({key:payload[key] for key in ('threads','telemetry','config','connections')})
+                self.assertEqual(set(payload['threads']),{'thread'})
+                self.assertEqual(set(payload['agentThreads']),{'thread','idle'})
+                self.assertEqual(payload['taskModes']['idle'],'automatic')
+                projections.append({key:payload[key] for key in ('threads','agentThreads','telemetry','config','connections')})
             self.assertEqual(projections[0],projections[1]); self.assertEqual(projections[1],projections[2])
 
     def test_real_child_lazy_history_revision_and_preview_are_read_only(self):
@@ -103,7 +106,7 @@ class MonitorServiceTests(unittest.TestCase):
                 self.assertTrue(dispatch(model,dict(action,requestId=1))['ok'])
             self.assertEqual(json.loads((root/'config.local.json').read_text())['jev']['api_key'],'PRIVATE_SENTINEL')
             self.assertEqual(model.payload()['taskModes']['thread'],'manual')
-            self.assertEqual(model.payload()['history'][-1]['model_quality'],'adequate')
+            self.assertEqual(model.payload()['history'][-1]['record']['model_quality'],'adequate')
             for action in ({'action':'quality','id':'missing','value':'adequate'}, {'action':'taskMode','thread':'unknown','value':'manual'}, {'action':'config','key':'python','value':'evil'}, {'action':'connection','value':'arbitrary'}):
                 with self.assertRaises(ValueError):dispatch(model,dict(action,requestId=2))
 

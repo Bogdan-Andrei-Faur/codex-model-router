@@ -14,7 +14,7 @@ const assert=require('node:assert/strict');
     await page.goto(pathToFileURL(path.resolve(__dirname,'../monitor-ui/index.html')).href);
     await page.evaluate(()=>{window.receive({productVersion:'0.8.1',ui:{mode:'Expanded',reduced:true},updates:{status:'idle',installedVersion:'0.8.1'}});showTab('settings');});
     const settings=page.locator('#settings');
-    assert.ok((await settings.innerText()).includes('Versión instalada · 0.8.1'));
+    assert.ok((await settings.innerText()).includes('Versión instalada · v0.8.1'));
     await settings.getByRole('button',{name:'Comprobar ahora',exact:true}).click();
     assert.deepEqual(await page.evaluate(()=>window.nativeMessages.filter(m=>m.action==='update').at(-1)),{action:'update',value:'check'});
     await page.evaluate(()=>window.receive({updates:{status:'available',installedVersion:'0.8.1',latestVersion:'0.9.0',canDownload:true}}));

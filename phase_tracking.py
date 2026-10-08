@@ -6,7 +6,7 @@ is marked as observed.
 """
 
 ASTRA = "gpt-6-astra"
-from workload import STEPS
+from workload import STEPS, plan_steps
 from model_catalog import MODELS
 COMPATIBLE_LIVE_MODELS = frozenset(("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"))
 
@@ -71,3 +71,22 @@ def phase_update(row, status, model=None, effort=None, transition=None):
     steps = [step.get("id") for step in row.get("phase_pipeline", []) if step.get("evidence") == "plan"]
     result["phase_pipeline"] = dynamic_pipeline(row.get("agent_category", "general"), status, steps)
     return result
+
+
+def native_plan(params):
+    """Project native plan states to content-free labels; discard all free text."""
+    plan = params.get("plan")
+    turn = params.get("turnId")
+    if not isinstance(turn, str) or not turn or not isinstance(plan, list) or len(plan) > 100:
+        return None
+    labels = {key: label for key, label, _ in STEPS}
+    states = {"pending": "pending", "inProgress": "active", "completed": "completed"}
+    steps = []
+    for index, step in enumerate(plan):
+        if not isinstance(step, dict) or step.get("status") not in states or not isinstance(step.get("step"), str):
+            return None
+        hints = plan_steps(step["step"][:4000])
+        label = labels[hints[0]] if hints else "Paso " + str(index + 1)
+        steps.append({"id": "step_" + str(index + 1), "label": label,
+                      "state": states[step["status"]], "evidence": "native_plan"})
+    return {"turn_id": turn, "steps": steps}

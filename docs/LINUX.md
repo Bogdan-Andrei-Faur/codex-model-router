@@ -131,7 +131,7 @@ Tras moverlo, ejecutar setup e install desde la ubicación nueva.
 
 ## Monitor y claves
 
-La bandeja permite alternar cápsula/panel, ocultar, pausar, mantener delante y
+La bandeja permite alternar compacto/isla desplegada, ocultar, pausar, mantener delante y
 salir. El acceso «Monitor de Codex» vuelve a mostrar la misma instancia. Sin
 AppIndicator se conserva esa forma de recuperación. Cerrar u ocultar el monitor
 no detiene el router. Las preferencias se guardan en
@@ -139,12 +139,20 @@ no detiene el router. Las preferencias se guardan en
 Los archivos JSON se reemplazan atómicamente; las valoraciones usan el mismo
 bloqueo de historial que el puente.
 
-El monitor prefiere X11/XWayland para que GNOME aplique la posición a la derecha
+El monitor prefiere X11/XWayland para que GNOME aplique la posición superior centrada
 y «Mantener delante», también al arrancar desde el acceso del escritorio.
 Solo su proceso usa `GDK_BACKEND=x11,wayland` por defecto: la sesión Ubuntu y
 Desktop pueden seguir usando Wayland. Se respeta un `GDK_BACKEND` explícito.
 La posición y la preferencia de superposición se reaplican tras mostrar la
 ventana, también después de ocultarla. La zona transparente deja pasar los clics.
+
+El host ofrece hasta 800px lógicos de viewport para la interfaz compartida. La
+región de entrada reproduce hombros cóncavos y esquinas inferiores de la isla.
+Un sondeo cada 50ms comprueba que la ventana bajo el puntero pertenece al monitor;
+en XWayland evita conservar hover por coordenadas obsoletas de una app Wayland.
+El estado exterior se repite para recuperar salidas perdidas. Inicio/Agentes
+ajustan altura; las vistas secundarias se redimensionan desde abajo. Geometría,
+preview local y recibos actuales: [NOTCH-MONITOR.md](NOTCH-MONITOR.md).
 
 Si no hay X11/XWayland disponible, se usa Wayland nativo y se muestra el aviso
 de sus limitaciones: el compositor decide posición y superposición. Las

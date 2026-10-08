@@ -2,7 +2,7 @@
 
 ## Iconos funcionales de la aplicación
 
-El catálogo funcional se unifica con **Lucide 1.51.0**: 27 SVG originales
+El catálogo funcional se unifica con **Lucide 1.51.0**: 33 SVG originales
 en `assets/lucide/icons`, licencia íntegra en `assets/lucide/LICENSE` y versión,
 integridad del paquete y SHA-256 de cada SVG en `assets/lucide/manifest.json`.
 Proceden de `lucide-static` publicado por Lucide; no son dibujos propios.
@@ -14,7 +14,12 @@ El PNG template de la bandeja Mac (`monitor-ui/tray-route.png`) es una
 rasterización del SVG `route`, sin cambiar el diseño. La licencia también
 se incluye en el bundle del monitor (`lucide-license.txt`). Todo funciona localmente.
 
-Los anillos de cuota/contexto, puntos de estado, barras y órbitas son
+Los personajes Milo/Lumi/Nori son ilustraciones originales SVG construidas por
+la interfaz, independientes del modelo. Checks, números, barras y nodos de la
+pipeline representan estados/datos; no se añaden al catálogo Lucide. Los
+personajes no usan imágenes generadas ni descargas en tiempo de ejecución.
+
+Los anillos históricos de cuota/contexto, puntos de estado, barras y órbitas son
 visualizaciones de datos, no pictogramas del catálogo. El logo existente del
 acceso sigue siendo el recurso de marca descrito abajo, separado de Lucide.
 Los checkmarks estándar que dibuja el sistema en sus menús no son dibujos
@@ -50,3 +55,12 @@ descargada sin los parametros de reduccion el 2026-09-21:
 https://ph-files.imgix.net/64f50b38-7e9e-47ca-b2e9-2939ff10431a.png
 El monitor usa esta version con escalado de alta calidad. El ICO conserva la
 version de 256 x 256 para compatibilidad con el formato de iconos de Windows.
+
+## Tipografía del monitor
+
+La interfaz compartida utiliza Nunito variable (peso 200–1000, estilo normal),
+obtenida sin modificaciones del repositorio oficial [Google Fonts](https://github.com/google/fonts/tree/main/ofl/nunito).
+El archivo se distribuye localmente en `monitor-ui/fonts/Nunito-variable.ttf`,
+con la licencia SIL Open Font License 1.1 íntegra (`OFL-Nunito.txt`) y un manifiesto
+con revisión de origen, URL, tamaño y SHA-256. Los tres paquetes copian esta misma
+carpeta; el monitor no descarga fuentes al ejecutarse.

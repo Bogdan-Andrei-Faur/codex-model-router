@@ -1,5 +1,18 @@
 # Validation and integration notes
 
+## Current dynamic-notch delivery — 2026-10-08
+
+[Delivery receipt](native-validation/2026-10-08-documentation-delivery.md):
+complete pending monitor/bridge/UI work, assets, fixtures and current documentation
+on `feature/dynamic-notch-monitor`, based on product `0.9.6`.
+Local Python/core/browser/routing checks and isolated Ubuntu package checks pass;
+the receipt separates publication CI from the previously installed `1~notch43`
+artifact, loaded bridge and remaining physical/macOS/Windows acceptance.
+
+Use [HANDOFF.md](HANDOFF.md), [the documentation index](README.md) and
+[STATUS.md](native-validation/STATUS.md) for current state. The dated sections
+below describe their original revisions and do not supersede the current ledger.
+
 ## Cached Linux launcher handoff — 2026-10-05
 
 After import and XDG registration, the real Desktop still executed the legacy

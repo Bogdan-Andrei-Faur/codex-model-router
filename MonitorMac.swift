@@ -97,6 +97,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         return URL(fileURLWithPath:ProcessInfo.processInfo.environment["PERSONAL_CODEX_MONITOR_CODE_ROOT"] ?? Bundle.main.object(forInfoDictionaryKey:"RouterCodeRoot") as? String ?? root.path)
     }
     var lastPointer: NSPoint?, lastModeRequest: Int?
+    var pointerDirty = true
     var keys = ["jev-typesafe": false, "jev-vercel": false]
     let io = DispatchQueue(label:"local.codex-model-router.monitor-data",qos:.utility)
     init(root: URL) { self.root = root.standardizedFileURL.resolvingSymlinksInPath(); super.init() }
@@ -149,9 +150,9 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     func position() {
         let screen = panel.screen ?? NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation,$0.frame,false) } ?? NSScreen.main
         guard let work = screen?.visibleFrame else { return }
-        let width = min(432,max(1,work.width-20)), height = max(1,work.height-20)
+        let width = min(800,max(1,work.width-20)), height = max(1,work.height-20)
         panelHeight = min(height,max(560,work.height * (panelHeights[screenKey(screen)] ?? 0.9)))
-        panel.setFrame(NSRect(x:work.maxX-width-10,y:work.minY+10,width:width,height:height),display:true)
+        panel.setFrame(NSRect(x:work.midX-width/2,y:work.maxY-height,width:width,height:height),display:true)
     }
     func screenKey(_ screen:NSScreen?) -> String {
         return String(describing:screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] ?? "main")
@@ -170,25 +171,29 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     }
     @objc func displayChanged() { position(); updateGlass(); publishUI(); lastPayload = Data(); refresh() }
     func updateGlass() {
-        // Material follows only the rounded web surface, never the transparent
-        // click-through area of the full-height panel. Use public AppKit blur.
+        // Keep the legacy material view hidden; the shared notch owns its shape.
         glass.frame = hitRect
-        glass.isHidden = mode == "Hidden" || hitRect.isEmpty || NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        glass.isHidden = true // The shared notch is intentionally opaque.
     }
     func updateHit() {
         guard mode != "Hidden" else { return }
         if resizing {panel.ignoresMouseEvents = false; return}
-        let inside = NSBezierPath(roundedRect:hitRect,xRadius:26,yRadius:26).contains(panel.convertPoint(fromScreen:NSEvent.mouseLocation))
+        let pointInPanel = panel.convertPoint(fromScreen:NSEvent.mouseLocation)
+        let y = hitRect.maxY-pointInPanel.y
+        let shoulder = min(20,hitRect.width/2), radius = min(32,max(0,(hitRect.width-2*shoulder)/2),hitRect.height/2)
+        var inset = shoulder
+        if y < shoulder {inset = sqrt(max(0,shoulder*shoulder-pow(shoulder-y,2)))}
+        if y > hitRect.height-radius {inset += radius-sqrt(max(0,radius*radius-pow(y-hitRect.height+radius,2)))}
+        let inside = hitRect.contains(pointInPanel) && pointInPanel.x >= hitRect.minX+inset && pointInPanel.x <= hitRect.maxX-inset
         if panel.ignoresMouseEvents == inside { panel.ignoresMouseEvents = !inside }
-        // Inactive WebKit intentionally gates hover. Project only local pointer
-        // geometry into our trusted page; never activate/key the panel on hover.
+        // Project local pointer geometry even while key: clipped windows can
+        // miss DOM leave events. This never activates or keys the panel.
         let point = panel.convertPoint(fromScreen:NSEvent.mouseLocation)
-        let inactive = !panel.isKeyWindow || !NSApp.isActive
-        let projected = inside && inactive ? NSPoint(x:round(point.x),y:round(panel.frame.height-point.y)) : nil
-        if projected != lastPointer {
-            lastPointer=projected
+        let projected = inside ? NSPoint(x:round(point.x),y:round(panel.frame.height-point.y)) : nil
+        if ready && (projected != lastPointer || pointerDirty) {
+            lastPointer=projected;pointerDirty=false
             let value:Any = projected.map { ["x":$0.x,"y":$0.y] } ?? NSNull()
-            if ready { web.callAsyncJavaScript("window.monitorPointer(point,inactive)",arguments:["point":value,"inactive":inactive],in:nil,in:.page,completionHandler:nil) }
+            if ready { web.callAsyncJavaScript("window.monitorPointer(point,inactive)",arguments:["point":value,"inactive":true],in:nil,in:.page,completionHandler:nil) }
         }
     }
     @objc func statusClick() {
@@ -197,7 +202,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     }
     func showMenu() {
         let menu = NSMenu(); let title = menu.addItem(withTitle:"Codex automático",action:nil,keyEquivalent:""); title.isEnabled = false; menu.addItem(.separator())
-        for (label,key) in [("Vista compacta","Compact"),("Panel lateral","Expanded"),("Ocultar monitor","Hidden")] {
+        for (label,key) in [("Vista compacta","Compact"),("Desplegar isla","Expanded"),("Ocultar monitor","Hidden")] {
             let item = menu.addItem(withTitle:label,action:#selector(menuMode(_:)),keyEquivalent:""); item.target = self; item.representedObject = key; item.state = mode == key ? .on : .off
         }
         menu.addItem(.separator())
@@ -238,7 +243,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         case "bounds":
             if let x = data["x"] as? Double, let y = data["y"] as? Double, let width = data["width"] as? Double, let height = data["height"] as? Double,
                x.isFinite,y.isFinite,width.isFinite,height.isFinite {
-                hitRect = NSRect(x:x,y:panel.frame.height-y-height,width:max(0,width),height:max(0,height)).intersection(NSRect(origin:.zero,size:panel.frame.size)); updateGlass();updateHit()
+                hitRect = NSRect(x:x,y:panel.frame.height-y-height,width:max(0,width),height:max(0,height)).intersection(NSRect(origin:.zero,size:panel.frame.size)); pointerDirty=true;updateGlass();updateHit()
             }
         case "mode": if let value = data["value"] as? String { lastModeRequest=data["request"] as? Int; setMode(value) }
         case "history":

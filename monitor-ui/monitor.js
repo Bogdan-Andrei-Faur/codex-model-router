@@ -1,23 +1,58 @@
 'use strict';
 const C = MonitorCore, $ = id => document.getElementById(id);
 let state = {threads:{},history:[],config:{enabled:true},ui:{mode:'Compact',topmost:true},connections:0};
-let currentTab = 'activity', order = [], selectedDecision = null, selectedThread = null, peekId = null, peekTimer, reasonOpen = false;
-let dataSignature = '', history = [], avatars = new Map(), orbitSequence = 0;
-let selectedAgent = null;
+let currentTab = 'home', order = [], selectedDecision = null, selectedThread = null, peekId = null, peekTimer, reasonOpen = false;
+let dataSignature = '', history = [], avatars = new Map();
+let selectedWorkspaceAgent = null;
+let selectedAgent = null, compactOrder=[], agentDetailsOpen=false, quotaDetailsOpen=false;
+let avatarSerial=0, islandFrame=0;
+let peekDismissed=false;
 let quotaOpen = false, nativeHover = null, modeRequest = 0, pendingModeRequest = 0;
-let historyDirty = true, historyRevision = 0;
+let islandCloseTimer=null, islandPointerOutside=false;
+function cancelIslandClose() {clearTimeout(islandCloseTimer);islandCloseTimer=null;}
+function scheduleIslandClose() {
+  if(state.ui.mode!=='Expanded'||heightDrag||islandCloseTimer)return;
+  islandCloseTimer=setTimeout(()=>{
+    islandCloseTimer=null;
+    if(state.ui.mode==='Expanded'&&islandPointerOutside&&!heightDrag)setMode('Compact');
+  },320);
+}
+function islandPointer(inside) {
+  islandPointerOutside=!inside;
+  if(inside)cancelIslandClose();else scheduleIslandClose();
+}
+let historyDirty = true, historyRevision = 0, projectedHistoryRevision=-1, historyBase=[], historyOverlayKey='';
+const historySearchText=new WeakMap();
 let connectionPending = null;
 function requestHistory() {
   if(state.ui.lazyHistory)native({action:'history',value:state.ui.mode==='Expanded' && ['history','statistics'].includes(currentTab)});
 }
 function ensureHistory() {
-  if(historyDirty){history=C.decisions(state.history,state.threads);historyDirty=false;}
+  if(historyDirty){
+    const fields=['decision_id','name','status','model','effort','requested_model','requested_effort','model_reason','effort_reason','phase_id','phase_name','phase_status','phase_model','phase_effort','phase_transition','observed_model','observed_effort','configured_model','configured_effort','accepted_model','accepted_effort','pipeline_mode','phase_pipeline','inference_source','evidence_confidence','inference_model_mismatch','inference_effort_mismatch','tokens'];
+    const overlayKey=JSON.stringify(Object.entries(state.threads).map(([id,row])=>[id,...fields.map(key=>row[key])]));
+    const rebuild=projectedHistoryRevision!==historyRevision;
+    if(rebuild){historyBase=C.decisions(state.history);projectedHistoryRevision=historyRevision;}
+    if(rebuild||overlayKey!==historyOverlayKey){history=C.withLiveDecisions(historyBase,state.threads);historyOverlayKey=overlayKey;}
+    historyDirty=false;
+  }
 }
 function selectAgent(id) {
-  selectedAgent=selectedAgent===id?null:id;reasonOpen=false;activity();
-  $('activity').querySelector('.agent-detail')?.scrollIntoView({block:'nearest'});
+  if(currentTab==='activity')selectedWorkspaceAgent=id;else selectedAgent=id;reasonOpen=false;activity();
+}
+function fitIsland() {
+  document.body.classList.toggle('overview',['home','activity'].includes(currentTab));
+  document.body.classList.toggle('history-view',currentTab==='history');
+  cancelAnimationFrame(islandFrame);
+  islandFrame=requestAnimationFrame(()=>{
+    if(state.ui.mode!=='Expanded' || !document.body.classList.contains('overview'))return;
+    const outer=node=>{const css=getComputedStyle(node);return node.getBoundingClientRect().height+parseFloat(css.marginTop)+parseFloat(css.marginBottom);};
+    const height=$('activity').scrollHeight+outer(document.querySelector('nav'))+outer($('notices'));
+    $('surface').style.setProperty('--overview-height',Math.ceil(height)+'px');
+  });
 }
 const native = message => {
+  if(state.readOnly && !['mode','bounds','ready','history','resizeStart','resizeEnd','resizeReset'].includes(message.action)){window.monitorFeedback('Vista previa de solo lectura.');return;}
   if(window.chrome?.webview)window.chrome.webview.postMessage(message);
   else window.webkit?.messageHandlers?.monitor?.postMessage(message);
 };
@@ -31,17 +66,19 @@ function panelHeight(value) {
 heightGrip.addEventListener('pointerdown',event=>{
   if(event.button!==0)return;
   heightDrag={y:event.screenY,height:$('surface').getBoundingClientRect().height};
+  cancelIslandClose();
   heightGrip.setPointerCapture(event.pointerId);document.body.classList.add('resizing');
   native({action:'resizeStart'});event.preventDefault();
 });
 heightGrip.addEventListener('pointermove',event=>{
-  if(heightDrag)panelHeight(heightDrag.height+heightDrag.y-event.screenY);
+  if(heightDrag)panelHeight(heightDrag.height+event.screenY-heightDrag.y);
 });
 function finishHeightDrag() {
   if(!heightDrag)return;
   const height=$('surface').getBoundingClientRect().height+16;
   heightDrag=null;document.body.classList.remove('resizing');
   native({action:'resizeEnd',height});
+  if(islandPointerOutside)scheduleIslandClose();
 }
 heightGrip.addEventListener('pointerup',finishHeightDrag);
 heightGrip.addEventListener('pointercancel',finishHeightDrag);
@@ -50,14 +87,15 @@ heightGrip.addEventListener('dblclick',()=>{native({action:'resizeReset'});});
 heightGrip.addEventListener('keydown',event=>{
   if(event.key==='Home'){native({action:'resizeReset'});event.preventDefault();}
   if(event.key==='ArrowUp'||event.key==='ArrowDown'){
-    const height=panelHeight($('surface').getBoundingClientRect().height+(event.key==='ArrowUp'?24:-24));
+    const height=panelHeight($('surface').getBoundingClientRect().height+(event.key==='ArrowDown'?24:-24));
     native({action:'resizeEnd',height:height+16});event.preventDefault();
   }
 });
 const el = (tag, cls, text) => { const node = document.createElement(tag); if(cls) node.className=cls; if(text !== undefined) node.textContent=String(text); return node; };
 function button(text, action, cls='') { const node=el('button',cls,text);node.addEventListener('click',action);return node; }
+function productButton(text,action,cls='') {const node=button(text,action,cls);node.disabled=!!state.readOnly;return node;}
 function palette(node, colors) {node.style.setProperty('--tint',colors[0]);node.style.setProperty('--face',colors[1]);return node;}
-function badge(value, effort=false) { const label=effort ? C.efforts[value] || 'Sin confirmar' : C.model(value);const node=palette(el('span','badge',label), effort ? C.effortColors[value] || C.neutral : C.models[C.family(value)] || C.neutral);node.title=(effort?'Razonamiento: ':'Modelo: ')+label;return node; }
+function badge(value, effort=false) { const label=effort ? C.efforts[value] || 'Sin confirmar' : C.model(value);const node=palette(el('span','badge',label), effort ? C.effortColors[value] || C.neutral : C.models[C.family(value)] || C.neutral);node.setAttribute('aria-label',(effort?'Razonamiento: ':'Modelo: ')+label);return node; }
 function tags(row, normalized=false) {const box=el('div','tags');box.append(badge(normalized?row.model:C.setting(row,'model')),badge(normalized?row.effort:C.setting(row,'effort'),true));return box;}
 function svg(tag, attributes={}) { const node=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [key,value] of Object.entries(attributes))node.setAttribute(key,String(value));return node; }
 function icon(name,cls='ui-glyph') {
@@ -66,83 +104,93 @@ function icon(name,cls='ui-glyph') {
   for(const [tag,attrs] of nodes)node.append(svg(tag,attrs));return node;
 }
 function controlLabel(node,name,label) {node.replaceChildren(icon(name),el('span','',label));}
-function gaugeRing(radius,percent,cls) {
-  const ring=svg('svg',{viewBox:'0 0 44 44',class:'usage-ring '+cls,'aria-hidden':'true'}),length=2*Math.PI*radius;
-  ring.append(svg('circle',{cx:22,cy:22,r:radius,class:'usage-track',...(percent===null?{'stroke-dasharray':'2 3'}:{})}));
-  if(percent!==null)ring.append(svg('circle',{cx:22,cy:22,r:radius,class:'usage-progress',transform:'rotate(-90 22 22)',
-    'stroke-dasharray':length,'stroke-dashoffset':length*(1-percent/100),visibility:percent===0?'hidden':'visible'}));
-  return ring;
-}
 function refreshQuota() {
-  const gauge=C.weeklyQuota(state.accountUsage,!!state.connections);
-  for(const node of [$('quota')]) {
-    const ring=gaugeRing(16,gauge.percent,'quota-ring'),label=gauge.percent===null?'—':gauge.percent+'%';
-    ring.prepend(svg('circle',{cx:22,cy:22,r:16,class:'quota-face'}));
-    const text=svg('text',{x:22,'text-anchor':'middle',class:'quota-number'});text.textContent=label;
-    // Center the visible glyphs, rather than the font's line box. The same SVG
-    // coordinates place both the arc and number regardless of button layout.
-    const context=document.createElement('canvas').getContext('2d');
-    const style=getComputedStyle(node);
-    context.font=style.fontWeight+' '+style.fontSize+' '+style.fontFamily;
-    const metrics=context.measureText(label);
-    const offset=Number.isFinite(metrics.actualBoundingBoxAscent) && Number.isFinite(metrics.actualBoundingBoxDescent)?
-      (metrics.actualBoundingBoxAscent-metrics.actualBoundingBoxDescent)/2:3.5;
-    text.setAttribute('y',22+offset);ring.append(text);node.replaceChildren(ring);
-    // SVG middle anchoring uses advance width. Glyph overhang can make the
-    // rendered bounds asymmetric (notably with the Windows system font).
-    const bounds=text.getBBox();
-    if(bounds.width>0)text.setAttribute('x',22+(22-bounds.x-bounds.width/2));
-    node.title=gauge.details;node.setAttribute('aria-label',gauge.details);
-    node.classList.toggle('unavailable',gauge.percent===null);
-  }
-  refreshQuotaBars();
-  if(quotaOpen)renderQuotaPeek();
+  const gauge=C.weeklyQuota(state.accountUsage,!!state.connections),node=$('quota');
+  node.replaceChildren(el('strong','quota-number',gauge.percent===null?'—':gauge.percent+'%'));
+  node.setAttribute('aria-label',gauge.details);
+  node.classList.toggle('unavailable',gauge.percent===null);
+  refreshQuotaBars();refreshOverviewQuota();if(quotaOpen)renderQuotaPeek();
 }
 function renderQuotaPeek() {
-  const content=el('div','peek-content');content.append(el('div','peek-category','CUOTA DE LA CUENTA'),el('p','quota-details',C.weeklyQuota(state.accountUsage,!!state.connections).details));
-  $('peek').replaceChildren(content);$('surface').style.setProperty('--peek-height',(96+content.offsetHeight)+'px');
+  const gauge=C.weeklyQuota(state.accountUsage,!!state.connections),content=el('div','peek-content quota-card');
+  const heading=el('div','quota-card-heading');heading.append(el('span','','Tu cuota'),el('span','quota-card-chip','Codex'));
+  const hero=el('div','quota-card-hero'),copy=el('div');
+  copy.append(el('strong','quota-card-number',gauge.percent===null?'—':gauge.percent+'%'),el('span','quota-card-caption',gauge.percent===null?'Pendiente de actualizar':'disponible esta semana'));
+  hero.append(copy,icon('gauge'));content.append(heading,hero);quotaSection(content);
+  $('peek').replaceChildren(content);$('surface').style.setProperty('--peek-height',(84+content.offsetHeight)+'px');
 }
-function openQuota() {
+function openQuota(force=false) {
+  if(peekDismissed && !force)return;peekDismissed=false;
   closePeek();quotaOpen=true;$('peek').hidden=false;document.body.classList.add('peek');renderQuotaPeek();
 }
-function avatar(id,row,open, existing) {
-  const node=existing || button('',open,'avatar');
-  node.classList.toggle('working',C.active(row.status));
-  node.setAttribute('aria-label',`${row.name || id} · ${C.model(C.setting(row,'model'))} · ${C.efforts[C.setting(row,'effort')] || 'Sin confirmar'} · ${C.status(row.status)}`);
-  const colors=C.models[C.family(C.setting(row,'model'))] || C.neutral;palette(node,colors);
-  node.style.setProperty('--effort',(C.effortColors[C.setting(row,'effort')] || C.neutral)[0]);
-  const identity=C.identity(row);
-  if(!existing) {
-    const face=el('span','face');face.append(icon(identity[1],'glyph'));
-    const track=svg('svg',{viewBox:'0 0 44 44',class:'track'});track.append(svg('circle',{cx:22,cy:22,r:20}));
-    const orbit=svg('svg',{viewBox:'0 0 44 44',class:'orbit','aria-hidden':'true'});
-    const gradientId='orbit-gradient-'+(++orbitSequence),defs=svg('defs');
-    const gradient=svg('linearGradient',{id:gradientId,x1:0,y1:0,x2:1,y2:1});
-    gradient.append(svg('stop',{offset:0,'stop-color':'var(--tint)','stop-opacity':0}),svg('stop',{offset:1,'stop-color':'var(--tint)'}));
-    defs.append(gradient);orbit.append(defs,svg('path',{d:'M22,2 A20,20 0 0 1 42,22',stroke:'url(#'+gradientId+')'}));
-    // A common epoch keeps activity and capsule rings in phase.
-    orbit.style.animationDelay=`-${(performance.now()%2800)/1000}s`;
-    node.append(face,track,orbit,el('span','effort-dot'));
-  } else if(node.querySelector('.glyph').dataset.lucide!==identity[1])node.querySelector('.glyph').replaceWith(icon(identity[1],'glyph'));
-  const context=C.contextGauge(row);
-  node.classList.toggle('compacting',!!context.compacting);
-  if(context.compacting) {
-    if(!node.querySelector('.compacting-ring')) {
-      node.querySelector('.context-ring')?.remove();
-      const ring=svg('svg',{viewBox:'0 0 44 44',class:'usage-ring context-ring compacting-ring','aria-hidden':'true'});
-      ring.append(svg('path',{d:'M22,6 A16,16 0 0 1 38,22 M22,38 A16,16 0 0 1 6,22'}));
-      ring.style.animationDelay=`-${(performance.now()%1600)/1000}s`;
-      node.append(ring);
-    }
-  } else {
-    node.querySelector('.context-ring')?.remove();node.append(gaugeRing(16,context.percent,'context-ring'));
+function avatar(id,row,open,existing) {
+  const node=existing || button('',open,'avatar'),identity=C.companion(id),visual=C.companionState(row,!!state.connections),context=C.contextGauge(row);
+  const previousKind=node.dataset.state;
+  node.dataset.companion=identity.variant;node.dataset.state=visual.kind;
+  node.style.setProperty('--character',identity.color);
+  node.classList.toggle('working',visual.kind==='working');node.classList.toggle('compacting',visual.kind==='compacting');
+  if(!existing){
+    const art=svg('svg',{viewBox:'0 0 100 100',class:'character','aria-hidden':'true',focusable:'false'});
+    const gradientId='companion-light-'+(++avatarSerial),defs=svg('defs'),gradient=svg('linearGradient',{id:gradientId,x1:0,y1:0,x2:0.7,y2:1});
+    gradient.append(svg('stop',{offset:0,'stop-color':'#ffffff','stop-opacity':.28}),svg('stop',{offset:.5,'stop-color':'#ffffff','stop-opacity':0}),svg('stop',{offset:1,'stop-color':'#000000','stop-opacity':.09}));defs.append(gradient);art.append(defs);
+    const body=svg('g',{class:'character-body'});
+    body.append(svg('path',{d:'M15 51 Q6 48 7 60 Q8 69 18 65 M85 51 Q94 48 93 60 Q92 69 82 65',class:'limbs'}),
+      svg('rect',{x:30,y:79,width:13,height:13,rx:6,class:'limbs'}),svg('rect',{x:57,y:79,width:13,height:13,rx:6,class:'limbs'}),
+      svg('rect',{x:11,y:20,width:78,height:65,rx:21,class:'character-face'}),
+      svg('rect',{x:11,y:20,width:78,height:65,rx:21,class:'character-light',fill:'url(#'+gradientId+')'}),
+      svg('path',{d:'M30 29 Q39 24 46 28',class:'character-mark'}),
+      svg('ellipse',{cx:37,cy:51,rx:4.5,ry:6,class:'eye'}),svg('ellipse',{cx:63,cy:51,rx:4.5,ry:6,class:'eye'}),
+      svg('path',{d:'M32 52 Q37 45 42 52 M58 52 Q63 45 68 52',class:'happy-eyes'}),
+      svg('path',{d:'M43 64 Q50 69 57 64',class:'mouth'}));
+    art.append(body);const meter=el('span','character-context');meter.append(el('span'));
+    node.append(art,meter);
+    if(identity.variant==='mint')body.querySelector('.character-mark').setAttribute('d','M43 19 Q43 8 53 12');
+    if(identity.variant==='lilac')body.querySelector('.character-mark').setAttribute('d','M30 30 Q50 16 70 30');
   }
-  node.title=context.label;node.setAttribute('aria-label',node.getAttribute('aria-label')+' · '+context.label);
+  if(previousKind!==visual.kind)node.querySelector('.character-body').style.animationDelay=`-${(performance.now()%(visual.kind==='compacting'?2800:3600))/1000}s`;
+  const meter=node.querySelector('.character-context');meter.classList.toggle('unavailable',context.percent===null);
+  meter.firstElementChild.style.width=(context.percent??0)+'%';
+  node.setAttribute('aria-label',`${identity.name} · identidad visual de ${row.name || id || 'reposo'} · ${visual.label} · ${C.model(C.setting(row,'model'))} · ${C.efforts[C.setting(row,'effort')] || 'Sin confirmar'} · ${context.label}`);
   return node;
 }
+function contextMeter(parent,row,concise=false) {
+  const context=C.contextGauge(row),box=el('div','context-metric'),line=el('div','metric-line');
+  line.append(el('span','','Contexto usado'),el('strong','',context.compacting?'Compactando…':context.percent===null?'Sin medición':Number(context.percent.toFixed(1))+' %'));
+  const track=el('div','context-meter'+(context.percent===null?' unavailable':'')+(context.compacting?' compacting':'')),fill=el('span');fill.style.width=(context.percent??0)+'%';track.append(fill);
+  track.setAttribute('role','progressbar');track.setAttribute('aria-label',context.label);track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax','100');
+  if(context.percent!==null)track.setAttribute('aria-valuenow',String(context.percent));
+  box.append(line,track);if(!concise)box.append(el('p','small',context.label));parent.append(box);
+}
+function companionHero(parent,entries) {
+  const selected=entries.find(([id])=>id===selectedAgent),live=entries.find(([,row])=>C.liveAgent(row)),attention=entries.find(([,row])=>['waiting','error','failed'].includes(row.status));
+  const recent=entries.slice().sort((a,b)=>(b[1].updated||0)-(a[1].updated||0))[0];
+  const [id,row]=selected||live||attention||recent||['rest',{status:'idle'}],identity=C.companion(id),visual=C.companionState(row,!!state.connections);
+  const hero=el('section','companion-hero'),scene=el('div','hero-scene'),art=avatar(id,row,()=>{if(state.threads[id]){selectedAgent=id;selectedWorkspaceAgent=id;showTab(agentDetailsOpen?'home':'activity');}}),copy=el('div','companion-copy');
+  hero.style.setProperty('--character',identity.color);art.classList.add('hero-character');
+  art.disabled=!state.threads[id];
+  copy.append(el('div','companion-alias',identity.name),el('h2','companion-headline',visual.headline),el('p','hero-task',row.name||'Las tareas aparecerán aquí.'),el('p','hero-status',visual.label));
+  if(state.threads[id]){const model=el('div','hero-model');model.append(el('span','','Modelo seleccionado'),tags(row));copy.append(model);}
+  scene.append(art);hero.append(scene,copy);parent.append(hero);
+  const metrics=el('div','hero-metrics');metrics.style.setProperty('--character',identity.color);contextMeter(metrics,row,true);
+  const quota=button('',()=>{quotaDetailsOpen=!quotaDetailsOpen;activity();},'overview-quota');quota.setAttribute('aria-expanded',String(quotaDetailsOpen));
+  const line=el('div','metric-line');line.append(el('span','','Cuota semanal'),el('strong','overview-quota-value'));
+  const track=el('div','quota-meter');track.append(el('span'));track.setAttribute('role','progressbar');track.setAttribute('aria-label','Cuota semanal disponible');track.setAttribute('aria-valuemin','0');track.setAttribute('aria-valuemax','100');
+  quota.append(line,track);metrics.append(quota);parent.append(metrics);
+  if(quotaDetailsOpen){const details=el('div','section quota-expanded');quotaSection(details);parent.append(details);}
+  return state.threads[id]?id:null;
+}
+function refreshOverviewQuota() {
+  const node=document.querySelector('.overview-quota');if(!node)return;
+  const gauge=C.weeklyQuota(state.accountUsage,!!state.connections),track=node.querySelector('.quota-meter');
+  node.querySelector('.overview-quota-value').textContent=gauge.percent===null?'Sin datos':gauge.percent+' % libre';
+  node.setAttribute('aria-label',gauge.details);track.classList.toggle('unavailable',gauge.percent===null);track.firstElementChild.style.width=(gauge.percent??0)+'%';
+  if(gauge.percent===null)track.removeAttribute('aria-valuenow');else track.setAttribute('aria-valuenow',String(gauge.percent));
+}
+
 function setMode(mode,notify=true) {
   if(!['Compact','Expanded','Hidden'].includes(mode))return;
-  state.ui.mode=mode;closePeek();clearNativeHover();
+  cancelIslandClose();
+  state.ui.mode=mode;peekDismissed=false;closePeek();clearNativeHover();
   document.body.classList.remove('compact','expanded','hidden');document.body.classList.add(mode.toLowerCase());
   $('compact').hidden=mode!=='Compact';$('expanded').hidden=mode!=='Expanded';
   refreshQuota(); // Hidden SVG text has no bounds; measure the newly visible view.
@@ -151,91 +199,109 @@ function setMode(mode,notify=true) {
   if(mode==='Expanded')renderPage();
   window.monitorBounds();
 }
-function openPeek(id) {
+function openPeek(id,force=false) {
+  if(peekDismissed && !force)return;peekDismissed=false;
   quotaOpen=false;
-  clearTimeout(peekTimer);if(!state.threads[id])return;
+  cancelPeekClose();if(!state.threads[id])return;
   peekId=id;$('peek').hidden=false;document.body.classList.add('peek');renderPeek();
 }
 function renderPeek() {
   const row=state.threads[peekId];if(!row)return closePeek();
   const box=$('peek'),content=el('div','peek-content'),ident=C.identity(row);
-  const category=palette(el('div','peek-category',ident[0]),C.models[C.family(C.setting(row,'model'))] || C.neutral);
-  category.title='Tipo orientativo · confianza '+(row.agent_confidence || 'sin confirmar');
-  content.append(category,el('div','peek-title',row.name || peekId),tags(row),el('div','peek-meta',C.status(row.status)),el('p','',C.contextGauge(row).label));
+  content.style.setProperty('--character',C.companion(peekId).color);
+  const category=el('div','peek-category');category.append(icon(ident[1]),el('span','',ident[0]));
+  category.setAttribute('aria-label',ident[0]+' · tipo orientativo · confianza '+(row.agent_confidence || 'sin confirmar'));
+  content.append(category,el('div','peek-title',row.name || peekId),tags(row));
+  const visual=C.companionState(row,!!state.connections);
+  if(!['working','compacting'].includes(visual.kind))content.append(el('div','peek-meta',visual.label));
+  contextMeter(content,row,true);
   box.replaceChildren(content);
-  $('surface').style.setProperty('--peek-height',(80+16+content.offsetHeight)+'px');
+  $('surface').style.setProperty('--peek-height',(84+content.offsetHeight)+'px');
 }
-function closePeek() {clearTimeout(peekTimer);peekId=null;quotaOpen=false;$('peek').hidden=true;document.body.classList.remove('peek');}
-function capsuleLimit() {return Math.max(1,Math.min(5,Math.floor((Math.min(366,innerWidth-16)-2-22-40-40-48-36)/44)));}
+function cancelPeekClose() {clearTimeout(peekTimer);peekTimer=null;}
+function schedulePeekClose() {
+  // Native pointer samples and DOM leave events may repeat during the grace
+  // period. Keep the first deadline; only re-entering the island cancels it.
+  if(peekTimer || (!peekId && !quotaOpen))return;
+  peekTimer=setTimeout(closePeek,220);
+}
+function closePeek() {cancelPeekClose();peekId=null;quotaOpen=false;$('peek').hidden=true;document.body.classList.remove('peek');}
+function capsuleLimit() {return Math.max(1,Math.min(6,Math.floor((Math.min(430,window.innerWidth)-177)/42)));}
 function capsule() {
   const rows=state.threads;
-  order=C.stableOrder(order,rows);
-  const limit=capsuleLimit(),visible=order.slice(0,limit),host=$('agents');
+  order=C.stableOrder(order,rows);compactOrder=C.companionOrder(compactOrder,rows);
+  const limit=capsuleLimit(),visible=compactOrder.slice(0,limit),host=$('agents');
+  $('compact').classList.toggle('multi-agent',compactOrder.length>1);
+  $('surface').style.setProperty('--compact-width',Math.max(350,Math.min(430,visible.length*42+177))+'px');
+  const focus=rows[visible[0]]||{status:'idle'},visual=C.companionState(focus,!!state.connections);
+  $('compact-summary').replaceChildren(el('strong','',visual.headline),el('span','',focus.name||'Codex'));
+  $('compact-summary').setAttribute('aria-label','Ver agentes · '+(focus.name||visual.label));
   for(const [id,node] of avatars) if(!visible.includes(id)) {
     if(node.classList.contains('leave'))continue;
+    if(rows[id])avatar(id,rows[id],null,node);
     node.classList.add('leave');
-    setTimeout(()=>{if(!order.slice(0,capsuleLimit()).includes(id)){node.remove();avatars.delete(id);if(!order.length&&!avatars.size)capsule();}},420);
+    setTimeout(()=>{if(!compactOrder.slice(0,capsuleLimit()).includes(id)){node.remove();avatars.delete(id);if(!compactOrder.length&&!avatars.size)capsule();}},420);
   }
   host.querySelector('.idle')?.remove();host.querySelector('.overflow')?.remove();
   for(const id of visible) {
     let node=avatars.get(id);
     if(!node) {
-      node=avatar(id,rows[id],()=>openPeek(id));node.classList.add('enter');
-      node.addEventListener('mouseenter',()=>openPeek(id));node.addEventListener('focus',()=>openPeek(id));
+      node=avatar(id,rows[id],()=>openPeek(id,true));node.classList.add('enter');
+      node.addEventListener('mouseenter',()=>openPeek(id));node.addEventListener('focus',()=>openPeek(id,true));
       avatars.set(id,node);host.append(node);setTimeout(()=>node.classList.remove('enter'),420);
     } else {node.classList.remove('leave');avatar(id,rows[id],null,node);}
   }
   // Never reorder surviving agents. Newly active ones join at the end.
-  if(!visible.length&&!avatars.size)host.append(el('span','idle','Todo en calma'));
-  if(order.length>limit)host.append(button('+'+(order.length-limit),()=>setMode('Expanded'),'overflow'));
-  if(peekId){if(!order.includes(peekId))closePeek();else renderPeek();}
+  if(!visible.length&&!avatars.size){const rest=avatar('rest',{status:'idle'},()=>setMode('Expanded'));rest.classList.add('idle');host.append(rest);}
+  if(compactOrder.length>limit)host.append(button('+'+(compactOrder.length-limit),()=>setMode('Expanded'),'overflow'));
+  if(peekId){if(!compactOrder.includes(peekId))closePeek();else renderPeek();}
 }
 function showTab(name) {
-  if(!['activity','history','statistics','settings'].includes(name))return;
+  if(!['home','activity','history','statistics','settings'].includes(name))return;
+  if(name==='home' || name==='activity')agentDetailsOpen=name==='activity';
   currentTab=name;for(const node of document.querySelectorAll('[data-tab]')){node.classList.toggle('selected',node.dataset.tab===name);node.setAttribute('aria-pressed',String(node.dataset.tab===name));}
-  $('view-title').textContent=({activity:'Agentes',history:'Historial',statistics:'Consumo',settings:'Ajustes'})[name];
-  for(const node of document.querySelectorAll('.page'))node.hidden=node.id!==name;
+  $('view-title').textContent=({home:'Inicio',activity:'Agentes',history:'Historial',statistics:'Consumo',settings:'Ajustes'})[name];
+  for(const node of document.querySelectorAll('.page'))node.hidden=node.id!==(name==='home'?'activity':name);
   requestHistory();renderPage();
 }
-function openHistory(id) {
-  selectedThread=id;
-  selectedDecision=state.threads[id]?.decision_id || null;
-  showTab('history');
-}
 function explanation(parent,label,value,kind='') {const box=el('div','reason-card'+(kind?' '+kind:''));box.append(el('h3','',label),el('p','',value || 'Registro anterior sin explicación separada.'));parent.append(box);}
-function continuity(value) {return value==='continue'?'Jev identificó trabajo pendiente y reevaluó el modelo y el razonamiento para continuarlo.':value==='reassess'?'Jev consideró que esta petición debía evaluarse de nuevo antes de elegir modelo y razonamiento.':'';}
 function phaseStatus(value) {return ({proposed:'Fase propuesta',requested:'Cambio solicitado',applied:'Cambio aceptado',rejected:'Cambio rechazado',preserved:'Selección conservada',unchanged:'Sin cambio',requires_new_turn:'Requiere otro turno',unknown_after_timeout:'Cambio sin confirmar',checkpoint_limit:'Límite de fases',cancelled:'Cancelado',accepted:'Aceptada por Codex',active:'Fase activa',observed:'Modelo observado',completed:'Fase completada',blocked:'Cambio bloqueado',failed:'Fase con incidencia'}[value] || 'Fase sin confirmar');}
-function pipeline(parent,row) {
-  const phases=Array.isArray(row.phase_pipeline)?row.phase_pipeline:[];
-  if(!phases.length)return;
-  const dynamic=row.pipeline_mode==='plan_and_observation',box=el('div','pipeline');box.append(el('div','pipeline-title',dynamic?'PLAN DE TRABAJO · OBSERVACIÓN':'PIPELINE · OBSERVACIÓN'));
-  for(const phase of phases){const item=el('div','pipeline-step '+phase.state+(phase.evidence==='observed'?' observed':''));const label=phase.state==='planned'?'Planificada':phase.state==='selected'?'Seleccionada':phase.state==='not_observed'?'Pendiente de evidencia':phase.state==='configured'?'Configurada':phaseStatus(phase.state);item.append(el('i',''),el('span','',phase.label),el('small','',label));box.append(item);}
-  parent.append(box,el('p','small',dynamic?'Las etapas son un plan. Solo “Ejecución en Codex” se actualiza con evidencia real.':'La evidencia interna de esta ejecución es limitada.'));
-}
-function executionEvidence(parent,row) {
-  if(!row.model && !row.accepted_model && !row.configured_model && !row.observed_model)return;
-  const lines=[];
-  if(row.status==='interrupted')lines.push('Turno interrumpido; esto no acredita la terminación de todos los procesos de sus herramientas.');
-  if(row.model)lines.push('Propuesto por el selector · '+C.model(row.model)+' · '+(C.efforts[row.effort]||'Sin confirmar'));
-  if(row.accepted_model)lines.push('Aceptado por Codex · '+C.model(row.accepted_model)+' · '+(C.efforts[row.accepted_effort]||'Sin confirmar'));
-  if(row.configured_model)lines.push('Configuración publicada · '+C.model(row.configured_model)+' · '+(C.efforts[row.configured_effort]||'Sin confirmar'));
-  if(row.observed_model)lines.push((row.evidence_confidence==='confirmed'?'Inferencia confirmada localmente · ':'Observación anterior sin correlación · ')+C.model(row.observed_model)+' · '+(C.efforts[row.observed_effort]||'Sin confirmar'));
-  else lines.push('Inferencia real · sin confirmación disponible todavía');
-  if(row.observed_candidate_model)lines.push('Coincidencia probable · '+C.model(row.observed_candidate_model)+' · '+(C.efforts[row.observed_candidate_effort]||'Sin confirmar'));
-  explanation(parent,'EVIDENCIA DEL MODELO',lines.join('\n'),'phase');
-  if(row.phase_events?.length)explanation(parent,'CAMBIOS DE FASE',row.phase_events.map(p=>`${p.phase_name} · ${phaseStatus(p.phase_status)} · ${C.model(p.phase_model)} · ${C.efforts[p.phase_effort]||'Sin confirmar'}`).join('\n'));
-  if(row.prior_inferences?.length)explanation(parent,'INFERENCIAS DE FASES ANTERIORES',row.prior_inferences.map(p=>`${C.model(p.model)} · ${C.efforts[p.effort]||'Sin confirmar'} · ${p.confidence||'sin correlación'}`).join('\n'));
+function historyEvidence(row) {
+  const settings=[];
+  const different=(model,effort,referenceModel,referenceEffort)=>model&&(model!==referenceModel||effort&&referenceEffort&&effort!==referenceEffort);
+  if(row.evidence_confidence==='confirmed'&&row.observed_model)settings.push(['Inferencia confirmada',row.observed_model,row.observed_effort]);
+  else if(row.observed_model||row.observed_candidate_model)settings.push(['Observación sin confirmar',row.observed_model||row.observed_candidate_model,row.observed_effort||row.observed_candidate_effort]);
+  if(different(row.accepted_model,row.accepted_effort,row.model,row.effort))settings.push(['Ajustes aceptados por Codex',row.accepted_model,row.accepted_effort]);
+  if(different(row.configured_model,row.configured_effort,row.accepted_model||row.model,row.accepted_effort||row.effort))settings.push(['Configuración publicada',row.configured_model,row.configured_effort]);
+  const phases=(row.phase_events||[]).filter(p=>['applied','rejected','failed','blocked','unknown_after_timeout','requires_new_turn','checkpoint_limit','cancelled'].includes(p.phase_status));
   const samples=Object.values(row.inference_samples||{});
-  if(samples.length)explanation(parent,'MÉTRICAS RECIBIDAS',samples.map(s=>{
-    const values=[`${s.phase_name||'inicio'} · ${s.inference_event_name||'evento'} / ${s.inference_event_kind||'petición'} · ${s.count} registros · ${s.failures||0} fallos · ${s.evidence_confidence||'sin correlación'}`];
+  return {settings,phases,samples};
+}
+function executionEvidence(parent,row,evidence=historyEvidence(row)) {
+  for(const [label,model,effort] of evidence.settings){const item=el('div','history-evidence-setting');item.append(el('h3','',label),tags({model,effort}));parent.append(item);}
+  if(evidence.phases.length)explanation(parent,'Cambios registrados',evidence.phases.map(p=>`${p.phase_name||'Fase'} · ${phaseStatus(p.phase_status)}${p.phase_model?' · '+C.model(p.phase_model):''}${p.phase_effort?' · '+(C.efforts[p.phase_effort]||p.phase_effort):''}`).join('\n'));
+  if(row.prior_inferences?.length)explanation(parent,'Inferencias anteriores',row.prior_inferences.map(p=>`${C.model(p.model)} · ${C.efforts[p.effort]||'Sin dato de esfuerzo'} · ${p.confidence==='confirmed'?'confirmada':'sin confirmar'}`).join('\n'));
+  if(evidence.samples.length)explanation(parent,'Métricas recibidas',evidence.samples.map(s=>{
+    const values=[`${s.inference_event_name||'evento'} / ${s.inference_event_kind||'petición'} · ${s.count} registros · ${s.failures||0} fallos`];
     for(const [k,label] of [['inference_input_tokens','tokens entrada'],['inference_output_tokens','tokens salida'],['inference_ttft_ms','TTFT ms'],['inference_duration_ms','duración del evento ms'],['inference_http_status','HTTP']])if(s[k]!==undefined)values.push(`${label}: ${s[k]}`);
     return values.join(' · ');
-  }).join('\n')+'\nValores del último registro de cada clase; las duraciones no se suman como latencia de inferencia.');
+  }).join('\n')+'\nÚltimo valor por clase de evento; no representa el total del turno.');
 }
-function taskModeControls(parent,id) {
+function historyMeasurements(parent,row) {
+  const metrics=el('div','history-measurements');
+  const item=(label,value,note)=>{const tile=el('div','history-measurement');tile.append(el('span','small',label),el('strong','',value));if(note)tile.append(el('span','small',note));metrics.append(tile);};
+  if(Number.isFinite(row.started)&&row.started>0&&Number.isFinite(row.finished)&&row.finished>=row.started){const seconds=Math.round(row.finished-row.started);item('Tiempo del turno',seconds<60?seconds+' s':Math.floor(seconds/60)+' min '+seconds%60+' s');}
+  const sample=C.usageSample(row);
+  if(sample.input!==null)item('Tokens de entrada',fmt(sample.input),'Última llamada');
+  if(sample.output!==null)item('Tokens de salida',fmt(sample.output),'Última llamada');
+  if(Number.isSafeInteger(row.native_retries)&&row.native_retries>0)item('Reintentos de conexión',fmt(row.native_retries));
+  if(metrics.children.length)parent.append(metrics);
+}
+function taskModeControls(parent,id,showHint=true) {
   if(!id)return;
   const mode=state.taskModes?.[id] || 'automatic';
   choices(parent,[['automatic','Automático'],['manual','Manual']],mode,value=>native({action:'taskMode',thread:id,value}));
+  if(!showHint && state.config.enabled)return;
   parent.append(el('p','small',!state.config.enabled?'El selector está pausado para todas las tareas.':mode==='manual'?
     'Próximo mensaje: usa el modelo y esfuerzo elegidos en Codex.':'Próximo mensaje: el selector decide modelo y esfuerzo.'));
 }
@@ -264,43 +330,106 @@ function quotaSection(parent) {
     const info=[windows.filter(x=>x.duration_minutes===w.duration_minutes).length>1?w.limit_id:null,Number.isFinite(w.resets_at)?'Se renueva '+when(w.resets_at):null].filter(Boolean).join(' · ');
     if(info)row.append(el('div','small',info));section.append(row);
   });
-  section.append(el('div','small','Cuota compartida de la cuenta'));parent.append(section);
+  parent.append(section);
 }
-function agentDetail(parent,id,row) {
-  const detail=el('div','agent-detail');detail.append(el('h2','',row.name||'Agente'),tags(row));
-  taskModeControls(detail,id);
-  detail.append(el('p','confirmation',row.phase_status?phaseStatus(row.phase_status):(row.confirmation||C.status(row.status))),el('p','small',C.contextGauge(row).label));
-  const usage=C.usageSample(row);
-  detail.append(el('p','small',usage.total===null?'Tokens: sin medición completa disponible.':`Última llamada observada: ${fmt(usage.input)} entrada · ${fmt(usage.output)} salida. No es el total del turno.`));
-  detail.append(button('¿Por qué esta elección?',()=>{reasonOpen=!reasonOpen;activity();},'why'));
-  if(reasonOpen){explanation(detail,'Modelo elegido',row.model_reason||row.reason,'model');explanation(detail,'Razonamiento elegido',row.effort_reason,'effort');if(row.continuity_strategy)explanation(detail,'Continuidad',continuity(row.continuity_strategy));}
-  pipeline(detail,row);executionEvidence(detail,row);detail.append(button('Ver historial',()=>openHistory(id),'why'));parent.append(detail);
+function livePipeline(parent,row) {
+  const data=C.executionPipeline(row,!!state.connections);if(!data)return;
+  const box=el('section','live-pipeline'),heading=el('div','live-pipeline-heading');
+  heading.append(el('h3','',data.source),el('span','small',data.status));box.append(heading);
+  const track=el('ol','live-pipeline-track');track.setAttribute('aria-label',data.source);
+  data.steps.forEach((step,index)=>{
+    const item=el('li','live-pipeline-step '+step.state+(step.animate?' animating':''));
+    item.dataset.step=String(index);if(step.state==='active')item.setAttribute('aria-current','step');
+    item.setAttribute('aria-label',`${index+1}. ${step.label}: ${step.statusLabel}`);
+    const marker=el('span','live-pipeline-marker');marker.setAttribute('aria-hidden','true');
+    marker.append(step.state==='completed'?icon('check'):document.createTextNode(String(index+1)));
+    item.append(marker,el('span','live-pipeline-label',step.label),el('small','',step.statusLabel));track.append(item);
+  });
+  box.append(track);parent.append(box);
+}
+function agentsWorkspace() {
+  const page=$('activity'),scroll=page.scrollTop,focused=document.activeElement?.dataset.agentControl;
+  const pickerScroll=page.querySelector('.agent-picker')?.scrollLeft||0,pickerTop=page.querySelector('.agent-picker')?.scrollTop||0;
+  const rows=state.agentThreads ?? state.threads;
+  const ids=Object.keys(rows).filter(id=>rows[id].archived!==true && rows[id].isArchived!==true).sort((a,b)=>(Number(rows[b].updated)||0)-(Number(rows[a].updated)||0)||a.localeCompare(b));
+  if(selectedWorkspaceAgent && !rows[selectedWorkspaceAgent])selectedWorkspaceAgent=null;
+  const id=selectedWorkspaceAgent && ids.includes(selectedWorkspaceAgent)?selectedWorkspaceAgent:ids.includes(selectedAgent)?selectedAgent:ids[0];
+  selectedWorkspaceAgent=id||null;
+  page.replaceChildren();
+  const workspace=el('div','agents-workspace'),heading=el('div','agents-heading');
+  heading.append(el('h2','','Control por tarea'),el('span','small',ids.length+' '+(ids.length===1?'agente':'agentes')));
+  workspace.append(heading);
+  if(!id){workspace.append(el('p','empty',state.connections?'No hay tareas disponibles sin archivar.':'Conecta la integración desde Ajustes para ver tus tareas.'));page.append(workspace);fitIsland();return;}
+  const layout=el('div','agents-layout'),sidebar=el('aside','agents-sidebar');sidebar.setAttribute('aria-label','Agente y selección de tarea');layout.append(sidebar);workspace.append(layout);
+  const identity=C.companion(id),selectedRow=rows[id],visualState=C.companionState(selectedRow,!!state.connections);
+  const identityHeader=el('div','agent-identity'),character=avatar(id,selectedRow,()=>{}),portrait=el('span','avatar agent-portrait'),identityCopy=el('div','agent-identity-copy');
+  portrait.dataset.companion=character.dataset.companion;portrait.dataset.state=character.dataset.state;portrait.style.cssText=character.style.cssText;
+  portrait.append(character.querySelector('.character'));portrait.setAttribute('aria-hidden','true');
+  identityHeader.style.setProperty('--character',identity.color);
+  identityCopy.append(el('span','companion-alias',identity.name),el('h3','',selectedRow.name||'Agente'),el('span','small',visualState.label));
+  identityHeader.append(portrait,identityCopy);sidebar.append(identityHeader);
+  const picker=el('div','agent-picker');picker.setAttribute('aria-label','Elegir tarea');
+  for(const key of ids){
+    const row=rows[key],visual=C.companionState(row,!!state.connections),item=button('',()=>selectAgent(key),'agent-pick'+(key===id?' selected':''));
+    item.dataset.agentControl='select:'+key;item.dataset.agent=key;item.style.setProperty('--character',C.companion(key).color);
+    item.setAttribute('aria-pressed',String(key===id));
+    const pickCopy=el('span','agent-pick-copy');pickCopy.append(el('span','',row.name||'Agente'),el('small','',row.catalog_only?'Sin actividad registrada':visual.label));
+    item.append(el('i','agent-dot'),pickCopy);
+    if(['waiting','error','offline'].includes(visual.kind)){const mark=el('span','agent-attention','!');mark.setAttribute('aria-label',visual.label);item.append(mark);}
+    picker.append(item);
+  }
+  sidebar.append(picker);
+  const row=rows[id],detail=el('section','agent-workspace-detail'),mode=el('div','routing-mode');
+  detail.setAttribute('aria-label',row.name||'Agente');
+  const modeHeading=el('div','routing-heading');modeHeading.append(icon('route'),el('h3','','Quién elige el modelo'));
+  mode.append(modeHeading);taskModeControls(mode,id,false);
+  for(const [index,control] of [...mode.querySelectorAll('button')].entries())control.dataset.agentControl='mode:'+index;
+  detail.append(mode);
+  const visual=C.companionState(row,!!state.connections);
+  let notice= !state.connections?'Sin conexión. Estos son los últimos datos recibidos.':
+    visual.kind==='waiting'?'Esta tarea espera tu respuesta en Codex.':
+    visual.kind==='error'?'Esta tarea ha registrado una incidencia. Consulta el historial para revisarla.':
+    ['blocked','failed','rejected','unknown_after_timeout'].includes(row.phase_status)?phaseStatus(row.phase_status)+'. Consulta el historial para revisar el cambio.':null;
+  if(notice){const alert=el('div','routing-attention');alert.append(icon('circle'),el('span','',notice));detail.append(alert);}
+  livePipeline(detail,row);
+  layout.append(detail);page.append(workspace);
+  page.scrollTop=scroll;picker.scrollLeft=pickerScroll;picker.scrollTop=pickerTop;fitIsland();
+  if(focused)[...page.querySelectorAll('[data-agent-control]')].find(node=>node.dataset.agentControl===focused)?.focus({preventScroll:true});
 }
 function activity() {
-  const page=$('activity'),scroll=page.scrollTop,attentionOpen=!!page.querySelector('.attention-notice')?.open;page.replaceChildren();
-  const quota=el('div','section');quotaSection(quota);page.append(quota);
-  const entries=Object.entries(state.threads),rows=entries.filter(([,row])=>C.liveAgent(row));
-  const liveIds=rows.map(([id])=>id),stable=order.filter(id=>liveIds.includes(id)).concat(liveIds.filter(id=>!order.includes(id)));
-  const attention=entries.filter(([,row])=>!C.liveAgent(row)&&(['waiting','error','failed'].includes(row.status)||!!row.error_type));
-  if(attention.length){const notice=el('details','attention-notice');notice.open=attentionOpen;notice.append(el('summary','',attention.length+' '+(attention.length===1?'agente necesita':'agentes necesitan')+' tu atención'));for(const [id,row] of attention)notice.append(button((row.name||'Agente')+' · '+C.status(row.status),()=>{selectedThread=id;selectedDecision=row.decision_id||null;showTab('history');},'attention-item'));page.append(notice);}
-  const label=el('div','agent-list-heading');label.append(el('span','',rows.length+' en curso'),el('span','','Tokens · última llamada'));page.append(label);
-  if(selectedAgent&&!state.threads[selectedAgent])selectedAgent=null;
-  for(const id of stable) {
-    const row=state.threads[id],card=button('',()=>selectAgent(id),'task-row'+(selectedAgent===id?' selected':'')),copy=el('div','agent-copy');
-    modelTone(card,C.setting(row,'model'));card.dataset.status=C.contextGauge(row).compacting?'compacting':row.status||'unknown';
-    card.setAttribute('aria-expanded',String(selectedAgent===id));
-    const title=el('div','task-title',row.name||'Agente');title.title=row.name||id;
-    const model=tags(row);model.classList.add('agent-model');
-    copy.append(model,title,el('div','task-status',C.contextGauge(row).compacting?'Compactando contexto':C.status(row.status)));
-    const art=avatar(id,row,()=>{}),artHost=el('span');artHost.append(...art.childNodes);artHost.className=art.className;artHost.style.cssText=art.style.cssText;artHost.setAttribute('aria-hidden','true');
-    const usage=C.usageSample(row),value=el('div','agent-usage');value.append(el('strong','',usage.total===null?'—':fmt(usage.total)),el('span','small',usage.total===null?'sin dato':'tokens'));
-    card.setAttribute('aria-label',`${row.name||'Agente'} · ${C.model(C.setting(row,'model'))} · ${C.contextGauge(row).label} · ${usage.total===null?'tokens sin dato':fmt(usage.total)+' tokens en la última llamada'}`);
-    card.append(artHost,copy,value);page.append(card);
-    if(selectedAgent===id)agentDetail(page,id,row);
+  if(currentTab==='activity'){agentsWorkspace();return;}
+  const page=$('activity'),scroll=page.scrollTop,crewScroll=page.querySelector('.agent-crew')?.scrollLeft||0;
+  const focused=page.contains(document.activeElement)?document.activeElement:null,focusedAgent=focused?.dataset.agent,focusedControl=focused?.classList.contains('detail-toggle')?'.detail-toggle':focused?.classList.contains('overview-quota')?'.overview-quota':null;
+  page.replaceChildren();
+  if(selectedAgent&&!state.threads[selectedAgent]){
+    selectedAgent=null;
+    if(currentTab==='activity'){showTab('home');return;}
   }
-  if(!rows.length)page.append(el('div','empty-state',state.connections?'Ningún agente trabajando':'Sin conexión con Desktop'),el('p','empty',state.connections?'Los trabajos anteriores están en Historial.':'Comprueba la conexión en Ajustes.'));
-  if(selectedAgent&&state.threads[selectedAgent]&&!liveIds.includes(selectedAgent)){const d=el('div','agent-finished');d.append(el('p','small','Este agente ha dejado de trabajar.'),button('Consultar su historial',()=>openHistory(selectedAgent),'why'),button('Cerrar detalle',()=>{selectedAgent=null;activity();},'why'));page.append(d);}
-  page.scrollTop=scroll;
+  const home=currentTab==='home',primary=home?el('div','home-primary'):page,others=home?el('aside','home-others'):page;
+  if(home){const layout=el('div','home-layout');layout.append(primary,others);page.append(layout);others.setAttribute('aria-label','Otros agentes');}
+  const entries=Object.entries(state.threads),heroId=companionHero(primary,entries);
+  const rows=entries.filter(([,row])=>C.liveAgent(row));
+  const ids=C.companionOrder(order,state.threads);
+  const label=el('div','agent-list-heading');label.append(el(home?'strong':'span','',home?'Otros agentes':rows.length+' en curso'));
+  if(heroId){const detailButton=button(agentDetailsOpen?'Volver a inicio':'Ver detalles',()=>{selectedAgent=heroId;selectedWorkspaceAgent=heroId;showTab(agentDetailsOpen?'home':'activity');},'detail-toggle');detailButton.setAttribute('aria-expanded',String(agentDetailsOpen));if(home){detailButton.classList.add('hero-details');detailButton.setAttribute('aria-label','Ver detalles del agente');detailButton.replaceChildren(icon('chevron-right'));primary.append(detailButton);}else label.append(detailButton);}
+  others.append(label);
+  const crew=el('div','agent-crew');crew.setAttribute('aria-label','Elegir agente');
+  for(const id of ids) {
+    if(home&&id===heroId)continue;
+    const row=state.threads[id],identity=C.companion(id),visual=C.companionState(row,!!state.connections),card=button('',()=>selectAgent(id),'task-row'+(heroId===id?' selected':'')),copy=el('div','agent-copy');
+    card.style.setProperty('--character',identity.color);card.dataset.status=C.contextGauge(row).compacting?'compacting':row.status||'unknown';
+    card.setAttribute('aria-pressed',String(heroId===id));card.dataset.agent=id;
+    const title=el('div','task-title',row.name||'Agente');title.title=row.name||id;
+    copy.append(el('div','crew-name',identity.name),title,el('div','task-status',visual.label));
+    const art=avatar(id,row,()=>{}),artHost=el('span');artHost.append(...art.childNodes);artHost.className=art.className;artHost.style.cssText=art.style.cssText;artHost.dataset.state=art.dataset.state;artHost.dataset.companion=art.dataset.companion;artHost.setAttribute('aria-hidden','true');
+    card.setAttribute('aria-label',`${row.name||'Agente'} · ${visual.label} · ${C.model(C.setting(row,'model'))} · ${C.contextGauge(row).label}`);
+    card.append(artHost,copy);crew.append(card);
+  }
+  if(crew.children.length)others.append(crew);
+  else if(home)others.append(el('p','empty','No hay más agentes activos.'));
+  if(!ids.length&&!state.connections)page.append(el('p','empty','Comprueba la conexión en Ajustes.'));
+  refreshOverviewQuota();page.scrollTop=scroll;crew.scrollLeft=crewScroll;fitIsland();
+  const restore=focusedAgent?([...crew.children].find(node=>node.dataset.agent===focusedAgent)||(heroId===focusedAgent?page.querySelector('.hero-character'):null)):focusedControl?page.querySelector(focusedControl):null;restore?.focus({preventScroll:true});
 }
 const fmt = n => Number(n||0).toLocaleString('es-ES');
 const when = n => n ? new Date(n*1000).toLocaleString('es-ES',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Fecha sin confirmar';
@@ -309,60 +438,98 @@ function modelTone(node,value) {
   const family=C.family(value),tint=(C.models[family]||C.neutral)[0];
   node.dataset.modelFamily=family;node.style.setProperty('--agent-tint',tint);node.style.setProperty('--agent-wash',tint+'14');
 }
-let historyQuery='',historyOffset=0;
+function historyStatus(record) {
+  const status=el('span','history-status'),failed=!!record.error_type||['error','failed'].includes(record.status);
+  const kind=failed?'error':['completed','done'].includes(record.status)?'done':C.active(record.status)?'active':'idle';
+  status.dataset.kind=kind;status.append(icon(kind==='done'?'circle-check':kind==='error'?'bug':kind==='active'?'play':'circle'),el('span','',record.status==='completed'?'Finalizada':C.status(record.status)));
+  return status;
+}
+let historyQuery='',historyOffset=0,historyRenderKey='';
+function historyViewKey(){return JSON.stringify([historyRevision,historyOverlayKey,state.readOnly,selectedDecision,selectedThread,historyQuery,historyOffset]);}
 function renderHistory() {
   const searchFocus=document.activeElement?.id==='history-search',searchPosition=document.activeElement?.selectionStart;
-  const page=$('history'),previousScroll=page.querySelector('.history-list')?.scrollTop || 0;
+  const page=$('history');
+  if(historyRenderKey===historyViewKey()&&page.querySelector('.history-layout'))return;
+  const previousScroll=page.querySelector('.history-list')?.scrollTop || 0;
   const previousDetail=page.querySelector('.history-detail'),detailScroll=previousDetail?.scrollTop || 0,previousId=previousDetail?.dataset.decision;
+  const disclosures=new Map([...page.querySelectorAll('details[data-section]')].map(n=>[n.dataset.section,n.open]));
+  const focusedRecord=document.activeElement?.dataset.historyRecord;
   page.replaceChildren();
-  const detail=el('div','history-detail'),list=el('div','history-list');
+  const detail=el('section','history-detail'),list=el('div','history-list'),sidebar=el('aside','history-sidebar'),layout=el('div','history-layout');
+  detail.setAttribute('aria-label','Detalle del registro');sidebar.setAttribute('aria-label','Registros del historial');
+  const top=el('div','history-heading');top.append(el('h2','','Historial'),el('span','small',fmt(history.length)+' registros'));page.append(top);
+  const group=(label,key,open,build)=>{
+    const node=el('details','history-group'),body=el('div','history-group-body');
+    node.dataset.section=key;node.open=previousId===selectedDecision&&disclosures.has(key)?disclosures.get(key):open;
+    let built=false;const fill=()=>{if(node.open&&!built){built=true;build(body);}};
+    node.append(el('summary','',label),body);node.addEventListener('toggle',fill);detail.append(node);fill();
+  };
   const chosen=history.find(d=>d.id===selectedDecision) || (selectedThread?history.find(d=>d.thread===selectedThread):null);if(chosen)selectedDecision=chosen.id;
-  if(!chosen){detail.append(el('p','small',history.length?'Selecciona un trabajo para consultar su detalle.':'Aún no hay decisiones registradas.'));taskModeControls(detail,selectedThread);}
+  if(!chosen){const empty=el('div','history-empty');empty.append(icon('history'),el('h3','',history.length?'Cada decisión, en detalle':'Aún no hay registros'),el('p','small',history.length?'Selecciona un trabajo para consultar qué se registró y valorar la elección.':'Las decisiones aparecerán aquí cuando utilices el enrutamiento.'));detail.append(empty);}
   else {
-    detail.append(el('h2','',chosen.title || 'Tarea'),tags(chosen,true),el('p','small',when(chosen.started || chosen.time)+' · '+C.status(chosen.status)));
-    if(chosen.phase_status) explanation(detail,'ESTADO DE LA FASE',phaseStatus(chosen.phase_status)+(chosen.phase_transition?' · '+chosen.phase_transition:''),'phase');
-    pipeline(detail,chosen);executionEvidence(detail,chosen);
-    if(chosen.inference_model_mismatch || chosen.inference_effort_mismatch)
-      detail.append(el('p','warning','La inferencia vinculada al turno difiere de los ajustes esperados.'));
-    taskModeControls(detail,chosen.thread);
-    explanation(detail,'Modelo elegido',chosen.model_reason,'model');explanation(detail,'Razonamiento elegido',chosen.effort_reason,'effort');if(chosen.continuity_strategy)explanation(detail,'Decisión de continuidad',continuity(chosen.continuity_strategy),'continuity');
-    detail.append(el('h3','quality-label','VALORA ESTA ELECCIÓN'));
-    for(const [aspect,label,key] of [['overall','Resultado global','quality'],['model','Modelo elegido','model_quality'],['effort','Razonamiento elegido','effort_quality']]){detail.append(el('p','small',label));const choices=el('div','choices');for(const [value,choiceLabel] of [['insufficient','Insuficiente'],['adequate','Adecuada'],['excessive','Excesiva']])choices.append(button(choiceLabel,()=>native({action:'quality',id:chosen.id,thread:chosen.thread || '',aspect,value:chosen[key]===value?'':value}),'choice'+(chosen[key]===value?' selected':'')));detail.append(choices);if(chosen[key])detail.append(button('Quitar valoración',()=>native({action:'quality',id:chosen.id,thread:chosen.thread || '',aspect,value:''}),'clear-quality'));}
-    detail.append(el('p','small','Puedes valorar el resultado global, el modelo y el razonamiento por separado. No se guarda el mensaje ni la respuesta.'));
-    detail.append(el('p','small','Motor aplicado: '+(engines[chosen.routing_engine] || 'Sin confirmar')));
-    if(chosen.finished>=chosen.started&&chosen.started)detail.append(el('p','small','Duración: '+Math.round(chosen.finished-chosen.started)+' s'));
-    const comparisons=Object.values(chosen.comparisons);
-    if(comparisons.length)explanation(detail,'MOTORES OBSERVADOS',comparisons.map(comparison=>{
-      const role=comparison.engine_active?(comparison.routing_engine===chosen.routing_engine?'aplicado':'intento'):'comparación';
-      const failure=comparison.engine_failure==='account_access_restricted'?'Vercel restringe el acceso del plan gratuito; requiere créditos':comparison.engine_failure==='circuit_open'?'En pausa por fallos; se usan reglas locales':comparison.engine_failure;
-      const result=comparison.engine_status==='ok'?Math.round(comparison.engine_latency_ms || 0)+' ms':[comparison.engine_status,failure].filter(Boolean).join(' · ') || 'Sin confirmar';
-      return `${engines[comparison.routing_engine] || comparison.routing_engine} · ${role} → ${C.model(comparison.proposed_model)} · ${C.efforts[comparison.proposed_effort] || '—'} · ${result}`;
-    }).join('\n'));
-    if(chosen.inputTokens!==undefined||chosen.outputTokens!==undefined){const sample=C.usageSample(chosen);explanation(detail,'USO OBSERVADO',`Última llamada · ${sample.input===null?'sin dato':fmt(sample.input)} entrada · ${sample.output===null?'sin dato':fmt(sample.output)} salida · ${Number.isSafeInteger(chosen.cachedInputTokens)&&chosen.cachedInputTokens>=0?fmt(chosen.cachedInputTokens):'sin dato'} en caché`);}
-    if(chosen.error_type)explanation(detail,'INCIDENCIA',C.errorLabel(chosen));
-    if(chosen.native_retries)explanation(detail,'REINTENTOS NATIVOS',String(chosen.native_retries));
-    if(chosen.signal)explanation(detail,'SEÑAL DE RESULTADO',chosen.signal==='retry'?'La siguiente petición indicó que el resultado no había resuelto la tarea.':chosen.signal);
+    const summary=el('div','history-summary'),category=el('div','history-category'),meta=el('div','history-meta');
+    const origin=({manual:'Elección manual',explicit:'Petición explícita',preserved:'Ajustes de Codex',agent:'Agente'})[chosen.source]||({jev:'Jev',rules:'Motor local'})[chosen.routing_engine];
+    modelTone(summary,chosen.model);if(origin)category.append(icon('route'),el('span','',origin));
+    meta.append(category,historyStatus(chosen));summary.append(meta,el('h2','',chosen.title || 'Tarea'),el('p','small',when(chosen.started || chosen.time)),el('span','history-model-label','Modelo elegido'),tags(chosen,true));detail.append(summary);
+    historyMeasurements(detail,chosen);
+    if(chosen.error_type)explanation(detail,'Incidencia registrada',C.errorLabel(chosen),'incident');
+    if(chosen.inference_model_mismatch||chosen.inference_effort_mismatch)explanation(detail,'Diferencia registrada','La inferencia vinculada al turno difiere del modelo o esfuerzo esperado. Consulta el diagnóstico.','incident');
+    const signals={retry:'Se detectó una petición de reintento posterior.',manual_override:'Se pidió otro modelo en un mensaje posterior.'};
+    if(signals[chosen.signal])explanation(detail,'Seguimiento',signals[chosen.signal]);
+    group('Valorar esta elección','quality',false,quality=>{
+      for(const [aspect,label,key,glyph] of [['overall','Elección global','quality','clipboard-check'],['model','Modelo elegido','model_quality','network'],['effort','Razonamiento elegido','effort_quality','gauge']]){
+        const row=el('div','quality-row'),heading=el('div','quality-heading'),title=el('h3'),options=el('div','choices quality-choices');
+        title.append(icon(glyph),el('span','',label));heading.append(title);
+        if(chosen[key]){const clear=productButton('',()=>native({action:'quality',id:chosen.id,thread:chosen.thread||'',aspect,value:''}),'quality-clear');clear.append(icon('x'));clear.setAttribute('aria-label','Quitar valoración: '+label);clear.title='Quitar valoración';heading.append(clear);}
+        options.setAttribute('role','group');options.setAttribute('aria-label',label);
+        for(const [value,choiceLabel] of [['insufficient','Insuficiente'],['adequate','Adecuada'],['excessive','Excesiva']]){
+          const selected=chosen[key]===value,choice=productButton('',()=>native({action:'quality',id:chosen.id,thread:chosen.thread||'',aspect,value:selected?'':value}),'choice rating-choice'+(selected?' selected':''));
+          choice.dataset.rating=value;choice.setAttribute('aria-pressed',String(selected));if(selected)choice.append(icon('check'));choice.append(el('span','',choiceLabel));options.append(choice);
+        }
+        row.append(heading,options);quality.append(row);
+      }
+    });
+
+    const evidence=historyEvidence(chosen);
+    const comparisons=Object.values(chosen.comparisons||{}).filter(c=>c.engine_active===false||c.engine_failure||c.engine_status&&c.engine_status!=='ok');
+    const estimates=Object.values(chosen.usage_estimates||{}).filter(s=>Number.isFinite(s.credits)&&s.credits>=0);
+    if(evidence.settings.length||evidence.phases.length||evidence.samples.length||chosen.prior_inferences?.length||comparisons.length||estimates.length){
+      group('Diagnóstico','diagnostics',false,diagnostics=>{
+        executionEvidence(diagnostics,chosen,evidence);
+        if(comparisons.length)explanation(diagnostics,'Comparaciones e incidencias del selector',comparisons.map(c=>{
+          const role=c.engine_active===false?'comparación':'intento';
+          const failure={account_access_restricted:'acceso restringido',circuit_open:'en pausa por fallos',route_outside_policy:'propuesta fuera de los límites'}[c.engine_failure]||c.engine_failure;
+          const result=c.engine_status==='ok'?'respuesta recibida':[c.engine_status,failure].filter(Boolean).join(' · ')||'sin resultado registrado';
+          return `${engines[c.routing_engine]||c.routing_engine} · ${role}${c.proposed_model?' → '+C.model(c.proposed_model):''}${c.proposed_effort?' · '+(C.efforts[c.proposed_effort]||c.proposed_effort):''} · ${result}`;
+        }).join('\n'));
+        if(estimates.length)explanation(diagnostics,'Equivalente Standard estimado',estimates.reduce((n,s)=>n+s.credits,0).toFixed(4)+' créditos Codex'+(estimates.every(s=>Number.isFinite(s.usd)&&s.usd>=0)?' · $'+estimates.reduce((n,s)=>n+s.usd,0).toFixed(6)+' API':'')+'. Estimación de inferencias con uso completo; no es el coste facturado ni el consumo de tu suscripción.');
+      });
+    }
   }
-  list.append(el('h3','section-title','DECISIONES RECIENTES'));
-  if(chosen?.usage_estimates) {
-    const samples=Object.values(chosen.usage_estimates);
-    explanation(detail,'ESTIMACIÓN STANDARD',samples.reduce((n,s)=>n+s.credits,0).toFixed(4)+' créditos Codex'+(samples.every(s=>Number.isFinite(s.usd))?' · $'+samples.reduce((n,s)=>n+s.usd,0).toFixed(6)+' equivalentes API':' · API sin estimar: falta información de escritura en caché')+'. Solo inferencias con uso completo; no es una factura ni el consumo de tu suscripción. Fast y otros modos no se incluyen.');
-  }
-  const filtered=history.filter(d=>[d.title,C.model(d.model),C.efforts[d.effort],engines[d.routing_engine],C.status(d.status)].join(' ').toLocaleLowerCase().includes(historyQuery.toLocaleLowerCase()));
+
+  const query=historyQuery.toLocaleLowerCase();
+  const filtered=query?history.filter(d=>{
+    let text=historySearchText.get(d);
+    if(text===undefined){text=[d.title,C.model(d.model),C.efforts[d.effort],engines[d.routing_engine],C.status(d.status)].join(' ').toLocaleLowerCase();historySearchText.set(d,text);}
+    return text.includes(query);
+  }):history;
   historyOffset=Math.min(historyOffset,Math.max(0,Math.floor((filtered.length-1)/40)*40));
   for(const record of filtered.slice(historyOffset,historyOffset+40)) {
     const row=button('',()=>{selectedDecision=record.id;selectedThread=record.thread;renderHistory();},'history-row'+(record.id===selectedDecision?' selected':''));
-    modelTone(row,record.model);
-    const copy=el('div','history-copy'),title=el('div','task-title',record.title || 'Tarea');title.title=record.title || 'Tarea';copy.append(title,el('div','small'+(record.error_type?' warning':''),when(record.time)+' · '+C.status(record.status)));row.append(copy,tags(record,true));list.append(row);
+    modelTone(row,record.model);row.dataset.historyRecord=record.id;row.setAttribute('aria-pressed',String(record.id===selectedDecision));
+    const copy=el('div','history-copy'),title=el('div','task-title',record.title || 'Tarea');title.title=record.title || 'Tarea';copy.append(title,el('div','small',when(record.started||record.time)));row.append(copy,tags(record,true),historyStatus(record));list.append(row);
   }
-  const search=el('input','history-search');search.id='history-search';search.type='search';search.placeholder='Buscar por tarea, modelo, motor o estado';search.setAttribute('aria-label',search.placeholder);search.value=historyQuery;
+  const search=el('input','history-search');search.id='history-search';search.type='search';search.placeholder='Buscar registros…';search.setAttribute('aria-label','Buscar por tarea, modelo, motor o estado');search.value=historyQuery;
   search.oninput=()=>{historyQuery=search.value;historyOffset=0;renderHistory();};
-  const pagination=el('div','choices');if(historyOffset)pagination.append(button('Anterior',()=>{historyOffset-=40;renderHistory();},'choice'));
+  const pagination=el('div','choices history-pagination');if(historyOffset)pagination.append(button('Anterior',()=>{historyOffset-=40;renderHistory();},'choice'));
   pagination.append(el('span','small',filtered.length?`${historyOffset+1}–${Math.min(historyOffset+40,filtered.length)} de ${filtered.length}`:'Sin coincidencias'));
-  if(historyOffset+40<filtered.length)pagination.append(button('Siguiente',()=>{historyOffset+=40;renderHistory();},'choice'));list.append(pagination);
-  detail.dataset.decision=chosen?.id || '';page.append(detail,el('div','rule'),search,list);list.scrollTop=previousScroll;
+  if(historyOffset+40<filtered.length)pagination.append(button('Siguiente',()=>{historyOffset+=40;renderHistory();},'choice'));
+  if(!filtered.length)list.append(el('p','history-no-results small',historyQuery?'No hay registros que coincidan con tu búsqueda.':'Todavía no hay decisiones registradas.'));
+  detail.dataset.decision=chosen?.id || '';const searchBox=el('div','history-search-box');searchBox.append(icon('search'),search);sidebar.append(searchBox,list,pagination);layout.append(sidebar,detail);page.append(layout);list.scrollTop=previousScroll;
+  if(focusedRecord)[...list.children].find(n=>n.dataset.historyRecord===focusedRecord)?.focus({preventScroll:true});
   if(searchFocus){search.focus();if(searchPosition!==null)search.setSelectionRange(searchPosition,searchPosition);}
   if(previousId===chosen?.id)detail.scrollTop=detailScroll;
+  historyRenderKey=historyViewKey();
 }
 function metric(parent,label,value,ratio=1,color='var(--accent)') {
   const box=el('div','metric'),line=el('div','metric-line'),number=el('span','metric-value',value);number.style.color=color;
@@ -469,11 +636,11 @@ function statistics() {
   const durations=history.filter(d=>d.started&&d.finished>=d.started);if(durations.length)metric(content,'Duración media',Math.round(durations.reduce((n,d)=>n+d.finished-d.started,0)/durations.length)+' s');
   content.append(el('p','small','Estos datos no demuestran ahorro de cuota ni calidad comparativa por sí solos.'));page.scrollTop=scroll;
 }
-function actionCard(parent,title,description,action){const node=button('',action,'settings-action');node.disabled=!!connectionPending;node.append(el('strong','',title),el('span','',description),icon('chevron-right','ui-glyph action-affordance'));parent.append(node);return node;}
+function actionCard(parent,title,description,action){const node=button('',action,'settings-action');node.disabled=!!state.readOnly || !!connectionPending;node.append(el('strong','',title),el('span','',description),icon('chevron-right','ui-glyph action-affordance'));parent.append(node);return node;}
 const connectionLabels={doctor:'Comprobando conexión…',install:'Conectando…',uninstall:'Desconectando…'};
 function connectionControls() {
   for(const node of $('settings').querySelectorAll('.settings-action')) {
-    node.disabled=!!connectionPending;
+    node.disabled=!!state.readOnly || !!connectionPending;
     if(!node.dataset.connectionAction)continue;
     const busy=node.dataset.connectionAction===connectionPending;
     node.classList.toggle('busy',busy);node.setAttribute('aria-busy',String(busy));
@@ -482,7 +649,7 @@ function connectionControls() {
   }
 }
 function connectDesktop(value) {
-  if(connectionPending)return;
+  if(state.readOnly || connectionPending)return;
   connectionPending=value;connectionControls();$('feedback').textContent=connectionLabels[value];
   native({action:'connection',value});
 }
@@ -492,21 +659,34 @@ function connectionCard(parent,value,title,description) {
   const spinner=el('i','action-spinner');spinner.setAttribute('aria-hidden','true');node.append(spinner);
   connectionControls();
 }
-function choices(parent,options,selected,action,disabled=[]) {const box=el('div','choices');for(const [key,label] of options){const chosen=Array.isArray(selected)?selected.includes(key):selected===key;const node=button('',()=>action(key),'choice'+(chosen?' selected':''));controlLabel(node,chosen?'circle-check':'circle',label);node.setAttribute('aria-pressed',String(chosen));node.disabled=disabled.includes(key);box.append(node);}parent.append(box);}
+function choices(parent,options,selected,action,disabled=[]) {const box=el('div','choices');for(const [key,label] of options){const chosen=Array.isArray(selected)?selected.includes(key):selected===key;const node=button('',()=>action(key),'choice'+(chosen?' selected':''));controlLabel(node,chosen?'circle-check':'circle',label);node.setAttribute('aria-pressed',String(chosen));node.disabled=!!state.readOnly || disabled.includes(key);box.append(node);}parent.append(box);}
 const configure = (key,value) => native({action:'config',key,value});
 function keySettings(parent,id,label) {
   const ready=state.keys?.[id];
   const editor=el('div','key-editor');editor.hidden=true;
   actionCard(parent,ready?'Clave guardada de '+label:'Añadir clave de '+label,'La clave se guarda en el llavero de este Mac.',()=>{editor.hidden=!editor.hidden;input.value='';if(!editor.hidden)input.focus();});
-  const input=el('input');input.type='password';input.autocomplete='off';input.setAttribute('aria-label','Clave API de '+label);
-  editor.append(input);const actions=el('div','choices');actions.append(button('Guardar clave',()=>{const value=input.value.trim();if(!value)return;native({action:'secret',provider:id,value});input.value='';editor.hidden=true;},'choice'),button('Cancelar',()=>{input.value='';editor.hidden=true;},'choice'));editor.append(actions);parent.append(editor);
+  const input=el('input');input.type='password';input.disabled=!!state.readOnly;input.autocomplete='off';input.setAttribute('aria-label','Clave API de '+label);
+  input.dataset.keyId=id;
+  editor.append(input);const actions=el('div','choices');actions.append(productButton('Guardar clave',()=>{const value=input.value.trim();if(!value)return;native({action:'secret',provider:id,value});input.value='';editor.hidden=true;},'choice'),button('Cancelar',()=>{input.value='';editor.hidden=true;},'choice'));editor.append(actions);parent.append(editor);
+}
+function refreshProductVersion() {
+  if(!$('product-version'))return;
+  const bridgeMismatch=(state.bridgeVersions||[]).filter(v=>v!==state.productVersion);
+  $('product-version').textContent='v'+(state.productVersion || state.updates?.installedVersion || '—')+(bridgeMismatch.length?' · puente '+bridgeMismatch.join(', '):state.bridgeBuildMismatch?' · router anterior':state.bridgeBuildUnknown?' · puente sin verificar':'')+(state.restartRequired?' · reinicio pendiente':'');
+  $('product-version').title=state.restartRequired?'Hay ajustes pendientes. Reinicia Desktop al terminar tus tareas para cargarlos.':(bridgeMismatch.length||state.bridgeBuildMismatch)?'La versión del router activo difiere de la incluida con este monitor. Reinicia Desktop al terminar tus tareas para cargar la versión instalada.':state.bridgeBuildUnknown?'El puente activo no informa su versión de componente. No se puede determinar si necesita reinicio; el próximo inicio de Desktop permitirá comprobarlo.':'Versión de Codex automático';
+}
+function refreshRoutingControl() {
+  const node=$('pause');if(!node)return;
+  node.disabled=!!state.readOnly||!!connectionPending;
+  node.querySelector('strong').replaceChildren(icon(state.config.enabled?'pause':'play'),document.createTextNode(state.config.enabled?'Pausar enrutamiento':'Activar enrutamiento'));
+  node.querySelector('span').textContent=state.config.enabled?'El enrutador elige el modelo en cada nuevo mensaje.':'Se respeta la selección manual de Codex.';
 }
 function updateSettings(box) {
   const update=state.updates||{status:'idle',installedVersion:state.productVersion},busy=['checking','downloading'].includes(update.status);
   heading(box,'ACTUALIZACIONES');
   const statuses={idle:'Sin comprobar',checking:'Comprobando…',available:'Nueva versión disponible',package_unavailable:'Hay una nueva versión; aún no hay instalador publicado para este equipo.',up_to_date:'No hay una versión estable más reciente.',downloading:'Descargando…',downloaded:'Descarga verificada. La instalación desde la aplicación aún no está disponible.',cancelled:'Operación cancelada.',error:'No se pudo comprobar o descargar la actualización.'};
   const errors={release_unavailable:'No hay una entrega pública accesible.',rate_limited:'GitHub ha limitado las comprobaciones. Vuelve a intentarlo más tarde.',network_error:'Comprueba tu conexión e inténtalo de nuevo.',invalid_release:'La entrega no tiene metadatos válidos para actualizar.',unsupported_platform:'No hay un instalador compatible con este equipo.',unsafe_download:'La dirección de descarga no es válida.',invalid_size:'El tamaño recibido no coincide con el publicado.',integrity_error:'La descarga no coincide con su huella publicada.'};
-  const card=el('div','update-card');card.append(el('strong','','Versión instalada · '+(update.installedVersion||state.productVersion||'Desconocida')));
+  const card=el('div','update-card'),version=el('span');version.id='product-version';const versionHeading=el('strong','','Versión instalada · ');versionHeading.append(version);card.append(versionHeading);
   if(update.latestVersion)card.append(el('p','small','Última estable · '+update.latestVersion));
   card.append(el('p','small',statuses[update.status]||statuses.idle));
   if(update.error)card.append(el('p','warning',errors[update.error]||errors.network_error));
@@ -515,23 +695,25 @@ function updateSettings(box) {
     const progress=el('progress');progress.max=100;progress.value=Number.isFinite(update.progress)?update.progress:0;progress.setAttribute('aria-label','Progreso de descarga');card.append(progress);
   }
   const actions=el('div','choices');
-  const check=button('Comprobar ahora',()=>native({action:'update',value:'check'}),'choice');check.disabled=busy||!!state.preview;actions.append(check);
-  if(update.canDownload){const download=button('Descargar versión '+update.latestVersion,()=>native({action:'update',value:'download'}),'choice');download.disabled=busy||!!state.preview;actions.append(download);}
-  if(busy){const cancel=button('Cancelar',()=>native({action:'update',value:'cancel'}),'choice');cancel.disabled=!!state.preview;actions.append(cancel);}
-  card.append(actions);box.append(card);
+  const check=button('Comprobar ahora',()=>native({action:'update',value:'check'}),'choice');check.disabled=busy||!!state.preview||!!state.readOnly;actions.append(check);
+  if(update.canDownload){const download=button('Descargar versión '+update.latestVersion,()=>native({action:'update',value:'download'}),'choice');download.disabled=busy||!!state.preview||!!state.readOnly;actions.append(download);}
+  if(busy){const cancel=button('Cancelar',()=>native({action:'update',value:'cancel'}),'choice');cancel.disabled=!!state.preview||!!state.readOnly;actions.append(cancel);}
+  card.append(actions);box.append(card);refreshProductVersion();
   actionCard(box,state.config.updates_auto_check?'Desactivar comprobación diaria':'Activar comprobación diaria','Consulta las versiones públicas de este repositorio en GitHub. No envía tus tareas ni tus ajustes; no instala automáticamente.',()=>configure('updates_auto_check',!state.config.updates_auto_check));
 }
 function settings() {
-  const page=$('settings'),scroll=page.scrollTop,box=el('div','section'),config=state.config,catalogOpen=!!page.querySelector('.icon-catalog')?.open;page.replaceChildren(box);
+  const page=$('settings'),scroll=page.scrollTop,box=el('div','section'),config=state.config,catalogOpen=!!page.querySelector('.icon-catalog')?.open;
+  // Keep unsaved input in memory when auto-collapse hides and rebuilds Settings.
+  const drafts=new Map([...page.querySelectorAll('input[data-key-id]')].map(input=>[input.dataset.keyId,{value:input.value,open:!input.closest('.key-editor').hidden}]));
+  page.replaceChildren(box);
   box.append(el('h2','','Ajustes'),el('p','','Controla el selector, el motor que decide y cuánto tiempo se conserva su historial local.'));
+  actionCard(box,'','',()=>configure('enabled',!state.config.enabled));box.lastElementChild.id='pause';refreshRoutingControl();
   updateSettings(box);
   heading(box,'CONEXIÓN CON DESKTOP');
   box.append(el('p','small','La instalación se detecta al arrancar. Conecta el inicio habitual una vez. Cerrar el monitor no detiene el selector.'));
   connectionCard(box,'doctor','Comprobar conexión','Distingue instalación, registro y conexión observada.');
   connectionCard(box,'install','Conectar al inicio habitual','Prepara el próximo arranque de Desktop. Puedes pulsarlo con tus tareas abiertas.');
   connectionCard(box,'uninstall','Desconectar integración','Restaura el inicio habitual sin borrar ajustes ni historial.');
-  actionCard(box,config.enabled?'Pausar selección automática':'Activar selección automática',config.enabled?'Codex automático decide en cada nuevo mensaje.':'Se respeta la selección manual de Codex.',()=>configure('enabled',!config.enabled));
-  box.lastElementChild.querySelector('strong').prepend(icon(config.enabled?'pause':'play'));
   actionCard(box,state.ui.topmost?'Desactivar Mantener delante':'Activar Mantener delante',state.ui.topmost?(state.platform==='linux'?'Solicita al escritorio mantener el monitor delante.':'El monitor permanece sobre otras ventanas.'):'El monitor puede quedar detrás de otras ventanas.',()=>native({action:'topmost',value:!state.ui.topmost}));
   if(state.platform==='linux' && state.desktopCapabilities?.positioning===false)box.append(el('p','small','El escritorio decide la posición y si mantiene el monitor delante. Puedes moverlo con el atajo de ventanas del sistema.'));
   heading(box,'CONSERVAR HISTORIAL');choices(box,[[30,'30 días'],[90,'90 días'],[180,'180 días'],[0,'Siempre']],config.history_days??90,v=>configure('history_days',v));
@@ -554,22 +736,24 @@ function settings() {
     if(!state.keys?.['jev-'+connection])box.append(el('p','small','Cada conexión necesita su propia clave. Si guardaste una clave en una versión anterior, introdúcela aquí una vez para vincularla a este proveedor.'));
   }
   heading(box,'POLÍTICA ACTUAL');for(const [tier,description] of [['simple','Tareas delimitadas'],['normal','Cambios concretos'],['complex','Ingeniería compleja'],['critical','UX, auditorías y gran alcance']]){const route=config.routes?.[tier];if(route){const row=el('div','policy');row.append(badge(route.model),el('span','',description),badge(route.effort,true));box.append(row);}}
-  const catalog=el('details','icon-catalog');catalog.open=catalogOpen;catalog.append(el('summary','','Iconos de los agentes · '+Object.keys(C.identities).length+' tipos'));
+  const catalog=el('details','icon-catalog');catalog.open=catalogOpen;catalog.append(el('summary','','Tipos de tarea · '+Object.keys(C.identities).length+' tipos'));
   const icons=el('div','icon-catalog-grid');for(const [category,[label]] of Object.entries(C.identities)){
-    const item=el('div'),art=avatar('',{agent_category:category,status:'idle'},()=>{}),host=el('span','avatar');host.style.cssText=art.style.cssText;host.append(...art.childNodes);host.setAttribute('aria-hidden','true');host.querySelector('.effort-dot')?.remove();host.querySelector('.context-ring')?.remove();item.append(host,el('span','small',label));icons.append(item);
+    const item=el('div');item.append(icon(C.identities[category][1],'glyph'),el('span','small',label));icons.append(item);
   }catalog.append(icons);box.append(catalog);
   heading(box,'PRIVACIDAD');box.append(el('p','small',config.prompt_logging?'Además de las métricas, se guarda el texto de tus mensajes en el archivo local privado state/prompts.jsonl para evaluar las decisiones. No guarda respuestas, adjuntos, herramientas ni credenciales. Las claves se almacenan en '+(state.secretStorage || 'el llavero de macOS')+'.':'El historial guarda tareas, ajustes, motivos, estados y contadores. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales. Las claves se almacenan en '+(state.secretStorage || 'el llavero de macOS')+'.'));
+  for(const input of page.querySelectorAll('input[data-key-id]')){const draft=drafts.get(input.dataset.keyId);if(draft){input.value=draft.value;input.closest('.key-editor').hidden=!draft.open;}}
   page.scrollTop=scroll;
 }
 function renderPage(){
   if(state.ui.mode!=='Expanded')return;
+  fitIsland();
   if(currentTab==='history' || currentTab==='statistics') {
     if(state.ui.lazyHistory && !state.historyLoaded){
       $(currentTab).replaceChildren(el('p','empty','Cargando historial…'));return;
     }
     ensureHistory();
   }
-  if(currentTab==='activity')activity();else if(currentTab==='history')renderHistory();else if(currentTab==='statistics')statistics();else settings();
+  if(currentTab==='home'||currentTab==='activity')activity();else if(currentTab==='history')renderHistory();else if(currentTab==='statistics')statistics();else settings();
 }
 window.receive = incoming => {
   const oldConfig=JSON.stringify(state.config),oldUi=JSON.stringify(state.ui),oldUpdates=JSON.stringify(state.updates);
@@ -582,16 +766,14 @@ window.receive = incoming => {
   document.body.classList.toggle('reduced',!!state.ui.reduced);
   if(!document.body.classList.contains(state.ui.mode.toLowerCase()))setMode(state.ui.mode,false);
   const active=Object.values(state.threads).filter(row=>C.liveAgent(row)).length;
-  $('connection').classList.toggle('disconnected',!state.connections);$('connection').querySelector('span').textContent=state.preview?'Vista previa · datos simulados':state.connections?`${active} ${active===1?'tarea activa':'tareas activas'}`:state.desktopRestartPending?'Conexión preparada · reinicia Desktop':'Sin conexión';$('connection').querySelector('i').classList.toggle('working',active>0);
-  controlLabel($('pause'),state.config.enabled?'pause':'play',state.config.enabled?'Pausar selección':'Activar selección');
-  const bridgeMismatch=(state.bridgeVersions||[]).filter(v=>v!==state.productVersion);
-  $('product-version').textContent='v'+(state.productVersion || '—')+(bridgeMismatch.length?' · puente '+bridgeMismatch.join(', '):state.bridgeBuildMismatch?' · router anterior':state.bridgeBuildUnknown?' · puente sin verificar':'')+(state.restartRequired?' · reinicio pendiente':'');
-  $('product-version').title=state.restartRequired?'Hay ajustes pendientes. Reinicia Desktop al terminar tus tareas para cargarlos.':(bridgeMismatch.length||state.bridgeBuildMismatch)?'La versión del router activo difiere de la incluida con este monitor. Reinicia Desktop al terminar tus tareas para cargar la versión instalada.':state.bridgeBuildUnknown?'El puente activo no informa su versión de componente. No se puede determinar si necesita reinicio; el próximo inicio de Desktop permitirá comprobarlo.':'Versión de Codex automático';
+  $('connection').classList.toggle('sr-only',!state.preview&&!state.readOnly);$('connection').querySelector('span').textContent=state.preview?'Vista previa · datos simulados':state.readOnly?'Vista previa · datos reales · solo lectura':state.connections?`${active} ${active===1?'tarea activa':'tareas activas'}`:state.desktopRestartPending?'Conexión preparada · reinicia Desktop':'Sin conexión';$('connection').querySelector('i').classList.toggle('working',active>0);
+  refreshProductVersion();
+  refreshRoutingControl();
   capsule();
   refreshQuota();
   document.body.classList.toggle('native-glass',!!state.ui.nativeGlass);
   document.body.classList.toggle('reduce-transparency',!!state.ui.reduceTransparency);
-  const signature=JSON.stringify([state.threads,historyRevision,state.historyLoaded,state.connections,state.taskModes,state.telemetry,state.accountUsage]);
+  const signature=JSON.stringify([state.readOnly,state.threads,state.agentThreads,historyRevision,state.historyLoaded,state.connections,state.taskModes,state.telemetry,state.accountUsage]);
   const settingsChanged=oldConfig!==JSON.stringify(state.config) || oldUi!==JSON.stringify(state.ui) || oldUpdates!==JSON.stringify(state.updates);
   if(signature!==dataSignature || settingsChanged){
     dataSignature=signature;
@@ -614,11 +796,12 @@ function clearNativeHover() {
 window.monitorPointer = (point,inactive=true) => {
   if(!inactive){clearNativeHover();return;}
   const target=point && state.ui.mode!=='Hidden' ? document.elementFromPoint(point.x,point.y) : null;
+  islandPointer(!!target?.closest('#surface'));
   const button=target?.closest('button');
-  if(button!==nativeHover){clearNativeHover();nativeHover=button;button?.classList.add('native-hover');}
+  if(button!==nativeHover){peekDismissed=false;clearNativeHover();nativeHover=button;button?.classList.add('native-hover');}
   if(state.ui.mode==='Compact') {
-    if(target?.closest('#compact'))clearTimeout(peekTimer);
-    else if(peekId || quotaOpen){clearTimeout(peekTimer);peekTimer=setTimeout(closePeek,220);}
+    if(target?.closest('#compact'))cancelPeekClose();
+    else schedulePeekClose();
     if(button?.id==='quota' && !quotaOpen)openQuota();
     if(button?.classList.contains('avatar')) {
       const id=[...avatars].find(([,node])=>node===button)?.[0];
@@ -629,14 +812,20 @@ window.monitorPointer = (point,inactive=true) => {
 let feedbackTimer;
 window.monitorConnectionState = status => { connectionPending=status.pending?status.value:null;connectionControls(); };
 window.monitorFeedback = text => { if(!state.ui.connectionProgress){connectionPending=null;connectionControls();}clearTimeout(feedbackTimer);$('feedback').textContent=text;feedbackTimer=setTimeout(()=>{$('feedback').textContent='';},7000); };
-$('expand').onclick=()=>setMode('Expanded');$('collapse').onclick=()=>setMode('Compact');$('hide').onclick=()=>setMode('Hidden');$('pause').onclick=()=>configure('enabled',!state.config.enabled);
-$('quota').onclick=openQuota;
-$('quota').addEventListener('mouseenter',openQuota);$('quota').addEventListener('focus',openQuota);
-window.addEventListener('resize',()=>{capsule();window.monitorBounds();});
+$('compact-summary').onclick=()=>setMode('Expanded');
+$('expand').onclick=()=>setMode('Expanded');
+$('quota').onclick=()=>openQuota(true);
+$('quota').addEventListener('mouseenter',()=>openQuota());$('quota').addEventListener('focus',()=>openQuota(true));
+window.addEventListener('resize',()=>{capsule();fitIsland();window.monitorBounds();});
 setInterval(refreshQuota,2000);
 for(const node of document.querySelectorAll('[data-tab]'))node.onclick=()=>showTab(node.dataset.tab);
-$('compact').addEventListener('mouseenter',()=>clearTimeout(peekTimer));$('compact').addEventListener('mouseleave',()=>{peekTimer=setTimeout(closePeek,220);});
-document.addEventListener('keydown',event=>{if(event.key==='Escape'){if(peekId||quotaOpen)closePeek();else setMode('Compact');}});
+$('compact').addEventListener('mouseenter',()=>{peekDismissed=false;cancelPeekClose();});$('compact').addEventListener('mouseleave',schedulePeekClose);
+document.documentElement.addEventListener('mouseleave',()=>{schedulePeekClose();islandPointer(false);});
+$('surface').addEventListener('mouseenter',()=>islandPointer(true));
+$('surface').addEventListener('mouseleave',()=>islandPointer(false));
+$('compact').addEventListener('focusout',event=>{if(!$('compact').contains(event.relatedTarget))schedulePeekClose();});
+$('compact').addEventListener('pointermove',event=>{if(event.movementX||event.movementY)peekDismissed=false;});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'){if(peekId||quotaOpen){peekDismissed=true;closePeek();}else setMode('Compact');}});
 let boundsFrame=0;
 window.monitorBounds=()=>{
   cancelAnimationFrame(boundsFrame);
@@ -647,6 +836,7 @@ window.monitorBounds=()=>{
   });
 };
 new ResizeObserver(window.monitorBounds).observe($('surface'));
+const contentObserver=new ResizeObserver(fitIsland);
+for(const node of [$('activity'),document.querySelector('nav'),$('notices')])contentObserver.observe(node);
 for(const node of document.querySelectorAll('[data-icon]'))node.replaceChildren(icon(node.dataset.icon));
-controlLabel($('pause'),'pause','Pausar selección');
 native({action:'ready'});

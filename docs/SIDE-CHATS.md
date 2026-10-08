@@ -1,5 +1,11 @@
 # Chats laterales locales — 0.3.1
 
+The shared monitor now has separate Home/live rows and a non-archived Agents
+catalog that includes inactive ordinary conversations. `agent_threads` does not
+resurrect suppressed internal/ephemeral catalog rows; the side-chat exclusion
+and persistence rules below remain in force. See
+[the current monitor contract](NOTCH-MONITOR.md).
+
 ## Alcance y causa
 
 El panel «Chat lateral» de Codex crea un `thread/fork` con `ephemeral: true`,

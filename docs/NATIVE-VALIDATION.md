@@ -208,6 +208,11 @@ catalog; do not silently enable tools, change account settings or remove auth.
 
 Fixtures check source/native behavior. The manual checklist must then run against
 the **actual installed** monitor, with installed/loaded identity recorded.
+The current [dynamic notch](NOTCH-MONITOR.md) is centered at the top of the
+selected work area. Check concave shoulder/bottom-corner click-through, downward
+resize, all five top navigation destinations, horizontal Home/Agents and compact
+return on pointer exit. Historical capsule/sidebar receipts do not accept these
+new bounds. Owner-host macOS/Windows redesign acceptance remains pending.
 
 ### Mac
 

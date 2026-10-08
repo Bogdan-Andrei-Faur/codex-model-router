@@ -25,6 +25,7 @@
   "svg_sha256": {
     "accessibility": "8495652d1020b978877d5e54c9c709baaa50369935603af8f05a03248d017322",
     "bug": "a9849a72dae627d4eb49fc03fdf8d779cd73fe6e0c228ca62967921b15c5c809",
+    "chart-no-axes-combined": "7cbb619b31cd4611db4ccccc775ab99a2d52878e6322927ec28308b0b4a36f9c",
     "check": "cf17af872c375d78ab1f24ab9b46cc2325fcc467deeab63c86525dc666ba0208",
     "chevron-right": "0d50095f592f567bf22c35649e3aac65ce81e4581bddf09ca666e8f95193740d",
     "circle": "c9d1d68895539ea75d8344ae9d6e946f35e06ca0d8a7b5967b806870902124b8",
@@ -35,6 +36,8 @@
     "flask-conical": "00d34a0db5da9c6a044588f38e65d1f447918a3223da8606d2a2f639aef5b315",
     "gauge": "aadcf042484ee23e04e2f1b20dc45edfa73eed9e13518b3c082f491573e08227",
     "git-branch": "a0bec5fc0eeb1b1ae6bd6974e2132ef8d7dcf513e8e657f750d1b0f0f5fe67fb",
+    "history": "5d17274fbed5e3f4060ed6fff46a32537f05cc4e576442d101ec291fc9b1895a",
+    "house": "5da15cf74a3cf58b29b087d2de8af14e7c8c7a3eb74c6ab4cd13792e3b580c04",
     "network": "e2b4674f29b92bac4c538d6d38012dd84d059c0cc9ec447ca37a6bf96873baa7",
     "panel-left-close": "a154c92d64ba549e525bee4d1f11cbca7da2ffc9aaf902879bff5cd7946fd6b8",
     "panel-left-open": "7f07eac3b4cff21894b594438b7e35e82c04d25c2c48a36672d76e5a5f8eaaaa",
@@ -46,9 +49,11 @@
     "rocket": "63cddc6ef6c4185f308a40e13474efe16a48b47992576f47b8624cdaf8d2ebbb",
     "route": "e793087d5a36c7ae52355f8deebc08de7850f0942b336334df7f8bab69717f0f",
     "search": "b788a5050b4408d4e283dbaaf19edd26fee446bcc6567a77ed8be4ebbca946de",
+    "settings": "1eae73e8583ae573ee331c8d41f654fc44db9bea25f7a896ad69910523139111",
     "settings-2": "44e7f353d95436c3d812da6e5e2e7b6eac3a13a3d8134390ed206ecd1699af9d",
     "sliders-horizontal": "fa5f686dfcf0617a423c75b051761e5d9bd1c5605d2ec195732c231dab1a4ddc",
     "text": "d3fa881210cb7ca193d03e5d44cc9bad0030d2ba2140898b12e4e7e2d0d0f446",
+    "users-round": "71022ba061663fbbcd5ac6b5644f910ad8ba776da9bf8e68b54765ff42188a6a",
     "workflow": "65b683adab66d9097a9a1d68da124c0958d57166cf785227bb4de4f66d620138",
     "x": "9c773653baf9b8d20eb67cebc18eaed4fe87f0c1d9e1fc996ba50b0ba5d08c94"
   }

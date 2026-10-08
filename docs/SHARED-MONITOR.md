@@ -2,8 +2,8 @@
 
 La decisión aprobada el 03/10/2026 concentra el producto en `monitor-ui/`
 (HTML/CSS/JS y Lucide) y en `monitor_state.py` (estado y acciones). Los tres
-sistemas muestran los mismos componentes de Agentes, Historial, Consumo,
-Ajustes y cápsula. Tauri no forma parte de esta migración.
+sistemas muestran los mismos componentes de Inicio, Agentes, Historial, Consumo,
+Ajustes y la isla dinámica descrita en [NOTCH-MONITOR.md](NOTCH-MONITOR.md). Tauri no forma parte de esta migración.
 
 ```mermaid
 flowchart TD
@@ -19,9 +19,9 @@ flowchart TD
 
 La ventana nativa mantiene bandeja, posición, altura, primer clic, hover,
 región interactiva y custodia de claves: Keychain en Mac, DPAPI en Windows y
-Secret Service en Linux. El cristal nativo de Mac sigue usando AppKit;
-Windows/Linux usan la superficie CSS transparente. La transparencia no
-acredita blur del escritorio en esos dos sistemas. Wayland conserva sus
+Secret Service en Linux. El nuevo diseño usa una superficie negra opaca común; el blur anterior de
+AppKit queda oculto. Las áreas exteriores transparentes permiten pasar clics
+al escritorio. Wayland conserva sus
 restricciones de posicionamiento y bandeja, descritas en la guía Linux.
 
 ## Datos y rendimiento
@@ -39,6 +39,29 @@ transitorio de lectura conserva la última vista. Agentes/cápsula no reproducen
 el historial; los ACK de modo son nativos e inmediatos. En Linux se usa la misma
 clase directamente en el executor; Mac y Windows la usan mediante un hijo
 Python y stdin/stdout privados, sin servidor HTTP.
+
+`HistoryProjection` conserva el significado de `MonitorCore.decisions` y procesa
+solo los eventos primarios añadidos. Cambios de diarios recuperados reconstruyen
+en el orden original. `history` transporta sobres `monitor_decision_snapshot`,
+con una copia separada de cada decisión; el diario original sigue completo para
+validar acciones y exportar evidencia. El frontend admite también eventos crudos
+anteriores, reutiliza la base y aplica overlays separados de conversaciones vivas.
+Contexto/cuota no reconstruyen Historial; búsqueda y nodos se cachean, y los
+grupos cerrados se materializan al abrirlos. El límite de respuesta sigue vigente.
+
+`threads` mantiene las conversaciones observadas para Inicio/compacto;
+`agentThreads` agrega el catálogo no archivado para Agentes. Los registros que
+solo vienen del catálogo tienen estado inactivo y no reciben ajustes inferidos.
+El puente expone `agent_threads` y planes nativos validados del turno actual.
+El plan usa estados y etiquetas simbólicas: el texto libre no viaja al snapshot.
+Estos añadidos requieren cargar el puente nuevo; una actualización solo de UI
+no cambia el puente ya abierto ni las reglas de selección.
+
+`MonitorState(read_only=True)` permite la preview de desarrollo y bloquea
+configuración, modos, valoraciones y comprobaciones automáticas de actualización.
+El adaptador `tools/preview_monitor.py` sirve solo GET en loopback con URL aleatoria
+y comprobaciones de origen/host. No se empaqueta como servidor del producto.
+Contrato completo: [preview, pipeline e Historial](NOTCH-MONITOR.md).
 
 El identificador de transporte `requestId` no sustituye el `id` de una decisión
 al guardar valoraciones. Los módulos Python exclusivos del monitor quedan fuera
@@ -75,7 +98,8 @@ congelado; no necesita Python instalado ni contiene estado del usuario.
 
 ## Validación
 
-- Regresiones Python prueban el cache de 35.000 registros, igualdad de datos y
+- Regresiones Python prueban el cache de 35.000 registros, proyección incremental
+  y paridad JS/Python ante append/rotación/recuperación, igualdad de datos y
   contadores por plataforma, aislamiento de claves, locks y pipe hijo real.
 - Las pruebas del navegador prueban componentes compartidos y el canal Windows
   `window.chrome.webview.postMessage`, incluyendo ACK, historial y ajustes.
@@ -91,6 +115,8 @@ congelado; no necesita Python instalado ni contiene estado del usuario.
 plataforma, ejecuta `build.ps1 -BuildOnly`, `dist/codex-monitor-v24.exe --self-test`
 y comprueba primer clic/hover con Desktop activo, cambios rápidos de modo,
 bandeja, cierre/reapertura, dos DPI/monitores y guardar/leer una clave DPAPI.
-En Ubuntu quedan la ventana GTK real, bandeja/posicionamiento X11/Wayland y
-Secret Service. No se realizan inferencias, cambios de política ni llamadas
-JEV para verificar esta migración.
+En Ubuntu hay recibos aislados GTK/WebKit y de instalación/readback para los
+pilotos de la isla. La interacción física, varios monitores/DPI y suspensión
+siguen requiriendo aceptación separada; consultar [STATUS.md](native-validation/STATUS.md).
+No se realizan inferencias, cambios de política ni llamadas JEV para verificar
+la presentación compartida.

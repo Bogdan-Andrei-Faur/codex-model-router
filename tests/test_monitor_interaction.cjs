@@ -40,6 +40,25 @@ const assert=require('node:assert/strict');
     await page.evaluate(p=>window.monitorPointer(p),{x:avatar.x+22,y:avatar.y+22});
     await page.evaluate(()=>window.monitorPointer(null,false));await page.waitForTimeout(260);
     assert.equal(await page.locator('#peek').isVisible(),true,'Key-window handoff closed active hover');
+    // Native hosts keep reporting pointer positions. Repeated outside samples
+    // must not postpone the leave deadline forever (agent and account quota).
+    await page.clock.install();
+    for(const selector of ['#agents .avatar','#quota']) {
+      const rect=await page.locator(selector).boundingBox();
+      await page.evaluate(p=>window.monitorPointer(p),{x:rect.x+rect.width/2,y:rect.y+rect.height/2});
+      assert.equal(await page.locator('#peek').isVisible(),true);
+      for(let i=0;i<12;i++) {await page.evaluate(()=>window.monitorPointer(null));await page.clock.runFor(33);}
+      assert.equal(await page.locator('#peek').isVisible(),false,selector+' remains expanded during repeated native pointer exits');
+      await page.evaluate(p=>window.monitorPointer(p),{x:rect.x+rect.width/2,y:rect.y+rect.height/2});
+      await page.evaluate(()=>window.monitorPointer(null));await page.clock.runFor(100);
+      const content=await page.locator('#peek').boundingBox();
+      await page.evaluate(p=>window.monitorPointer(p),{x:content.x+20,y:content.y+20});await page.clock.runFor(300);
+      assert.equal(await page.locator('#peek').isVisible(),true,'Returning to details must cancel closure');
+      assert.equal(await page.locator('#compact [title]').count(),0,'Native tooltips duplicate compact details');
+      await page.keyboard.press('Escape');
+      await page.evaluate(()=>window.monitorPointer(null));await page.clock.runFor(300);
+      assert.equal(await page.locator('#peek').isVisible(),false);
+    }
     const timings=await page.evaluate(()=>{
       const start=performance.now();setMode('Expanded');const expanded=performance.now()-start;
       setMode('Compact');
@@ -61,6 +80,27 @@ const assert=require('node:assert/strict');
     await page.locator('#expand').click();
     assert.equal(await page.locator('#expanded').isVisible(),true,'One DOM click must expand immediately');
     assert.ok((await page.locator('#activity').innerText()).includes('Updated synthetic agent'),'Expanded view stale');
+    // One deadline closes Expanded; re-entry cancels it, regardless of repeated
+    // native outside samples. The shared path also receives DOM leave events.
+    await page.evaluate(()=>window.monitorPointer(null));await page.clock.runFor(100);
+    const nav=await page.locator('nav').boundingBox();
+    await page.evaluate(p=>window.monitorPointer(p),{x:nav.x+20,y:nav.y+20});await page.clock.runFor(400);
+    assert.equal(await page.locator('#expanded').isVisible(),true,'Re-entry failed to cancel auto-collapse');
+    for(let i=0;i<12;i++){await page.evaluate(()=>window.monitorPointer(null));await page.clock.runFor(40);}
+    assert.equal(await page.locator('#compact').isVisible(),true,'Repeated outside samples postponed auto-collapse');
+    assert.equal(await page.evaluate(()=>window.nativeMessages.filter(m=>m.action==='mode').at(-1).value),'Compact');
+    await page.locator('#expand').click();
+    await page.evaluate(()=>window.receive({config:{enabled:true,routing_engine:'jev'}}));
+    await page.locator('[data-tab="settings"]').click();
+    await page.evaluate(()=>{const input=document.querySelector('#settings input[type=password]');input.closest('.key-editor').hidden=false;input.value='synthetic-unsaved-fixture';});
+    await page.mouse.move(1,850);await page.clock.runFor(400);
+    assert.equal(await page.locator('#compact').isVisible(),true,'DOM exit failed to compact the island');
+    await page.locator('#expand').click();
+    assert.equal(await page.locator('#settings input[type=password]').first().inputValue(),'synthetic-unsaved-fixture','Auto-collapse discarded unsaved input');
+    await page.evaluate(()=>{heightDrag={y:0,height:600};window.monitorPointer(null);});await page.clock.runFor(400);
+    assert.equal(await page.locator('#expanded').isVisible(),true,'Auto-collapse interrupted height drag');
+    await page.evaluate(()=>finishHeightDrag());await page.clock.runFor(400);
+    assert.equal(await page.locator('#compact').isVisible(),true,'Outside release failed to resume auto-collapse');
     // Legacy Windows host has no UI-only ack; polling/menu mode remains authoritative.
     await page.evaluate(()=>{pendingModeRequest=0;window.receiveUI({acknowledgesMode:false,mode:'Expanded'},null);setMode('Compact');window.receive({ui:{mode:'Expanded'}});});
     assert.equal(await page.locator('#expanded').isVisible(),true,'Legacy host mode sync broken');

@@ -1,5 +1,12 @@
 # Windows per-user installer — 0.9.6
 
+The current shared monitor requests a top-centered dynamic notch, five icon
+destinations, horizontal Home/Agents and incremental History. Installer layout,
+per-user data and credential custody retain the contracts below. Source/native
+compilation and owner-installed acceptance are separate; see
+[NOTCH-MONITOR.md](NOTCH-MONITOR.md) and [STATUS.md](native-validation/STATUS.md).
+
+
 This is a native x64 setup builder, not the legacy Windows ZIP. Production
 installation/owner data migration is separate from isolated fixture acceptance.
 No restart, source-installation replacement or live provider inference is needed

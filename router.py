@@ -23,7 +23,7 @@ from thread_inventory import ThreadInventory, thread_metadata
 from platform_support import backend_path, creation_flags, uses_stdio, stop_backend, input_lines, with_loopback_telemetry, with_server_overrides
 from desktop_runtime import discover
 from task_modes import read_mode
-from phase_tracking import phase_update, proposed_phase
+from phase_tracking import phase_update, proposed_phase, native_plan
 from inference_telemetry import LocalInferenceTelemetry
 from inference_attribution import COUNTERS as ATTRIBUTION_COUNTERS, COMPLETION_FIELDS, attribute
 from workload import effective_context, merge_contract, plan_steps, context_for_engine, resumes_work, cancels_work
@@ -283,6 +283,7 @@ class Router:
             atomic_json(target, {"version": 3, "storage_schema": 3, "product_version": BUILD[0], "build_id": BUILD[1], "router_build_id": ROUTER_BUILD,
                                        "routing_policy_version": POLICY_VERSION, "pid": os.getpid(), "events": self.events,
                                        "heartbeat": time.time(), "threads": self.inventory.visible(self.threads),
+                                       "agent_threads": self.inventory.agents(self.threads),
                                        "client_name": self.client_name, "handshake_complete": self.handshake_complete,
                                        "inventory_synced_at": self.inventory.synced_at,
                                        "catalog": {m: sorted(e) for m, e in self.catalog.items()},
@@ -512,9 +513,19 @@ class Router:
                 if method == "turn/started":
                     self.active.add(tid)
                     row = self.threads.setdefault(tid, {})
+                    if row.get("turn_id") != (params.get("turn") or {}).get("id"):
+                        row.pop("live_plan", None)
                     row.update(status="inProgress", turn_id=(params.get("turn") or {}).get("id"), updated=time.time(), **phase_update(row, "active"))
                     self.record_history("phase_started", decision_id=self.current_decisions.get(tid), thread=tid,
                                         **phase_update(row, "active"))
+                elif method == "turn/plan/updated":
+                    row = self.threads.get(tid)
+                    plan = native_plan(params)
+                    if (row is not None and plan is not None and plan["turn_id"] == row.get("turn_id")
+                            and row.get("status") in ("active", "inProgress", "running", "waiting")):
+                        row["live_plan"] = plan
+                        row["updated"] = time.time()
+                        self.log({"event": "native_plan_updated", "thread": tid})
                 elif method == "error":
                     row = self.threads.get(tid, {})
                     turn_id = params.get("turnId")

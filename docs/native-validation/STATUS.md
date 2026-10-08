@@ -3,6 +3,32 @@
 Use [the runbook](../NATIVE-VALIDATION.md) and [report template](REPORT-TEMPLATE.md).
 This ledger is repository-owned; no external knowledge/memory service is needed.
 
+## Current dynamic notch — 2026-10-08
+
+Development source is `feature/dynamic-notch-monitor`, product baseline `0.9.6`.
+The current implementation is in [NOTCH-MONITOR.md](../NOTCH-MONITOR.md);
+[HANDOFF.md](../HANDOFF.md) contains continuation steps and
+[NOTCH-CHANGELOG.md](../NOTCH-CHANGELOG.md) preserves all iteration notes.
+
+| Gate | Current evidence | Remaining boundary |
+| --- | --- | --- |
+| Shared/offline source checks | 518 Python tests, 37 optional/platform skips; 31 JS core tests; all 10 browser groups; routing 27/27 and six offline JEV cases PASS | Skips are not optional Docker/native execution proof |
+| Ubuntu installed pilot | `0.9.6-1~notch43`, monitor `2e0a5284b2aa9c8e`, connected router `2fec36051e3ccedb`; last readback PASS | Physical owner input/display/sleep/scaling acceptance remains open |
+| Ubuntu native fixture | Exact `1~notch43` full GTK/WebKit package smoke, History spacing/detail/ratings and Home opening metric probe PASS | Synthetic isolated windows do not accept physical input/compositor behavior |
+| History performance | Incremental transport/projection, parity/recovery and lazy/cached UI PASS; isolated measurements in receipt | Measurements exclude owner-perceived latency acceptance |
+| Intermittent quota Escape | Dedicated browser group passed current run | Earlier intermittent failure has no demonstrated root fix; keep gate open |
+| macOS/Windows redesign | Shared hosts/source supplied; new native execution on owner machines NOT_RUN | Hosted CI and physical owner receipts are separate |
+| Published delivery CI | See current-SHA evidence in [delivery receipt](2026-10-08-documentation-delivery.md) | Prior baseline had a Windows installer fixture failure |
+
+Current artifact details: [ratings/spacing](2026-10-08-linux-notch-history-ratings.md).
+Feature receipts: [detail cleanup](2026-10-08-linux-notch-history-detail.md),
+[History performance](2026-10-08-linux-notch-history-performance.md),
+[Home opening layout](2026-10-08-linux-notch-home-spacing.md),
+[live pipeline](2026-10-08-linux-notch-live-pipeline.md),
+[Agents catalog](2026-10-08-linux-notch-agents-catalog.md).
+The [documentation index](../README.md#development-and-native-receipts) includes
+all redesign receipts; their stated earlier artifacts remain historical evidence.
+
 ## Baseline recorded 2026-10-05
 
 Source `02d0be1efe98c9f2c30751b4ee4a532a0c5ed1fb` passed

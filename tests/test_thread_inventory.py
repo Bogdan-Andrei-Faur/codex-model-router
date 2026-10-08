@@ -31,6 +31,22 @@ class ThreadInventoryTests(unittest.TestCase):
         self.assertIn("deleted", self.rows)
         self.assertNotIn("PRIVATE CONTENT", json.dumps(self.inventory.catalog))
 
+    def test_agents_include_unobserved_catalog_without_mutating_home_or_routing(self):
+        req = self.inventory.poll(self.rows, now=0)
+        self.reply(req, [{"id": "kept", "name": "Current"},
+                         {"id": "unseen", "name": "Inactive catalog task", "preview": "PRIVATE"}])
+        agents = self.inventory.agents(self.rows)
+        self.assertEqual(set(agents), {"kept", "unseen"})
+        self.assertTrue(agents["unseen"]["catalog_only"])
+        self.assertNotIn("model", agents["unseen"])
+        self.assertNotIn("PRIVATE", json.dumps(agents))
+        self.assertEqual(set(self.inventory.visible(self.rows)), {"kept"})
+        self.assertNotIn("unseen", self.rows)
+        self.inventory.notification("thread/archived", {"threadId": "unseen"})
+        self.assertNotIn("unseen", self.inventory.agents(self.rows))
+        self.inventory.notification("thread/unarchived", {"threadId": "unseen"})
+        self.assertIn("unseen", self.inventory.agents(self.rows))
+
     def test_all_pages_required_and_failed_page_keeps_last_good_snapshot(self):
         req = self.inventory.poll(self.rows, now=0)
         owned, next_page = self.reply(req, [{"id": "kept", "name": "New"}], "page2")

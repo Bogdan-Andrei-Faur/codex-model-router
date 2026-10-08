@@ -1,5 +1,54 @@
 # Cambios
 
+## Desarrollo — Isla dinámica y monitor compartido, 08/10/2026
+
+Trabajo acumulado de `feature/dynamic-notch-monitor`, sobre la base 0.9.6.
+Las revisiones Ubuntu `1~notchN` son artefactos piloto; esta publicación de código
+y documentación no crea una versión de producto ni un canal de instaladores.
+
+- Isla negra centrada arriba con hombros cóncavos, región de entrada nativa,
+  tipografía Nunito local con licencia OFL y tres personajes originales de
+  identidad estable: Milo/coral, Lumi/menta y Nori/lila.
+- Cinco destinos por iconos arriba: Inicio, Agentes, Historial, Consumo y Ajustes.
+  Inicio/Agentes ajustan su altura; las vistas secundarias conservan tirador
+  inferior. Salir con el ratón recoge la isla; la bandeja permite recuperarla.
+- Inicio horizontal: principal a la izquierda, otros agentes a la derecha,
+  acceso a detalle en la esquina y barras de contexto/cuota alineadas desde
+  la apertura. Fondos secundarios más visibles y separación de scroll correcta.
+- Agentes horizontal, con personaje/selector a la izquierda y modo/pipeline a la
+  derecha. Catálogo independiente de conversaciones no archivadas, también
+  inactivas; los filtros de Inicio mantienen su alcance.
+- Plan nativo del turno actual (`turn/plan/updated`) para la pipeline en tiempo
+  real. Estados validados, reinicio entre turnos, etiquetas sin texto privado y
+  fallback al ciclo observado. Los nodos son gotas sólidas pequeñas, con
+  números/checks negros; activo y completados comparten verde sin efecto extra.
+- Tags de modelo/esfuerzo compartidos, saturados y con borde de 1px. Categoría
+  con icono y color; quota compacta solo como porcentaje centrado, tarjeta azul
+  sin borde y eliminación de textos/controles repetidos.
+- Hover nativo reforzado: Mac/Windows proyectan el puntero con foco; Linux
+  comprueba pertenencia de la ventana X11/XWayland y repite el estado exterior
+  para recuperar salidas perdidas. Wayland conserva sus límites del compositor.
+- Historial ancho con búsqueda, páginas de 40 registros, selección/scroll/foco
+  persistentes y diagnóstico diferido. Se eliminan motivos genéricos, pipeline
+  histórica inferida y controles que modificaban la tarea actual desde un registro.
+- Duración, uso de última llamada, reintentos e incidencias visibles cuando constan.
+  Atribución confirmada/probable, cero/dato ausente y coste estimado/facturado
+  conservan sus diferencias. Se omiten ajustes idénticos y diagnósticos vacíos.
+- Valoraciones coral/menta/lila, iconos por aspecto, checks oscuros y acción
+  accesible de quitar. Separación de 12px tras el separador de ajustes diagnosticados.
+- `HistoryProjection` incremental en Python, snapshots compactos, overlays
+  separados, búsqueda/DOM reutilizados y grupos construidos al abrirlos. Los
+  diarios originales permanecen completos; métricas/paridad y recuperación probadas.
+- Preview local de solo lectura con URL aleatoria, GET en loopback y acciones
+  bloqueadas, separada de los hosts instalados. Nuevos fixtures, assets y recibos
+  de instalación quedan documentados y versionados.
+
+La política de selección y el motor oficial no se modifican. El puente añade
+catálogo/plan para el monitor; una instalación anterior los carga en su próximo
+arranque habitual de Desktop. Estado actual, pruebas y pendientes:
+[HANDOFF.md](docs/HANDOFF.md), [índice](docs/README.md) y
+[recibo de entrega](docs/native-validation/2026-10-08-documentation-delivery.md).
+
 ## 0.9.6 — Puente interactivo y conexión visible, 07/10/2026
 
 - El puente instalado vacía el búfer después de cada mensaje; la inicialización

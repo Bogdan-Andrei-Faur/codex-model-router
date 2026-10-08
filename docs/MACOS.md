@@ -70,52 +70,44 @@ Desconectar integración (o `python3 desktop.py uninstall`) antes de cerrar la a
 y abrirla normalmente. Se conserva el historial. Detalles y límites de v19 en
 [Conexión con Desktop](DESKTOP-INTEGRATION.md).
 
-## Monitor de Mac — cápsula y panel
+## Monitor de Mac — isla dinámica
 
 Puedes abrir `dist/Monitor de Codex.app` o ejecutar `python3 macos.py monitor`.
-Abrir solo el monitor no activa el puente. Un clic izquierdo en el icono de la
-barra de menús alterna cápsula y panel; desde oculto muestra la cápsula. Un clic
-derecho abre el menú de vistas, pausa, mantener delante y salida.
+Abrir solo el monitor no activa el puente. La barra de menús permite recuperar
+el compacto, desplegar la isla, ocultarla, pausar o cambiar Mantener delante.
 
-La cápsula y el panel comparten el borde inferior y derecho del área útil de la
-pantalla. La superficie compacta mide 366×80 puntos; la expandida hasta 416×744,
-con reducción para pantallas menores. La transición dura 420 ms y respeta el
-ajuste de movimiento reducido de macOS. Se reutilizan exactamente los colores
-de modelo/razonamiento, iconos vectoriales de categorías y logotipo de Windows.
-La tipografía se adapta a la fuente de sistema del Mac.
+La ventana solicita el centro del borde superior del área útil de la pantalla,
+respetando la barra de menús. Ofrece hasta 800 puntos de viewport y una región de
+entrada que sigue los hombros cóncavos y esquinas de la superficie web. El material
+blur histórico está oculto: la isla actual usa negro opaco y Nunito local.
+AppKit proyecta el puntero a WebKit incluso con foco para recuperar salidas de
+hover perdidas; no activa la ventana solo por pasar el ratón.
 
-La cápsula conserva el orden de los agentes que siguen activos, muestra hasta
-cinco y ofrece `+N` para el resto. Pasar el ratón, enfocar o pulsar un agente
-abre su detalle dentro de la misma superficie. Escape lo recoge. Los aros giran
-solo con actividad observada; el punto inferior representa el razonamiento.
+La interfaz compartida ofrece Inicio, Agentes, Historial, Consumo y Ajustes.
+Inicio/Agentes ajustan su altura; las vistas secundarias tienen tirador inferior.
+Personajes, catálogo de conversaciones, pipeline, cuotas, tags y valoraciones
+siguen el [contrato común](NOTCH-MONITOR.md). Historial conserva todos los registros
+mediante búsqueda y páginas de 40; la proyección y las tarjetas son diferidas.
 
-El panel ofrece Actividad, Historial, Estadísticas y Ajustes. Pulsar una tarea
-abre su decisión en Historial. Las valoraciones Insuficiente/Adecuada/Excesiva se
-pueden cambiar y quitar; sobreviven a reinicios sin alterar la fecha de ejecución.
-Las estadísticas incluyen modelos, razonamiento, motores, fiabilidad, latencia,
-coincidencia de comparaciones, valoraciones, duración y tokens observados.
-
-Las vistas y Mantener delante se guardan en `state/monitor-ui-mac.json`. Ocultar
-o salir del monitor no interrumpe el enrutamiento. Solo se permite una instancia
-por copia del repositorio. La actualización del monitor no requiere cerrar Codex;
-los cambios al puente Python sí se cargan al reiniciar la app de Codex.
+Las preferencias siguen en `state/monitor-ui-mac.json`; salir u ocultar el monitor
+no detiene el puente. Cambios solo de UI no necesitan reiniciar Desktop; cambios
+en el puente se cargan al próximo arranque habitual. La instalación/source y la
+identidad realmente cargada se verifican por separado.
 
 | Función | macOS |
 | --- | --- |
-| Enrutamiento antes de `turn/start`, modelo y esfuerzo | Motor Python compartido |
-| Catálogo, contexto de tareas y exclusión de ayudantes internos | Motor Python compartido |
-| Actividad y confirmación | Panel con actualización cada 2 segundos |
-| Historial | Detalle de decisiones, últimas 80 en la lista, valoraciones persistentes |
-| Estadísticas | Historial acumulado, telemetría de motores y valoraciones |
-| Pausa y mantener delante | Controles nativos |
-| Cápsula animada, avatares y valoraciones | Portadas desde los contratos de Windows |
-| Editor de motores y comparaciones | Reglas y Jev |
-| Lectura del historial recuperado de Windows | Fusiona `history.recovered.jsonl` sin duplicar decisiones |
+| Routing, modelo/esfuerzo, contexto y exclusiones | Motor Python compartido |
+| Datos/acciones del monitor | `MonitorState` mediante hijo/pipe privado |
+| Cinco pantallas, personajes, tags, barras y valoraciones | Interfaz web compartida |
+| Posición, click-through, foco, bandeja y custodia de claves | AppKit/WebKit y Keychain |
+| Historial y búsqueda | Snapshots incrementales, páginas de 40 y valoraciones persistentes |
+| Catálogo/pipeline actuales | Requieren cargar el puente con catálogo/plan nativo |
 
-«Aceptado por Codex» indica aceptación de los ajustes del turno, no telemetría de
-cada inferencia interna. Las estadísticas no prueban ahorro ni calidad. Los
-títulos e identificadores pueden ser sensibles: configuración y `state/` se
-mantienen locales e ignorados por Git.
+La compilación/ejecución de este rediseño en Mac y la aceptación física del
+propietario requieren su recibo actual. Los resultados anteriores del monitor
+no aceptan la nueva geometría. Usar [NATIVE-VALIDATION.md](NATIVE-VALIDATION.md)
+y [STATUS.md](native-validation/STATUS.md); no reiniciar Desktop para validar
+mientras el propietario tenga trabajo activo.
 
 ## Proveedores y credenciales
 

@@ -140,3 +140,17 @@ class ThreadInventory:
                 # in them, even if Desktop sends thread/name/updated later.
                 rows[tid]["name"] = "Chat lateral"
         return rows
+
+    def agents(self, threads):
+        """Monitor-only non-archived catalog, with no inferred routing settings."""
+        rows = self.visible(threads)
+        for tid, metadata in (self.catalog or {}).items():
+            if tid in rows or tid in self.hidden or metadata.get("parent") in self.hidden:
+                continue
+            # Do not resurrect suppressed internal/ephemeral rows from the catalog.
+            if tid in threads and threads[tid].get("ephemeral"):
+                continue
+            rows[tid] = {"name": self.names.get(tid) or metadata.get("name") or "Agente",
+                         "parent": metadata.get("parent"), "status": "idle",
+                         "catalog_only": True, "updated": 0}
+        return rows

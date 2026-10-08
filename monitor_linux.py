@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 # Set before GI imports: the Gdk override can open the display during import.
 # Native Wayland cannot honor this utility window's placement/keep-above hints.
@@ -23,7 +24,7 @@ gi.require_foreign('cairo')
 from gi.repository import Gdk, Gio, GLib, Gtk, WebKit2
 
 from build_identity import identity, router_identity
-from monitor_state import MonitorState, read_json
+from monitor_state import MonitorState, notch_inset, read_json
 from state_store import atomic_json, file_lock
 from application_layout import code_root, data_root, manifest
 
@@ -59,10 +60,17 @@ class Monitor(Gtk.Application):
         self.mode_request = None
         self.page = (ROOT / ('ui/index.html' if manifest(ROOT) else 'dist/linux-ui/index.html')).resolve().as_uri()
         self.panel_height = 760
+        self.hit_rect = None
+        self.last_pointer = object()
+        self.last_pointer_sent = 0
+        self.pointer_timer = None
         self.connect('activate', self.activate_window)
         self.connect('shutdown', self.shutdown)
 
     def shutdown(self, *_):
+        if self.pointer_timer is not None:
+            GLib.source_remove(self.pointer_timer)
+            self.pointer_timer = None
         self.model.close()
         self.executor.shutdown(wait=True, cancel_futures=True)
         if self.migration_lock is not None:
@@ -121,6 +129,7 @@ class Monitor(Gtk.Application):
             self.window.hide()
         self.web.load_uri(self.page)
         GLib.timeout_add_seconds(2, self.refresh)
+        self.pointer_timer = GLib.timeout_add(50, self.update_pointer)
         Gdk.Display.get_default().connect('monitor-added', lambda *_: self.position())
         Gdk.Display.get_default().connect('monitor-removed', lambda *_: self.position())
         if not self.preview:
@@ -156,7 +165,7 @@ class Monitor(Gtk.Application):
 
     def make_tray(self):
         menu = Gtk.Menu()
-        for label, mode in [('Vista compacta', 'Compact'), ('Panel lateral', 'Expanded'), ('Ocultar monitor', 'Hidden')]:
+        for label, mode in [('Vista compacta', 'Compact'), ('Desplegar isla', 'Expanded'), ('Ocultar monitor', 'Hidden')]:
             item = Gtk.MenuItem(label=label)
             item.connect('activate', lambda _, mode=mode: self.set_mode(mode))
             menu.append(item)
@@ -199,12 +208,49 @@ class Monitor(Gtk.Application):
         monitor = display.get_monitor_at_window(self.window.get_window()) if self.window.get_window() else display.get_primary_monitor()
         monitor = monitor or display.get_monitor(0)
         area = monitor.get_workarea()
-        width, height = min(432, max(1, area.width - 20)), max(1, area.height - 20)
+        width, height = min(800, max(1, area.width - 20)), max(1, area.height - 20)
         self.panel_height = min(height, max(560, area.height * self.ratio))
         self.window.resize(width, height)
         # A positioning request on X11; the compositor chooses placement on Wayland.
-        self.window.move(area.x + area.width - width - 10, area.y + 10)
+        self.window.move(area.x + (area.width - width) // 2, area.y)
         self.last_payload = None
+
+    def update_pointer(self):
+        # Input-shaped windows can lose DOM leave events when the pointer moves
+        # into their transparent area. Sample the real pointer without activating
+        # the window, including while WebKit has keyboard focus.
+        if not self.ready or not self.window.get_mapped() or self.hit_rect is None:
+            return True
+        display = Gdk.Display.get_default()
+        # Native Wayland does not expose reliable global pointer coordinates.
+        # Its normal WebKit enter/leave handling remains authoritative.
+        if display.__gtype__.name != 'GdkX11Display':
+            return True
+        native = self.window.get_window()
+        pointer = display.get_default_seat().get_pointer()
+        if native is None or pointer is None:
+            return True
+        _, screen_x, screen_y = pointer.get_position()
+        _, origin_x, origin_y = native.get_origin()
+        px, py = screen_x - origin_x, screen_y - origin_y
+        x, y, width, height = self.hit_rect
+        # XWayland may retain coordinates after entering a native Wayland app.
+        # Only a window owned by this monitor can keep the hover panel open.
+        pointed, _, _ = pointer.get_window_at_position()
+        owned = pointed is not None and pointed.get_toplevel() == native
+        inside = owned and x <= px < x + width and y <= py < y + height
+        if inside:
+            inset = notch_inset(width, height, py - y)
+            inside = x + inset <= px < x + width - inset
+        point = (px, py) if inside else None
+        now = time.monotonic()
+        # Repeat outside state so a late DOM enter/focus or missed notification
+        # cannot leave details open forever at an unchanged pointer position.
+        if point != self.last_pointer or (point is None and now - self.last_pointer_sent >= .25):
+            self.last_pointer = point
+            self.last_pointer_sent = now
+            self.emit('monitorPointer', {'x': px, 'y': py} if inside else None)
+        return True
 
     def on_delete(self, *_):
         self.set_mode('Hidden')
@@ -300,7 +346,16 @@ class Monitor(Gtk.Application):
         x, y, width, height = values
         if min(width, height) <= 0:
             return
-        region = cairo.Region(cairo.RectangleInt(max(0, int(x)), max(0, int(y)), min(432, int(width + 1)), min(self.window.get_size()[1], int(height + 1))))
+        self.hit_rect = (x, y, width, height)
+        self.last_pointer = object()  # Recheck a stationary pointer after expansion.
+        # Match the CSS shoulders and bottom corners, including click-through.
+        region = cairo.Region()
+        for line in range(max(0, min(math.ceil(height), self.window.get_size()[1]))):
+            inset = notch_inset(width, height, line + .5)
+            left = max(0, math.ceil(x + inset))
+            right = min(self.window.get_size()[0], math.floor(x + width - inset))
+            if right > left:
+                region.union(cairo.RectangleInt(left, max(0, int(y) + line), right - left, 1))
         self.window.input_shape_combine_region(region)
 
     def perform_action(self, data):

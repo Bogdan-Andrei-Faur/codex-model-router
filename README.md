@@ -6,6 +6,11 @@ Para continuar desde otro equipo o con un agente nuevo, empieza por
 [la guía de traspaso y pendientes](docs/HANDOFF.md). Distingue el código publicado,
 la instalación activa, las pruebas locales y la aceptación nativa pendiente.
 
+El [índice de documentación](docs/README.md) reúne uso, arquitectura, instalación,
+enrutamiento, privacidad, pruebas y recibos. La interfaz actual y sus contratos
+están descritos en [Monitor](docs/MONITOR-UI.md) y
+[la isla dinámica](docs/NOTCH-MONITOR.md).
+
 Para validar un Mac, Windows o Ubuntu real, sigue el
 [procedimiento autosuficiente](docs/NATIVE-VALIDATION.md), consulta el
 [estado por equipo](docs/native-validation/STATUS.md) y registra la evidencia con
@@ -16,56 +21,45 @@ Atlas, memoria personal ni el chat original.
 
 El producto usa versiones semánticas. La versión actual es **0.9.6**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
-tercero corrige fallos. La versión visible en la esquina inferior derecha del
-panel procede del archivo común `VERSION` en modo repositorio y del sello
-incluido en la compilación en modo empaquetado. Cada entrega se registra en
-[CHANGELOG.md](CHANGELOG.md) y una etiqueta Git anotada `v<versión>` apunta a su
-commit. La huella de compilación y la versión de política son identificadores
+tercero corrige fallos. La versión visible en **Ajustes → Actualizaciones**
+procede del archivo común `VERSION` en modo repositorio y del sello
+incluido en la compilación en modo empaquetado. Los cambios se registran en
+[CHANGELOG.md](CHANGELOG.md); las entregas versionadas tienen una etiqueta Git
+anotada `v<versión>`. El rediseño de la rama `feature/dynamic-notch-monitor`
+mantiene la base 0.9.6 y revisiones de paquete de desarrollo independientes.
+La huella de compilación y la versión de política son identificadores
 técnicos independientes; no sustituyen a la versión del producto.
 
 ## Contexto y cuota de Codex
 
-El borde del fondo de cada agente indica el contexto ocupado: comienza arriba y
-se cierra al 100 %. Conserva el color del modelo; la órbita exterior sigue
-indicando actividad. Al pasar el ratón o abrir el agente se muestra el porcentaje
-y los tokens de la última medición. Se calcula con `last.totalTokens` y
-`modelContextWindow` del evento nativo `thread/tokenUsage/updated`; no suma el
-consumo acumulado ni vuelve a contar la caché. Es una medición entre respuestas,
-no un contador en tiempo real de cada token. Tras compactar o cambiar de modelo,
-espera una nueva medición. Los agentes hijos necesitan su propio evento.
+Cada personaje representa una conversación. Su pequeña barra de contexto y la
+barra de Inicio muestran la **capacidad usada**. La cuota muestra el porcentaje
+**disponible** de la cuenta. Los personajes conservan su identidad visual aunque
+cambie el modelo; modelo y esfuerzo se identifican mediante tags de color.
 
-Durante la compactación, dos arcos giran y se contraen alrededor del icono del
-agente, sustituyendo el porcentaje de contexto y la órbita de trabajo. El detalle
-indica «Compactando contexto». Se activa con `item/started` de tipo
-`contextCompaction` y termina con `item/completed`; también reconoce el aviso
-antiguo `thread/compacted`. Al terminar muestra «esperando nueva medición» hasta
-recibir datos válidos. La animación respeta la preferencia de movimiento reducido.
+El contexto procede de `last.totalTokens` y `modelContextWindow` de
+`thread/tokenUsage/updated`. Es la última medición entre respuestas; no suma
+actualizaciones ni vuelve a contar la caché. Durante `contextCompaction` se muestra
+«Compactando…» y, al terminar, se espera otra medición válida. Cada agente hijo
+necesita sus propios datos. Las animaciones respetan movimiento reducido.
 
-El aro lateral de la cápsula y el de la cabecera del panel muestran el
-**porcentaje de cuota disponible** de la cuenta, con el número dentro. Al
-pulsarlo aparecen las ventanas que informa Codex,
-sus porcentajes y fechas de renovación. Si hay varios límites, representa el
-más restrictivo; la cuota es compartida por la cuenta y no se suma por agente ni
-por sesión. No representa saldo de API ni créditos adicionales, y el porcentaje
-no garantiza autorización para seguir usando el servicio.
+El porcentaje compacto utiliza exclusivamente la ventana semanal. Inicio muestra
+contexto y cuota semanal alineados; al abrir la cuota aparecen todas las ventanas
+reportadas y sus fechas de renovación. La cuota es compartida por la cuenta,
+no por agente. Los datos desconocidos, caducados o desconectados quedan explícitos;
+un cero válido sigue siendo cero. La lectura no garantiza autorización de uso.
 
-La cápsula compacta centra los agentes en vertical y omite el recuento de tareas
-bajo sus iconos. El recuento permanece en la cabecera del panel lateral.
+`account/rateLimits/read` se consulta cada minuto y también recibe notificaciones.
+Una lectura caduca al renovarse su ventana o tras tres minutos sin refresco. Los
+snapshots conservan porcentajes, ventanas y tiempos; excluyen credenciales e
+identificadores de cuenta. Estas lecturas no ejecutan inferencias ni compras.
 
-Los datos ausentes aparecen como un aro discontinuo y «—», nunca como 0 %. La
-cuota se consulta mediante `account/rateLimits/read` cada minuto y se actualiza
-también con sus notificaciones; una muestra caduca al renovarse su ventana o a
-los tres minutos sin refresco. Una desconexión invalida el indicador. Son lecturas
-sin inferencia, compras ni canjes. Los snapshots solo guardan porcentajes,
-ventanas y tiempos; no identificadores de cuenta ni credenciales.
-
-Windows, macOS y Linux comparten el contrato Python de datos/acciones y la
-interfaz web. Windows usa WebView2 en una ventana WPF; Mac usa AppKit/WebKit
-y Ubuntu GTK/WebKitGTK. Cada host conserva solo integración nativa y llavero.
-Windows requiere .NET Framework 4.8 y WebView2 Runtime Evergreen. Véase
-[la arquitectura compartida y sus límites de validación](docs/SHARED-MONITOR.md). Las tareas que ya estaban ejecutándose
-necesitan volver a abrir Desktop para cargar el nuevo puente. La validación
-nativa realizada y las pendientes figuran en [VALIDATION.md](docs/VALIDATION.md).
+Windows, macOS y Ubuntu comparten `monitor-ui/` y el contrato Python.
+Windows aloja WebView2 en WPF; Mac usa AppKit/WebKit y Ubuntu GTK/WebKitGTK.
+Cada host conserva su ventana, bandeja, región de entrada y llavero nativos.
+La [arquitectura compartida](docs/SHARED-MONITOR.md) y los
+[recibos por equipo](docs/native-validation/STATUS.md) distinguen implementación,
+compilación, instalación y aceptación física.
 
 ### Instaladores y actualizaciones
 
@@ -174,7 +168,7 @@ El acceso `dist/Codex automático.app` se conserva como alternativa. No muevas
 los bundles fuera de `dist`: esta instalación todavía depende del repositorio.
 
 **Compilación interna del lanzador: v19; monitor Windows: v24.** No son la versión de producto; esta se
-consulta en la esquina inferior derecha del monitor. La interfaz se puede actualizar sin cerrar Codex ni
+consulta en Ajustes → Actualizaciones. La interfaz se puede actualizar sin cerrar Codex ni
 interrumpir sus tareas. Los accesos del escritorio apuntan a la compilación actual.
 Los cambios del selector, cuando los haya, se cargan al volver a abrir Codex
 desde su acceso habitual, si has conectado la integración. Una conexión instalada
@@ -207,8 +201,7 @@ tareas cotidianas sigue siendo necesaria. Consulta
 ## Distribución y base 0.3.0
 
 La auditoría general, correcciones, pruebas y límites están en
-[AUDIT-REMEDIATION.md](docs/AUDIT-REMEDIATION.md). El pie del monitor distingue su
-versión de un puente abierto que todavía use otra. Los eventos nuevos incluyen
+[AUDIT-REMEDIATION.md](docs/AUDIT-REMEDIATION.md). Ajustes distingue la versión del monitor de un puente abierto que todavía use otra. Los eventos nuevos incluyen
 build y versión de política; el historial anterior no recibe versiones inventadas.
 
 El ZIP Windows es autocontenido e incluye sus iconos. Extraer siempre en la misma
@@ -218,51 +211,46 @@ requiere Python; el paquete compilado no.
 
 ## Uso diario
 
-1. Con la integración instalada, abre **ChatGPT Desktop** desde su acceso habitual.
-   Abre **Estado de Codex automático** cuando quieras mostrar el monitor.
-2. El icono de Codex automático permanece en el área junto al reloj de Windows,
-   posiblemente dentro de la flecha. Su menú permite mostrar la vista compacta,
-   desplegar el panel lateral, ocultar el monitor o pausar la selección.
-3. La vista compacta aparece abajo a la derecha. Al pulsarla se convierte en el
-   panel lateral, también anclado abajo a la derecha; al recoger el panel vuelve a la vista compacta. Nunca se muestran
-ambas formas al mismo tiempo y ocultarlas no detiene el selector.
+1. Abre Desktop desde el acceso conectado y muestra **Monitor de Codex**.
+2. La isla aparece centrada en el borde superior del área útil de la pantalla.
+   La bandeja permite recuperarla, ocultarla, cambiar de vista o salir.
+3. La vista compacta muestra los personajes activos o que requieren atención,
+   el porcentaje semanal y un acceso para desplegar la isla. Pasar el ratón o
+   enfocar un personaje abre sus datos. Al apartarlo, el detalle se recoge.
+4. La isla desplegada vuelve a compacto al apartar el ratón. La navegación
+   permanece arriba: **Inicio, Agentes, Historial, Consumo y Ajustes**.
 
-El panel usa por defecto el 90 % del área útil del monitor y conserva su base
-inferior al desplegarse. Arrastra el pequeño tirador del borde superior para
-cambiar la altura; se recuerda la proporción elegida por pantalla y se limita
-al espacio disponible cuando cambian la resolución, el escalado o la barra de
-tareas. Doble clic en el tirador recupera la altura automática. Con el tirador
-enfocado, las flechas arriba/abajo ajustan la altura y `Inicio` la restablece.
-La cabecera y las pestañas permanecen visibles mientras el contenido se desplaza.
+Inicio y Agentes ajustan su altura al contenido. Historial, Consumo y Ajustes
+conservan un tirador inferior para cambiar la altura: arrastrar hacia abajo la
+amplía; las flechas la ajustan y `Inicio` o doble clic recuperan la altura
+automática. La posición superior permanece fija y el contenido puede desplazarse.
 
-El enrutamiento decide al inicio de cada turno. Con `phase_routing: true`,
-las tareas nuevas pueden registrar un checkpoint para cambiar de modelo o
-esfuerzo en fases posteriores del mismo turno, dentro de la compatibilidad
-admitida por Codex. Las tareas existentes sin ese checkpoint mantienen el
-cambio entre turnos. Consulta [activación y límites](docs/PHASE-PROBE.md).
-El panel extrae acciones de la petición y del plan pendiente: cantidad y orden
-pueden cambiar. No usa tres etapas fijas por categoría. Sin acciones detectadas
-muestra una etapa genérica. Los pasos siguen marcados como **planificados**;
-dibujar ese plan no ejecuta transiciones. Un ajuste aceptado por Codex y una
-inferencia observada son evidencias distintas.
+**Inicio** dispone el agente principal a la izquierda y los demás a la derecha.
+El icono de la esquina superior derecha del principal abre Agentes. **Agentes**
+coloca el personaje y el selector de conversaciones a la izquierda, y el control
+Automático/Manual y la pipeline a la derecha. Los diseños se adaptan a pantallas
+estrechas. Agentes incluye conversaciones inactivas y excluye archivadas; Inicio
+mantiene su selección de tareas en curso o que requieren atención.
 
-Modelo y razonamiento aparecen como etiquetas. Luna es azul, Terra verde, Sol
-ámbar y Astra violeta; el texto permite identificarlos sin depender del color.
-Cada nivel de razonamiento tiene su propio tono. Las etiquetas de actividad
-mantienen un ancho común. En el menú de la bandeja, una marca indica la vista
-elegida y **Mantener delante** muestra expresamente **Activado** o **Desactivado**.
-Las tareas que están trabajando muestran un punto sólido con un halo animado;
-las que están en espera conservan un punto hueco y quieto. El mismo pulso aparece
-en el resumen del panel y de la cápsula cuando existe actividad. La transformación
-entre ambas vistas dura 420 ms y acelera y frena de forma progresiva.
+La pipeline se actualiza con los estados del plan nativo `turn/plan/updated` del
+turno actual. Sin un plan disponible, muestra selección, aceptación, ejecución y
+finalización a partir de eventos observados. Un paso completado refleja el plan
+del agente, no una comprobación independiente de su resultado. El componente no
+provoca cambios de modelo. Véase [el contrato de la pipeline](docs/NOTCH-MONITOR.md#live-pipeline).
 
-El panel se actualiza cada dos segundos. La cápsula muestra la tarea destacada,
-modelo, razonamiento y número de tareas activas. El panel añade las tareas en
-paralelo, su estado, la confirmación y el motivo. **Aceptado por Codex** significa
-que el motor aceptó la petición con esos ajustes; no es telemetría de cada
-inferencia interna. El panel separa el modelo propuesto, aceptado por Codex,
-configuración publicada e inferencia confirmada localmente. Si no conoce un dato,
-muestra «Sin confirmar».
+El enrutamiento decide al comienzo de cada turno. Con `phase_routing: true`, las
+tareas nuevas pueden registrar checkpoints para cambiar modelo/esfuerzo dentro
+de la compatibilidad admitida por Codex. La frontera Astra requiere otro turno;
+no debe confundirse la pipeline visual con el mecanismo de cambio. Consulta
+[activación y límites](docs/PHASE-PROBE.md).
+
+Modelo y razonamiento usan tags compartidos, con bordes de 1px y colores intensos:
+Luna azul, Terra menta, Sol ámbar y Astra lila. Los personajes Milo, Lumi y Nori
+usan coral, menta y lila por identidad de conversación. Estado, texto y etiquetas
+permiten identificar los datos sin depender solo del color. El monitor refresca
+cada dos segundos; **Ajustes** contiene pausa de enrutamiento, versión y estado
+de la conexión. «Aceptado» acredita ajustes aceptados por Codex; «Confirmada»
+requiere evidencia atribuida de inferencia.
 
 La telemetría de inferencia está activa por defecto y puede desactivarse en
 **Ajustes**. El
@@ -300,51 +288,48 @@ incluido en la lista blanca; no emitió identificadores de turno o respuesta. La
 métricas numéricas útiles descubiertas por la sonda sí se incorporaron a la lista
 blanca con tipos y límites estrictos.
 
-## Panel e historial
+## Pantallas y registro histórico
 
-El panel lateral tiene cuatro vistas:
+| Pantalla | Uso |
+| --- | --- |
+| Inicio | Agente principal, otros agentes en curso/atención y barras de contexto/cuota |
+| Agentes | Catálogo no archivado, personaje/selector, modo por tarea y pipeline en tiempo real |
+| Historial | Búsqueda, páginas de 40 registros y detalle con datos registrados y valoraciones |
+| Consumo | Distribuciones, uso, motores/comparaciones, fiabilidad, errores y diagnósticos de captura |
+| Ajustes | Pausa, mantener delante, retención, motor, comparaciones, credenciales, fases, telemetría, integración y actualizaciones |
 
-- **Actividad** destaca por defecto la tarea actualizada más recientemente.
-  Al pulsar una tarea, queda destacada durante **un minuto** y su pipeline sigue
-  actualizándose sin que otra tarea la sustituya. Otro clic renueva el minuto;
-  **Volver al más reciente** recupera inmediatamente la selección automática.
-  **Ver historial** abre sus decisiones. Si la tarea deja de estar disponible,
-  la vista vuelve automáticamente a la más reciente.
-  La tarea destacada y el detalle de Historial permiten elegir **Automático** o
-  **Manual** por tarea. La elección persiste y afecta al siguiente mensaje;
-  Manual conserva el modelo y esfuerzo enviados por Desktop y no llama al clasificador.
-- **Historial** conserva decisiones activas y terminadas con dos explicaciones
-  independientes: por qué se eligió el modelo y por qué se eligió el razonamiento.
-  También muestra estado, fecha, duración, tokens observados e incidencias. Desde
-  cada decisión puedes valorar por separado el **resultado global**, el
-  **modelo** y el **razonamiento** como **Insuficiente**, **Adecuada** o
-  **Excesiva**. Vuelve a pulsar una opción marcada o usa **Quitar valoración**.
-- **Estadísticas** resume distribución por modelo, razonamiento y motor de
-  enrutamiento, valoraciones, errores, reintentos detectados, duración y tokens cuando están disponibles.
-  Añade fiabilidad de cada motor, demoras, tokens consumidos para clasificar,
-  incidencias agrupadas, coincidencia entre propuestas y calidad por motor aplicado.
-- **Ajustes** permite pausar el selector, cambiar Mantener delante y conservar el
-  historial 30, 90, 180 días o indefinidamente. También permite elegir el motor,
-  activar comparaciones en paralelo, configurar Jev y activar los cambios
-  automáticos por fases. Este último ajuste se carga al reiniciar Desktop y se
-  ofrece solo a tareas nuevas; las tareas ya abiertas conservan el enrutamiento
-  entre turnos.
-  Los selectores mantienen un contorno visible en todas sus opciones. La configuración
-  de Jev aparece solo al elegir ese motor; las claves se editan dentro
-  del panel con **Guardar clave** y **Cancelar**, sin abrir otra ventana.
+El modo **Automático/Manual** se guarda por tarea y afecta al próximo mensaje.
+Manual conserva los ajustes recibidos de Desktop. Los registros de Historial no
+modifican ese modo actual. El catálogo de Agentes depende del puente cargado;
+puentes anteriores conservan el catálogo de conversaciones observadas hasta su
+próximo arranque habitual.
 
-El historial persistente empieza a recoger decisiones cuando Codex se abre con
-esta versión del selector. Un mensaje posterior como «sigue fallando» se registra
-como señal automática de que la decisión anterior no resolvió la tarea. Un cambio
-explícito de modelo se registra como ajuste manual. Estas señales ayudan a corregir
-la política sin asumir que toda tarea terminada tuvo un resultado de calidad.
-La valoración manual se guarda localmente ligada solo al identificador de decisión
-y a la etiqueta elegida; no conserva el mensaje ni la respuesta.
+El detalle histórico muestra elección, origen, estado y fecha; duración, tokens
+de la última llamada, reintentos e incidencias aparecen cuando constan. Un dato
+faltante no se convierte en cero ni se rellena con totales acumulados de la tarea.
+Se omiten las explicaciones genéricas de modelo/esfuerzo/continuidad y la pipeline
+histórica inferida. **Diagnóstico** agrupa evidencia confirmada o probable, ajustes
+que difieren, cambios/fallos de fase, métricas y estimaciones válidas. Una
+coincidencia probable no acredita el modelo real, y los equivalentes Standard
+estimados no son facturación ni consumo de la suscripción.
 
-El nombre del modelo junto al botón de enviar de Codex puede permanecer en la
-selección del editor. El selector comunica el cambio al motor, pero **no se ha
-conseguido garantizar que ese control visual lo refleje**. Usa el monitor para
-comprobar lo aceptado. No se han modificado archivos de la app instalada.
+**Valorar esta elección** permite puntuar elección global, modelo y razonamiento:
+Insuficiente (coral), Adecuada (menta) y Excesiva (lila). El fondo sólido y el check
+oscuro identifican la opción marcada. Otro clic la retira; el icono de quitar la
+valoración se encuentra en la cabecera del apartado. Se guarda la decisión/aspecto
+localmente, sin copiar mensajes o respuestas. Una petición de reintento posterior
+es una señal registrada; no demuestra por sí sola que el trabajo fuera incorrecto.
+
+El historial se proyecta incrementalmente en Python y viaja como snapshots de
+decisiones. La interfaz reutiliza la proyección, los filtros y los nodos cuando
+solo cambia contexto/cuota; los grupos cerrados se construyen al abrirlos.
+Los diarios originales permanecen completos. Contrato, mediciones y límites:
+[Historial](docs/NOTCH-MONITOR.md#history-workspace) y
+[recibo de rendimiento](docs/native-validation/2026-10-08-linux-notch-history-performance.md).
+
+El nombre junto al botón de enviar de Codex puede conservar la selección del
+editor. Un ajuste aceptado y una inferencia confirmada tienen evidencias distintas;
+no se han modificado los recursos de la app instalada para cambiar ese control.
 
 ## Criterios de selección
 
@@ -529,37 +514,29 @@ suscripción. La calidad y el ahorro real requieren observar tareas representati
 
 Pruebas y límites de validación: [VALIDATION.md](docs/VALIDATION.md).
 
-Para retomar el trabajo desde otro agente, consulta la [guía de continuidad del proyecto](docs/KNOWLEDGE-CONTINUITY.md), que separa la evidencia Windows de la validación nativa pendiente en macOS.
+Para retomar el trabajo desde otro agente, consulta [HANDOFF.md](docs/HANDOFF.md)
+y el [estado por equipo](docs/native-validation/STATUS.md). Las notas anteriores
+de continuidad permanecen como evidencia histórica.
 
-## Cápsula de agentes
+## Personajes y vista compacta
 
-La cápsula muestra hasta cinco agentes activos y agrupa el resto en `+N`.
-Cada círculo usa el color de su modelo y un icono orientativo según el tipo de
-tarea (interfaces, correcciones, pruebas, auditorías, arquitectura, textos,
-investigación, configuración, automatización o tarea general). El icono no
-interviene en la elección del modelo.
+Milo (coral), Lumi (menta) y Nori (lila) son ilustraciones originales de las
+conversaciones. Su alias se calcula de forma estable a partir de la identidad de
+la tarea; varias conversaciones pueden compartir personaje, y el título permite
+reconocerlas. Los cambios de modelo o esfuerzo no cambian de personaje.
 
-La categoría se decide al enviar la tarea, combinando título, mensaje, adjuntos
-y el motivo de selección. Solo se guarda la categoría y una indicación de
-confianza; nunca el mensaje. Los seguimientos breves conservan la categoría de
-la tarea, incluso al reiniciar Codex, y los agentes secundarios la heredan hasta
-que reciben una instrucción propia.
+La isla compacta muestra hasta seis personajes, reduce ese límite en pantallas
+estrechas y agrupa el resto en `+N`. Los que siguen disponibles conservan su
+orden. Trabajo, compactación, espera, error, finalización y desconexión tienen
+estados visuales y etiquetas accesibles; la animación no afirma que un modelo
+esté pensando. El movimiento reducido mantiene legibles los estados.
 
-El aro gira mientras se observa actividad. Al pasar el ratón, pulsar o enfocar
-un agente con el teclado, se despliega su tarea, modelo, esfuerzo y estado desde
-la propia cápsula. El detalle permanece abierto al mover el ratón sobre él;
-Escape o salir de la cápsula lo cierra. La flecha y `+N` abren el panel lateral.
-
-Las entradas y salidas se animan sin reordenar los agentes que siguen activos.
-La base y el borde derecho permanecen fijos. Las animaciones respetan la opción
-de movimiento de Windows y los aros se detienen cuando la cápsula está oculta.
-No se infiere si un modelo está pensando: se muestra la actividad observada.
-
-El icono de Codex queda a la izquierda, los agentes en el centro y la flecha a
-la derecha. Actividad y su tarea destacada utilizan los mismos avatares.
-El círculo identifica el modelo; el punto inferior derecho identifica el nivel
-de razonamiento con el color de su etiqueta. Sin un nivel confirmado, el punto
-es neutro. El aro gira únicamente mientras se observa actividad.
+Pasar el ratón, enfocar o pulsar un personaje abre sus datos dentro de la isla.
+La categoría lleva su icono y color, y las etiquetas muestran modelo y esfuerzo.
+Escape o salir de la isla recoge el detalle. La cuota compacta muestra solo el
+porcentaje semanal centrado; su tarjeta incluye las ventanas y renovaciones.
+Toda la geometría, tiempos de cierre y límites nativos están en
+[NOTCH-MONITOR.md](docs/NOTCH-MONITOR.md).
 
 ### Experimental code evaluations
 

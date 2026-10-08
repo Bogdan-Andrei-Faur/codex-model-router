@@ -1,4 +1,10 @@
-# Conexión con Desktop — producto 0.2.1
+# Conexión con Desktop
+
+La isla actual concentra versión, pausa y conexión en Ajustes; la interfaz está
+descrita en [MONITOR-UI.md](MONITOR-UI.md). El catálogo completo de Agentes y los
+planes nativos necesitan un puente actualizado. Cambiar solo la UI no carga un
+puente nuevo en Desktop abierto: comprobar su identidad y preparar el siguiente
+arranque habitual cuando el propietario haya terminado su trabajo.
 
 ## Uso
 
@@ -20,8 +26,8 @@ por completo cuando terminen sus tareas y ábrelo desde su acceso habitual.
 
 El monitor es independiente. Ocultarlo o cerrarlo no detiene el enrutamiento.
 Se abre desde **Estado de Codex automático** (Windows) o **Monitor de Codex.app**
-(Mac). En Actividad y en el detalle de Historial, Automático/Manual controla cada
-tarea. Las nuevas tareas son automáticas; la pausa global prevalece. Manual
+(Mac). En Agentes, Automático/Manual controla cada tarea; Historial conserva
+las decisiones pasadas. Las nuevas tareas son automáticas; la pausa global prevalece. Manual
 conserva exactamente modelo, esfuerzo, permisos y petición enviados por Desktop,
 sin llamadas a Jev/Proveedor ni comparaciones. Cambiar el modo nunca modifica un
 turno en curso. El historial explica las selecciones manuales como tales.
@@ -34,7 +40,7 @@ guarda mensajes, respuestas, adjuntos, herramientas, credenciales ni la carga
 bruta. Si no puede asociar un evento a una única tarea compatible, lo deja sin
 atribuir. El cambio se aplica al próximo arranque de Desktop.
 
-**Estadísticas → Telemetría local** permite comprobar la salud del receptor sin
+**Consumo → Telemetría local** permite comprobar la salud del receptor sin
 mostrar contenido privado: informa de receptor activo, solicitudes, registros con
 modelo, finalizaciones e inferencias asociadas. Cero solicitudes con receptor
 abierto significa que no han llegado datos; no prueba un fallo ni inactividad de
@@ -47,7 +53,15 @@ nativa sustituyen la lista de opciones globales. Si solo había opciones globale
 el puente las conserva al añadir la nueva lista. Si ya existía una lista del
 subcomando, conserva su precedencia nativa. No modifica la configuración global.
 
-## Paquete autocontenido de Windows
+## Paquetes e instalación
+
+Windows dispone de instalador por usuario y runtime congelado; la guía actual
+es [WINDOWS-INSTALLER.md](WINDOWS-INSTALLER.md). Ubuntu usa APT/`.deb` y Mac
+dispone de constructor local `.pkg`. Código, datos y actualización se describen
+en [INSTALLATION-UPDATES.md](INSTALLATION-UPDATES.md). La firma/distribución y
+la aceptación física por equipo siguen siendo comprobaciones separadas.
+
+El ZIP portátil de Windows se conserva como alternativa:
 
 `python package_windows.py` produce un ZIP con lanzador, monitor y runtimes
 congelados. Extrae el ZIP en una ubicación permanente y ejecuta
@@ -121,11 +135,16 @@ El usuario eligió el control por tarea en nuestro panel para esta versión.
 La existencia de `model_catalog_json` en la documentación oficial no garantiza
 por sí sola esa integración: https://learn.chatgpt.com/docs/config-file/config-reference.
 
-El diagnóstico, la instalación y el modo por tarea están implementados en ambas
-plataformas. Los bundles todavía requieren Python y el repositorio; no son un
-instalador independiente, firmado y notarizado para distribuir a terceros.
+El diagnóstico, la instalación y el modo por tarea están implementados en los
+tres hosts. El modo repositorio y los paquetes tienen requisitos distintos;
+consulta las guías actuales de instalación y el estado nativo de cada equipo.
+La existencia de un paquete no demuestra distribución firmada/notarizada ni
+aceptación física de otra máquina.
 
-## Evidencia de esta entrega (2026-09-23)
+## Evidencia histórica de la entrega 0.2.1 (2026-09-23)
+
+Los resultados siguientes describen esa revisión. El estado actual está en
+[HANDOFF.md](HANDOFF.md) y [STATUS.md](native-validation/STATUS.md).
 
 - 75 pruebas Python: Windows, 72 superadas y 3 POSIX omitidas; WSL/Linux, 75 superadas.
 - Build de Windows y self-test del monitor: correctos. Imágenes de Actividad,

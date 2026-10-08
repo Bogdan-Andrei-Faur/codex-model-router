@@ -14,6 +14,39 @@ import time
 import selectors
 import shlex
 import signal
+from types import SimpleNamespace
+from unittest.mock import patch
+
+
+def check_pointer_ownership(Monitor):
+    """XWayland can retain an inside coordinate after crossing to a native app."""
+    native = SimpleNamespace(get_origin=lambda: (True, 0, 0))
+    native.get_toplevel = lambda: native
+    pointed = [None]
+    pointer = SimpleNamespace(get_position=lambda: (None, 150, 40),
+                             get_window_at_position=lambda: (pointed[0], 150, 40))
+    display = SimpleNamespace(__gtype__=SimpleNamespace(name='GdkX11Display'),
+                              get_default_seat=lambda: SimpleNamespace(get_pointer=lambda: pointer))
+    messages = []
+    host = SimpleNamespace(ready=True, hit_rect=(100, 0, 300, 200),
+                           last_pointer=object(), last_pointer_sent=0,
+                           window=SimpleNamespace(get_mapped=lambda: True, get_window=lambda: native),
+                           emit=lambda name, value: messages.append(value))
+    with patch('monitor_linux.Gdk.Display.get_default', return_value=display):
+        Monitor.update_pointer(host)
+        assert messages[-1] is None, 'Stale inside coordinates must not keep a foreign-window hover open'
+        pointed[0] = native
+        Monitor.update_pointer(host)
+        assert messages[-1] == {'x': 150, 'y': 40}, 'Owned-window hover must still reach WebKit'
+        pointed[0] = SimpleNamespace(get_toplevel=lambda: object())
+        Monitor.update_pointer(host)
+        assert messages[-1] is None, 'An overlapping foreign window must close hover'
+        messages.clear()  # Simulate an outside notification lost before WebKit opens a panel.
+        deadline = time.monotonic() + .8
+        while not messages and time.monotonic() < deadline:
+            time.sleep(.02)
+            Monitor.update_pointer(host)
+        assert messages and messages[-1] is None, 'Stationary outside pointer must recover a missed notification'
 
 
 def adopt_worker_descendants():
@@ -87,7 +120,8 @@ def exercise(package, base):
         XDG_DATA_HOME=str(base / 'xdg'), XDG_CONFIG_HOME=str(base / 'config'),
         XDG_CACHE_HOME=str(base / 'cache'), GDK_BACKEND='x11')
     sys.path.insert(0, str(resources))
-    from monitor_linux import Gtk, GLib, Monitor
+    from monitor_linux import Gdk, Gtk, GLib, Monitor
+    check_pointer_ownership(Monitor)
     from linux_onboarding import prepare
     from state_store import atomic_json
     source = base / 'old checkout'
@@ -166,6 +200,9 @@ def exercise(package, base):
         if not failure: GLib.source_remove(timer)
     assert not failure and message_seen and 'Codex' in message_seen[0] and 'config.local.json' not in message_seen[0]
     assert not blocked.exists()
+    atomic_json(migrated / 'preview.json', {'threads': {'fixture-agent': {
+        'name': 'Synthetic agent', 'status': 'running', 'model': 'gpt-6.1-sol',
+        'updated': time.time()}}})
     app = Monitor(migrated, preview=True)
     received = []
     original = app.emit
@@ -175,15 +212,88 @@ def exercise(package, base):
     app.emit = capture
     deadline = time.monotonic() + 25
     error = []
+    font_loaded = []
+    font_pending = []
+    hover_started = []
+    hover_passed = []
+    hover_pending = []
+    def hover_result(web, result, _):
+        hover_pending.clear()
+        try:
+            outcome = json.loads(web.evaluate_javascript_finish(result).to_string())
+            if outcome['done']:
+                if all(outcome['checks']): hover_passed.append(True)
+                else: error.append('Packaged hover assertions: ' + str(outcome['checks']))
+        except Exception as failure:
+            error.append('Packaged hover check failed: ' + str(failure))
+    def font_result(web, result, _):
+        font_pending.clear()
+        try:
+            if web.evaluate_javascript_finish(result).to_boolean(): font_loaded.append(True)
+        except Exception as failure:
+            error.append('Packaged font check failed: ' + str(failure))
     def check():
-        if app.ready and received:
+        if error:
             app.quit(); return False
+        if app.ready and received and font_loaded and hover_passed:
+            app.quit(); return False
+        if font_loaded and app.hit_rect is not None and not hover_started:
+            hover_started.append(True)
+            # Verify ownership against a real mapped GTK window as well as the
+            # stale/foreign pointer fixtures. Warping is confined to this Xvfb.
+            display = Gdk.Display.get_default()
+            pointer = display.get_default_seat().get_pointer()
+            screen, old_x, old_y = pointer.get_position()
+            _, origin_x, origin_y = app.window.get_window().get_origin()
+            x, y, width, _ = app.hit_rect
+            try:
+                pointer.warp(screen, int(origin_x + x + width / 2), int(origin_y + y + 25))
+                display.sync()
+                pointed = pointer.get_window_at_position()[0]
+                assert pointed is not None and pointed.get_toplevel() == app.window.get_window(), 'Real owned GTK window was rejected'
+            finally:
+                pointer.warp(screen, old_x, old_y)
+                display.sync()
+            # Keep the isolated Xvfb pointer outside both compact and expanded
+            # bounds; its default center can fall inside the expanded island.
+            pointer.warp(screen, 0, screen.get_height() - 1)
+            display.sync()
+            # Open
+            # the details without generating mouseleave: native pointer geometry
+            # must close both panels, including an unchanged outside position.
+            app.web.evaluate_javascript("""
+                window.fixtureHoverResults=[];
+                document.querySelector('#agents .avatar').click();
+                window.fixtureHoverResults.push(!document.querySelector('#peek').hidden,
+                    document.querySelectorAll('#compact [title]').length===0);
+                setTimeout(()=>{
+                    window.fixtureHoverResults.push(document.querySelector('#peek').hidden);
+                    document.querySelector('#quota').click();
+                    window.fixtureHoverResults.push(!document.querySelector('#peek').hidden);
+                    setTimeout(()=>{
+                        window.fixtureHoverResults.push(document.querySelector('#peek').hidden);
+                        document.querySelector('#expand').click();
+                        window.fixtureHoverResults.push(!document.querySelector('#expanded').hidden,
+                            document.querySelectorAll('header,#collapse,#hide').length===0);
+                        setTimeout(()=>{
+                            window.fixtureHoverResults.push(!document.querySelector('#compact').hidden);
+                            window.fixtureHoverDone=true;
+                        },850);
+                    },500);
+                },500);
+            """, -1, None, app.page, None, None, None)
+        if hover_started and not hover_pending:
+            hover_pending.append(True)
+            app.web.evaluate_javascript("JSON.stringify({done:window.fixtureHoverDone===true,checks:window.fixtureHoverResults||[]})", -1, None, app.page, None, hover_result, None)
+        if app.ready and received and not font_loaded and not font_pending:
+            font_pending.append(True)
+            app.web.evaluate_javascript("[...document.fonts].some(face => face.family === 'Router Nunito' && face.status === 'loaded')", -1, None, app.page, None, font_result, None)
         if time.monotonic() > deadline:
-            error.append('Packaged WebKit never became ready'); app.quit(); return False
+            error.append('Packaged WebKit, bundled font or native hover checks did not complete'); app.quit(); return False
         return True
     GLib.timeout_add(100, check)
     app.run(['router-package-smoke'])
-    assert not error and received and app.ready, error
+    assert not error and received and app.ready and font_loaded and hover_passed, error
     assert (migrated / 'config.local.json').read_bytes() == (source / 'config.local.json').read_bytes()
     # Exercise the actual executable/dispatcher as well as the GTK object.
     child_env = dict(os.environ, PERSONAL_CODEX_ROUTER_ROOT=str(base / 'launcher-preview'))
@@ -227,8 +337,10 @@ def exercise(package, base):
             except subprocess.TimeoutExpired: child.kill(); child.wait()
         child.stdout.close()
     print(json.dumps({'pass': True, 'extracted_package': True, 'gtk_onboarding_cancel_new_import': True,
-                      'webkit_ready': True, 'shared_ui_payload': True, 'preview_only': True,
+                      'webkit_ready': True, 'bundled_font_loaded': True, 'native_hover_exit_closes_agent_and_quota': True, 'shared_ui_payload': True, 'preview_only': True,
                       'exact_packaged_launcher_ready': True,
+                      'stale_foreign_pointer_rejected': True, 'missed_exit_recovers': True,
+                      'mapped_gtk_pointer_ownership': True,
                       'stopped_pid_reuse_import': True, 'active_bridge_specific_error': True,
                       'cached_monitor_single_instance': True}))
 

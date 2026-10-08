@@ -1,4 +1,90 @@
-# Continuar desde otro equipo — 07/10/2026
+# Current project handoff — 2026-10-08
+
+Canonical project: `codex-model-router`,
+`https://github.com/Bogdan-Andrei-Faur/codex-model-router.git`.
+Read [AGENTS.md](../AGENTS.md), then this file. [The documentation index](README.md)
+links current contracts, installation, routing/evidence and historical receipts.
+This checkout is sufficient; no other agent, personal memory or external knowledge
+service is needed. Preserve local work and coordinate disruptive owner actions.
+
+## Current source and delivery
+
+- Working branch: `feature/dynamic-notch-monitor`, based on
+  `48760d78e35c7bd31263308f74cbc39b8a501611`. Use `git rev-parse HEAD` and
+  `git status --short --branch` for the published revision and local divergence.
+- Product baseline: `0.9.6`. Development Debian revisions `1~notchN` identify
+  separate pilot artifacts; this redesign does not create a release/tag.
+- Shared UI: top-centered black island, original coral/mint/lilac companions,
+  bundled Nunito, colored model/effort tags and five top navigation destinations.
+  Home/Agents are horizontal and sized to content; other views retain resizing.
+- Home keeps current/attention tasks. Agents has an independent non-archived
+  catalog including inactive conversations, selected companion/picker left and
+  task mode/live pipeline right. No current task controls remain in History.
+- The live pipeline consumes validated current-turn `turn/plan/updated`; absent
+  plans use observed lifecycle fields. Generic plan labels replace free text.
+  Native-plan completion is not independent result validation and the visual
+  pipeline does not switch models. Routing policy and attribution rules are
+  unchanged. `router.py`, `thread_inventory.py` and `phase_tracking.py` add monitor
+  catalog/plan projection, so an older loaded bridge needs its next owner-controlled
+  Desktop restart to expose those additions.
+- History uses incremental `HistoryProjection` snapshots, detached live overlays,
+  cached search/DOM and lazy disclosures. Complete journals remain available to
+  actions/evidence. Details prioritize valid last-call metrics and incidents;
+  duplicate generic prose/settings are omitted and attribution stays conservative.
+- Settings owns routing pause/version/connection/update state. Per-task modes,
+  quality action payloads, native key custody and installation data are preserved.
+
+Implementation contracts: [monitor UI](MONITOR-UI.md),
+[notch specification](NOTCH-MONITOR.md), [shared architecture](SHARED-MONITOR.md),
+[phase boundaries](PHASE-PROBE.md). The [iteration archive](NOTCH-CHANGELOG.md)
+retains the full feedback/install progression and every linked safe receipt.
+
+## Recorded installed state and verification
+
+Ubuntu pilot `0.9.6-1~notch43` is installed: monitor `2e0a5284b2aa9c8e`,
+packaged/connected router `2fec36051e3ccedb`. Its last installed readback passed:
+one connected monitor, matching UI files, preserved settings, WebKit ready,
+no startup traceback, bridge mismatch/unknown=false, restartRequired=false.
+Only the monitor restarted in the last iteration; Desktop was not restarted.
+See [ratings and spacing receipt](native-validation/2026-10-08-linux-notch-history-ratings.md).
+An installed artifact identity is not the source commit or future CI result.
+
+Current local delivery checks: 518 Python tests (37 skipped for optional/native
+requirements), 31 JS core tests, all 10 shared browser groups, routing corpus 27/27
+and six offline JEV constraint cases pass. Skips do not validate optional Docker
+execution or native platform behavior. Exact `1~notch43` isolated GTK/WebKit
+package smoke and Home opening metric regression also pass. The metric probe
+forces X11 to stay in Xvfb instead of inheriting the owner's Wayland compositor.
+The dedicated quota Escape group passed
+this run, but the previously reproduced intermittent failure has no demonstrated
+root fix and remains an open physical/input gate.
+
+Mac/Windows redesign native execution and physical display/input/sleep acceptance
+remain separate. Check the current published SHA's complete CI matrix; old runs
+cannot validate it. The previous baseline run had a Windows installer fixture
+failure (`Frozen bridge closed before protocol response`), documented in the
+[delivery receipt](native-validation/2026-10-08-documentation-delivery.md).
+Use [NATIVE-VALIDATION.md](NATIVE-VALIDATION.md) and
+[STATUS.md](native-validation/STATUS.md) for exact gates and safe receipts.
+
+## Continue safely
+
+1. Fetch and compare the intended branch before integrating; preserve dirty work.
+2. Start offline/shared checks using the child-environment reset in the runbook.
+3. Use `python3 tools/preview_monitor.py --live` for token-protected, read-only
+   local review. Synthetic review uses `--fixture-root`; product actions stay disabled.
+4. Before platform acceptance, record source, artifact, loaded bridge and human
+   observations independently. Do not restart Desktop or replace an installation
+   merely to run tests. Never publish private state, prompts, raw logs or credentials.
+5. Extend current contracts and add safe receipts; do not turn historical
+   installation notes into claims about a different artifact or host.
+
+## Historical connection and delivery notes
+
+The following dated Windows/Mac/Ubuntu notes retain their original evidence.
+Their source/artifact states are historical and do not supersede the summary above.
+
+## Historical Windows connection — 2026-10-07
 
 Windows 0.9.6 is installed and active on the owner host (build
 `611981b0f2d8abd4`, router `b1f4bff15e1556ee`). After the owner's restart,
@@ -82,7 +168,7 @@ la aceptación física de la instalación del propietario.
 
 | Área | Implementado | Límite de aceptación |
 | --- | --- | --- |
-| UI común | `monitor-ui/`, `monitor_state.py`, `monitor_service.py`; Agentes/Historial/Consumo/Ajustes, cápsula, aros, Lucide y carga incremental | Los tres hosts comparten interfaz; cada integración nativa requiere su propio QA |
+| UI común | `monitor-ui/`, `monitor_state.py`, `monitor_service.py`; Agentes/Historial/Consumo/Ajustes, isla dinámica, personajes, barras, Lucide y carga incremental | Los tres hosts comparten interfaz; cada integración nativa requiere su propio QA |
 | Hosts | `MonitorMac.swift`, `MonitorWindows.cs`, `monitor_linux.py` | Windows activo usa WebView2/WPF; los C# anteriores quedan preservados fuera del build |
 | Routing | Referencia 8 y candidata 9 separadas; Manual y peticiones explícitas prevalecen | Comparaciones y fixtures no autorizan activar categorías ni prueban ahorro causal |
 | Evidencia | `evidence.py`, `inference_attribution.py`, evaluadores y contadores estrictos | ACK/`applied` no prueba inferencia posterior; coste estimado no es facturación |
@@ -143,7 +229,7 @@ npx playwright install chromium
 npm test
 ```
 
-Para los siete grupos de interfaz, en Mac/Linux:
+Para los diez grupos de interfaz actuales, en Mac/Linux:
 
 ```sh
 ROUTER_TEST_BROWSER=chromium npm run test:layout

@@ -75,8 +75,8 @@ def main():
                     elif window.get_mapped():
                         native = window.get_window()
                         area = display.get_monitor_at_window(native).get_workarea()
-                        width = min(432, max(1, area.width - 20))
-                        expected = (area.x + area.width - width - 10, area.y + 10)
+                        width = min(800, max(1, area.width - 20))
+                        expected = (area.x + (area.width - width) // 2, area.y)
                         # GTK's cached ABOVE flag can lag the actual WM state.
                         # Query only this synthetic window's EWMH property.
                         wm_state = subprocess.check_output(

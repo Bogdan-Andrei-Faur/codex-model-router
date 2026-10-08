@@ -1,3 +1,11 @@
+# Current continuity notice — 2026-10-08
+
+Use [HANDOFF.md](HANDOFF.md), [AGENTS.md](../AGENTS.md),
+[NATIVE-VALIDATION.md](NATIVE-VALIDATION.md) and
+[STATUS.md](native-validation/STATUS.md). They are repository-owned and sufficient
+for a fresh agent. The notes below retain historical context and do not require
+an external memory/Knowledge service or contact with another machine's agent.
+
 # Continuidad del proyecto: fases automáticas y validación multiplataforma
 
 ## Punto de entrada vigente — 05/10/2026

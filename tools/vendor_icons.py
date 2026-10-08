@@ -23,7 +23,8 @@ CATEGORIES = {'audit':'clipboard-check', 'tests':'flask-conical', 'architecture'
               'data':'database', 'performance':'gauge', 'deployment':'rocket',
               'versioning':'git-branch', 'integration':'plug', 'accessibility':'accessibility'}
 CONTROLS = ['panel-left-open','panel-left-close','sliders-horizontal','x','pause','play',
-            'circle-check','circle','check','plus','route','chevron-right']
+            'circle-check','circle','check','plus','route','chevron-right',
+            'house','users-round','history','chart-no-axes-combined','settings']
 
 
 def geometry(tag, attrs):

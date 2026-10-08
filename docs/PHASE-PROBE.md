@@ -1,5 +1,11 @@
 # Phase routing feasibility — updated 2026-09-25
 
+> Current visual pipeline: Agents consumes validated native `turn/plan/updated`
+> states for the current turn, or observed lifecycle fields when no plan exists.
+> This visual projection does not trigger model switches or independently verify
+> completed work. See [NOTCH-MONITOR.md](NOTCH-MONITOR.md#live-pipeline).
+> The phase-switch boundaries and protocol experiments below remain separate.
+
 ## Scope and decision
 
 The native experiments below established compatibility. The bridge now has an
@@ -340,9 +346,10 @@ than the original `turn/interrupt` alone, provides process termination.
    `blocked`/`failed`) and the monitor displays it. Its opt-in loopback OTel
    collector now records `response.completed` model/effort evidence only when
    it can associate exactly one active task. It deliberately does not label a
-   selector/settings notification as an observed inference. El monitor convierte
-   esa evidencia en un plan dinámico con pasos planificados y una ejecución
-   observada; esos nombres no activan cambios automáticos de modelo ni esfuerzo.
+   selector/settings notification as an observed inference. The current visual
+   pipeline uses native plan states or observed lifecycle fields; the historical
+   inferred semantic pipeline is no longer shown. These names do not trigger
+   automatic model/effort changes.
 3. Visually review Desktop's presentation when phases use successive native
    turns. Native approval and cancellation callbacks are verified above; this
    protocol probe does not judge the UI surface.
