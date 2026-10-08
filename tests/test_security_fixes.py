@@ -15,11 +15,12 @@ from zipfile import ZipFile, ZIP_DEFLATED
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-import evidence
-import state_store
-from platform_support import TELEMETRY_AUTH_ENV, with_loopback_telemetry
-from router import Router
-from recover_history import recover
+sys.path.insert(0, str(ROOT / "src"))
+import codex_model_router.telemetry.evidence as evidence
+import codex_model_router.storage.state_store as state_store
+from codex_model_router.platforms.platform_support import TELEMETRY_AUTH_ENV, with_loopback_telemetry
+from codex_model_router.bridge.router import Router
+from codex_model_router.storage.recover_history import recover
 from tests.coding_trials import SandboxUnavailable, require_memory_result
 
 

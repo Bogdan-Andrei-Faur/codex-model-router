@@ -14,8 +14,9 @@ from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from application_layout import user_data_root
-from monitor_state import MonitorState
+sys.path.insert(0, str(ROOT / "src"))
+from codex_model_router.platforms.application_layout import user_data_root
+from codex_model_router.monitor.monitor_state import MonitorState
 
 
 class PreviewServer(HTTPServer):

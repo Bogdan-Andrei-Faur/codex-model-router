@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     if sys.platform != 'darwin':
         print('SKIP: requires macOS AppKit/WebKit'); return
-    source = (ROOT / 'MonitorMac.swift').read_text().split('let app=NSApplication.shared')[0]
+    source = (ROOT / 'native/macos/MonitorMac.swift').read_text().split('let app=NSApplication.shared')[0]
     harness = r'''
 let app=NSApplication.shared
 app.setActivationPolicy(.accessory)

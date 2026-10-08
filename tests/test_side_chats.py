@@ -8,8 +8,9 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from router import Router
-from routing import DEFAULT_ROUTES, EFFORTS
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.bridge.router import Router
+from codex_model_router.routing.routing import DEFAULT_ROUTES, EFFORTS
 
 
 def wire(message):
@@ -95,7 +96,7 @@ class SideChatTests(unittest.TestCase):
         self.config.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES,
                                           "routing_engine": "jev"}))
         self.fork()
-        with patch("router.run_jev", return_value={"status": "ok", "engine": "jev",
+        with patch("codex_model_router.bridge.router.run_jev", return_value={"status": "ok", "engine": "jev",
                    "route": {"model": "gpt-6-luna", "effort": "low", "tier": "simple"},
                    "continuity_strategy": "reassess"}) as classify:
             self.start_turn()

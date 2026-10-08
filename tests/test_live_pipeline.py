@@ -4,8 +4,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from phase_tracking import native_plan
-from router import Router
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from codex_model_router.bridge.phase_tracking import native_plan
+from codex_model_router.bridge.router import Router
 
 
 class LivePipelineTests(unittest.TestCase):

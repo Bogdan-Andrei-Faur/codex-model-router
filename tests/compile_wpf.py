@@ -13,9 +13,10 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from build_identity import identity, router_identity
+sys.path.insert(0,str(ROOT / "src"))
+from codex_model_router.build_identity import identity, router_identity
 
-SOURCES = ('MonitorWindows.cs', 'WindowsLayout.cs', 'WindowsOnboarding.cs')
+SOURCES = ('native/windows/MonitorWindows.cs', 'native/windows/WindowsLayout.cs', 'native/windows/WindowsOnboarding.cs')
 REFERENCES = ('mscorlib','System','System.Core','System.Windows.Forms','System.Drawing','System.Web.Extensions',
               'System.Security','System.Xaml','WindowsBase','PresentationCore','PresentationFramework')
 
@@ -41,7 +42,7 @@ def main():
     env=dict(os.environ,DOTNET_ROOT=str(args.dotnet.parent),DOTNET_CLI_HOME=str(args.output/'cli-home'),
              DOTNET_CLI_TELEMETRY_OPTOUT='1',DOTNET_SKIP_FIRST_TIME_EXPERIENCE='1')
     for name,sources,entry in (('monitor',[ROOT/s for s in SOURCES]+[stamp],'RouterMonitorProgram'),
-                               ('launcher',[ROOT/'Launcher.cs'],None)):
+                               ('launcher',[ROOT/'native/windows/Launcher.cs'],None)):
         flags=['/nologo','/noconfig','/nostdlib+','/langversion:5','/target:winexe','/optimize+',
                '/out:'+str(args.output/(name+'.exe')),'/win32icon:'+str(ROOT/'assets/codex.ico')]
         if entry:flags.append('/main:'+entry)
@@ -57,7 +58,7 @@ def main():
     report={'product_version':version,'build_id':build,'compile_host':sys.platform,
             'webview2_version':'1.0.4258.31','framework_target':args.framework.name,'language_version':'5','compiled':True,
             'native_compiler_used':False,'native_wpf_execution':False,'visual_acceptance':False,
-            'sources_sha256':{name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in (*SOURCES,'Launcher.cs')},
+            'sources_sha256':{name:hashlib.sha256((ROOT/name).read_bytes()).hexdigest() for name in (*SOURCES,'native/windows/Launcher.cs')},
             'artifacts_sha256':{name:hashlib.sha256((args.output/name).read_bytes()).hexdigest() for name in ('monitor.exe','launcher.exe')}}
     (args.output/'compilation.json').write_text(json.dumps(report,indent=2))
     print(json.dumps(report,indent=2))

@@ -15,7 +15,8 @@ import tomllib
 import secrets
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from desktop_runtime import discover
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.platforms.desktop_runtime import discover
 from smoke_native import Client, ROOT
 
 

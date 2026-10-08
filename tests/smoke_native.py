@@ -16,8 +16,9 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from platform_support import creation_flags
-from model_catalog import MODELS
+sys.path.insert(0, str(ROOT / "src"))
+from codex_model_router.platforms.platform_support import creation_flags
+from codex_model_router.routing.model_catalog import MODELS
 WRAPPER = ROOT / "dist" / ("codex-router-v19.exe" if os.name == "nt" else "codex-router")
 
 

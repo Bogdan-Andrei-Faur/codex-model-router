@@ -7,11 +7,12 @@ import unittest
 from zipfile import ZipFile
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from router import Router
-from inference_attribution import COUNTERS
-from evidence import export, scrub, summarize, SCHEMA
-from outcome_evaluation import record_check, evaluate_checks
-from state_store import append_record, read_records
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.bridge.router import Router
+from codex_model_router.telemetry.inference_attribution import COUNTERS
+from codex_model_router.telemetry.evidence import export, scrub, summarize, SCHEMA
+from codex_model_router.evaluation.outcome_evaluation import record_check, evaluate_checks
+from codex_model_router.storage.state_store import append_record, read_records
 
 
 class AttributionRegression(unittest.TestCase):
@@ -87,11 +88,11 @@ class AttributionRegression(unittest.TestCase):
         self.assertNotIn('observed_model',self.router.threads['thread-one'])
 
     def test_all_monitors_forward_stage_counters(self):
-        from monitor_state import TELEMETRY_COUNTERS
+        from codex_model_router.monitor.monitor_state import TELEMETRY_COUNTERS
         root = Path(__file__).resolve().parents[1]
         for counter in COUNTERS:
             self.assertIn(counter,TELEMETRY_COUNTERS)
-        for name in ('MonitorMac.swift','MonitorWindows.cs'):
+        for name in ('native/macos/MonitorMac.swift','native/windows/MonitorWindows.cs'):
             self.assertIn('monitor_service.py',(root/name).read_text())
 
 

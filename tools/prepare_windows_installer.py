@@ -14,7 +14,7 @@ import urllib.request
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from build_windows_installer import build_environment
+from tools.packaging.build_windows_installer import build_environment
 
 
 def signed(path, publisher):

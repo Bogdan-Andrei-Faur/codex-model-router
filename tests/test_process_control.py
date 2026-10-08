@@ -3,7 +3,8 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from process_control import CommandProcesses, OwnedProcess
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.bridge.process_control import CommandProcesses, OwnedProcess
 
 
 class CommandProcessTests(unittest.TestCase):

@@ -6,7 +6,11 @@ import subprocess
 import tempfile
 import unittest
 
-from monitor_state import HistoryProjection, MonitorState
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from codex_model_router.monitor.monitor_state import HistoryProjection, MonitorState
 
 ROOT = Path(__file__).resolve().parents[1]
 

@@ -8,11 +8,12 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-import candidate_policy as cp
-from decision_engines import _run_jev, build_state
-from desktop_runtime import discover
-from model_catalog import DEFAULT_ROUTES
-from state_store import atomic_json
+sys.path.insert(0, str(ROOT / "src"))
+import codex_model_router.routing.candidate_policy as cp
+from codex_model_router.routing.decision_engines import _run_jev, build_state
+from codex_model_router.platforms.desktop_runtime import discover
+from codex_model_router.routing.model_catalog import DEFAULT_ROUTES
+from codex_model_router.storage.state_store import atomic_json
 from tests import repository_trials as grading, native_probe_profile, trial_tool_evidence, run_multifile_trials
 from tests.coding_trials import sandbox_controls
 from tests.smoke_native import Client
@@ -91,7 +92,7 @@ def run_trials(output, max_native=2, max_provider=1):
                  'native_runner': Path(run_multifile_trials.__file__),
                  'tool_evidence': Path(trial_tool_evidence.__file__),
                  'profile': Path(native_probe_profile.__file__),
-                 'candidate_policy': ROOT/'candidate_policy.py', 'jev_engine': ROOT/'decision_engines.py'}
+                 'candidate_policy': ROOT/'src/codex_model_router/routing/candidate_policy.py', 'jev_engine': ROOT/'src/codex_model_router/routing/decision_engines.py'}
     report = {'schema': 'repository-function-trials/1', 'case_sha256': grading.CASE_HASH,
               'grader_sha256': grading.GRADER_HASH, 'module_loader_sha256': grading.base.GRADER_HASH,
               'origin': data['origin'], 'origin_scope': data['origin_scope'],

@@ -6,7 +6,8 @@ import tempfile
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from routing import DEFAULT_ROUTES
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.routing.routing import DEFAULT_ROUTES
 
 
 def main():

@@ -17,9 +17,10 @@ from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from desktop_runtime import discover
-import inference_telemetry as otel
-from platform_support import with_loopback_telemetry
+sys.path.insert(0,str(ROOT / "src"))
+from codex_model_router.platforms.desktop_runtime import discover
+import codex_model_router.telemetry.inference_telemetry as otel
+from codex_model_router.platforms.platform_support import with_loopback_telemetry
 from tests.smoke_native import Client
 from tests.native_response_evidence import RawEvidence
 from tests.run_policy_trials import mcp_overrides, fixtures, check_answer, FIXTURE_HASH

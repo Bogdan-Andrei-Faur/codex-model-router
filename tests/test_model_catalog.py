@@ -4,11 +4,15 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from model_catalog import (MODELS, DEFAULT_ROUTES, LEGACY_ROUTES, migrate_config,
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from codex_model_router.routing.model_catalog import (MODELS, DEFAULT_ROUTES, LEGACY_ROUTES, migrate_config,
                            available_routes, estimate_standard_usage)
-from routing import EFFORTS, explicit_model, select_route_details
-from router import Router
-from decision_engines import candidate_routes
+from codex_model_router.routing.routing import EFFORTS, explicit_model, select_route_details
+from codex_model_router.bridge.router import Router
+from codex_model_router.routing.decision_engines import candidate_routes
 
 
 class ModelCatalogTests(unittest.TestCase):
@@ -38,7 +42,7 @@ class ModelCatalogTests(unittest.TestCase):
         self.assertEqual(explicit_model('Usa GPT-6.1 Sol', DEFAULT_ROUTES)['model'], 'gpt-6.1-sol')
 
     def test_new_phase_pairs_are_not_enabled_by_catalog_recognition(self):
-        from phase_tracking import can_switch_within_turn, transition_kind
+        from codex_model_router.bridge.phase_tracking import can_switch_within_turn, transition_kind
         for source, target in [('gpt-6-luna', 'gpt-6.1-sol'), ('gpt-6.1-sol', 'gpt-6-luna')]:
             self.assertFalse(can_switch_within_turn(source, target))
             self.assertEqual(transition_kind(source, target), 'blocked_review_boundary')

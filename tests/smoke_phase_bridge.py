@@ -12,9 +12,13 @@ import tempfile
 import tomllib
 
 from smoke_native import Client, ROOT
-from desktop_runtime import discover
-from routing import DEFAULT_ROUTES
-from platform_support import with_loopback_telemetry
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from codex_model_router.platforms.desktop_runtime import discover
+from codex_model_router.routing.routing import DEFAULT_ROUTES
+from codex_model_router.platforms.platform_support import with_loopback_telemetry
 from probe_model_compatibility import Collector
 
 

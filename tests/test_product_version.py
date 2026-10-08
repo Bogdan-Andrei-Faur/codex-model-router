@@ -7,8 +7,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from router import PRODUCT_VERSION, Router
-from routing import DEFAULT_ROUTES
+sys.path.insert(0, str(ROOT / "src"))
+from codex_model_router.bridge.router import PRODUCT_VERSION, Router
+from codex_model_router.routing.routing import DEFAULT_ROUTES
 
 
 class ProductVersionTests(unittest.TestCase):

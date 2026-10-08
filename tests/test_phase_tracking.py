@@ -3,7 +3,8 @@ from pathlib import Path
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from phase_tracking import can_switch_within_turn, dynamic_pipeline, phase_update, proposed_phase, transition_kind
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.bridge.phase_tracking import can_switch_within_turn, dynamic_pipeline, phase_update, proposed_phase, transition_kind
 
 
 class PhaseTrackingTests(unittest.TestCase):

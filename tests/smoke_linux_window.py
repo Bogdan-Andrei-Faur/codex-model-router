@@ -15,7 +15,8 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from monitor_linux import Gdk, GLib, Monitor
+sys.path.insert(0, str(ROOT / "src"))
+from codex_model_router.monitor.monitor_linux import Gdk, GLib, Monitor
 import gi
 gi.require_version('GdkX11', '3.0')
 from gi.repository import GdkX11

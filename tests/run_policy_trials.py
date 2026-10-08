@@ -15,14 +15,15 @@ import time
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-import candidate_policy as cp
-from routing import select_route_details
-from model_catalog import DEFAULT_ROUTES
-from build_identity import router_identity
-from state_store import read_records, append_record
-from outcome_evaluation import record_check
-from trial_evaluation import record_attempt, evaluate_trials
-from evidence import export
+sys.path.insert(0,str(ROOT / "src"))
+import codex_model_router.routing.candidate_policy as cp
+from codex_model_router.routing.routing import select_route_details
+from codex_model_router.routing.model_catalog import DEFAULT_ROUTES
+from codex_model_router.build_identity import router_identity
+from codex_model_router.storage.state_store import read_records, append_record
+from codex_model_router.evaluation.outcome_evaluation import record_check
+from codex_model_router.evaluation.trial_evaluation import record_attempt, evaluate_trials
+from codex_model_router.telemetry.evidence import export
 from tests.smoke_native import Client
 
 FIXTURE_HASH='29e592e34c1d21403bae6cec22fe060ab2c90de6b5fb6d3ef828064b60cd0102'

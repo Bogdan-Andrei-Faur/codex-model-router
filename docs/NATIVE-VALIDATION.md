@@ -295,7 +295,7 @@ Native credential storage remains a separate optional host acceptance row
 isolated new test data root with a synthetic value, keep classifier mode Rules,
 never use/replace an existing provider key, verify save/read/reopen, and remove
 only the test entry afterward. Follow the native storage adapters in
-`MonitorMac.swift`, `MonitorWindows.cs`, `linux_secret.py` and `decision_engines.py`;
+`native/macos/MonitorMac.swift`, `native/windows/MonitorWindows.cs`, `src/codex_model_router/platforms/linux_secret.py` and `src/codex_model_router/routing/decision_engines.py`;
 record the store and booleans only. Unit mocks/presence indicators alone do not
 prove native decryption. If that isolated test is not authorized/prepared, mark
 `NOT_RUN`; it does not invalidate the unrelated Docker/telemetry results.

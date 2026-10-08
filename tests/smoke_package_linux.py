@@ -32,7 +32,7 @@ def check_pointer_ownership(Monitor):
                            last_pointer=object(), last_pointer_sent=0,
                            window=SimpleNamespace(get_mapped=lambda: True, get_window=lambda: native),
                            emit=lambda name, value: messages.append(value))
-    with patch('monitor_linux.Gdk.Display.get_default', return_value=display):
+    with patch('codex_model_router.monitor.monitor_linux.Gdk.Display.get_default', return_value=display):
         Monitor.update_pointer(host)
         assert messages[-1] is None, 'Stale inside coordinates must not keep a foreign-window hover open'
         pointed[0] = native
@@ -119,11 +119,11 @@ def exercise(package, base):
         PERSONAL_CODEX_ROUTER_ROOT=str(base / 'data'), HOME=str(base / 'home'),
         XDG_DATA_HOME=str(base / 'xdg'), XDG_CONFIG_HOME=str(base / 'config'),
         XDG_CACHE_HOME=str(base / 'cache'), GDK_BACKEND='x11')
-    sys.path.insert(0, str(resources))
-    from monitor_linux import Gdk, Gtk, GLib, Monitor
+    sys.path.insert(0, str(resources / "src"))
+    from codex_model_router.monitor.monitor_linux import Gdk, Gtk, GLib, Monitor
     check_pointer_ownership(Monitor)
-    from linux_onboarding import prepare
-    from state_store import atomic_json
+    from codex_model_router.platforms.linux_onboarding import prepare
+    from codex_model_router.storage.state_store import atomic_json
     source = base / 'old checkout'
     atomic_json(source / 'config.local.json', {'platform': 'linux', 'enabled': False, 'owner_preference': 'synthetic'})
     (source / 'state').mkdir()
@@ -309,7 +309,7 @@ def exercise(package, base):
         # Reproduce Desktop starting a cached legacy monitor command while
         # the installed monitor is already open. It must activate that same
         # GTK application and exit rather than displaying another capsule.
-        from linux_legacy_handoff import redirect_launchers
+        from codex_model_router.platforms.linux_legacy_handoff import redirect_launchers
         (source / 'dist').mkdir()
         old_router = '#!/bin/sh\nexport PERSONAL_CODEX_ROUTER_CONFIG=' + shlex.quote(str(source / 'config.local.json')) + '\nexport PYTHONUTF8=1\nexec /usr/bin/python3 ' + shlex.quote(str(source / 'router.py')) + ' "$@"\n'
         old_monitor = '#!/bin/sh\nexec /usr/bin/python3 ' + shlex.quote(str(source / 'monitor_linux.py')) + ' "$@"\n'

@@ -10,10 +10,14 @@ from unittest.mock import patch
 import urllib.error
 import urllib.request
 
-from updates import (UpdateManager, UpdateError, architecture, candidate, fetch_release,
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from codex_model_router.updates import (UpdateManager, UpdateError, architecture, candidate, fetch_release,
                      installer_name, valid_transport_url, version_key, SafeRedirect,
                      MAX_PACKAGE, LATEST, REPOSITORY)
-from monitor_state import MonitorState
+from codex_model_router.monitor.monitor_state import MonitorState
 
 ROOT = Path(__file__).resolve().parents[1]
 BODY = b'fixture installer bytes; never executed'
@@ -88,7 +92,7 @@ class UpdateTests(unittest.TestCase):
 
     def test_http_404_is_unknown_not_up_to_date_and_raw_errors_never_projected(self):
         error=urllib.error.HTTPError(LATEST, 404, 'PRIVATE_RESPONSE', {}, None)
-        with patch('updates.open_url', side_effect=error):
+        with patch('codex_model_router.updates.open_url', side_effect=error):
             with self.assertRaises(UpdateError) as caught: fetch_release()
         self.assertEqual(caught.exception.code, 'release_unavailable')
         with tempfile.TemporaryDirectory() as folder:

@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     if sys.platform != 'darwin':
         raise SystemExit('macOS AppKit/WebKit required')
-    declarations = (ROOT / 'MonitorMac.swift').read_text().split('// Native lifecycle', 1)[0]
+    declarations = (ROOT / 'native/macos/MonitorMac.swift').read_text().split('// Native lifecycle', 1)[0]
     harness = (ROOT / 'tests/mac_first_click.swift').read_text()
     with tempfile.TemporaryDirectory(prefix='router-native-click-') as folder:
         source = Path(folder) / 'main.swift'

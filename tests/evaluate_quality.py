@@ -5,8 +5,9 @@ import json
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from state_store import read_records
-from outcome_evaluation import evaluate_checks
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.storage.state_store import read_records
+from codex_model_router.evaluation.outcome_evaluation import evaluate_checks
 
 
 def evaluate(records):

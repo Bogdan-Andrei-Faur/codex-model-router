@@ -5,8 +5,9 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from companion_activity import CompanionActivity, ITEMS
-from router import Router
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.bridge.companion_activity import CompanionActivity, ITEMS
+from codex_model_router.bridge.router import Router
 
 
 class ActivityTests(unittest.TestCase):

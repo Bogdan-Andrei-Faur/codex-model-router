@@ -37,7 +37,7 @@ def main():
                        check=True, env=dict(os.environ, DEBIAN_FRONTEND='noninteractive'), timeout=600)
 
     def inline(code):
-        return run(['/usr/bin/python3', '-I', '-c', 'import sys; sys.path.insert(0,' + repr(str(resources)) + '); ' + code])
+        return run(['/usr/bin/python3', '-I', '-c', 'import sys; sys.path.insert(0,' + repr(str(resources / "src")) + '); ' + code])
 
     apt('install', str(old))
     installed = subprocess.check_output(['dpkg-query', '-W', '-f=${Version}', 'codex-model-router'], text=True)
@@ -48,8 +48,8 @@ def main():
     inline('import gi; gi.require_version("Gtk","3.0"); gi.require_version("WebKit2","4.1"); '
            'gi.require_version("Secret","1"); gi.require_foreign("cairo"); from gi.repository import Gtk,WebKit2,Secret')
     # Migrate synthetic offline data using the exact installed code, never keys.
-    inline('from pathlib import Path; import json; from state_store import atomic_json; '
-           'from linux_onboarding import import_installation; '
+    inline('from pathlib import Path; import json; from codex_model_router.storage.state_store import atomic_json; '
+           'from codex_model_router.platforms.linux_onboarding import import_installation; '
            'source=Path.home()/"old checkout"; '
            'atomic_json(source/"config.local.json", {"platform":"linux","enabled":False,"installation_mode":"auto","updates_auto_check":False,"owner_preference":"keep"}); '
            '(source/"state").mkdir(); (source/"state/history.jsonl").write_text("{\\"fixture\\":true}\\n"); '
@@ -66,7 +66,7 @@ def main():
                           ('resources/codex', '#!/bin/sh\nprintf "codex-cli fixture\\n"\n')]:
         path = fixture_app / name; path.write_text(content); path.chmod(0o755)
     assert run(['/usr/lib/codex-model-router/bin/codex-router', '--version']).startswith('codex-cli fixture')
-    inline('from linux_desktop import fallback_launcher; from pathlib import Path; '
+    inline('from codex_model_router.platforms.linux_desktop import fallback_launcher; from pathlib import Path; '
            'fallback_launcher(Path(' + repr(str(data)) + '),Path("/usr/lib/codex-model-router/bin/codex-desktop"))')
     apt('install', str(new))
     upgraded = subprocess.check_output(['dpkg-query', '-W', '-f=${Version}', 'codex-model-router'], text=True)

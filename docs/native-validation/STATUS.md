@@ -5,16 +5,20 @@ This ledger is repository-owned; no external knowledge/memory service is needed.
 
 ## Current dynamic notch — 2026-10-08
 
-The notch is integrated into `main`; published runtime is `9bddadc`, product baseline `0.9.6`.
+The notch is integrated into `main`; last verified publication is `5b050fc`, product baseline `0.9.6`.
+The owner authorized direct-main publication of the source layout below; use
+local HEAD and remote `main` for its delivery revision. Source publication does
+not replace earlier installed/loaded artifacts. Rows describe their receipt times.
 The current implementation is in [NOTCH-MONITOR.md](../NOTCH-MONITOR.md);
 [HANDOFF.md](../HANDOFF.md) contains continuation steps and
 [NOTCH-CHANGELOG.md](../NOTCH-CHANGELOG.md) preserves all iteration notes.
 
 | Gate | Current evidence | Remaining boundary |
 | --- | --- | --- |
+| Source organization | Source `37359ff46664c768` / router `5aa7726ffeba863f`;544 Python (53 skips),33 JS,14 browser groups, isolated Mac package smoke and C#5 WPF cross-compilation PASS; [receipt](2026-10-08-source-layout.md) | Active installation unchanged; Windows native installer/runtime and Ubuntu real package lifecycle/GTK acceptance remain separate. Current CI result not asserted |
 | Observed activity/animations | Mac monitor `4891f87b980d518e`;538 Python (53 skips),33 JS,14 browser groups and isolated18-pose WebKit fixture PASS; [receipt](2026-10-08-macos-companion-activity.md) | Expected router `281078dcf3e49517`; Desktop still loads `80e86c3d7accf253`. Owner restart and real event/physical acceptance pending; Windows/Linux native separate |
 | Consumption/Settings alignment | Local Mac monitor `ca01f55f5cdab9d4`, source/assets match; thirteen browser groups PASS, settings drafts/actions/read-only states verified; [receipt](2026-10-08-macos-consumption-settings.md) | Current isolated Mac glass fixture fails on initial bounds delivery, also with prior UI; cause unresolved. Physical Mac and Windows/Linux native acceptance separate |
-| Per-agent editor | Local Mac monitor `a0a5ea7bcfe28228`; shared persistence/browser tests and native isolated save/acknowledgement PASS; [receipt](2026-10-08-macos-agent-editor.md) | Physical owner acceptance and Windows/Linux native editor checks pending; richer activity reducer not implemented |
+| Per-agent editor | Local Mac monitor `a0a5ea7bcfe28228`; shared persistence/browser tests and native isolated save/acknowledgement PASS; [receipt](2026-10-08-macos-agent-editor.md) | Physical owner acceptance and Windows/Linux native editor checks pending; richer activity reducer implemented, real delivery pending |
 | macOS camera/top-edge integration | Camera iteration monitor `6d5ce16a097573ca` (superseded by editor build), actual window Y=0/level25; eleven browser groups and native fixtures PASS; [receipt](2026-10-08-macos-camera-integration.md) | Physical camera/menu appearance and real external-display transition pending |
 | Shared/offline source checks | 518 Python tests, 37 optional/platform skips; 31 JS core tests; all 10 browser groups; routing 27/27 and six offline JEV cases PASS | Skips are not optional Docker/native execution proof |
 | Ubuntu installed pilot | `0.9.6-1~notch43`, monitor `2e0a5284b2aa9c8e`, connected router `2fec36051e3ccedb`; last readback PASS | Physical owner input/display/sleep/scaling acceptance remains open |

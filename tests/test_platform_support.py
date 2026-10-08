@@ -11,11 +11,12 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import macos
-import decision_engines
-import desktop
-from desktop_runtime import Installation
-from platform_support import backend_path, uses_stdio, with_loopback_telemetry, with_server_overrides
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+import codex_model_router.platforms.macos as macos
+import codex_model_router.routing.decision_engines as decision_engines
+import codex_model_router.platforms.desktop as desktop
+from codex_model_router.platforms.desktop_runtime import Installation
+from codex_model_router.platforms.platform_support import backend_path, uses_stdio, with_loopback_telemetry, with_server_overrides
 
 ROOT = Path(__file__).resolve().parents[1]
 

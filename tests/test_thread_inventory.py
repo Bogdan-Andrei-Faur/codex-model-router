@@ -6,8 +6,9 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from thread_inventory import ThreadInventory
-from router import Router
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.storage.thread_inventory import ThreadInventory
+from codex_model_router.bridge.router import Router
 
 
 class ThreadInventoryTests(unittest.TestCase):

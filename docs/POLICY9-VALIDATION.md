@@ -51,9 +51,9 @@ escalada gradual. Manual y las órdenes explícitas prevalecen.
 ## Modos reversibles
 
 ```sh
-python3 policy_control.py status
-python3 policy_control.py compare
-python3 policy_control.py reference
+python3 run.py policy status
+python3 run.py policy compare
+python3 run.py policy reference
 ```
 
 `compare` conserva las rutas y llamadas JEV de referencia. La llamada adicional
@@ -94,10 +94,10 @@ sus resultados con `evidence.py record-check`. Liga cada decisión terminal a
 un intento inmutable, incluyendo los fallidos:
 
 ```sh
-python3 evidence.py record-attempt --decision-id DECISION \
+python3 run.py evidence record-attempt --decision-id DECISION \
   --evaluation-id evaluacion-01 --workload-id tarea-01 --run-id pareja-01 \
   --arm candidate --attempt 1 --origin real --split held_out --check tests
-python3 evidence.py evaluate-trials --state state
+python3 run.py evidence evaluate-trials --state state
 ```
 
 Los índices deben ser consecutivos y los criterios iguales. El evaluador usa la

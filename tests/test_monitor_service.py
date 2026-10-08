@@ -10,9 +10,13 @@ import time
 import unittest
 from unittest.mock import patch
 
-from monitor_service import dispatch, serve, MAX_REQUEST
-from monitor_state import MonitorState, TELEMETRY_COUNTERS
-from state_store import atomic_json
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from codex_model_router.monitor.monitor_service import dispatch, serve, MAX_REQUEST
+from codex_model_router.monitor.monitor_state import MonitorState, TELEMETRY_COUNTERS
+from codex_model_router.storage.state_store import atomic_json
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -41,11 +45,11 @@ class MonitorServiceTests(unittest.TestCase):
             try:
                 for code,expected in cases:
                     result=subprocess.CompletedProcess([],1,b'',json.dumps({'code':code,'error':'PRIVATE_SENTINEL'}).encode())
-                    with self.subTest(code=code), patch('monitor_state.subprocess.run',return_value=result):
+                    with self.subTest(code=code), patch('codex_model_router.monitor.monitor_state.subprocess.run',return_value=result):
                         feedback=model.action({'action':'connection','value':'install'})
                     self.assertIn(expected,feedback);self.assertNotIn('PRIVATE_SENTINEL',feedback)
                 for stderr in (b'PRIVATE_SENTINEL',b'[]',b'{"code":[],"error":"PRIVATE_SENTINEL"}',b'{"code":"unknown","error":"PRIVATE_SENTINEL"}'):
-                    with patch('monitor_state.subprocess.run',return_value=subprocess.CompletedProcess([],1,b'[]',stderr)):
+                    with patch('codex_model_router.monitor.monitor_state.subprocess.run',return_value=subprocess.CompletedProcess([],1,b'[]',stderr)):
                         feedback=model.action({'action':'connection','value':'install'})
                     self.assertEqual(feedback,'No se pudo completar la conexión. Tus tareas siguen abiertas.')
             finally:model.close()

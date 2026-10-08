@@ -208,7 +208,7 @@ success and HTTP status. Those metrics are now allowlisted; the raw batch is not
 
 ### Implemented bridge integration (macOS, 2026-09-25)
 
-`phase_control.py` registers `router_phase_checkpoint` on new durable
+`src/codex_model_router/bridge/phase_control.py` registers `router_phase_checkpoint` on new durable
 `thread/start` requests when `phase_routing: true` was present at bridge startup
 and the client negotiated the experimental API. Existing dynamic tools and
 instructions are preserved. Internal ephemeral roots, forks, existing tasks

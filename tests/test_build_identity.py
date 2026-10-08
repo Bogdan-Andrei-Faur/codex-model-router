@@ -6,7 +6,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from build_identity import identity, router_identity
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.build_identity import identity, router_identity
 
 
 class BuildIdentityTests(unittest.TestCase):
@@ -14,20 +15,24 @@ class BuildIdentityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             (root / 'VERSION').write_text('0.3.1')
-            (root / 'routing.py').write_text('policy = 1')
+            (root / 'src/codex_model_router/routing').mkdir(parents=True)
+            (root / 'src/codex_model_router/routing/routing.py').write_text('policy = 1')
             (root / 'monitor-ui').mkdir()
             before, backend = identity(root), router_identity(root)
-            for name in ('MonitorMac.swift', 'MonitorWpf.cs', 'MonitorWindows.cs', 'monitor_state.py', 'monitor_service.py', 'monitor_linux.py', 'updates.py', 'monitor-ui/monitor.js', 'monitor-ui/monitor.css'):
+            for name in ('native/macos/MonitorMac.swift', 'native/windows/MonitorWpf.cs', 'native/windows/MonitorWindows.cs', 'src/codex_model_router/monitor/monitor_state.py', 'src/codex_model_router/monitor/monitor_service.py', 'src/codex_model_router/monitor/monitor_linux.py', 'src/codex_model_router/updates.py', 'monitor-ui/monitor.js', 'monitor-ui/monitor.css'):
+                (root / name).parent.mkdir(parents=True, exist_ok=True)
                 (root / name).write_text('changed')
                 self.assertNotEqual(identity(root), before)
                 self.assertEqual(router_identity(root), backend)
-            (root / 'routing.py').write_text('policy = 2')
+            (root / 'src/codex_model_router/routing/routing.py').write_text('policy = 2')
             self.assertNotEqual(router_identity(root), backend)
             backend = router_identity(root)
-            (root / 'BridgeMac.swift').write_text('native bridge changed')
+            (root / 'native/macos').mkdir(parents=True, exist_ok=True)
+            (root / 'native/macos/BridgeMac.swift').write_text('native bridge changed')
             self.assertNotEqual(router_identity(root), backend)
             backend = router_identity(root)
-            for name in ('Launcher.cs', 'InstalledLauncher.cs', 'WindowsLayout.cs'):
+            for name in ('native/windows/Launcher.cs', 'native/windows/InstalledLauncher.cs', 'native/windows/WindowsLayout.cs'):
+                (root/name).parent.mkdir(parents=True, exist_ok=True)
                 (root/name).write_text('native Windows bridge changed')
                 self.assertNotEqual(router_identity(root),backend)
                 backend=router_identity(root)

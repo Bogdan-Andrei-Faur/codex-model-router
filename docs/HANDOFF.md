@@ -9,6 +9,20 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 
 ## Current source and delivery
 
+- The owner authorized direct-main publication of source reorganization on top
+  of `5b050fc`. It groups Python responsibilities
+  under `src/codex_model_router/`, native hosts under `native/` and builders under
+  `tools/packaging/`. Qualified imports, snapshot/frozen/Ubuntu resource paths,
+  CI commands and current guides are adapted. Six root compatibility launchers
+  and the `build.ps1` forwarding shim preserve source-backed shortcut paths.
+  See [SOURCE-LAYOUT.md](SOURCE-LAYOUT.md) and
+  [the local validation receipt](native-validation/2026-10-08-source-layout.md).
+  Use local HEAD and remote `main` for the delivery revision. The validation
+  receipt records the earlier uncommitted candidate, not the later publication.
+  No installation replacement or Desktop restart accompanies source publication.
+  Earlier installed identities below remain historical; they are not acceptance
+  of these new source identities. New CI is not awaited or asserted successful.
+
 - The owner authorized direct publication to `main` of the accumulated camera,
   companion editor/wardrobe, Consumption/Settings and observed-activity changes.
   Use `git rev-parse HEAD` and the remote `main` reference for the delivery revision.
@@ -92,7 +106,7 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
   plans use observed lifecycle fields. Generic plan labels replace free text.
   Native-plan completion is not independent result validation and the visual
   pipeline does not switch models. Routing policy and attribution rules are
-  unchanged. `router.py`, `thread_inventory.py` and `phase_tracking.py` add monitor
+  unchanged. `router.py`, `src/codex_model_router/storage/thread_inventory.py` and `src/codex_model_router/bridge/phase_tracking.py` add monitor
   catalog/plan projection, so an older loaded bridge needs its next owner-controlled
   Desktop restart to expose those additions.
 - History uses incremental `HistoryProjection` snapshots, detached live overlays,
@@ -254,14 +268,14 @@ la aceptación física de la instalación del propietario.
 
 | Área | Implementado | Límite de aceptación |
 | --- | --- | --- |
-| UI común | `monitor-ui/`, `monitor_state.py`, `monitor_service.py`; Agentes/Historial/Consumo/Ajustes, isla dinámica, personajes, barras, Lucide y carga incremental | Los tres hosts comparten interfaz; cada integración nativa requiere su propio QA |
-| Hosts | `MonitorMac.swift`, `MonitorWindows.cs`, `monitor_linux.py` | Windows activo usa WebView2/WPF; los C# anteriores quedan preservados fuera del build |
+| UI común | `monitor-ui/`, `src/codex_model_router/monitor/monitor_state.py`, `monitor_service.py`; Agentes/Historial/Consumo/Ajustes, isla dinámica, personajes, barras, Lucide y carga incremental | Los tres hosts comparten interfaz; cada integración nativa requiere su propio QA |
+| Hosts | `native/macos/MonitorMac.swift`, `native/windows/MonitorWindows.cs`, `monitor_linux.py` | Windows activo usa WebView2/WPF; los C# anteriores quedan preservados fuera del build |
 | Routing | Referencia 8 y candidata 9 separadas; Manual y peticiones explícitas prevalecen | Comparaciones y fixtures no autorizan activar categorías ni prueban ahorro causal |
-| Evidencia | `evidence.py`, `inference_attribution.py`, evaluadores y contadores estrictos | ACK/`applied` no prueba inferencia posterior; coste estimado no es facturación |
-| Actualizaciones | `updates.py`: comprobación asíncrona, descarga exacta OS/arquitectura, integridad SHA-256 y cancelación | Solo preparación: `canInstall=false`; no ejecuta instaladores ni demuestra autenticidad del editor |
-| Mac portátil | `package_macos.py`, `packaged_main.py`, `BridgeMac.swift`, `application_layout.py` | `.pkg` local ad-hoc con runtime; no Installer/Gatekeeper en máquina limpia, firma de editor ni notarización |
-| Windows instalado | `build_windows_installer.py`, `installer/windows.iss`, entrada estable y versiones independientes | Piloto 0.9.6 sin firma instalado; registro, puente instalado 0.9.6 y telemetría activos tras reinicio del propietario. VM limpia validada en 0.9.4 |
-| Migración | `installation_migration.py`: copia offline; bienvenida gráfica Ubuntu/Windows y traspaso separado de conexión | GUI Mac pendiente; no migra claves entre usuarios/sistemas |
+| Evidencia | `src/codex_model_router/telemetry/evidence.py`, `src/codex_model_router/telemetry/inference_attribution.py`, evaluadores y contadores estrictos | ACK/`applied` no prueba inferencia posterior; coste estimado no es facturación |
+| Actualizaciones | `src/codex_model_router/updates.py`: comprobación asíncrona, descarga exacta OS/arquitectura, integridad SHA-256 y cancelación | Solo preparación: `canInstall=false`; no ejecuta instaladores ni demuestra autenticidad del editor |
+| Mac portátil | `tools/packaging/package_macos.py`, `src/codex_model_router/packaged_main.py`, `native/macos/BridgeMac.swift`, `src/codex_model_router/platforms/application_layout.py` | `.pkg` local ad-hoc con runtime; no Installer/Gatekeeper en máquina limpia, firma de editor ni notarización |
+| Windows instalado | `tools/packaging/build_windows_installer.py`, `installer/windows.iss`, entrada estable y versiones independientes | Piloto 0.9.6 sin firma instalado; registro, puente instalado 0.9.6 y telemetría activos tras reinicio del propietario. VM limpia validada en 0.9.4 |
+| Migración | `src/codex_model_router/platforms/installation_migration.py`: copia offline; bienvenida gráfica Ubuntu/Windows y traspaso separado de conexión | GUI Mac pendiente; no migra claves entre usuarios/sistemas |
 
 Detalles: [monitor compartido](SHARED-MONITOR.md), [diseño](MONITOR-UI.md),
 [instalación/actualizaciones](INSTALLATION-UPDATES.md),
@@ -370,8 +384,8 @@ aislado nuevo (ruta ilustrativa; no reutilizar uno desconocido):
 
 ```sh
 python3 -m venv state/handoff-build-venv
-state/handoff-build-venv/bin/python -m pip install -r requirements-build.txt
-python3 package_macos.py --python state/handoff-build-venv/bin/python --output release
+state/handoff-build-venv/bin/python -m pip install -r tools/packaging/requirements-build.txt
+python3 tools/packaging/package_macos.py --python state/handoff-build-venv/bin/python --output release
 ```
 
 El constructor requiere PyInstaller **6.22.3**, crea un directorio de salida nuevo

@@ -1,6 +1,6 @@
 # Observed companion activity
 
-Implementation: `companion_activity.py` observes the existing native bridge;
+Implementation: `src/codex_model_router/bridge/companion_activity.py` observes the existing native bridge;
 `monitor-ui/core.js` projects labels and `monitor.js`/`monitor.css` render poses.
 The [App Server reference](https://learn.chatgpt.com/docs/app-server) and installed
 CLI schema supply the event vocabulary. Actual Desktop delivery is a separate gate.

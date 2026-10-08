@@ -8,10 +8,11 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from routing import DEFAULT_ROUTES, EFFORTS, select_route_details
-from decision_engines import candidate_routes
-from model_catalog import CODEX_RATES
-from build_identity import POLICY_VERSION
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.routing.routing import DEFAULT_ROUTES, EFFORTS, select_route_details
+from codex_model_router.routing.decision_engines import candidate_routes
+from codex_model_router.routing.model_catalog import CODEX_RATES
+from codex_model_router.build_identity import POLICY_VERSION
 
 
 CASES = (

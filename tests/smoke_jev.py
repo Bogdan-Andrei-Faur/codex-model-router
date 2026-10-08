@@ -11,10 +11,11 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 
-from decision_engines import build_state, candidate_routes, run_jev
-from model_catalog import migrate_config, available_routes
-from routing import DEFAULT_ROUTES, EFFORTS, select_route_details
+from codex_model_router.routing.decision_engines import build_state, candidate_routes, run_jev
+from codex_model_router.routing.model_catalog import migrate_config, available_routes
+from codex_model_router.routing.routing import DEFAULT_ROUTES, EFFORTS, select_route_details
 
 
 CASES = (

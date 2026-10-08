@@ -9,7 +9,7 @@ credentials, settings, task modes and private telemetry.
 
 ## Current implementation boundary
 
-`updates.py` provides shared asynchronous stable-release discovery and download
+`src/codex_model_router/updates.py` provides shared asynchronous stable-release discovery and download
 staging. Settings exposes installed/latest version, explicit checks, opt-in daily
 checks, progress and cancellation. All three native hosts forward the same actions
 through the shared monitor model. Preview cannot start updates.
@@ -40,15 +40,15 @@ Staging currently uses the existing data root's `state/updates` directory.
 
 ## Portable macOS package implemented — 2026-10-04
 
-`application_layout.py` separates immutable resources from per-user data while
+`src/codex_model_router/platforms/application_layout.py` separates immutable resources from per-user data while
 preserving legacy checkout mode. Packaged Mac defaults to
 `~/Library/Application Support/codex-model-router`; Windows/Linux user-data paths
 are defined and tested. Ubuntu packaging is described below; Windows setup is
 implemented in the 0.9.0 local pilot below. Existing configuration is never replaced by bootstrap. Packaged identity
 comes from the embedded build stamp, not a VERSION file in the data directory.
 
-`package_macos.py` builds a fresh local `.pkg` with an AppKit/WebKit host, native
-`BridgeMac.swift` launcher and console-capable nested runtime bundle produced by
+`tools/packaging/package_macos.py` builds a fresh local `.pkg` with an AppKit/WebKit host, native
+`native/macos/BridgeMac.swift` launcher and console-capable nested runtime bundle produced by
 pinned PyInstaller6.22.3. The nested bundle keeps macOS code/framework/resource
 layout and private JSONL stdin/stdout intact. Only source code and selected public
 assets enter packaging; repository state, local config, prompts and keys do not.
@@ -64,7 +64,7 @@ utilities available. No provider inference, integration registration or system
 installer execution was performed. Repeated bootstrap preserved fixture settings.
 This is artifact/runtime acceptance, not clean-machine Installer/Gatekeeper QA.
 
-`installation_migration.py` imports known product data into a new, independent
+`src/codex_model_router/platforms/installation_migration.py` imports known product data into a new, independent
 root: configuration, history/prompts, task modes/workloads, monitor preferences
 and opaque credential metadata/blobs. Original data files remain unchanged;
 coordination lock files may be created. Active bridge snapshots, occupied targets,
@@ -86,7 +86,7 @@ purchase or public release was created.
 
 ## Ubuntu native package implemented — 2026-10-05
 
-`build_linux_package.py` creates a `.deb` with the shared Python engine, monitor
+`tools/packaging/build_linux_package.py` creates a `.deb` with the shared Python engine, monitor
 assets and `linux-deb-v1` manifest. Runtime dependencies are installed by APT;
 there is no development interpreter, virtualenv, checkout or pip requirement.
 The application lives in `/usr/lib/codex-model-router`, with independent XDG user

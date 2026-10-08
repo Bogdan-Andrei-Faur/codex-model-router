@@ -11,6 +11,10 @@ enrutamiento, privacidad, pruebas y recibos. La interfaz actual y sus contratos
 están descritos en [Monitor](docs/MONITOR-UI.md) y
 [la isla dinámica](docs/NOTCH-MONITOR.md).
 
+El código está organizado por responsabilidades en `src/codex_model_router/`,
+los hosts en `native/` y los instaladores en `tools/packaging/`.
+Consulta [la estructura y los puntos de entrada](docs/SOURCE-LAYOUT.md).
+
 Para validar un Mac, Windows o Ubuntu real, sigue el
 [procedimiento autosuficiente](docs/NATIVE-VALIDATION.md), consulta el
 [estado por equipo](docs/native-validation/STATUS.md) y registra la evidencia con
@@ -73,7 +77,7 @@ Estado y límites: [INSTALLATION-UPDATES.md](docs/INSTALLATION-UPDATES.md).
 
 ### Evidencia comparable y evaluación
 
-`python3 evidence.py export --source state --output muestra.zip --platform macos`
+`python3 run.py evidence export --source state --output muestra.zip --platform macos`
 genera el formato común `router-evidence/2`. En Ubuntu/Windows usa `--platform
 ubuntu` o `--platform windows`; `--source` también admite los ZIP históricos y
 `--version 0.8.1` limita la muestra. El destino debe ser nuevo. Exporta metadatos
@@ -92,7 +96,7 @@ y los cambios de modelo se contabilizan por separado de la inferencia posterior.
 Para registrar el resultado de una comprobación **ya ejecutada**:
 
 ```sh
-python3 evidence.py record-check --decision-id ID_DE_LA_DECISION \
+python3 run.py evidence record-check --decision-id ID_DE_LA_DECISION \
   --evaluation-id comparacion-01 --workload-id fixture-01 --check-id tests \
   --arm candidate --result passed --origin synthetic
 ```

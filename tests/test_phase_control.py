@@ -6,12 +6,13 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from phase_control import TOOL, SPEC
-from routing import EFFORTS
-from model_catalog import LEGACY_ROUTES as DEFAULT_ROUTES
-from router import Router
-from task_modes import mode_path
-from state_store import atomic_json
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.bridge.phase_control import TOOL, SPEC
+from codex_model_router.routing.routing import EFFORTS
+from codex_model_router.routing.model_catalog import LEGACY_ROUTES as DEFAULT_ROUTES
+from codex_model_router.bridge.router import Router
+from codex_model_router.routing.task_modes import mode_path
+from codex_model_router.storage.state_store import atomic_json
 
 
 def wire(value):
@@ -20,7 +21,7 @@ def wire(value):
 
 class PhaseControlTests(unittest.TestCase):
     def test_current_luna_escalation_stops_at_native_boundary_without_sending_update(self):
-        from model_catalog import DEFAULT_ROUTES as CURRENT_ROUTES, MODELS
+        from codex_model_router.routing.model_catalog import DEFAULT_ROUTES as CURRENT_ROUTES, MODELS
         self.settings['routes'] = copy.deepcopy(CURRENT_ROUTES)
         self.config.write_text(json.dumps(self.settings))
         self.router.catalog = {model: set(EFFORTS) for model in MODELS}
@@ -33,7 +34,7 @@ class PhaseControlTests(unittest.TestCase):
         self.assertEqual(self.router.threads['t']['accepted_model'], 'gpt-6-luna')
 
     def test_current_sol_can_change_reasoning_without_changing_model(self):
-        from model_catalog import DEFAULT_ROUTES as CURRENT_ROUTES, MODELS
+        from codex_model_router.routing.model_catalog import DEFAULT_ROUTES as CURRENT_ROUTES, MODELS
         self.settings['routes'] = copy.deepcopy(CURRENT_ROUTES)
         self.config.write_text(json.dumps(self.settings))
         self.router.catalog = {model: set(EFFORTS) for model in MODELS}

@@ -7,10 +7,11 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from usage_state import AccountUsage, context_window, update_context_compaction
-from router import Router
-from monitor_state import MonitorState
-from routing import DEFAULT_ROUTES
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.telemetry.usage_state import AccountUsage, context_window, update_context_compaction
+from codex_model_router.bridge.router import Router
+from codex_model_router.monitor.monitor_state import MonitorState
+from codex_model_router.routing.routing import DEFAULT_ROUTES
 
 
 def bucket(used=24, duration=10080, reset=500):
@@ -116,9 +117,9 @@ class UsageStateTests(unittest.TestCase):
                 data = {'pid': os.getpid(), 'heartbeat': 100, 'threads': {},
                         'account_usage': {'updated': updated, 'remaining_percent': updated}}
                 (root / 'state' / ('status-%s.json' % index)).write_text(json.dumps(data))
-            with patch('monitor_state.time.time', return_value=100):
+            with patch('codex_model_router.monitor.monitor_state.time.time', return_value=100):
                 self.assertEqual(MonitorState(root).payload()['accountUsage']['remaining_percent'], 30)
-            with patch('monitor_state.time.time', return_value=113):
+            with patch('codex_model_router.monitor.monitor_state.time.time', return_value=113):
                 self.assertEqual(MonitorState(root).payload()['accountUsage'], {})
 
     def test_compaction_lifecycle_is_per_agent_and_snapshot_is_visible_to_monitor(self):

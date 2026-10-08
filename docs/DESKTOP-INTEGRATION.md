@@ -63,7 +63,7 @@ la aceptación física por equipo siguen siendo comprobaciones separadas.
 
 El ZIP portátil de Windows se conserva como alternativa:
 
-`python package_windows.py` produce un ZIP con lanzador, monitor y runtimes
+`python tools/packaging/package_windows.py` produce un ZIP con lanzador, monitor y runtimes
 congelados. Extrae el ZIP en una ubicación permanente y ejecuta
 `dist\\codex-router.exe --install-integration`. No incluye Python, tu historial,
 claves ni Desktop; descubre el paquete instalado de Desktop al iniciar. Es un

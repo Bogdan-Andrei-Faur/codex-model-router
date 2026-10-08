@@ -5,7 +5,8 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from recover_history import recover, recover_records
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.storage.recover_history import recover, recover_records
 
 
 class RecoveryTests(unittest.TestCase):

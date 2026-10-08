@@ -69,7 +69,7 @@ jobs:
           if-no-files-found: warn
       - name: Compile macOS native monitor
         if: runner.os == 'macOS'
-        run: xcrun swiftc MonitorMac.swift -o "$RUNNER_TEMP/codex-monitor-mac" -framework AppKit -framework WebKit -framework Security -target "$(uname -m)-apple-macosx12.0"
+        run: xcrun swiftc native/macos/MonitorMac.swift -o "$RUNNER_TEMP/codex-monitor-mac" -framework AppKit -framework WebKit -framework Security -target "$(uname -m)-apple-macosx12.0"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -84,7 +84,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1 gir1.2-secret-1 gir1.2-ayatanaappindicator3-0.1 desktop-file-utils xvfb dbus-x11
-          /usr/bin/python3 build_linux_package.py --output release/linux-ui
+          /usr/bin/python3 tools/packaging/build_linux_package.py --output release/linux-ui
           xvfb-run -a dbus-run-session -- /usr/bin/python3 tests/smoke_package_linux.py release/linux-ui/*.deb
   deb-lifecycle:
     strategy:
@@ -101,8 +101,8 @@ jobs:
           apt-get install -y --no-install-recommends python3 desktop-file-utils
       - name: Build initial and upgrade packages
         run: |
-          python3 build_linux_package.py --output release/deb-v1 --revision 1
-          python3 build_linux_package.py --output release/deb-v2 --revision 2
+          python3 tools/packaging/build_linux_package.py --output release/deb-v1 --revision 1
+          python3 tools/packaging/build_linux_package.py --output release/deb-v2 --revision 2
       - name: Validate install, import, upgrade, remove, purge and reinstall
         run: python3 tests/smoke_deb_lifecycle.py release/deb-v1/*.deb release/deb-v2/*.deb
   windows-installer:
@@ -116,7 +116,7 @@ jobs:
         shell: pwsh
         run: |
           python -m venv state/windows-installer-venv
-          state/windows-installer-venv/Scripts/python.exe -m pip install -r requirements-build-windows.txt
+          state/windows-installer-venv/Scripts/python.exe -m pip install -r tools/packaging/requirements-windows.txt
           python tools/prepare_windows_installer.py
       - name: Build initial and upgrade fixtures
         shell: pwsh
@@ -126,10 +126,10 @@ jobs:
           $original = Get-Content VERSION -Raw
           try {
             [IO.File]::WriteAllText((Join-Path $PWD 'VERSION'), "9.9.0`n")
-            & $python build_windows_installer.py --python $python --compiler $tools.compiler --webview2-bootstrapper $tools.webview2Bootstrapper --output release/initial
+            & $python tools/packaging/build_windows_installer.py --python $python --compiler $tools.compiler --webview2-bootstrapper $tools.webview2Bootstrapper --output release/initial
             if ($LASTEXITCODE -ne 0) { throw 'Initial fixture build failed' }
             [IO.File]::WriteAllText((Join-Path $PWD 'VERSION'), "9.9.1`n")
-            & $python build_windows_installer.py --python $python --compiler $tools.compiler --webview2-bootstrapper $tools.webview2Bootstrapper --output release/latest
+            & $python tools/packaging/build_windows_installer.py --python $python --compiler $tools.compiler --webview2-bootstrapper $tools.webview2Bootstrapper --output release/latest
             if ($LASTEXITCODE -ne 0) { throw 'Upgrade fixture build failed' }
           } finally { [IO.File]::WriteAllText((Join-Path $PWD 'VERSION'), $original) }
       - name: Validate frozen native payload and isolated installer lifecycle

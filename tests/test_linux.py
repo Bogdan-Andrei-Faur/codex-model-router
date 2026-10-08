@@ -11,11 +11,12 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-import desktop_runtime
-import linux_desktop
-import linux_secret
-from monitor_state import MonitorState, TELEMETRY_COUNTERS
-from state_store import atomic_json
+sys.path.insert(0, str(ROOT / "src"))
+import codex_model_router.platforms.desktop_runtime as desktop_runtime
+import codex_model_router.platforms.linux_desktop as linux_desktop
+import codex_model_router.platforms.linux_secret as linux_secret
+from codex_model_router.monitor.monitor_state import MonitorState, TELEMETRY_COUNTERS
+from codex_model_router.storage.state_store import atomic_json
 
 
 @unittest.skipUnless(sys.platform == 'linux', 'Linux filesystem and executable semantics')
@@ -104,7 +105,7 @@ class LinuxIntegrationTests(unittest.TestCase):
                 self.assertIsNone(linux_desktop.registration(root))
 
     def test_argument_forwarding_without_shell_expansion(self):
-        import linux
+        import codex_model_router.platforms.linux as linux
         with patch.object(linux, 'open_monitor'), patch.object(linux.os, 'execvpe') as execute:
             command = ['/custom/mcp launcher', 'a b', '$(touch /tmp/no)', 'https://example.com/?a=1&b=2']
             linux.launch_native(command)
@@ -119,8 +120,8 @@ class LinuxMonitorContractTests(unittest.TestCase):
 
     def test_policy_matches_router_migration_without_rewriting_config(self):
         from copy import deepcopy
-        from model_catalog import LEGACY_ROUTES, DEFAULT_ROUTES
-        from router import read_config
+        from codex_model_router.routing.model_catalog import LEGACY_ROUTES, DEFAULT_ROUTES
+        from codex_model_router.bridge.router import read_config
         custom = deepcopy(LEGACY_ROUTES)
         custom['normal']['effort'] = 'high'
         cases = [({'routes': LEGACY_ROUTES}, DEFAULT_ROUTES),
@@ -183,7 +184,7 @@ class LinuxMonitorContractTests(unittest.TestCase):
             with self.assertRaises(ValueError): model.quality('d', 'overall', '')
 
     def test_all_public_telemetry_counters_are_projected(self):
-        from inference_telemetry import LocalInferenceTelemetry
+        from codex_model_router.telemetry.inference_telemetry import LocalInferenceTelemetry
         collector = LocalInferenceTelemetry(lambda _: None)
         try:
             self.assertFalse(set(collector.snapshot()) - {'enabled'} - set(TELEMETRY_COUNTERS))

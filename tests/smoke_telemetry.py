@@ -13,9 +13,10 @@ import time
 import tomllib
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from desktop_runtime import discover
-from inference_telemetry import LocalInferenceTelemetry
-from platform_support import with_loopback_telemetry
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.platforms.desktop_runtime import discover
+from codex_model_router.telemetry.inference_telemetry import LocalInferenceTelemetry
+from codex_model_router.platforms.platform_support import with_loopback_telemetry
 from smoke_native import Client
 
 

@@ -216,7 +216,7 @@ npm test
 ROUTER_TEST_BROWSER=chromium npm run test:layout
 env -u PERSONAL_CODEX_ROUTER_ROOT -u PERSONAL_CODEX_ROUTER_CODE_ROOT \
   -u PERSONAL_CODEX_ROUTER_CONFIG python3 -m unittest discover -s tests -q
-python3 build_linux_package.py --output dist/notch-review --revision 1~review1
+python3 tools/packaging/build_linux_package.py --output dist/notch-review --revision 1~review1
 env -u PERSONAL_CODEX_ROUTER_ROOT -u PERSONAL_CODEX_ROUTER_CODE_ROOT \
   -u PERSONAL_CODEX_ROUTER_CONFIG xvfb-run -a dbus-run-session -- \
   /usr/bin/python3 tests/smoke_package_linux.py \

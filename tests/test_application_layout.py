@@ -9,9 +9,13 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import application_layout as layout
-from installation_migration import import_legacy, MigrationError
-from state_store import atomic_json
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+import codex_model_router.platforms.application_layout as layout
+from codex_model_router.platforms.installation_migration import import_legacy, MigrationError
+from codex_model_router.storage.state_store import atomic_json
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -124,7 +128,7 @@ class ApplicationLayoutTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder)/'data';env=dict(os.environ)
             for key in ('PERSONAL_CODEX_ROUTER_ROOT','PERSONAL_CODEX_ROUTER_CODE_ROOT','PERSONAL_CODEX_ROUTER_CONFIG','PERSONAL_CODEX_ROUTER_STATE'):env.pop(key,None)
-            command=[sys.executable,str(ROOT/'packaged_main.py'),'--resources',str(ROOT),'--data-root',str(root),'bootstrap']
+            command=[sys.executable,str(ROOT/'tools/packaging/runtime_entry.py'),'--resources',str(ROOT),'--data-root',str(root),'bootstrap']
             first=subprocess.run(command,env=env,capture_output=True,check=True)
             second=subprocess.run(command,env=env,capture_output=True,check=True)
             self.assertTrue(json.loads(first.stdout)['createdConfig']);self.assertFalse(json.loads(second.stdout)['createdConfig'])

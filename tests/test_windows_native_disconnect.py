@@ -25,20 +25,21 @@ class NativeDisconnectTests(unittest.TestCase):
         cls.registry_parent = 'Software\\CodexRouterQA\\' + uuid.uuid4().hex
         cls.registry_key = cls.registry_parent + '\\Environment'
         source = Path(__file__).resolve().parents[1]
-        launcher = (source / 'InstalledLauncher.cs').read_text(encoding='utf-8')
+        launcher = (source / 'native/windows/InstalledLauncher.cs').read_text(encoding='utf-8')
         needle = 'Registry.CurrentUser.CreateSubKey("Environment")'
         if launcher.count(needle) != 1:
             raise RuntimeError('Native fixture registry redirection must remain explicit')
         launcher = launcher.replace(needle, 'Registry.CurrentUser.CreateSubKey(' + json.dumps(cls.registry_key) + ')')
-        (cls.root / 'InstalledLauncher.cs').write_text(launcher, encoding='utf-8')
-        shutil.copy2(source / 'WindowsLayout.cs', cls.root / 'WindowsLayout.cs')
+        (cls.root / 'native/windows').mkdir(parents=True)
+        (cls.root / 'native/windows/InstalledLauncher.cs').write_text(launcher, encoding='utf-8')
+        shutil.copy2(source / 'native/windows/WindowsLayout.cs', cls.root / 'native/windows/WindowsLayout.cs')
         binary = cls.root / 'application/bin/codex-router.exe'
         binary.parent.mkdir(parents=True)
         cls.binary = binary
         subprocess.run([str(compiler), '/nologo', '/target:exe', '/r:System.Core.dll',
                         '/r:System.Web.Extensions.dll', '/r:System.Windows.Forms.dll',
-                        '/out:' + str(binary), str(cls.root / 'InstalledLauncher.cs'),
-                        str(cls.root / 'WindowsLayout.cs')], check=True, capture_output=True,
+                        '/out:' + str(binary), str(cls.root / 'native/windows/InstalledLauncher.cs'),
+                        str(cls.root / 'native/windows/WindowsLayout.cs')], check=True, capture_output=True,
                        timeout=30, creationflags=subprocess.CREATE_NO_WINDOW)
         version='0.0.0-aaaaaaaaaaaaaaaa'
         resources=binary.parent.parent/'versions'/version/'Resources';resources.mkdir(parents=True)

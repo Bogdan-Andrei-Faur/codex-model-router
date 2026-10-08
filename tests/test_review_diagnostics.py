@@ -7,11 +7,12 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from error_diagnostics import native_error, rpc_error, ERROR_TYPES, HTTP_ERRORS
-from router import Router
-from routing import DEFAULT_ROUTES, EFFORTS, classify, select_route_details
-from decision_engines import candidate_routes
-from state_store import read_records
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.telemetry.error_diagnostics import native_error, rpc_error, ERROR_TYPES, HTTP_ERRORS
+from codex_model_router.bridge.router import Router
+from codex_model_router.routing.routing import DEFAULT_ROUTES, EFFORTS, classify, select_route_details
+from codex_model_router.routing.decision_engines import candidate_routes
+from codex_model_router.storage.state_store import read_records
 
 
 def wire(value):
@@ -198,7 +199,7 @@ class NativeLifecycleTests(unittest.TestCase):
         config = self.router.config_path
         config.write_text(json.dumps({'enabled': True, 'routes': DEFAULT_ROUTES, 'routing_engine': 'jev'}))
         for model, effort in [('gpt-6-luna', 'low'), ('gpt-6.1-sol', 'high')]:
-            with self.subTest(model=model), patch('router.run_jev', return_value={
+            with self.subTest(model=model), patch('codex_model_router.bridge.router.run_jev', return_value={
                     'engine': 'jev', 'status': 'ok', 'route': {'model': model, 'effort': effort}}):
                 self.router.pending.clear()
                 request = wire({'id': 3, 'method': 'turn/start', 'params': {'threadId': 'task',

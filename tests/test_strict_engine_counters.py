@@ -1,7 +1,11 @@
 import unittest
 
-from decision_engines import engine_usage, token_count
-import candidate_policy as cp
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from codex_model_router.routing.decision_engines import engine_usage, token_count
+import codex_model_router.routing.candidate_policy as cp
 
 
 class StrictEngineCounterTests(unittest.TestCase):

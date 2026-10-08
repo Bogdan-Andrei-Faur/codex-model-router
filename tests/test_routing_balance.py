@@ -5,12 +5,16 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from decision_engines import candidate_routes
-from routing import DEFAULT_ROUTES, EFFORTS, select_route_details
-from router import Router
-from workload import response_summary, merge_contract, effective_context, context_for_engine
-from state_store import persist_task, read_records
-from task_modes import mode_path
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from codex_model_router.routing.decision_engines import candidate_routes
+from codex_model_router.routing.routing import DEFAULT_ROUTES, EFFORTS, select_route_details
+from codex_model_router.bridge.router import Router
+from codex_model_router.routing.workload import response_summary, merge_contract, effective_context, context_for_engine
+from codex_model_router.storage.state_store import persist_task, read_records
+from codex_model_router.routing.task_modes import mode_path
 
 
 def wire(value):
@@ -106,7 +110,7 @@ class BalancedBridgeTests(unittest.TestCase):
 
     def route(self, prompt, result):
         self.router.pending.clear()
-        with patch('router.run_jev', return_value=result) as mock:
+        with patch('codex_model_router.bridge.router.run_jev', return_value=result) as mock:
             actual = json.loads(self.router.client_line(self.request(prompt)))['params']
         return actual, mock
 

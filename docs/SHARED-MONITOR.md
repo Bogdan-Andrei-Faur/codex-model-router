@@ -1,7 +1,7 @@
 # Una interfaz y un contrato de datos
 
 La decisión aprobada el 03/10/2026 concentra el producto en `monitor-ui/`
-(HTML/CSS/JS y Lucide) y en `monitor_state.py` (estado y acciones). Los tres
+(HTML/CSS/JS y Lucide) y en `src/codex_model_router/monitor/monitor_state.py` (estado y acciones). Los tres
 sistemas muestran los mismos componentes de Inicio, Agentes, Historial, Consumo,
 Ajustes y la isla dinámica descrita en [NOTCH-MONITOR.md](NOTCH-MONITOR.md). Tauri no forma parte de esta migración.
 
@@ -76,9 +76,9 @@ y modos se escriben mediante los locks/operaciones atómicas comunes.
 
 ## Windows y distribución
 
-`MonitorWindows.cs` sustituye como entrada activa al renderizador WPF anterior.
-`build.ps1` ya no compila `MonitorWpf.cs`, `MonitorAgents.cs`, `MonitorAnalytics.cs`,
-`MonitorPhases.cs`, `MonitorReviewTests.cs` ni `MonitorIcons.cs`; estos archivos
+`native/windows/MonitorWindows.cs` sustituye como entrada activa al renderizador WPF anterior.
+`build.ps1` ya no compila `native/windows/MonitorWpf.cs`, `native/windows/MonitorAgents.cs`, `native/windows/MonitorAnalytics.cs`,
+`native/windows/MonitorPhases.cs`, `native/windows/MonitorReviewTests.cs` ni `native/windows/MonitorIcons.cs`; estos archivos
 históricos se preservan porque contenían cambios locales anteriores.
 
 Requisitos: **.NET Framework 4.8** y **WebView2 Runtime Evergreen**. El SDK

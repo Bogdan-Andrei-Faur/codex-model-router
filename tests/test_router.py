@@ -8,8 +8,9 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from routing import DEFAULT_ROUTES, EFFORTS, classify, classify_agent_identity, select_route, select_route_details, summarize_response_context
-from router import Router
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.routing.routing import DEFAULT_ROUTES, EFFORTS, classify, classify_agent_identity, select_route, select_route_details, summarize_response_context
+from codex_model_router.bridge.router import Router
 
 
 def encode(value):
@@ -146,8 +147,8 @@ class RoutingPolicyTests(unittest.TestCase):
 
 class ProtocolTests(unittest.TestCase):
     def test_manual_mode_is_persistent_scoped_and_preserves_exact_request(self):
-        from task_modes import mode_path, read_mode
-        from desktop import atomic_json
+        from codex_model_router.routing.task_modes import mode_path, read_mode
+        from codex_model_router.platforms.desktop import atomic_json
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         target=mode_path(self.router.state_dir,'t')
         atomic_json(target,{'schema':1,'thread':'t','mode':'manual'})
@@ -167,7 +168,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(json.loads(restarted.client_line(raw))['params']['model'],'gpt-6-luna')
 
     def test_damaged_task_preference_cannot_reenable_routing(self):
-        from task_modes import mode_path, read_mode
+        from codex_model_router.routing.task_modes import mode_path, read_mode
         target=mode_path(self.router.state_dir,'t');target.parent.mkdir(parents=True)
         for contents in ('bad-json','[]','{"mode":"automatic","thread":"someone-else"}'):
             target.write_text(contents)
@@ -221,7 +222,7 @@ class ProtocolTests(unittest.TestCase):
             model="gpt-6-astra", reasoning_effort="high")
         self.assertEqual(json.loads(self.router.client_line(encode(original))), expected)
 
-    @patch("router.run_jev")
+    @patch("codex_model_router.bridge.router.run_jev")
     def test_jev_engine_can_select_a_valid_pair_and_keeps_telemetry_content_free(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         fake_jev.return_value = {"engine": "jev", "status": "ok", "latency_ms": 25, "confidence": .91,
@@ -232,7 +233,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(records[-1]["routing_engine"], "jev")
         self.assertNotIn("PRIVATE_JEV_SENTINEL", (Path(self.tmp.name) / "state" / "history.jsonl").read_text())
 
-    @patch("router.run_jev")
+    @patch("codex_model_router.bridge.router.run_jev")
     def test_jev_can_reduce_effort_while_continuing_complex_work(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True)
@@ -247,7 +248,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(records[0]["continuity_strategy"], "continue")
         fake_jev.assert_called_once()
 
-    @patch("router.run_jev")
+    @patch("codex_model_router.bridge.router.run_jev")
     def test_jev_continuation_does_not_override_a_lightweight_route(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True,
@@ -265,7 +266,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(records[0]["request_kind"], "acknowledgement")
         self.assertNotIn("Parece que ahora", str(records))
 
-    @patch("router.run_jev")
+    @patch("codex_model_router.bridge.router.run_jev")
     def test_jev_cannot_downgrade_ambiguity_to_luna_or_force_astra_from_title(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         self.router.threads["t"].update(name="Auditoría de seguridad", agent_category="audit")
@@ -276,7 +277,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(fake_jev.call_args.args[2]["quality_floor"], "complex")
         self.assertEqual({r['tier'] for r in fake_jev.call_args.args[3].values()}, {'complex'})
 
-    @patch("router.run_jev")
+    @patch("codex_model_router.bridge.router.run_jev")
     def test_jev_cannot_force_maximum_for_an_acknowledgement(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True)
@@ -287,7 +288,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(self.router.threads["t"]["engine_status"], "guardrail")
         self.assertEqual(self.router.threads["t"]["routing_engine"], "rules")
 
-    @patch("router.run_jev")
+    @patch("codex_model_router.bridge.router.run_jev")
     def test_jev_cannot_drop_the_capacity_of_work_it_is_asked_to_resume(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True)
@@ -298,7 +299,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6-astra", "xhigh"))
         self.assertEqual(self.router.threads["t"]["engine_status"], "guardrail")
 
-    @patch("router.run_jev")
+    @patch("codex_model_router.bridge.router.run_jev")
     def test_jev_outage_uses_lightweight_fallback_for_confirmation(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         self.router.threads["t"].update(model="gpt-6-astra", effort="max", tier="critical", seen_turn=True)
@@ -307,7 +308,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual((result["params"]["model"], result["params"]["effort"]), ("gpt-6-luna", "low"))
         self.assertEqual(self.router.threads["t"]["routing_engine"], "rules")
 
-    @patch("router.run_jev")
+    @patch("codex_model_router.bridge.router.run_jev")
     def test_response_plan_is_sent_as_metadata_for_brief_confirmation(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         self.router.threads["t"].update(model="gpt-6.1-sol", effort="medium", tier="normal", seen_turn=True,
@@ -322,7 +323,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(state["previous_response_context"]["response_kind"], "plan")
         self.assertTrue(state["previous_response_context"]["mentions_tests"])
 
-    @patch("router.run_jev")
+    @patch("codex_model_router.bridge.router.run_jev")
     def test_pending_points_prevent_jev_from_selecting_luna(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         context = summarize_response_context("Faltan varios puntos: integrar los cambios entre servicios, corregir el flujo y validar las pruebas.")
@@ -336,7 +337,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(state["previous_response_context"]["work_floor"], "complex")
         self.assertTrue(all(route["tier"] in ("complex", "critical") for route in candidates.values()))
 
-    @patch("router.run_jev")
+    @patch("codex_model_router.bridge.router.run_jev")
     def test_pending_tests_keep_floor_for_elliptical_followup_after_luna(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         context = summarize_response_context("Todavía quedan cambios por hacer y después hay que ejecutar las pruebas.")
@@ -350,7 +351,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual((state["request_kind"], state["quality_floor"]), ("planned_followup", "complex"))
         self.assertTrue(all(route["tier"] in ("complex", "critical") for route in candidates.values()))
 
-    @patch("router.run_jev")
+    @patch("codex_model_router.bridge.router.run_jev")
     def test_jev_cannot_reduce_a_research_quality_floor(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         fake_jev.return_value = {"engine": "jev", "status": "ok", "latency_ms": 25, "confidence": .91,
@@ -645,7 +646,7 @@ class ProtocolTests(unittest.TestCase):
         restarted.client_line(encode(self.request("Sí, continúa")))
         self.assertEqual(restarted.threads["t"]["agent_category"], "architecture")
 
-    @patch("router.run_jev")
+    @patch("codex_model_router.bridge.router.run_jev")
     def test_pending_work_floor_survives_restart_without_response_text(self, fake_jev):
         self.path.write_text(json.dumps({"enabled": True, "routes": DEFAULT_ROUTES, "routing_engine": "jev"}))
         self.router.server_line(encode({"method": "item/completed", "params": {"threadId": "t", "item": {

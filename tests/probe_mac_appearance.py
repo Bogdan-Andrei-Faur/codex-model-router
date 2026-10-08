@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
-    source = (ROOT/'MonitorMac.swift').read_text().rsplit('let app=NSApplication.shared', 1)[0]
+    source = (ROOT/'native/macos/MonitorMac.swift').read_text().rsplit('let app=NSApplication.shared', 1)[0]
     harness = r'''
 let app=NSApplication.shared
 app.setActivationPolicy(.accessory)

@@ -13,10 +13,11 @@ import sys
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-import candidate_policy as cp
-from decision_engines import _run_jev, build_state, number
-from model_catalog import DEFAULT_ROUTES
-from state_store import atomic_json
+sys.path.insert(0,str(ROOT / "src"))
+import codex_model_router.routing.candidate_policy as cp
+from codex_model_router.routing.decision_engines import _run_jev, build_state, number
+from codex_model_router.routing.model_catalog import DEFAULT_ROUTES
+from codex_model_router.storage.state_store import atomic_json
 from tests.multifile_trials import cases, CASE_HASH
 from tests.probe_inference_identity import PROBE_MODELS
 

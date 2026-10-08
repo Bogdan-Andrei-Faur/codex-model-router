@@ -15,13 +15,14 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from router import Router
-from routing import DEFAULT_ROUTES, EFFORTS, select_route_details
-from decision_engines import candidate_routes, jev_key, run_jev
-from inference_telemetry import LocalInferenceTelemetry, MAX_DECODED_BYTES
-from request_dispatch import Dispatcher
-from state_store import append_prompt_record, append_record, compact_history, compact_prompt_history, read_records
-from workload import response_summary
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.bridge.router import Router
+from codex_model_router.routing.routing import DEFAULT_ROUTES, EFFORTS, select_route_details
+from codex_model_router.routing.decision_engines import candidate_routes, jev_key, run_jev
+from codex_model_router.telemetry.inference_telemetry import LocalInferenceTelemetry, MAX_DECODED_BYTES
+from codex_model_router.bridge.request_dispatch import Dispatcher
+from codex_model_router.storage.state_store import append_prompt_record, append_record, compact_history, compact_prompt_history, read_records
+from codex_model_router.routing.workload import response_summary
 from test_inference_telemetry import payload
 
 
@@ -61,7 +62,7 @@ class AuditRegressions(unittest.TestCase):
             stream.write('{broken\n')
         self.router = Router(self.config, self.root / 'state')
         self.resume(self.router)
-        with patch('router.run_jev', return_value={'engine': 'jev', 'status': 'ok', 'route': {'model': 'gpt-6-luna', 'effort': 'low'}}):
+        with patch('codex_model_router.bridge.router.run_jev', return_value={'engine': 'jev', 'status': 'ok', 'route': {'model': 'gpt-6-luna', 'effort': 'low'}}):
             actual = json.loads(self.router.client_line(wire(self.request('Adelante'))))
         self.assertEqual(actual['params']['model'], 'gpt-6-astra')
         self.assertGreaterEqual(EFFORTS.index(actual['params']['effort']), EFFORTS.index('high'))
@@ -82,7 +83,7 @@ class AuditRegressions(unittest.TestCase):
         self.assistant('Queda pendiente corregir una vulnerabilidad de autenticación y validar las pruebas.')
         self.router = Router(self.config, self.root / 'state')
         self.resume(self.router)
-        with patch('router.run_jev', return_value={'engine': 'jev', 'status': 'ok',
+        with patch('codex_model_router.bridge.router.run_jev', return_value={'engine': 'jev', 'status': 'ok',
                    'route': {'model': 'gpt-6.1-sol', 'effort': 'medium'}}) as jev:
             actual = json.loads(self.router.client_line(wire(self.request('Ok, implementa un formulario de contactos'))))
         self.assertEqual(actual['params']['model'], 'gpt-6.1-sol')
@@ -95,7 +96,7 @@ class AuditRegressions(unittest.TestCase):
             'threadId': 'task-audit', 'turn': {'id': 'turn-independent', 'status': 'completed'}}}))
         followup = self.request('Sigue con lo que falta', 3)
         followup['params'].update(model='gpt-6.1-sol', effort='medium')
-        with patch('router.run_jev', return_value={'engine': 'jev', 'status': 'ok',
+        with patch('codex_model_router.bridge.router.run_jev', return_value={'engine': 'jev', 'status': 'ok',
                    'route': {'model': 'gpt-6.1-sol', 'effort': 'medium'}}):
             actual = json.loads(self.router.client_line(wire(followup)))
         self.assertEqual(actual['params']['model'], 'gpt-6-astra')
@@ -115,7 +116,7 @@ class AuditRegressions(unittest.TestCase):
 
     def test_malformed_provider_uses_local_fallback_and_records_decision(self):
         for response in ([], {'answers': []}, {'answers': {'route': []}}, None, 'wrong'):
-            with self.subTest(response=response), patch('decision_engines.jev_key', return_value='synthetic'), patch('decision_engines._post_json', return_value=response):
+            with self.subTest(response=response), patch('codex_model_router.routing.decision_engines.jev_key', return_value='synthetic'), patch('codex_model_router.routing.decision_engines._post_json', return_value=response):
                 self.router.pending.clear()
                 actual = json.loads(self.router.client_line(wire(self.request('Haz una auditoría exhaustiva de seguridad'))))
                 self.assertEqual(actual['params']['model'], 'gpt-6-astra')
@@ -142,14 +143,14 @@ class AuditRegressions(unittest.TestCase):
         self.assertEqual(created[0]['source'], 'automatic')
 
     def test_disk_failure_does_not_restore_the_small_original_model(self):
-        with patch('router.persist_task', side_effect=OSError('synthetic')), patch('router.run_jev', return_value={'engine':'jev', 'status':'unavailable'}):
+        with patch('codex_model_router.bridge.router.persist_task', side_effect=OSError('synthetic')), patch('codex_model_router.bridge.router.run_jev', return_value={'engine':'jev', 'status':'unavailable'}):
             result = json.loads(self.router.client_line(wire(self.request('Audita toda la autenticación'))))
         self.assertEqual(result['params']['model'], 'gpt-6-astra')
 
     def test_new_task_clear_survives_another_restart(self):
         self.assistant('Queda pendiente corregir autenticación.')
         self.router = Router(self.config, self.root / 'state'); self.resume(self.router)
-        with patch('router.run_jev', return_value={'engine':'jev','status':'unavailable'}):
+        with patch('codex_model_router.bridge.router.run_jev', return_value={'engine':'jev','status':'unavailable'}):
             self.router.client_line(wire(self.request('Nueva tarea: traduce hola')))
         restored = Router(self.config, self.root / 'state').thread_categories['task-audit']
         self.assertNotIn('task_floor', restored)
@@ -175,7 +176,7 @@ class AuditRegressions(unittest.TestCase):
         native, client = [], []
         dispatcher = Dispatcher(self.router, native.append, client.append)
         self.addCleanup(dispatcher.close)
-        with patch('router.run_jev', side_effect=slow):
+        with patch('codex_model_router.bridge.router.run_jev', side_effect=slow):
             dispatcher.submit(wire(self.request('Audita exhaustivamente la seguridad')))
             self.assertTrue(entered.wait(1))
             self.assertTrue(self.router.lock.acquire(timeout=.2))
@@ -208,7 +209,7 @@ class AuditRegressions(unittest.TestCase):
                 results.append(run_jev({'jev': {'timeout_seconds': .1}}, self.root, {}, {}))
             finally:
                 finished.set()
-        with patch('decision_engines.jev_key', side_effect=slow):
+        with patch('codex_model_router.routing.decision_engines.jev_key', side_effect=slow):
             worker = threading.Thread(target=classify, daemon=True)
             worker.start()
             try:
@@ -228,7 +229,7 @@ class AuditRegressions(unittest.TestCase):
         history.write_text(''.join(json.dumps({'event': 'old', 'time': 1, 'index': i})+'\n' for i in range(20005)))
         compact_history(state, 0)
         self.assertEqual(len(list(read_records(history))), 20005)
-        code = 'from state_store import append_record; import sys; from pathlib import Path; [append_record(Path(sys.argv[1]), {"event":"parallel", "writer":sys.argv[2], "i":i}) for i in range(40)]'
+        code = 'import sys; sys.path.insert(0, ' + repr(str(Path(__file__).resolve().parents[1] / 'src')) + '); from codex_model_router.storage.state_store import append_record; import sys; from pathlib import Path; [append_record(Path(sys.argv[1]), {"event":"parallel", "writer":sys.argv[2], "i":i}) for i in range(40)]'
         processes = [subprocess.Popen([sys.executable, '-c', code, str(state), str(n)], cwd=Path(__file__).resolve().parents[1]) for n in range(3)]
         for process in processes:
             self.assertEqual(process.wait(timeout=10), 0)
@@ -247,12 +248,12 @@ class AuditRegressions(unittest.TestCase):
     def test_credentials_are_bound_to_connection_and_legacy_is_not_reused(self):
         (self.root / 'jev.secret').write_bytes(b'legacy')
         (self.root / 'jev-typesafe.secret').write_bytes(b'typesafe')
-        with patch('decision_engines.sys.platform', 'win32'), patch.dict(os.environ, {'PERSONAL_CODEX_JEV_API_KEY': 'unbound'}, clear=True), patch('decision_engines._unprotect_windows', side_effect=lambda x:x.decode()):
+        with patch('codex_model_router.routing.decision_engines.sys.platform', 'win32'), patch.dict(os.environ, {'PERSONAL_CODEX_JEV_API_KEY': 'unbound'}, clear=True), patch('codex_model_router.routing.decision_engines._unprotect_windows', side_effect=lambda x:x.decode()):
             self.assertEqual(jev_key(self.root, 'typesafe'), 'typesafe')
             self.assertIsNone(jev_key(self.root, 'vercel'))
         with patch.dict(os.environ, {'AI_GATEWAY_API_KEY': 'vercel'}, clear=True):
             self.assertEqual(jev_key(self.root, 'vercel'), 'vercel')
-        with patch.dict(os.environ, {}, clear=True), patch('decision_engines.sys.platform', 'darwin'), patch('decision_engines._keychain_key', side_effect=lambda state, key: key):
+        with patch.dict(os.environ, {}, clear=True), patch('codex_model_router.routing.decision_engines.sys.platform', 'darwin'), patch('codex_model_router.routing.decision_engines._keychain_key', side_effect=lambda state, key: key):
             self.assertEqual(jev_key(self.root, 'vercel'), 'jev-vercel')
             self.assertEqual(jev_key(self.root, 'typesafe'), 'jev-typesafe')
 

@@ -5,10 +5,14 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from decision_engines import _record_circuit_result, _read_circuit, _circuit_open
-from routing import DEFAULT_ROUTES, EFFORTS, explicit_model
-from router import Router
-from state_store import recover_tasks
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from codex_model_router.routing.decision_engines import _record_circuit_result, _read_circuit, _circuit_open
+from codex_model_router.routing.routing import DEFAULT_ROUTES, EFFORTS, explicit_model
+from codex_model_router.bridge.router import Router
+from codex_model_router.storage.state_store import recover_tasks
 
 def fail_worker(path, gate):
     gate.wait()
@@ -56,7 +60,7 @@ class BoundaryLifecycle(unittest.TestCase):
     def start(self, text, rid=1):
         request = {'id': rid, 'method': 'turn/start', 'params': {'threadId': 't',
             'model': DEFAULT_ROUTES['complex']['model'], 'input': [{'type': 'text', 'text': text}]}}
-        with patch('router.run_jev', return_value={'engine': 'jev', 'status': 'unavailable'}) as external:
+        with patch('codex_model_router.bridge.router.run_jev', return_value={'engine': 'jev', 'status': 'unavailable'}) as external:
             result = json.loads(self.router.client_line(wire(request)))['params']
         return result, external
 
@@ -118,9 +122,9 @@ class BoundaryLifecycle(unittest.TestCase):
 class CircuitConcurrency(unittest.TestCase):
     def test_provider_access_error_is_a_content_free_enum(self):
         import io, urllib.error
-        from decision_engines import _post_json, engine_failure
+        from codex_model_router.routing.decision_engines import _post_json, engine_failure
         error=urllib.error.HTTPError('https://example.invalid',403,'',{},io.BytesIO(b'{"error":"Free tier has no access; add credits. PRIVATE"}'))
-        with patch('decision_engines.urllib.request.urlopen',side_effect=error):
+        with patch('codex_model_router.routing.decision_engines.urllib.request.urlopen',side_effect=error):
             with self.assertRaises(urllib.error.HTTPError) as caught:_post_json('https://example.invalid',{})
         self.assertEqual(engine_failure(caught.exception),'account_access_restricted')
 
@@ -148,7 +152,7 @@ class CircuitConcurrency(unittest.TestCase):
 
 class Retention(unittest.TestCase):
     def test_small_quiet_prompt_file_has_its_own_expiry_and_forever_is_preserved(self):
-        from state_store import append_prompt_record, read_records
+        from codex_model_router.storage.state_store import append_prompt_record, read_records
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder); cfg = root / 'config.json'; cfg.write_text('{}')
             router = Router(cfg, root / 'state')
@@ -174,7 +178,7 @@ class OutcomeCoverage(unittest.TestCase):
 
 class TelemetryPipeline(unittest.TestCase):
     def test_stream_volume_is_aggregated_and_flushed_on_completion(self):
-        from state_store import read_records
+        from codex_model_router.storage.state_store import read_records
         with tempfile.TemporaryDirectory() as folder:
             cfg=Path(folder)/'config.json';cfg.write_text('{}');router=Router(cfg,Path(folder)/'state')
             router.threads['t']={'phase_status':'active','phase_model':'gpt-5.6-terra','turn_id':'turn'}
@@ -188,9 +192,9 @@ class TelemetryPipeline(unittest.TestCase):
     def test_http_to_router_to_monitor_with_duplicates_and_failed_request(self):
         import shutil, subprocess, time
         from urllib.request import Request, urlopen
-        from inference_telemetry import LocalInferenceTelemetry
+        from codex_model_router.telemetry.inference_telemetry import LocalInferenceTelemetry
         from test_inference_telemetry import payload
-        from state_store import read_records
+        from codex_model_router.storage.state_store import read_records
         if not shutil.which('node'): self.skipTest('Node is required for monitor projection')
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder); cfg=root/'config.json'; cfg.write_text('{}')
@@ -239,11 +243,11 @@ class TelemetryPipeline(unittest.TestCase):
         import threading, time
         from concurrent.futures import ThreadPoolExecutor
         from urllib.request import Request, urlopen
-        from inference_telemetry import LocalInferenceTelemetry
+        from codex_model_router.telemetry.inference_telemetry import LocalInferenceTelemetry
         from test_inference_telemetry import payload
         entered=threading.Event();release=threading.Event()
         def receive(record): entered.set();release.wait(3)
-        with patch('inference_telemetry.MAX_CONNECTIONS',1):collector=LocalInferenceTelemetry(receive)
+        with patch('codex_model_router.telemetry.inference_telemetry.MAX_CONNECTIONS',1):collector=LocalInferenceTelemetry(receive)
         def post():
             try:
                 with urlopen(Request(collector.endpoint,data=wire(payload()),headers={'Authorization':'Bearer '+collector.token}),timeout=3) as r:return r.status

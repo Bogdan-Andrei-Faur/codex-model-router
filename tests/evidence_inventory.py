@@ -14,7 +14,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from state_store import atomic_json
+sys.path.insert(0, str(ROOT / "src"))
+from codex_model_router.storage.state_store import atomic_json
 from tests.evaluate_jev_trials import link_measured
 from tests.probe_inference_identity import PROBE_MODELS
 

@@ -4,8 +4,12 @@ import unittest
 import urllib.error
 from unittest.mock import patch
 
-from decision_engines import candidate_routes, engine_failure, engine_usage, run_jev
-from routing import DEFAULT_ROUTES, EFFORTS, select_route_details
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from codex_model_router.routing.decision_engines import candidate_routes, engine_failure, engine_usage, run_jev
+from codex_model_router.routing.routing import DEFAULT_ROUTES, EFFORTS, select_route_details
 
 
 class DecisionEngineTests(unittest.TestCase):
@@ -43,8 +47,8 @@ class DecisionEngineTests(unittest.TestCase):
         self.assertEqual(engine_failure(urllib.error.HTTPError('', 401, '', {}, None)), "authentication")
         self.assertEqual(engine_failure(urllib.error.HTTPError('', 403, '', {}, None)), "forbidden")
 
-    @patch("decision_engines.jev_key", return_value="synthetic-key")
-    @patch("decision_engines._post_json")
+    @patch("codex_model_router.routing.decision_engines.jev_key", return_value="synthetic-key")
+    @patch("codex_model_router.routing.decision_engines._post_json")
     def test_repeated_provider_failure_opens_a_bounded_circuit_and_success_resets_it(self, post, key):
         post.side_effect = urllib.error.HTTPError('', 403, '', {}, None)
         with tempfile.TemporaryDirectory() as folder:
@@ -57,14 +61,14 @@ class DecisionEngineTests(unittest.TestCase):
             self.assertEqual(post.call_count, 2)
             post.side_effect = None
             post.return_value = {"answers": {"route": {"choice": "simple_low"}}}
-            from decision_engines import _read_circuit
+            from codex_model_router.routing.decision_engines import _read_circuit
             deadline = _read_circuit(folder)['open_until']
-            with patch('decision_engines.time.time', return_value=deadline + 1):
+            with patch('codex_model_router.routing.decision_engines.time.time', return_value=deadline + 1):
                 recovered = run_jev(config, folder, {"task": "PRIVATE"}, self.candidates)
             self.assertEqual(recovered["status"], "ok")
 
-    @patch("decision_engines.jev_key", return_value="synthetic-key")
-    @patch("decision_engines._post_json")
+    @patch("codex_model_router.routing.decision_engines.jev_key", return_value="synthetic-key")
+    @patch("codex_model_router.routing.decision_engines._post_json")
     def test_jev_uses_vercel_evaluate_with_public_model(self, post, key):
         post.return_value = {"answers": {"strategy": {"choice": "reassess"},
                                           "route": {"choice": "simple_low", "confidence": 0.9}},
@@ -81,16 +85,16 @@ class DecisionEngineTests(unittest.TestCase):
         key.assert_called_once_with("", "vercel")
         self.assertNotIn("PRIVATE_SENTINEL", str(result))
 
-    @patch("decision_engines.jev_key", return_value="synthetic-key")
-    @patch("decision_engines._post_json")
+    @patch("codex_model_router.routing.decision_engines.jev_key", return_value="synthetic-key")
+    @patch("codex_model_router.routing.decision_engines._post_json")
     def test_jev_records_an_explicit_continuation_strategy(self, post, key):
         post.return_value = {"answers": {"strategy": {"choice": "continue"}, "route": {"choice": "simple_low"}}}
         result = run_jev({}, "", {"task": "PRIVATE_SENTINEL", "previous_model": "gpt-6-astra", "previous_effort": "high"}, self.candidates)
         self.assertEqual(result["continuity_strategy"], "continue")
         self.assertIn("continue", post.call_args.args[1]["questions"]["strategy"]["criteria"])
 
-    @patch("decision_engines.jev_key", return_value="synthetic-key")
-    @patch("decision_engines._post_json")
+    @patch("codex_model_router.routing.decision_engines.jev_key", return_value="synthetic-key")
+    @patch("codex_model_router.routing.decision_engines._post_json")
     def test_jev_connection_ignores_stale_other_provider_endpoint_and_model(self, post, key):
         post.return_value = {"answers": {"route": {"choice": "simple_low"}}}
         result = run_jev({"jev": {"connection": "vercel", "endpoint": "https://api.typesafe.ai/v1/systemone",
@@ -100,8 +104,8 @@ class DecisionEngineTests(unittest.TestCase):
         self.assertEqual(post.call_args.args[0], "https://ai-gateway.vercel.sh/v1/evaluate")
         self.assertEqual(post.call_args.args[1]["model"], "typesafe-ai/jev")
 
-    @patch("decision_engines.jev_key", return_value="synthetic-key")
-    @patch("decision_engines._post_json")
+    @patch("codex_model_router.routing.decision_engines.jev_key", return_value="synthetic-key")
+    @patch("codex_model_router.routing.decision_engines._post_json")
     def test_jev_keeps_direct_typesafe_as_default(self, post, key):
         post.return_value = {"answers": {"route": {"choice": "critical_high"}}}
         result = run_jev({}, "", {"task": "PRIVATE_SENTINEL"}, self.candidates)

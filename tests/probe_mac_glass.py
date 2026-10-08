@@ -17,7 +17,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--capture-dir', type=Path, help='Optional safe synthetic-backdrop window captures')
     args = parser.parse_args()
-    source = (ROOT / 'MonitorMac.swift').read_text().rsplit('let app=NSApplication.shared', 1)[0]
+    source = (ROOT / 'native/macos/MonitorMac.swift').read_text().rsplit('let app=NSApplication.shared', 1)[0]
     harness = r'''
 let app=NSApplication.shared
 app.setActivationPolicy(.accessory)

@@ -80,7 +80,7 @@ field and adds `win32` only to the imported copy. Explicit foreign-platform
 configurations remain rejected. Fixed, safe error codes now reach the welcome
 dialog, distinguishing an open old monitor, an active Codex bridge, a wrong
 folder and an occupied destination. No raw runtime output is shown.
-Import uses `installation_migration.py`: only known configuration/history/task
+Import uses `src/codex_model_router/platforms/installation_migration.py`: only known configuration/history/task
 preferences and opaque credential blobs are copied, preserving source files.
 Occupied destinations, active bridge snapshots, changing data, symlinks and
 Windows reparse points/junctions are rejected. The existing WPF monitor's named
@@ -123,11 +123,11 @@ users of the resulting setup do not need development tools or the source checkou
 
 ```powershell
 python -m venv state/windows-installer-venv
-state/windows-installer-venv/Scripts/python.exe -m pip install -r requirements-build-windows.txt
+state/windows-installer-venv/Scripts/python.exe -m pip install -r tools/packaging/requirements-windows.txt
 python tools/prepare_windows_installer.py
 $tools = Get-Content state/installer-build-tools/tools-receipt.json -Raw | ConvertFrom-Json
 $python = 'state/windows-installer-venv/Scripts/python.exe'
-& $python build_windows_installer.py --python $python --compiler $tools.compiler --webview2-bootstrapper $tools.webview2Bootstrapper
+& $python tools/packaging/build_windows_installer.py --python $python --compiler $tools.compiler --webview2-bootstrapper $tools.webview2Bootstrapper
 ```
 
 If framework references are not at the standard location, supply

@@ -7,7 +7,8 @@ import sys
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from state_store import atomic_json
+sys.path.insert(0,str(ROOT / "src"))
+from codex_model_router.storage.state_store import atomic_json
 from tests import causal_trials as grading, native_probe_profile, multifile_trials
 from tests.coding_trials import sandbox_controls
 from tests.probe_inference_identity import PROBE_MODELS

@@ -10,10 +10,11 @@ import time
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from desktop_runtime import discover
-import inference_telemetry as otel
-from platform_support import with_loopback_telemetry
-from state_store import atomic_json
+sys.path.insert(0,str(ROOT / "src"))
+from codex_model_router.platforms.desktop_runtime import discover
+import codex_model_router.telemetry.inference_telemetry as otel
+from codex_model_router.platforms.platform_support import with_loopback_telemetry
+from codex_model_router.storage.state_store import atomic_json
 from tests.smoke_native import Client
 from tests.probe_inference_identity import IdentityShapes, PROBE_MODELS
 from tests.native_probe_profile import isolated_overrides

@@ -1,9 +1,13 @@
 import copy
 import unittest
 
-import candidate_policy as cp
-from inference_telemetry import bounded_number, safe_records
-from inference_attribution import attribute
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+import codex_model_router.routing.candidate_policy as cp
+from codex_model_router.telemetry.inference_telemetry import bounded_number, safe_records
+from codex_model_router.telemetry.inference_attribution import attribute
 from tests.test_inference_telemetry import payload
 from tests import test_phase_control as phases
 

@@ -6,9 +6,13 @@ import time
 import unittest
 from zipfile import ZipFile
 
-from inference_attribution import REJECTIONS
-from inference_telemetry import safe_records
-from router import Router
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from codex_model_router.telemetry.inference_attribution import REJECTIONS
+from codex_model_router.telemetry.inference_telemetry import safe_records
+from codex_model_router.bridge.router import Router
 from tests.test_inference_telemetry import payload
 
 
@@ -84,7 +88,7 @@ class AttributionDiagnosticsTests(unittest.TestCase):
         self.assertEqual(self.router.stats['telemetry_completion_turn_mismatch'], 1)
 
     def test_export_keeps_completion_counts_without_exporting_private_snapshot_data(self):
-        from evidence import export
+        from codex_model_router.telemetry.evidence import export
         self.router.observe_inference(self.record(thread_id='unknown-thread'))
         snapshot = dict(stats=self.router.stats, heartbeat=time.time(),
                         threads={'private-thread': {'name': 'PRIVATE_TITLE'}})

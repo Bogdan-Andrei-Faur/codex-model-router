@@ -2,7 +2,7 @@
 
 ## Paquete autónomo `.deb`
 
-`build_linux_package.py` produce un paquete sin dependencia del checkout ni de
+`tools/packaging/build_linux_package.py` produce un paquete sin dependencia del checkout ni de
 un entorno de desarrollo. APT instala Python del sistema, GTK/WebKit, Cairo y
 Secret Service como dependencias; no se incluye ni modifica el motor de Codex.
 Se comparte el layout de recursos/datos y la importación con macOS.
@@ -38,7 +38,7 @@ Construcción y comprobaciones para desarrollo:
 
 ```sh
 sudo apt install python3 desktop-file-utils
-python3 build_linux_package.py --output release/linux --revision 1
+python3 tools/packaging/build_linux_package.py --output release/linux --revision 1
 sudo apt install ./release/linux/codex-model-router_0.8.1-1_all.deb
 dbus-run-session -- xvfb-run -a /usr/bin/python3 tests/smoke_package_linux.py release/linux/*.deb
 ```
@@ -54,7 +54,7 @@ y la distribución con autenticidad del editor siguen pendientes.
 
 Linux utiliza el router Python existente y los mismos archivos HTML/CSS/JavaScript
 `monitor-ui/` que macOS. `monitor_linux.py` solo aloja esa interfaz con
-GTK 3/WebKitGTK 4.1 y adapta ventana, bandeja y acciones. `monitor_state.py`
+GTK 3/WebKitGTK 4.1 y adapta ventana, bandeja y acciones. `src/codex_model_router/monitor/monitor_state.py`
 produce el contrato que consume esa interfaz; usa la persistencia compartida,
 los mismos nombres de eventos y modos por tarea. No existe una política de
 modelos específica de Ubuntu. Windows conserva WPF.

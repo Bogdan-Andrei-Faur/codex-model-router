@@ -9,7 +9,8 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from inference_telemetry import LocalInferenceTelemetry, MAX_WIRE_BYTES, MAX_DECODED_BYTES
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.telemetry.inference_telemetry import LocalInferenceTelemetry, MAX_WIRE_BYTES, MAX_DECODED_BYTES
 from test_inference_telemetry import payload
 
 
@@ -105,7 +106,7 @@ class TelemetryBatchTests(unittest.TestCase):
     def test_busy_decoder_is_bounded_and_snapshot_does_not_wait_for_it(self):
         self.collector.parse_lock.acquire()
         try:
-            with patch('inference_telemetry.PROCESSING_WAIT_TIMEOUT', .075):
+            with patch('codex_model_router.telemetry.inference_telemetry.PROCESSING_WAIT_TIMEOUT', .075):
                 self.assertEqual(self.post(b'{}'), 503)
             self.assertEqual(self.collector.snapshot()['processing_busy'], 1)
         finally:
@@ -120,11 +121,11 @@ class TelemetryBatchTests(unittest.TestCase):
 
     def test_native_monitor_bridges_forward_all_public_counters(self):
         root = Path(__file__).resolve().parents[1]
-        from monitor_state import TELEMETRY_COUNTERS
+        from codex_model_router.monitor.monitor_state import TELEMETRY_COUNTERS
         self.assertEqual(set(self.collector.snapshot()) - {'enabled'} - set(TELEMETRY_COUNTERS), set())
-        for name in ('MonitorMac.swift', 'MonitorWindows.cs'):
+        for name in ('native/macos/MonitorMac.swift', 'native/windows/MonitorWindows.cs'):
             self.assertIn('monitor_service.py', (root / name).read_text())
-        self.assertIn('self.model.payload(', (root / 'monitor_linux.py').read_text())
+        self.assertIn('self.model.payload(', (root / 'src/codex_model_router/monitor/monitor_linux.py').read_text())
 
 
 

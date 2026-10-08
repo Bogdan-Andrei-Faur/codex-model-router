@@ -10,13 +10,17 @@ import shlex
 import unittest
 from unittest.mock import patch
 
-from application_layout import credential_namespace, installed_path
-from desktop_runtime import DiscoveryError, Installation
-from linux_onboarding import import_installation, error_detail
-from installation_migration import MigrationError
-import linux_legacy_handoff as handoff
-import linux_desktop as integration
-from state_store import atomic_json
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from codex_model_router.platforms.application_layout import credential_namespace, installed_path
+from codex_model_router.platforms.desktop_runtime import DiscoveryError, Installation
+from codex_model_router.platforms.linux_onboarding import import_installation, error_detail
+from codex_model_router.platforms.installation_migration import MigrationError
+import codex_model_router.platforms.linux_legacy_handoff as handoff
+import codex_model_router.platforms.linux_desktop as integration
+from codex_model_router.storage.state_store import atomic_json
 
 
 @unittest.skipUnless(sys.platform == 'linux', 'Linux launchers and permissions')

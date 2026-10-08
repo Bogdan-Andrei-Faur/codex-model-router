@@ -18,8 +18,9 @@ import time
 import tomllib
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from desktop_runtime import discover
-from platform_support import with_loopback_telemetry
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.platforms.desktop_runtime import discover
+from codex_model_router.platforms.platform_support import with_loopback_telemetry
 from smoke_native import Client, ROOT
 
 MODELS = ("gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol", "gpt-6-astra")
@@ -29,7 +30,7 @@ FINAL_TARGET = dict(zip(MODELS, (MODELS[1], MODELS[2], MODELS[0], MODELS[3])))
 
 class Collector:
     def __init__(self):
-        from inference_telemetry import LocalInferenceTelemetry
+        from codex_model_router.telemetry.inference_telemetry import LocalInferenceTelemetry
         self.events = []
         self.receiver = LocalInferenceTelemetry(self.consume)
         self.server = self.receiver.server

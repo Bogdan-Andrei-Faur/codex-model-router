@@ -10,8 +10,9 @@ import zipfile
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from smoke_native import Client
-from platform_support import creation_flags
+from codex_model_router.platforms.platform_support import creation_flags
 
 
 def main():

@@ -12,8 +12,9 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import desktop
-import desktop_runtime as runtime
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+import codex_model_router.platforms.desktop as desktop
+import codex_model_router.platforms.desktop_runtime as runtime
 
 
 class DiscoveryTests(unittest.TestCase):
@@ -251,7 +252,7 @@ class IntegrationTests(unittest.TestCase):
         snapshot.write_text(json.dumps({'pid':os.getpid(),'heartbeat':time.time(),'events':[]}));before=snapshot.read_bytes()
         with patch.object(desktop,'manifest',return_value={'layout':'windows-install-v1'}), \
              patch.object(desktop,'wrapper_path',return_value=self.root/'dist/codex-router.exe'), \
-             patch('installation_migration.reject_active',side_effect=AssertionError('Do not import live data')):
+             patch('codex_model_router.platforms.installation_migration.reject_active',side_effect=AssertionError('Do not import live data')):
             self.assertTrue(desktop.install()['registered'])
         self.assertEqual(self.env['value'],str((self.root/'dist/codex-router.exe').resolve()))
         self.assertEqual(snapshot.read_bytes(),before)

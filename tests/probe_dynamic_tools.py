@@ -9,9 +9,10 @@ import tempfile
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
+sys.path.insert(0,str(ROOT / "src"))
 from tests.run_multifile_trials import run_arm
 from tests import native_probe_profile, run_multifile_trials
-from state_store import atomic_json
+from codex_model_router.storage.state_store import atomic_json
 
 CASE={'id':'dynamic-echo-roundtrip','request':
     'Synthetic tool-availability check. You must call trial_echo in the trial namespace with value 37 using the provided Code Mode executor and the exact callable name shown in its generated tool documentation. Then finish briefly. Do not read/write files or call other tools.'}

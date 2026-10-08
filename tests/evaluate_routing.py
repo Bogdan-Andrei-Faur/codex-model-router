@@ -3,10 +3,11 @@ import json
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from routing import DEFAULT_ROUTES, EFFORTS, TIERS, select_route_details
-from workload import effective_context, merge_contract, response_summary
-from decision_engines import candidate_routes
-from build_identity import identity, POLICY_VERSION
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.routing.routing import DEFAULT_ROUTES, EFFORTS, TIERS, select_route_details
+from codex_model_router.routing.workload import effective_context, merge_contract, response_summary
+from codex_model_router.routing.decision_engines import candidate_routes
+from codex_model_router.build_identity import identity, POLICY_VERSION
 
 
 def evaluate():

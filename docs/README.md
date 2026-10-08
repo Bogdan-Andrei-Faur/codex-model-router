@@ -9,6 +9,7 @@ it does not validate a later implementation or a different owner's machine.
 
 | Guide | Scope |
 | --- | --- |
+| [SOURCE-LAYOUT.md](SOURCE-LAYOUT.md) | Source responsibilities, compatible launchers, resource paths and packaging |
 | [MONITOR-UI.md](MONITOR-UI.md) | Five screens, companions, tags, controls, pipeline and useful History |
 | [NOTCH-MONITOR.md](NOTCH-MONITOR.md) | Geometry, native hover, preview, live plan, projection and layout contracts |
 | [SHARED-MONITOR.md](SHARED-MONITOR.md) | UI/hosts, data/action channels, key custody, caching and packaging |
@@ -17,8 +18,8 @@ it does not validate a later implementation or a different owner's machine.
 | [../assets/README.md](../assets/README.md) | Brand provenance, Lucide subset, original companions, Nunito/OFL manifests |
 
 Implementation entry points: `router.py` observes and forwards the app-server
-protocol; `thread_inventory.py` provides live and non-archived catalogs;
-`phase_tracking.py` projects content-free current-turn plans; `monitor_state.py`
+protocol; `src/codex_model_router/storage/thread_inventory.py` provides live and non-archived catalogs;
+`src/codex_model_router/bridge/phase_tracking.py` projects content-free current-turn plans; `src/codex_model_router/monitor/monitor_state.py`
 provides data/actions and incremental History snapshots; `monitor_service.py`
 serves native private pipes; `monitor-ui/` renders the shared surface. AppKit,
 WebView2/WPF and GTK hosts retain window/input/tray/key custody. Development

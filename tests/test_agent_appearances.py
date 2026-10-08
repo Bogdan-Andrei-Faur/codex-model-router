@@ -5,8 +5,12 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from monitor_state import MonitorState, appearance_value
-from monitor_service import dispatch
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from codex_model_router.monitor.monitor_state import MonitorState, appearance_value
+from codex_model_router.monitor.monitor_service import dispatch
 
 ROOT = Path(__file__).resolve().parents[1]
 LOOK = dict(name='Milo', color='#ff9e88', accessoryColor='#51698b', roundness=21,

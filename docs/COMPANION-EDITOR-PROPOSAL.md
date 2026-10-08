@@ -63,7 +63,7 @@ in `companion()` and eight coarse states in `companionState()` (including unknow
 The editor now applies per-agent appearance overrides on every shared surface.
 `router.py` consumes turn lifecycle,
 native plan updates, command lifecycle and errors, and passes compaction into
-`usage_state.py`. Its `thread/status/changed` branch retains `status.type` but
+`src/codex_model_router/telemetry/usage_state.py`. Its `thread/status/changed` branch retains `status.type` but
 discards `activeFlags`; there is no dedicated pending-request projection for
 approvals/questions. Command tracking currently supports cancellation, not a
 complete visual activity feed. Generic active state does not prove reasoning.

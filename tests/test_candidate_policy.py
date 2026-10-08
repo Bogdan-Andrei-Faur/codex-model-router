@@ -5,14 +5,18 @@ from pathlib import Path
 import unittest
 from unittest.mock import patch
 
-import candidate_policy as cp
-from decision_engines import candidate_routes, choice_confidence, run_jev
-from model_catalog import DEFAULT_ROUTES
-from router import Router
-from state_store import read_records, append_record, atomic_json
-from trial_evaluation import attempt_metrics, evaluate_trials, record_attempt
-from evidence import scrub
-from policy_control import configure
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+import codex_model_router.routing.candidate_policy as cp
+from codex_model_router.routing.decision_engines import candidate_routes, choice_confidence, run_jev
+from codex_model_router.routing.model_catalog import DEFAULT_ROUTES
+from codex_model_router.bridge.router import Router
+from codex_model_router.storage.state_store import read_records, append_record, atomic_json
+from codex_model_router.evaluation.trial_evaluation import attempt_metrics, evaluate_trials, record_attempt
+from codex_model_router.telemetry.evidence import scrub
+from codex_model_router.evaluation.policy_control import configure
 from tests.run_policy_trials import check_answer, mcp_overrides, accepted_route, await_telemetry
 
 CATALOG={r['model']:{'low','medium','high','xhigh','max'} for r in DEFAULT_ROUTES.values()}
@@ -98,7 +102,7 @@ class CandidatePolicyTests(unittest.TestCase):
                 self.assertEqual(any(x['event']=='policy_comparison' for x in events),mode!='reference')
                 explicit=json.dumps({'id':2,'method':'turn/start','params':{'threadId':'t','input':[{'type':'text','text':'Usa Astra: revisa este botón.'}]}}).encode()
                 self.assertEqual(json.loads(r.route_turn(json.loads(explicit),explicit))['params']['model'],'gpt-6-astra')
-                with patch('router.read_mode',return_value='manual'):
+                with patch('codex_model_router.bridge.router.read_mode',return_value='manual'):
                     self.assertEqual(r.route_turn(json.loads(raw),raw),raw)
             self.assertEqual(len(set(results)),1)
 
@@ -111,7 +115,7 @@ class CandidatePolicyTests(unittest.TestCase):
             def start(text):
                 message={'id':1,'method':'turn/start','params':{'threadId':'t','model':'gpt-6.1-sol','input':[{'type':'text','text':text}]}}
                 return json.loads(r.route_turn(message,json.dumps(message).encode()))
-            with patch('router.candidate_policy.enabled_classes',return_value={'bounded'}):
+            with patch('codex_model_router.bridge.router.candidate_policy.enabled_classes',return_value={'bounded'}):
                 out=start('Corrige una función acotada.')
                 self.assertEqual(out['params']['model'],'gpt-6-luna')
                 events=list(read_records(r.state_dir/'history.jsonl'))
@@ -126,7 +130,7 @@ class CandidatePolicyTests(unittest.TestCase):
             root=Path(folder); path=root/'config.local.json'
             config={'routes':DEFAULT_ROUTES,'private_value':'synthetic-preserve','jev':{'timeout_ms':1000}}
             path.write_text(json.dumps(config))
-            with patch('policy_control.router_identity',return_value='a'*16):
+            with patch('codex_model_router.evaluation.policy_control.router_identity',return_value='a'*16):
                 configure(root,'compare')
                 saved=path.read_bytes()
                 self.assertEqual(json.loads(saved)['private_value'],config['private_value'])
@@ -169,8 +173,8 @@ class ConfidenceTests(unittest.TestCase):
         self.assertFalse(cp.accepted_jev(result,{}))
         self.assertFalse(cp.accepted_jev(result,{'candidate_confidence_threshold':.95}))
 
-    @patch('decision_engines.jev_key',return_value='synthetic')
-    @patch('decision_engines._post_json')
+    @patch('codex_model_router.routing.decision_engines.jev_key',return_value='synthetic')
+    @patch('codex_model_router.routing.decision_engines._post_json')
     def test_candidate_jev_can_abstain_and_extract_provider_cost(self,post,key):
         a=cp.profile('Corrige una función acotada.')
         choices=cp.candidates(DEFAULT_ROUTES,CATALOG,a)

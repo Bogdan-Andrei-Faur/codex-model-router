@@ -8,11 +8,12 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-import candidate_policy as cp
-import inference_telemetry as otel
-from decision_engines import _run_jev, build_state
-from model_catalog import DEFAULT_ROUTES
-from state_store import atomic_json
+sys.path.insert(0, str(ROOT / "src"))
+import codex_model_router.routing.candidate_policy as cp
+import codex_model_router.telemetry.inference_telemetry as otel
+from codex_model_router.routing.decision_engines import _run_jev, build_state
+from codex_model_router.routing.model_catalog import DEFAULT_ROUTES
+from codex_model_router.storage.state_store import atomic_json
 from tests import metrics_trials as grading, run_multifile_trials as native, trial_tool_evidence
 from tests.coding_trials import sandbox_controls
 from tests.run_token_counter_trials import PAIRS, native_catalog, safe_choice
@@ -41,7 +42,7 @@ def run(output, previous=None, identity_probe=None):
               for index, case in enumerate(data['cases']) for m, e in (PAIRS if index == 0 else PAIRS[::-1])]
     artifacts = [Path(__file__), Path(grading.__file__), Path(native.__file__),
                  Path(trial_tool_evidence.__file__), ROOT/'tests/native_probe_profile.py',
-                 ROOT/'candidate_policy.py', ROOT/'decision_engines.py', ROOT/'inference_telemetry.py']
+                 ROOT/'src/codex_model_router/routing/candidate_policy.py', ROOT/'src/codex_model_router/routing/decision_engines.py', ROOT/'src/codex_model_router/telemetry/inference_telemetry.py']
     report = dict(schema='metrics-repository-trials/1', case_sha256=grading.CASE_HASH,
                   grader_sha256=grading.GRADER_HASH, origin=data['origin'], origin_scope=data['origin_scope'],
                   artifact_hashes={p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in artifacts},

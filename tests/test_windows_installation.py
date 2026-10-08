@@ -12,10 +12,14 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import application_layout as layout
-from desktop_runtime import DiscoveryError
-from windows_connection import imported_connection
-from installation_migration import reject_active, import_legacy, MigrationError, snapshot_pid_reused, windows_process_started_at
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+import codex_model_router.platforms.application_layout as layout
+from codex_model_router.platforms.desktop_runtime import DiscoveryError
+from codex_model_router.platforms.windows_connection import imported_connection
+from codex_model_router.platforms.installation_migration import reject_active, import_legacy, MigrationError, snapshot_pid_reused, windows_process_started_at
 
 
 class WindowsInstallationTests(unittest.TestCase):
@@ -44,14 +48,14 @@ class WindowsInstallationTests(unittest.TestCase):
                 self.assertFalse(destination.exists())
 
     def test_packaged_import_returns_safe_reason_instead_of_swallowing_failure(self):
-        import packaged_main
+        import codex_model_router.packaged_main as packaged_main
         with tempfile.TemporaryDirectory() as folder, patch.dict(os.environ):
             destination=Path(folder)/'new'
             argv=['packaged_main','--data-root',str(destination),'import-legacy',str(Path(folder)/'missing')]
             for code in ('busy_source','active_bridge','foreign_platform','occupied_destination','missing_config'):
                 output=io.StringIO()
                 with patch.object(sys,'argv',argv), patch.object(sys,'platform','win32'), \
-                     patch('installation_migration.import_legacy',side_effect=MigrationError(code,'PRIVATE_VALUE')), \
+                     patch('codex_model_router.platforms.installation_migration.import_legacy',side_effect=MigrationError(code,'PRIVATE_VALUE')), \
                      contextlib.redirect_stdout(output):
                     self.assertEqual(packaged_main.main(),1)
                 self.assertEqual(json.loads(output.getvalue()),{'error':{'code':code}})
@@ -98,7 +102,7 @@ class WindowsInstallationTests(unittest.TestCase):
                 if scenario=='foreign':record['wrapper']='foreign.exe'
                 if scenario=='platform':record['platform']='linux'
                 (legacy/'state/desktop-integration.json').write_text(json.dumps(record))
-                with patch('monitor_state.alive',return_value=True):
+                with patch('codex_model_router.monitor.monitor_state.alive',return_value=True):
                     with self.assertRaises(DiscoveryError):imported_connection(root,current)
 
     def test_missing_provenance_does_not_override_foreign_connection(self):
@@ -112,7 +116,7 @@ class WindowsInstallationTests(unittest.TestCase):
             snapshot.write_text(json.dumps({'pid':os.getpid(),'heartbeat':time.time(),'events':[]}))
             source_receipt=legacy/'state/desktop-integration.json'
             before=(source_receipt.read_bytes(),snapshot.read_bytes())
-            with patch('installation_migration.reject_active',side_effect=AssertionError('Offline guard must not gate next-launch registration')):
+            with patch('codex_model_router.platforms.installation_migration.reject_active',side_effect=AssertionError('Offline guard must not gate next-launch registration')):
                 result=imported_connection(root,{'value':record['wrapper'],'kind':1})
             self.assertEqual(result['previous'],record['previous'])
             self.assertEqual(before,(source_receipt.read_bytes(),snapshot.read_bytes()))
@@ -133,8 +137,8 @@ class WindowsInstallationTests(unittest.TestCase):
             snapshot=legacy/'state/status-fixture.json'
             snapshot.write_text(json.dumps({'pid':123,'heartbeat':100,'events':[]}))
             before=snapshot.read_bytes()
-            with patch('monitor_state.alive',return_value=True), \
-                 patch('installation_migration.windows_process_started_at',return_value=200):
+            with patch('codex_model_router.monitor.monitor_state.alive',return_value=True), \
+                 patch('codex_model_router.platforms.installation_migration.windows_process_started_at',return_value=200):
                 reject_active(legacy/'state')
                 self.assertEqual(imported_connection(root,{'value':record['wrapper'],'kind':1})['previous'],record['previous'])
             self.assertEqual(snapshot.read_bytes(),before)
@@ -144,14 +148,14 @@ class WindowsInstallationTests(unittest.TestCase):
             with self.subTest(started=started), tempfile.TemporaryDirectory() as folder:
                 state=Path(folder)/'state';state.mkdir()
                 (state/'status-fixture.json').write_text(json.dumps({'pid':123,'heartbeat':100,'events':[]}))
-                with patch('monitor_state.alive',return_value=True), \
-                     patch('installation_migration.windows_process_started_at',return_value=started):
+                with patch('codex_model_router.monitor.monitor_state.alive',return_value=True), \
+                     patch('codex_model_router.platforms.installation_migration.windows_process_started_at',return_value=started):
                     with self.assertRaises(MigrationError) as error:reject_active(state)
                 self.assertEqual(error.exception.code,'active_bridge')
 
     def test_missing_or_invalid_heartbeat_cannot_prove_pid_reuse(self):
         for heartbeat in (None,False,'100',0,-1,float('nan'),float('inf')):
-            with self.subTest(heartbeat=heartbeat), patch('installation_migration.windows_process_started_at') as query:
+            with self.subTest(heartbeat=heartbeat), patch('codex_model_router.platforms.installation_migration.windows_process_started_at') as query:
                 self.assertFalse(snapshot_pid_reused({'pid':123,'heartbeat':heartbeat}))
                 query.assert_not_called()
 

@@ -8,9 +8,10 @@ from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from inference_telemetry import LocalInferenceTelemetry, safe_records
-from router import Router
-from routing import DEFAULT_ROUTES
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from codex_model_router.telemetry.inference_telemetry import LocalInferenceTelemetry, safe_records
+from codex_model_router.bridge.router import Router
+from codex_model_router.routing.routing import DEFAULT_ROUTES
 
 
 def payload(model="gpt-5.6-terra", effort="medium", kind="response.completed"):

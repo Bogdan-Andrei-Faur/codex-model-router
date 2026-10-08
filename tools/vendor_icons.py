@@ -87,7 +87,7 @@ def artifacts(raw):
     cs+='using System;\nusing System.Collections.Generic;\ninternal sealed partial class ModernRouterMonitor\n{\n    static readonly Dictionary<string,string> LucidePaths = new Dictionary<string,string> {\n'
     cs+=',\n'.join('        { '+json.dumps(name)+', '+json.dumps(path)+' }' for name,path in paths.items())
     cs+='\n    };\n    static string LucidePath(string name) { string path; if(!LucidePaths.TryGetValue(name,out path))throw new ArgumentException("Unknown Lucide icon", "name");return path; }\n}\n'
-    files['MonitorIcons.cs']=cs.encode()
+    files['native/windows/MonitorIcons.cs']=cs.encode()
     return files
 
 
