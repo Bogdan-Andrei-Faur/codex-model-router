@@ -6,6 +6,8 @@ import LocalAuthentication
 import Darwin
 
 final class RouterPanel: NSPanel {
+    // This accessory deliberately occupies the menu-bar band.
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
     override func sendEvent(_ event: NSEvent) {
@@ -13,6 +15,21 @@ final class RouterPanel: NSPanel {
         // before dispatching its first click, rather than swallowing that click.
         if event.type == .leftMouseDown && !isKeyWindow { makeKey() }
         super.sendEvent(event)
+    }
+}
+
+struct NotchPlacement {
+    let frame: NSRect
+    let cameraWidth: CGFloat
+    let cameraHeight: CGFloat
+    init(screen: NSRect, work: NSRect, inset: CGFloat, left: NSRect?, right: NSRect?) {
+        let width = min(800,max(1,screen.width-20))
+        let height = max(1,screen.maxY-work.minY-20)
+        let cutout = inset > 0 && left != nil && right != nil ? max(0,right!.minX-left!.maxX) : 0
+        let center = cutout > 0 ? (left!.maxX+right!.minX)/2 : screen.midX
+        frame = NSRect(x:min(screen.maxX-width,max(screen.minX,center-width/2)),y:screen.maxY-height,width:width,height:height)
+        cameraHeight = max(0,inset)
+        cameraWidth = cutout
     }
 }
 
@@ -87,6 +104,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     var mode = "Compact", topmost = true, ready = false, busy = false, refreshPending = false
     var panelHeights = [String:Double](), resizing = false, historyRequested = false
     var panelHeight: Double = 760
+    var cameraWidth: CGFloat = 0, cameraHeight: CGFloat = 0
     var lockFD: Int32 = -1
     var timer: Timer?, hitTimer: Timer?
     var hitRect = NSRect.zero
@@ -131,7 +149,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         glass.isHidden = true
         web.autoresizingMask = [.width,.height]
         content.addSubview(glass);content.addSubview(web);panel.contentView = content
-        panel.level = topmost ? .floating : .normal; position()
+        panel.level = topmost ? .statusBar : .normal; position()
         status = NSStatusBar.system.statusItem(withLength:NSStatusItem.squareLength)
         let trayImage = NSImage(contentsOf:resources.appendingPathComponent("tray-route.png"))
         trayImage?.size = NSSize(width:18,height:18);trayImage?.isTemplate = true
@@ -149,10 +167,11 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
     func loadPage() { sentJournalRevision = -1; ready = false; web.loadFileURL(resources.appendingPathComponent("index.html"),allowingReadAccessTo:resources) }
     func position() {
         let screen = panel.screen ?? NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation,$0.frame,false) } ?? NSScreen.main
-        guard let work = screen?.visibleFrame else { return }
-        let width = min(800,max(1,work.width-20)), height = max(1,work.height-20)
-        panelHeight = min(height,max(560,work.height * (panelHeights[screenKey(screen)] ?? 0.9)))
-        panel.setFrame(NSRect(x:work.midX-width/2,y:work.maxY-height,width:width,height:height),display:true)
+        guard let screen = screen else { return }
+        let placement = NotchPlacement(screen:screen.frame,work:screen.visibleFrame,inset:screen.safeAreaInsets.top,left:screen.auxiliaryTopLeftArea,right:screen.auxiliaryTopRightArea)
+        cameraWidth = placement.cameraWidth; cameraHeight = placement.cameraHeight
+        panelHeight = min(placement.frame.height,max(560,screen.visibleFrame.height * (panelHeights[screenKey(screen)] ?? 0.9)))
+        panel.setFrame(placement.frame,display:true)
     }
     func screenKey(_ screen:NSScreen?) -> String {
         return String(describing:screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] ?? "main")
@@ -184,7 +203,8 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         var inset = shoulder
         if y < shoulder {inset = sqrt(max(0,shoulder*shoulder-pow(shoulder-y,2)))}
         if y > hitRect.height-radius {inset += radius-sqrt(max(0,radius*radius-pow(y-hitRect.height+radius,2)))}
-        let inside = hitRect.contains(pointInPanel) && pointInPanel.x >= hitRect.minX+inset && pointInPanel.x <= hitRect.maxX-inset
+        let camera = NSRect(x:(panel.frame.width-cameraWidth)/2,y:panel.frame.height-cameraHeight,width:cameraWidth,height:cameraHeight)
+        let inside = !camera.contains(pointInPanel) && hitRect.contains(pointInPanel) && pointInPanel.x >= hitRect.minX+inset && pointInPanel.x <= hitRect.maxX-inset
         if panel.ignoresMouseEvents == inside { panel.ignoresMouseEvents = !inside }
         // Project local pointer geometry even while key: clipped windows can
         // miss DOM leave events. This never activates or keys the panel.
@@ -222,13 +242,13 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         updateGlass();publishUI(); saveUI(); lastPayload = Data(); refresh()
     }
     func uiSnapshot() -> [String:Any] {
-        return ["mode":mode,"topmost":topmost,"panelHeight":panelHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,"reduceTransparency":NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency,"nativeGlass":true,"acknowledgesMode":true,"lazyHistory":true,"modeRequest":lastModeRequest as Any? ?? NSNull()]
+        return ["mode":mode,"topmost":topmost,"panelHeight":panelHeight,"cameraWidth":cameraWidth,"cameraHeight":cameraHeight,"reduced":NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,"reduceTransparency":NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency,"nativeGlass":true,"acknowledgesMode":true,"lazyHistory":true,"modeRequest":lastModeRequest as Any? ?? NSNull()]
     }
     func publishUI() {
         guard ready else {return}
         web.callAsyncJavaScript("window.receiveUI(ui,request)",arguments:["ui":uiSnapshot(),"request":lastModeRequest as Any? ?? NSNull()],in:nil,in:.page,completionHandler:nil)
     }
-    func setTopmost(_ value:Bool) { topmost = value; panel.level = value ? .floating : .normal; saveUI(); lastPayload = Data(); refresh() }
+    func setTopmost(_ value:Bool) { topmost = value; panel.level = value ? .statusBar : .normal; saveUI(); lastPayload = Data(); refresh() }
     func saveUI() { if preview {return}; do { try write(["mode":mode,"topmost":topmost,"panelHeights":panelHeights],uiPath) } catch { feedback("No se pudo guardar la vista.") } }
     func feedback(_ value:String) { web.callAsyncJavaScript("window.monitorFeedback(message)",arguments:["message":value],in:nil,in:.page,completionHandler:nil) }
     func webView(_ webView:WKWebView,decidePolicyFor action:WKNavigationAction,decisionHandler:@escaping(WKNavigationActionPolicy)->Void) {
@@ -254,24 +274,29 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         case "resizeEnd": resizing = false; resizePanel(data["height"] as? Double,finished:true)
         case "resizeReset": resizePanel(nil,finished:true)
         case "topmost": if let value = data["value"] as? Bool { setTopmost(value) }
-        case "config", "quality", "taskMode", "connection", "update": performAction(data)
+        case "config", "quality", "taskMode", "connection", "update", "appearance": performAction(data)
         case "secret": if let provider = data["provider"] as? String, ["jev-typesafe", "jev-vercel"].contains(provider), let value = data["value"] as? String, !value.isEmpty,value.utf8.count<16384 { storeKey(provider,value) }
         default: break
         }
     }
     var actionBusy=false
     func performAction(_ data:[String:Any]) {
-        guard !preview,!actionBusy else {feedback("Vista previa o una operación todavía en curso.");return}
+        guard !preview,!actionBusy else {feedback("Vista previa o una operación todavía en curso."); appearanceResult(data,false);return}
         actionBusy=true
         io.async { [weak self] in
             guard let self=self else{return}
             let reply=try? self.dataService.request(data)
             DispatchQueue.main.async {
-                self.actionBusy=false;self.lastPayload=Data()
+                self.actionBusy=false;self.lastPayload=Data();self.appearanceResult(data,reply?["ok"] as? Bool == true)
                 self.feedback(reply?["feedback"] as? String ?? "No se pudo completar la operación. Tus tareas siguen abiertas.")
                 self.refresh()
             }
         }
+    }
+    func appearanceResult(_ data:[String:Any],_ ok:Bool) {
+        guard data["action"] as? String == "appearance" else {return}
+        let result:[String:Any] = ["thread":data["thread"] as Any? ?? NSNull(),"request":data["request"] as Any? ?? NSNull(),"ok":ok]
+        web.callAsyncJavaScript("window.monitorAppearanceResult(result)",arguments:["result":result],in:nil,in:.page,completionHandler:nil)
     }
     func configure(_ key:String,_ value:Any) {performAction(["action":"config","key":key,"value":value])}
     func applicationWillTerminate(_ notification:Notification) {timer?.invalidate();hitTimer?.invalidate();dataService.stop();if lockFD>=0 {Darwin.close(lockFD)}}

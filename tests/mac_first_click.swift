@@ -1,3 +1,17 @@
+// Pure display fixtures also cover negative origins and a menu bar on a flat screen.
+for origin in [NSPoint.zero,NSPoint(x:-1920,y:240)] {
+    let screen=NSRect(origin:origin,size:NSSize(width:1728,height:1117))
+    let work=NSRect(x:origin.x,y:origin.y+85,width:1728,height:999)
+    let left=NSRect(x:origin.x,y:screen.maxY-32,width:771.5,height:32)
+    let right=NSRect(x:origin.x+956.5,y:screen.maxY-32,width:771.5,height:32)
+    let camera=NotchPlacement(screen:screen,work:work,inset:32,left:left,right:right)
+    assert(camera.frame.maxY==screen.maxY && camera.frame.midX==screen.midX)
+    assert(camera.frame.minY==work.minY+20 && camera.cameraWidth==185 && camera.cameraHeight==32)
+    let flat=NotchPlacement(screen:screen,work:work,inset:0,left:nil,right:nil)
+    assert(flat.frame.maxY==screen.maxY && flat.cameraWidth==0 && flat.cameraHeight==0)
+    let hiddenMenu=NotchPlacement(screen:screen,work:screen,inset:0,left:nil,right:nil)
+    assert(hiddenMenu.frame.maxY==screen.maxY && hiddenMenu.frame.height==1097)
+}
 // Append to the monitor's actual RouterPanel/RouterWebView declarations.
 // This exercises native dispatch; it does not synthesize OS/global mouse input.
 final class ClickProbe: NSObject, WKScriptMessageHandler, WKNavigationDelegate {

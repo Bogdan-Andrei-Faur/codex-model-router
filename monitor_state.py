@@ -207,6 +207,42 @@ def number(value):
     return value if type(value) in (int, float) and math.isfinite(value) else 0
 
 
+def appearance_value(value):
+    """Cosmetic data only: never accept markup, paths or arbitrary properties."""
+    required = {'name', 'color', 'accessoryColor', 'roundness', 'eyes', 'head', 'glasses'}
+    optional = {'scarf', 'outfit', 'neck', 'detail'}
+    if not isinstance(value, dict) or not required <= set(value) or set(value) - required - optional:
+        raise ValueError('Personaje no válido.')
+    if not isinstance(value['name'], str) or not 1 <= len(value['name'].strip()) <= 24 or not value['name'].isprintable():
+        raise ValueError('El nombre debe tener entre 1 y 24 caracteres.')
+    for key in ('color', 'accessoryColor'):
+        color = value[key]
+        if not isinstance(color, str) or len(color) != 7 or color[0] != '#' or any(c not in '0123456789abcdefABCDEF' for c in color[1:]):
+            raise ValueError('Color no válido.')
+    if type(value['roundness']) is not int or not 16 <= value['roundness'] <= 27:
+        raise ValueError('Redondez no válida.')
+    result = dict(value, name=value['name'].strip())
+    if type(result['glasses']) is bool:
+        result['glasses'] = 'rectangle' if result['glasses'] else 'none'
+    if 'scarf' in result and type(result['scarf']) is not bool:
+        raise ValueError('Accesorio no válido.')
+    result.setdefault('neck', 'scarf' if result.get('scarf') else 'none')
+    result.pop('scarf', None)
+    result.setdefault('outfit', 'none')
+    result.setdefault('detail', 'none')
+    slots = {
+        'eyes': ('oval', 'round'),
+        'head': ('none', 'cap', 'antenna', 'beanie', 'beret', 'hat', 'headphones'),
+        'glasses': ('none', 'round', 'rectangle', 'sunglasses', 'visor'),
+        'outfit': ('none', 'tee', 'sweater', 'hoodie', 'overalls', 'vest', 'jacket', 'labcoat'),
+        'neck': ('none', 'bandana', 'scarf', 'tie', 'bowtie'),
+        'detail': ('none', 'pocket', 'buttons', 'pin', 'patch'),
+    }
+    if any(type(result[key]) is not str or result[key] not in choices for key, choices in slots.items()):
+        raise ValueError('Accesorio no válido.')
+    return result
+
+
 class MonitorState:
     def __init__(self, root, code_root=None, preview=False, platform='linux', read_only=False):
         self.root = Path(root)
@@ -309,6 +345,7 @@ class MonitorState:
                 'desktopRestartPending': desktop_restart_pending,
                 'threads': threads, 'agentThreads': agent_threads, 'connections': connections, 'config': safe,
                 'taskModes': {tid: read_mode(self.state, tid) for tid in tids}, 'telemetry': telemetry,
+                'appearances': self.appearances(),
                 'accountUsage': account_usage, 'updates': self.updater.snapshot(),
                 'historyLoaded': history_revision >= 0 or needs_history, 'journalRevision': self.journal_revision,
                 'preview': self.preview, 'readOnly': self.read_only, 'platform': self.platform,
@@ -333,6 +370,11 @@ class MonitorState:
             elif action == 'taskMode':
                 self.task_mode(data.get('thread'), data.get('value'))
                 return 'Modo guardado para el próximo mensaje de esta tarea.'
+            elif action == 'appearance':
+                if 'value' not in data:
+                    raise ValueError('Personaje no válido.')
+                self.save_appearance(data.get('thread'), data.get('value'))
+                return 'Personaje guardado.'
             elif action == 'quality':
                 self.quality(data.get('id'), data.get('aspect', 'overall'), data.get('value'))
             elif action == 'connection':
@@ -379,6 +421,37 @@ class MonitorState:
             else:
                 raise ValueError('Acción no válida.')
             return 'Guardado.'
+
+    def appearances(self):
+        document = read_json(self.state / 'agent-appearances.json')
+        if document.get('version') != 1 or not isinstance(document.get('agents'), dict):
+            return {}
+        result = {}
+        for key, value in document['agents'].items():
+            try:
+                if isinstance(key, str) and 0 < len(key) <= 200:
+                    result[key] = appearance_value(value)
+            except (ValueError, TypeError):
+                pass
+        return result
+
+    def save_appearance(self, thread, value):
+        if self.preview or self.read_only:
+            raise ValueError('Los cambios están desactivados en la vista previa.')
+        if not isinstance(thread, str) or not 0 < len(thread) <= 200 or not thread.isprintable():
+            raise ValueError('Agente no válido.')
+        normalized = None if value is None else appearance_value(value)
+        path = self.state / 'agent-appearances.json'
+        with file_lock(self.state / 'agent-appearances.lock'):
+            # Reject corrupt/unknown formats rather than destroying other agents.
+            document = json.loads(path.read_text(encoding='utf-8')) if path.exists() else {'version': 1, 'agents': {}}
+            if not isinstance(document, dict) or document.get('version') != 1 or not isinstance(document.get('agents'), dict):
+                raise ValueError('No se pudo leer el archivo de personajes; se conserva sin cambios.')
+            if normalized is None:
+                document['agents'].pop(thread, None)
+            else:
+                document['agents'][thread] = normalized
+            atomic_json(path, document)
 
     def configure(self, key, value):
         if self.preview or self.read_only:

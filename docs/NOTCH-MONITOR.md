@@ -75,7 +75,8 @@ Version 0.9.6 remains the baseline: the development package is not a new release
   reserved scrollbar gutter and card clearance; narrow views retain the horizontal
   task picker with bottom clearance. The turn-selection heading and proposed, accepted
   and confirmed model cards have been removed. Agents fits its content height like Home; below 620px the columns
-  stack. Other secondary views retain their resizable height. Disconnected data is explicitly
+  stack. Consumption and Settings fit content height; History retains manual
+  resizing. Disconnected data is explicitly
   marked as the last reading. Waiting/error/blocked changes show an attention
   notice; a phase is shown only when reported. Recorded evidence and phase changes
   are available from History in the top navigation. No hero, context/quota gauges,
@@ -83,9 +84,20 @@ Version 0.9.6 remains the baseline: the development package is not a new release
   picker scroll and keyboard focus; preview controls are disabled. The routine next-message hint and evidence
   explanation paragraph are omitted from Agents; the paused-routing notice
   remains available.
+- Agents → Personalizar opens the selected character editor in the right column.
+  Alias, body/accessory colors, roundness, eyes and25 wardrobe pieces in six
+  thumbnail categories ([catalogue](COMPANION-WARDROBE.md))
+  preview immediately in the upper-left portrait. Personalizar aligns right of
+  the status. A compact name field and nine curated solid-color swatches replace
+  unrestricted color inputs; no second preview. Save waits for native service
+  acknowledgement; failures retain drafts. Cancel discards the draft; restore
+  default requires Save. Appearance uses stable local agent IDs, independently
+  of title/model, in versioned `state/agent-appearances.json`. Routing controls
+  return when editing ends. See [editor contract](COMPANION-EDITOR-PROPOSAL.md).
 - The expanded footer is removed. Routing pause/resume lives at the top of
   Settings, labeled “Pausar enrutamiento” / “Activar enrutamiento”. Installed
-  version and bridge/restart indicators live in Settings' update card. Transient
+  version lives in the Settings heading; bridge/restart indicators and updates
+  live in its Application section. Transient
   operation feedback remains visible below navigation and does not reserve space
   when empty. Preview controls remain read-only.
 - Leaving the island returns Expanded to Compact after 320ms. Re-entering
@@ -125,11 +137,23 @@ Mac camera hardware. The native window is up to 800 logical pixels wide; the
 remaining area is transparent and passes clicks through.
 
 The full-height native viewport allows downward expansion without moving the
-anchor. The overview sizes automatically. In History, Consumption and Settings, the
-resize handle is at the bottom: dragging down grows the panel;
+anchor. Home, Agents, Consumption and Settings size to content, bounded by the
+available viewport with scrolling when needed. In History, the resize handle is
+at the bottom: dragging down grows the panel;
 ArrowDown grows it, ArrowUp shrinks it, Home/double-click resets automatic height.
 Existing mode/topmost/height preferences remain compatible. No preference rewrite
 or Desktop re-registration is required for this visual change.
+
+Consumption leads with available quota, valid measured tokens, measurement
+coverage and token distribution by selected model. Technical routing, telemetry,
+quality and usage summaries remain available under collapsed Diagnostics with
+flat rows. Scope details distinguish sampled last-call tokens from accumulated
+journals, quota and billing; selected models do not prove inference attribution.
+Settings keeps the routing pause action visible and groups infrequent controls
+into Application, Routing, Data/privacy and Connection. Narrow views use a row
+of section buttons. Section selection and credential drafts survive polling;
+read-only/preview surfaces disable mutations. Updater progress and existing native
+action payloads remain unchanged.
 
 The three hosts calculate the same concave shoulders and bottom curves for their
 native input regions. macOS hides its former blur view because the new black
@@ -315,3 +339,34 @@ overlays. Context/quota changes do not rebuild History; search text is cached by
 record. Closed disclosure bodies are created on first opening and stay subject to
 read-only controls. Test with `tests/test_monitor_history_projection.py`, the core,
 History and lazy-history browser groups. The transport change is monitor-only.
+
+## macOS camera and top edge
+
+The AppKit accessory anchors to `NSScreen.frame.maxY`, not `visibleFrame.maxY`.
+Its normal always-on-top level is `statusBar`; disabling that preference retains
+normal window ordering. System popup menus retain their higher window level.
+The native panel permits positioning in the menu-bar band. Bottom space still
+respects the display work area/Dock.
+
+`safeAreaInsets.top` and `auxiliaryTopLeftArea`/`auxiliaryTopRightArea` determine
+camera size and center in points (no hardcoded MacBook model or pixel ratio).
+Compact content occupies symmetric left/right wings around a noninteractive gap.
+Wing width grows with visible companions (up to four plus an overflow counter),
+then contracts as they leave; names remain in hover details instead of reserving
+a wide permanent headline. The camera185 fixture spans433–631 points.
+During width transitions, companions remain clipped to their safe wing;
+expanded navigation uses two safe wings: Home/Agents left and
+History/Consumption/Settings right. The content begins beneath this header.
+Narrow windows retain the vertical safe inset for navigation. Narrow windows or missing cutout
+width use a vertical safe inset. Flat displays use the existing compact layout
+at the actual screen top. Screen changes republish geometry; Linux and Windows
+receive no camera fields and retain their existing layout.
+
+The camera rectangle and transparent shoulder areas pass pointer events through.
+The middle menu-bar area is occupied by the island while always-on-top is enabled;
+physical menu overlap, auto-hide/full-screen behavior and external-display
+switching need owner-host acceptance, separately from fixture proof.
+
+API reference: [Apple NSScreen safe areas](https://developer.apple.com/documentation/appkit/nsscreen/safeareainsets).
+Regression coverage: `tests/mac_first_click.swift`, `tests/probe_mac_glass.py`,
+`tests/test_monitor_camera.cjs` (included in `npm run test:layout`).

@@ -217,13 +217,30 @@ test('companion state distinguishes compaction, waiting, completion and disconne
   assert.equal(C.companionState({status:'waiting'}).kind,'waiting');
   assert.equal(C.companionState({status:'completed'}).kind,'done');
   assert.equal(C.companionState({status:'active'},false).kind,'offline');
-  assert.equal(C.companionState({status:'interrupted'}).kind,'unknown');
+  assert.equal(C.companionState({status:'interrupted'}).kind,'interrupted');
 });
 test('compact companions keep waiting/error visible without treating them as live',()=>{
   const rows={working:{status:'active'},waiting:{status:'waiting'},failed:{status:'error'},done:{status:'completed'}};
   assert.deepEqual(C.stableOrder([],rows),['working']);
   assert.deepEqual(C.companionOrder([],rows),['working','waiting','failed']);
   assert.deepEqual(C.companionOrder(['waiting','working'],rows),['waiting','working','failed']);
+});
+
+test('native activity requires current scope and preserves nonblocking attention',()=>{
+ const row={turn_id:'current',status:'active',activity:{version:1,source:'native',turn_id:'current',kind:'thinking',attention:['input'],blocking:false}};
+ assert.equal(C.companionState(row).kind,'thinking');
+ assert.match(C.companionState(row).label,/Respuesta pendiente/);
+ assert.equal(C.companionState({...row,activity:{...row.activity,turn_id:'old'}}).kind,'working');
+ assert.equal(C.companionState({...row,activity:{...row.activity,kind:'invented'}}).kind,'working');
+ assert.equal(C.companionState({...row,status:'failed'}).kind,'error');
+ assert.equal(C.companionState({...row,status:'completed'}).label,'Turno terminado');
+ assert.equal(C.companionState(row,false).kind,'offline');
+ assert.equal(C.companionState({...row,activity:{...row.activity,turn_id:null,scope:'thread',kind:'approval'}}).kind,'approval');
+ assert.equal(C.companionState({...row,status:'pending',activity:{...row.activity,turn_id:null,scope:'thread',kind:'approval'}}).kind,'working');
+ const waiting={...row,accepted_model:'gpt-6.1-sol',phase_status:'active',activity:{...row.activity,kind:'approval',attention:['approval'],blocking:true}};
+ const pipeline=C.executionPipeline(waiting);
+ assert.equal(pipeline.status,'En espera');
+ assert.equal(pipeline.steps.find(step=>step.state==='active').animate,false);
 });
 
 test('live pipeline follows native steps, resets by turn and never completes a plan from turn end',()=>{
@@ -250,4 +267,12 @@ test('live overlays never mutate cached historical evidence or token counters',(
   assert.equal(live[0].outputTokens,0);
   assert.deepEqual(base,cached);
   assert.deepEqual(C.withLiveDecisions(base,{}),cached);
+});
+
+test('wardrobe normalizes legacy accessories and rejects unknown visual slots',()=>{
+ const old=C.companion('legacy',{glasses:true,scarf:true});
+ assert.equal(old.glasses,'rectangle');assert.equal(old.neck,'scarf');
+ const invalid=C.companion('legacy',{outfit:'arbitrary.svg',head:'script',glasses:[],neck:'unknown',detail:'bad'});
+ for(const key of Object.keys(C.appearanceSlots))assert.equal(invalid[key],'none');
+ for(const [key,choices] of Object.entries(C.appearanceSlots))for(const [value] of choices)assert.equal(C.companion('a',{[key]:value})[key],value);
 });

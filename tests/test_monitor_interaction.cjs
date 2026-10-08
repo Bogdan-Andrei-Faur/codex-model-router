@@ -92,6 +92,7 @@ const assert=require('node:assert/strict');
     await page.locator('#expand').click();
     await page.evaluate(()=>window.receive({config:{enabled:true,routing_engine:'jev'}}));
     await page.locator('[data-tab="settings"]').click();
+    await page.locator('[data-settings-section=routing]').click();
     await page.evaluate(()=>{const input=document.querySelector('#settings input[type=password]');input.closest('.key-editor').hidden=false;input.value='synthetic-unsaved-fixture';});
     await page.mouse.move(1,850);await page.clock.runFor(400);
     assert.equal(await page.locator('#compact').isVisible(),true,'DOM exit failed to compact the island');

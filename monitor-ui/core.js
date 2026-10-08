@@ -191,21 +191,62 @@
     const label=percent===null?'Cuota semanal restante: sin datos actuales':`Cuota semanal restante: ${percent} % disponible`;
     return {percent,label,details:label+'\nCuota compartida de la cuenta.'+windows.map(w=>`\n${w.limit_id||'Codex'} · semanal: ${w.percent===null?'sin datos actuales':w.percent+' % disponible'}${Number.isFinite(w.resets_at)?' · se renueva '+new Date(w.resets_at*1000).toLocaleString('es-ES'):''}`).join('')};
   }
+  const appearanceSlots={
+    outfit:[['none','Sin ropa'],['tee','Camiseta'],['sweater','Jersey'],['hoodie','Sudadera'],['overalls','Peto'],['vest','Chaleco'],['jacket','Chaqueta'],['labcoat','Bata']],
+    glasses:[['none','Sin gafas'],['round','Redondas'],['rectangle','Rectangulares'],['sunglasses','De sol'],['visor','Visor']],
+    head:[['none','Sin accesorio'],['cap','Gorra'],['antenna','Antena'],['beanie','Gorro'],['beret','Boina'],['hat','Sombrero'],['headphones','Auriculares']],
+    neck:[['none','Sin accesorio'],['bandana','Pañuelo'],['scarf','Bufanda'],['tie','Corbata'],['bowtie','Pajarita']],
+    detail:[['none','Sin detalle'],['pocket','Bolsillo'],['buttons','Botones'],['pin','Pin'],['patch','Parche']],
+  };
   // Stable visual aliases depend on the conversation, never on routing choices.
-  function companion(id) {
+  function companion(id, appearance) {
     let hash=2166136261;
     for(const char of String(id)){hash^=char.codePointAt(0);hash=Math.imul(hash,16777619);}
     const variants=[['coral','Milo','#ff9e88'],['mint','Lumi','#81d7bd'],['lilac','Nori','#c1a0f0']];
     const [variant,name,color]=variants[(hash>>>0)%variants.length];
-    return {variant,name,color};
+    const base={variant,name,color,accessoryColor:'#51698b',roundness:21,eyes:'oval',head:'none',glasses:'none',outfit:'none',neck:'none',detail:'none'};
+    if(!appearance || typeof appearance!=='object')return base;
+    return {...base,variant:'custom',name:typeof appearance.name==='string'?appearance.name.slice(0,24):name,
+      color:/^#[0-9a-f]{6}$/i.test(appearance.color)?appearance.color:color,
+      accessoryColor:/^#[0-9a-f]{6}$/i.test(appearance.accessoryColor)?appearance.accessoryColor:base.accessoryColor,
+      roundness:Number.isInteger(appearance.roundness)?Math.max(16,Math.min(27,appearance.roundness)):21,
+      eyes:appearance.eyes==='round'?'round':'oval',
+      ...Object.fromEntries(Object.entries(appearanceSlots).map(([key,choices])=>{
+        const value=key==='glasses'&&typeof appearance.glasses==='boolean'?(appearance.glasses?'rectangle':'none'):key==='neck'&&appearance.neck===undefined&&appearance.scarf===true?'scarf':appearance[key];
+        return [key,choices.some(([id])=>id===value)?value:'none'];
+      }))};
   }
   function companionState(row={},connected=true) {
     if(!connected)return {kind:'offline',headline:'Sin noticias.',label:'Sin conexión · última lectura'};
     if(row.catalog_only)return {kind:'idle',headline:'Un respiro.',label:'Sin actividad registrada'};
+    const poses={
+      preparing:['Preparándose.','Preparando turno'],working:['En ello.','Trabajando'],
+      thinking:['Dándole vueltas.','Pensando'],writing:['Tomando nota.','Escribiendo'],
+      planning:['Paso a paso.','Planificando'],executing:['Manos a la obra.','Ejecutando comando'],
+      editing:['Afinando detalles.','Editando archivos'],searching:['Buscando pistas.','Buscando en la web'],
+      tool:['En ello.','Usando una herramienta'],collaborating:['En equipo.','Colaborando'],
+      inspecting:['Mirando de cerca.','Observando una imagen'],generating:['Creando.','Generando una imagen'],
+      reviewing:['Con lupa.','Revisando'],compacting:['Poniendo orden.','Compactando contexto'],
+      approval:['Te necesita.','Esperando aprobación en Desktop'],
+      question:['Te necesita.','Esperando tu respuesta en Desktop'],
+      retrying:['Otro intento.','Reintentando'],error:['Algo ha fallado.','Error'],
+      interrupted:['Una pausa.','Turno interrumpido'],done:['Turno terminado.','Turno terminado'],
+      idle:['Un respiro.','En reposo'],unknown:['A la espera.','Actividad sin confirmar']
+    };
+    const activity=row.activity;
+    if(!activity && row.status==='completed' && contextGauge(row).compacting)return {kind:'compacting',headline:'Poniendo orden.',label:'Compactando contexto'};
+    const terminal={failed:'error',error:'error',systemError:'error',interrupted:'interrupted',completed:'done'}[row.status];
+    if(terminal){const [headline,label]=poses[terminal];return {kind:terminal,headline,label,attention:[]};}
+    if(activity?.version===1 && activity.source==='native' && poses[activity.kind] &&
+       ((activity.turn_id && activity.turn_id===row.turn_id) || (!activity.turn_id && (row.status==='pending'?activity.kind==='preparing':!row.turn_id || activity.scope==='thread')))){
+      const attention=Array.isArray(activity.attention)?activity.attention.filter(value=>['approval','input'].includes(value)):[];
+      const [headline,label]=poses[activity.kind];
+      const attentionLabel=attention.includes('approval')?'Aprobación pendiente en Desktop':attention.includes('input')?'Respuesta pendiente en Desktop':'';
+      return {kind:activity.kind,headline,label:label+(attentionLabel&&!['approval','question'].includes(activity.kind)?' · '+attentionLabel:''),attention,attentionLabel};
+    }
     if(contextGauge(row).compacting)return {kind:'compacting',headline:'Poniendo orden.',label:'Compactando contexto'};
     if(['waiting','error','failed'].includes(row.status))return {kind:row.status==='waiting'?'waiting':'error',headline:'Te necesita.',label:status(row.status)};
     if(active(row.status))return {kind:'working',headline:'En ello.',label:status(row.status)};
-    if(row.status==='completed')return {kind:'done',headline:'Todo listo.',label:'Tarea terminada'};
     if(row.status==='idle' || !row.status)return {kind:'idle',headline:'Un respiro.',label:'En reposo'};
     return {kind:'unknown',headline:'A la espera.',label:status(row.status)};
   }
@@ -231,12 +272,12 @@
       if(!row.model && !accepted && !started)steps[1].state='pending';
     }
     const labels={completed:'Completado',active:'En curso',pending:'Pendiente',stopped:row.status==='interrupted'?'Interrumpido':'Con incidencia',unknown:'Sin confirmar'};
-    const waiting=row.status==='waiting';
+    const waiting=['waiting','approval','question'].includes(companionState(row,connected).kind);
     return {source,steps:steps.map(step=>({...step,animate:connected&&!waiting&&step.state==='active',
       statusLabel:!connected&&step.state==='active'?'Última lectura':waiting&&step.state==='active'?'En espera':labels[step.state]||'Sin confirmar'})),
       status:!connected?'Sin conexión':row.status==='interrupted'?'Interrumpida':stopped?'Con incidencia':row.status==='completed'?'Turno terminado':waiting?'En espera':''};
   }
-  const api = {withLiveDecisions,executionPipeline,companion,companionState,companionOrder,models,efforts,effortColors,neutral,identities,active,status,setting,model,family,identity,stableOrder,decisions,featuredThread,errorLabel,contextGauge,quotaGauge,liveAgent,usageSample,quotaWindows,weeklyQuota};
+  const api = {appearanceSlots,withLiveDecisions,executionPipeline,companion,companionState,companionOrder,models,efforts,effortColors,neutral,identities,active,status,setting,model,family,identity,stableOrder,decisions,featuredThread,errorLabel,contextGauge,quotaGauge,liveAgent,usageSample,quotaWindows,weeklyQuota};
   if (typeof module !== 'undefined') module.exports = api;
   else scope.MonitorCore = api;
 })(globalThis);

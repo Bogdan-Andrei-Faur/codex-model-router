@@ -51,6 +51,9 @@ var phase=0
 let timer=Timer.scheduledTimer(withTimeInterval:0.1,repeats:true) { timer in
     guard monitor.ready,!monitor.hitRect.isEmpty else {return}
     if phase==0 {
+        assert(monitor.panel.frame.maxY==monitor.panel.screen!.frame.maxY,"Island detached from screen edge")
+        assert(monitor.panel.level == .statusBar,"Island hidden behind menu bar")
+        assert(monitor.cameraHeight==monitor.panel.screen!.safeAreaInsets.top)
         assert(monitor.web.bounds.width>0 && monitor.web.bounds.height>0,"Web view did not resize with container")
         assert(monitor.status.button?.image?.isTemplate==true,"Lucide tray template missing")
         assert(monitor.glass.frame==monitor.hitRect,"Glass escaped the interactive surface")
@@ -60,8 +63,17 @@ let timer=Timer.scheduledTimer(withTimeInterval:0.1,repeats:true) { timer in
         backdrop.setFrame(monitor.panel.frame,display:true);backdrop.orderFrontRegardless();monitor.panel.orderFrontRegardless()
         // Synthetic lifecycle, not physical hover: ignore the owner's pointer.
         phase=1
-        monitor.web.evaluateJavaScript("window.monitorPointer=()=>{};void 0") { _,error in
-            guard error==nil else {exit(3)}
+        monitor.web.callAsyncJavaScript("""
+            window.monitorPointer=()=>{};
+            window.receiveUI(ui,null);
+            await new Promise(resolve=>setTimeout(resolve,500));
+            const left=(innerWidth-ui.cameraWidth)/2,right=(innerWidth+ui.cameraWidth)/2;
+            return [...document.querySelectorAll('.capsule-bar button')].every(node=>{
+                const r=node.getBoundingClientRect();
+                return !r.width || !ui.cameraWidth || r.right<=left || r.left>=right || r.top>=ui.cameraHeight;
+            });
+            """,arguments:["ui":monitor.uiSnapshot()],in:nil,in:.page) { result in
+            guard case .success(let value)=result,value as? Bool==true else {exit(3)}
             monitor.setMode("Expanded")
         }
         return
@@ -69,8 +81,8 @@ let timer=Timer.scheduledTimer(withTimeInterval:0.1,repeats:true) { timer in
     if phase==1 && monitor.hitRect.height>200 {
         assert(monitor.glass.frame==monitor.hitRect)
         phase=2
-        monitor.web.evaluateJavaScript("JSON.stringify({rows:document.querySelectorAll('.task-row').length,heroes:document.querySelectorAll('.companion-hero').length,title:document.querySelector('#view-title').textContent,glass:document.body.classList.contains('native-glass')})") { value,error in
-            guard error==nil,let text=value as? String,let data=text.data(using:.utf8),let result=try? JSONSerialization.jsonObject(with:data) as? [String:Any],result["rows"] as? Int==0,result["heroes"] as? Int==1,result["title"] as? String=="Inicio",result["glass"] as? Bool==true else {exit(3)}
+        monitor.web.evaluateJavaScript("JSON.stringify({rows:document.querySelectorAll('.task-row').length,heroes:document.querySelectorAll('.companion-hero').length,title:document.querySelector('#view-title').textContent,glass:document.body.classList.contains('native-glass'),topNav:!document.body.classList.contains('camera-nav')||document.querySelector('nav').getBoundingClientRect().top<10})") { value,error in
+            guard error==nil,let text=value as? String,let data=text.data(using:.utf8),let result=try? JSONSerialization.jsonObject(with:data) as? [String:Any],result["rows"] as? Int==0,result["heroes"] as? Int==1,result["title"] as? String=="Inicio",result["glass"] as? Bool==true,result["topNav"] as? Bool==true else {exit(3)}
             timer.invalidate()
             monitor.web.evaluateJavaScript("window.receiveUI({reduced:true},null)",completionHandler:nil)
             DispatchQueue.main.asyncAfter(deadline:.now()+0.5) {
@@ -87,8 +99,8 @@ let timer=Timer.scheduledTimer(withTimeInterval:0.1,repeats:true) { timer in
     }
 }
 DispatchQueue.main.asyncAfter(deadline:.now()+15){
-    print("fixture_phase=\(phase) ready=\(monitor.ready) native_mode=\(monitor.mode) hit_height=\(monitor.hitRect.height)")
-    monitor.web.evaluateJavaScript("JSON.stringify({fixtureErrors:window.fixtureErrors||[],icons:typeof RouterIcons,receive:typeof window.receive,uiMode:state.ui.mode,body:document.body.className})") { value,error in
+    print("fixture_phase=\(phase) ready=\(monitor.ready) native_mode=\(monitor.mode) hit_height=\(monitor.hitRect.height) panel=\(monitor.panel.frame) web=\(monitor.web.frame)")
+    monitor.web.evaluateJavaScript("JSON.stringify({fixtureErrors:window.fixtureErrors||[],icons:typeof RouterIcons,receive:typeof window.receive,uiMode:state.ui.mode,body:document.body.className,viewport:[innerWidth,innerHeight],surface:document.querySelector('#surface').getBoundingClientRect().toJSON(),reported:window.fixtureBounds||null})") { value,error in
         print(value as? String ?? "Fixture JavaScript unavailable");exit(4)
     }
 }
@@ -102,6 +114,8 @@ app.run()
         ui = contents / 'Resources' / 'ui'
         shutil.copytree(ROOT / 'monitor-ui', ui)
         shutil.copyfile(ROOT / 'assets/codex-ui-1024.png', ui / 'codex.png')
+        script=ui/'monitor.js'
+        script.write_text(script.read_text().replace("native({action:'bounds',x:r.x", "window.fixtureBounds={x:r.x,y:r.y,width:r.width,height:r.height};native({action:'bounds',x:r.x"))
         (ui / 'probe-errors.js').write_text("window.fixtureErrors=[];window.addEventListener('error',e=>window.fixtureErrors.push(e.message));\n")
         index = ui / 'index.html'
         index.write_text(index.read_text().replace('<script src="icons.js">', '<script src="probe-errors.js"></script><script src="icons.js">'))

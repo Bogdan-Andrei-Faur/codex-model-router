@@ -9,16 +9,72 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 
 ## Current source and delivery
 
+- The owner authorized direct publication to `main` of the accumulated camera,
+  companion editor/wardrobe, Consumption/Settings and observed-activity changes.
+  Use `git rev-parse HEAD` and the remote `main` reference for the delivery revision.
+  The receipts below record earlier installation observations; their dirty-tree
+  and no-publication statements describe those observation times. Private runtime
+  data and generated installation artifacts are excluded from source publication.
+  Do not wait for Actions: the owner reports that free-account quota may be
+  exhausted. The local checks below remain separate from new CI results,
+  installed artifacts, bridge activation and native human acceptance.
+
+- Observed companion states and shared animations are implemented; see the
+  [contract](COMPANION-ACTIVITY.md) and [Mac receipt](native-validation/2026-10-08-macos-companion-activity.md).
+  Installed monitor `4891f87b980d518e` expects router `281078dcf3e49517`.
+  Desktop still runs `80e86c3d7accf253`; one connection remains and the expected
+  mismatch is visible. **Owner restart is needed to load the new observer.**
+  Only the monitor restarted; configuration is unchanged. Fourteen browser
+  groups, 33 JS tests, 538 Python tests (53 skips), routing27/27, six offline JEV
+  cases and an isolated native18-pose WebKit fixture PASS. Real Desktop event
+  presence, physical input and Windows/Linux native animation acceptance remain
+  separate.
+
+- Consumption and Settings now follow the minimal Home/Agents/History hierarchy.
+  Prior Mac monitor `ca01f55f5cdab9d4` is superseded by the activity build above;
+  its observed router remained
+  `80e86c3d7accf253`, with one connection and no restart/mismatch flags.
+  Consumption prioritizes quota, measured tokens and model distribution; technical
+  diagnostics are collapsed. Settings groups Application, Routing, Data/privacy
+  and Connection, retaining existing actions and credential drafts. Both views
+  fit their content height. All thirteen browser groups PASS. The isolated Mac
+  glass fixture currently fails before its initial bounds callback, also with the
+  previous UI; cause unresolved. Compilation/install do not close native input
+  acceptance. See the [receipt](native-validation/2026-10-08-macos-consumption-settings.md).
+
+- Per-agent customization was installed in Mac monitor `a0a5ea7bcfe28228`,
+  superseded by the Consumption/Settings build above.
+  Open Agents → Personalizar: six thumbnail categories and25 wardrobe pieces
+  are implemented; see [catalogue](COMPANION-WARDROBE.md).
+  Shared storage and draft/save/cancel/reset are
+  implemented; router remains `80e86c3d7accf253` with no Desktop restart needed.
+  Twelve browser groups, 31 JS tests, five persistence tests and isolated native
+  Mac save/acknowledgement pass. Windows/Linux native editor acceptance remains
+  open. Richer activity animations are implemented but await bridge activation.
+  See the
+  [editor receipt](native-validation/2026-10-08-macos-agent-editor.md).
+
+- Local Mac camera integration (developed on top of `38d3678`): the monitor
+  uses the full display top edge, actual camera geometry and safe control wings.
+  Camera iteration monitor `6d5ce16a097573ca` is superseded by the editor build
+  above; router remains `80e86c3d7accf253`.
+  All eleven browser groups and the native WebKit fixture pass after moving
+  expanded navigation into the camera side wings. Compact width remains433–631
+  points. Physical owner acceptance and
+  a real external-display switch remain open; see the
+  [camera integration receipt](native-validation/2026-10-08-macos-camera-integration.md).
+
 - Main integration on 2026-10-08 includes `cef7fee`, corrected quota dismissal
   and the native Mac fixture. The owner authorized publication and installation.
   Runtime commit `9bddadc` is published on `main`;
   [CI 37812220808](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37812220808)
   passes 13/14 jobs, including all three monitor/browser jobs. Only the existing
   Windows frozen-installer protocol failure remains; no Actions quota block was observed.
-  The Mac monitor now runs notch build `840e7d1e86cceab6`; its ordinary Desktop
-  bridge uses matching router `80e86c3d7accf253`. One connection is observed,
-  mismatch/unknown and both restart flags are false. No further restart is
-  required for this observed connection. See the [Mac integration and installation receipt](native-validation/2026-10-08-macos-notch-integration.md).
+  At that installation, the Mac monitor ran notch build `840e7d1e86cceab6`; its
+  ordinary Desktop bridge used matching router `80e86c3d7accf253`. One connection
+  was observed, with mismatch/unknown and both restart flags false. That historical
+  readback does not close the new observer activation gate above. See the
+  [Mac integration and installation receipt](native-validation/2026-10-08-macos-notch-integration.md).
 - Published implementation `30ad758`, native/preview follow-up `c5ff3d9`.
   Original delivery branch: `feature/dynamic-notch-monitor`, based on
   `48760d78e35c7bd31263308f74cbc39b8a501611`. Use `git rev-parse HEAD` and
@@ -27,7 +83,8 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
   separate pilot artifacts; this redesign does not create a release/tag.
 - Shared UI: top-centered black island, original coral/mint/lilac companions,
   bundled Nunito, colored model/effort tags and five top navigation destinations.
-  Home/Agents are horizontal and sized to content; other views retain resizing.
+  Home/Agents are horizontal and sized to content; Consumption/Settings also fit
+  their content. History retains manual resizing.
 - Home keeps current/attention tasks. Agents has an independent non-archived
   catalog including inactive conversations, selected companion/picker left and
   task mode/live pipeline right. No current task controls remain in History.
@@ -84,6 +141,17 @@ failure (`Frozen bridge closed before protocol response`), documented in the
 [delivery receipt](native-validation/2026-10-08-documentation-delivery.md).
 Use [NATIVE-VALIDATION.md](NATIVE-VALIDATION.md) and
 [STATUS.md](native-validation/STATUS.md) for exact gates and safe receipts.
+
+## Character editor and activity research
+
+The owner requested independent companion customization using the rounded
+rectangle reference and richer activity animations. See
+[the editor contract and event proposal](COMPANION-EDITOR-PROPOSAL.md). The editor
+is implemented and installed on Mac; the richer event reducer and animations are
+now implemented in source and await owner-controlled bridge activation.
+The installed CLI schema
+supports more states than the monitor currently projects; runtime delivery and
+human-request semantics require validation before binding animations.
 
 ## Continue safely
 

@@ -90,7 +90,7 @@ const {pathToFileURL}=require('node:url');
       await page.evaluate(()=>window.receive({threads:{a0:{name:'Tarea segura',status:'active',context_compaction:{state:'awaiting_usage'}}}}));
       assert.match(await page.locator('.hero-character').getAttribute('aria-label'),/esperando nueva medición/);assert.equal(await page.locator('.companion-hero [data-state="compacting"]').count(),0);
       await page.evaluate(()=>window.receive({threads:{a0:{name:'Tarea segura',status:'waiting'}}}));assert.equal(await page.locator('.companion-headline').innerText(),'Te necesita.');
-      await page.evaluate(()=>window.receive({threads:{a0:{name:'Tarea segura',status:'completed'}}}));assert.equal(await page.locator('.companion-headline').innerText(),'Todo listo.');
+      await page.evaluate(()=>window.receive({threads:{a0:{name:'Tarea segura',status:'completed'}}}));assert.equal(await page.locator('.companion-headline').innerText(),'Turno terminado.');
       await page.evaluate(()=>window.receive({connections:0}));assert.equal(await page.locator('.companion-headline').innerText(),'Sin noticias.');assert.equal(await page.locator('#quota .quota-number').innerText(),'—');
       assert.deepEqual(errors,[]);await page.close();
     }

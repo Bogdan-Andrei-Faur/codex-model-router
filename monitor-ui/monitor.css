@@ -212,3 +212,147 @@ body.expanded.history-view #surface{width:min(790px,100%)}
 .live-pipeline-step.stopped .live-pipeline-marker{background:var(--warning)}
 .live-pipeline-label{display:block;color:var(--ink);margin-top:8px;line-height:14px;font-size:10px;font-weight:750}
 .live-pipeline-step small{display:block;font-size:9px;margin-top:2px;line-height:12px}
+
+/* AppKit supplies camera geometry in points; other hosts keep the original layout. */
+.capsule-left,.capsule-right{display:contents}.camera-gap{display:none}
+body.camera-wings,body.camera-inset{--panel:#000}
+body.camera-wings .capsule-bar{grid-template-columns:minmax(0,1fr) var(--camera-gap) minmax(0,1fr);gap:0}
+body.camera-wings .capsule-left,body.camera-wings .capsule-right{display:flex;align-items:center;gap:5px;min-width:0}
+body.camera-wings .capsule-left{overflow:hidden}
+body.camera-wings .capsule-left .crew{flex-shrink:0}
+body.camera-wings #compact-summary{display:none}
+body.camera-wings #agents{gap:0}
+body.camera-wings .capsule-right{justify-content:flex-end}
+body.camera-wings .camera-gap{display:block;height:var(--camera-top);align-self:start;pointer-events:none}
+body.camera-wings.expanded #surface,body.camera-inset #surface{padding-top:var(--camera-top)}
+body.camera-inset:not(.expanded):not(.peek) #surface{height:calc(64px + var(--camera-top))}
+body.camera-inset.peek #surface{height:min(calc(var(--peek-height,300px) + var(--camera-top)),calc(100% - 16px))}
+
+/* Open island: use both safe menu-bar wings instead of a blank camera-height row. */
+.nav-left,.nav-right{display:contents}
+body.camera-nav.expanded #surface{padding-top:0}
+body.camera-nav nav{display:grid;grid-template-columns:minmax(0,1fr) var(--camera-gap) minmax(0,1fr);gap:0;margin:4px 16px 6px;padding:0;min-height:max(40px,var(--camera-top))}
+body.camera-nav nav:before{content:'';grid-column:2;grid-row:1;pointer-events:none}
+body.camera-nav .nav-left,body.camera-nav .nav-right{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden;grid-row:1;padding:2px}
+body.camera-nav .nav-left{grid-column:1}
+body.camera-nav .nav-right{grid-column:3;justify-content:flex-end}
+body.camera-nav nav button[data-tab=settings]{margin-left:0}
+/* Shared per-agent editor; cosmetic controls never alter routing settings. */
+.agent-identity-copy{flex:1;width:100%}
+.agent-identity-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:10px}
+.customize-character{margin-left:auto;gap:7px;color:var(--accent);flex-shrink:0}
+.appearance-editor{padding:16px;border-radius:22px;background:var(--panel2)}
+.appearance-editor>p{line-height:18px;margin:10px 0 16px}
+.appearance-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.appearance-field{display:flex;flex-direction:column;gap:7px;min-width:0;font-size:11px;color:var(--muted)}
+.appearance-field[data-field=name]{grid-column:1/-1;width:min(100%,220px)}
+.appearance-field input,.appearance-field select{font:inherit;min-width:0;max-width:100%;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px;min-height:34px}
+.appearance-swatches{display:grid;grid-template-columns:repeat(3,32px);gap:8px;width:max-content;padding:3px}
+.appearance-swatch{width:32px;height:26px;min-height:0;padding:0;border:0;border-radius:7px;cursor:pointer;position:relative}
+.appearance-swatch[aria-pressed=true]{outline:2px solid var(--ink);outline-offset:2px}
+.appearance-swatch[aria-pressed=true]::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:#151515;left:50%;top:50%;transform:translate(-50%,-50%)}
+.appearance-swatch:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.appearance-field input[type=range]{padding:0;accent-color:var(--accent)}
+.appearance-field input[type=checkbox]{width:20px;min-height:20px;accent-color:var(--accent)}
+.appearance-editor>.choices{margin-top:18px}
+.appearance-categories{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 16px}
+.appearance-categories .choice{padding:7px 10px;font-size:11px;border-radius:11px}
+.appearance-categories .selected{color:var(--accent);background:#96cfff18;border-color:#96cfff65}
+.appearance-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.appearance-option{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:94px;padding:9px 5px;border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--muted);cursor:pointer;font:inherit;font-size:11px}
+.appearance-option[aria-pressed=true]{border-color:var(--accent);background:#96cfff14;color:var(--ink)}
+.appearance-option .character{width:54px;height:54px}
+.appearance-option .character-body,.appearance-option .eye{animation:none;transform:none}
+
+/* Observed activity uses a small shared pose set; identity colors stay stable. */
+.hand-left{transform-origin:17px 55px}.hand-right{transform-origin:83px 55px}
+.avatar[data-state=thinking] .character-body,.avatar[data-state=planning] .character-body{animation:companion-think 4.2s ease-in-out infinite}
+.avatar[data-state=thinking] .eye,.avatar[data-state=planning] .eye{translate:1px -3px}
+.avatar[data-state=writing] .character-body,.avatar[data-state=executing] .character-body,.avatar[data-state=editing] .character-body,.avatar[data-state=generating] .character-body,.avatar[data-state=tool] .character-body{animation:companion-work 2.4s ease-in-out infinite}
+.avatar[data-state=writing] .hand-left,.avatar[data-state=executing] .hand-left,.avatar[data-state=editing] .hand-left,.avatar[data-state=generating] .hand-left{animation:companion-tap .9s ease-in-out infinite}
+.avatar[data-state=writing] .hand-right,.avatar[data-state=executing] .hand-right,.avatar[data-state=editing] .hand-right,.avatar[data-state=generating] .hand-right{animation:companion-tap .9s .45s ease-in-out infinite}
+.avatar[data-state=searching] .character-body{animation:companion-look 4s ease-in-out infinite}
+.avatar[data-state=inspecting] .character-body,.avatar[data-state=reviewing] .character-body{animation:companion-inspect 4s ease-in-out infinite}
+.avatar[data-state=reviewing] .eye{transform:scaleY(.65)}
+.avatar[data-state=collaborating] .hand-right{animation:companion-wave 3.8s ease-in-out infinite}
+.avatar[data-state=approval] .hand-right,.avatar[data-state=question] .hand-right{transform:translate(7px,-10px) rotate(-70deg)}
+.avatar[data-state=approval] .character-body,.avatar[data-state=question] .character-body{animation:companion-attention 4.6s ease-in-out infinite}
+.avatar[data-state=approval] .eye,.avatar[data-state=question] .eye{translate:0 -2px}
+.avatar[data-state=retrying] .character-body{animation:companion-recover 3s ease-in-out infinite}
+.avatar[data-state=preparing] .character-body{animation:companion-inspect 3.5s ease-in-out infinite}
+.avatar[data-state=error] .character-body{animation:companion-flinch .6s ease-out both}
+.avatar[data-state=interrupted] .character-body{animation:companion-settle .6s ease-out both}
+.avatar[data-state=interrupted] .eye{transform:scaleY(.5)}
+.avatar[data-state=done] .character-body{animation:companion-celebrate .8s ease-out both}
+.character-attention{position:absolute;right:-2px;top:2px;display:grid;place-items:center;width:18px;height:18px;border-radius:7px;background:#202327;border:1px solid #ffffff35;color:var(--accent);pointer-events:none}
+.character-attention[data-kind=approval]{color:#f0d19c}.character-attention .ui-glyph{width:12px;height:12px}
+.hero-character .character-attention,.agent-portrait .character-attention{width:25px;height:25px;border-radius:9px;right:2px;top:20px}.hero-character .character-attention .ui-glyph,.agent-portrait .character-attention .ui-glyph{width:16px;height:16px}
+.character-attention[hidden]{display:none}
+@keyframes companion-think{0%,100%{transform:rotate(-3deg)}50%{transform:translateY(-2px) rotate(4deg)}}
+@keyframes companion-work{50%{transform:translateY(-2px) rotate(2deg)}}
+@keyframes companion-tap{50%{transform:translateY(-4px) rotate(18deg)}}
+@keyframes companion-look{0%,100%{transform:rotate(0)}25%{transform:rotate(-7deg)}75%{transform:rotate(7deg)}}
+@keyframes companion-inspect{50%{transform:translateY(2px) scale(1.04,.97) rotate(-3deg)}}
+@keyframes companion-wave{15%,35%{transform:translate(7px,-10px) rotate(-80deg)}25%{transform:translate(7px,-10px) rotate(-55deg)}50%,100%{transform:rotate(0)}}
+@keyframes companion-attention{0%,80%,100%{transform:translateY(0)}86%{transform:translateY(-3px)}92%{transform:translateY(0)}}
+@keyframes companion-recover{15%{transform:rotate(-5deg)}30%{transform:rotate(4deg)}45%,100%{transform:rotate(0)}}
+@keyframes companion-flinch{20%{transform:translateX(-3px) rotate(-5deg)}40%{transform:translateX(3px) rotate(4deg)}100%{transform:rotate(-3deg)}}
+@keyframes companion-settle{to{transform:translateY(2px) rotate(-3deg)}}
+@keyframes companion-celebrate{30%{transform:translateY(-8px) scale(.97,1.04)}65%{transform:translateY(1px) scale(1.04,.97)}100%{transform:translateY(0)}}
+body.motion-hidden .character *,body.compact #pages .character *,.page[hidden] .character *{animation-play-state:paused!important}
+.appearance-option:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:380px){.appearance-options{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.appearance-save-status{overflow-wrap:anywhere}
+.avatar[data-eyes=round] .eye{ry:4px}
+@media(max-width:380px){.appearance-fields{grid-template-columns:minmax(0,1fr)}}
+
+/* Consumption and Settings use the same quiet workspace hierarchy as Agents. */
+.consumption-summary,.settings-workspace{padding:16px 24px 22px}
+.workspace-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.workspace-heading h2{margin:0;font-size:19px;font-weight:850}
+.content-heading,.settings-panel-title{font-size:13px;color:var(--ink);font-weight:750;margin:0 0 14px}
+.telemetry-status{font-size:10px;color:var(--muted)}
+.telemetry-status.enabled{color:var(--good)}
+.consumption-quota{padding-bottom:16px;border-bottom:1px solid var(--line)}
+.consumption-quota .account-quota{border:0;padding:0}
+.consumption-readings{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:20px 0;border-bottom:1px solid var(--line)}
+.consumption-total,.consumption-coverage{font-size:27px;font-weight:800;letter-spacing:-.03em;margin:5px 0 0}
+.consumption-coverage{color:var(--muted);font-size:22px}
+.consumption-models{padding:20px 0 12px}
+.consumption-model{margin:14px 0}.consumption-model .meter{margin-top:9px;height:4px}
+.consumption-scope{font-size:11px;color:var(--muted);margin-top:8px}
+.consumption-scope summary{cursor:pointer}.consumption-scope p{margin-top:12px}
+.consumption-diagnostics{padding:0 24px 24px}
+.consumption-diagnostics>summary{padding:16px 0;font-size:12px;color:var(--ink)}
+.diagnostic-navigation{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 18px}
+.diagnostic-navigation .choice{font-size:11px;padding:7px 10px;border-radius:11px}
+.diagnostic-section .metric{padding:8px 0;margin:0;border-bottom:1px solid #ffffff08}
+.diagnostic-section .heading{font-size:11px;margin-top:22px}
+.diagnostic-section h2{font-size:15px}
+.settings-layout{display:grid;grid-template-columns:150px minmax(0,1fr);gap:24px;align-items:start;margin-top:22px}
+.settings-navigation{display:flex;flex-direction:column;gap:6px;border-right:1px solid var(--line);padding-right:16px}
+.settings-nav-item{min-width:0;text-align:left;padding:11px 12px;border:1px solid transparent;border-radius:14px;font-size:12px;color:var(--muted);background:transparent}
+.settings-nav-item.selected{background:#96cfff16;border-color:#96cfff35;color:var(--accent)}
+.settings-detail{min-width:0}
+.settings-panel .heading{font-size:10px;letter-spacing:.04em;margin:20px 0 10px}
+.settings-workspace .settings-action{border:0;border-radius:12px;border-bottom:1px solid var(--line);background:transparent;margin:0;padding:13px 30px 13px 0}
+.settings-workspace .settings-action:hover{background:#ffffff06}
+.settings-workspace .settings-action strong{font-size:12px}.settings-workspace .settings-action span{font-size:10px;line-height:16px}
+.settings-workspace .settings-master{padding:13px 36px 16px 0}
+.settings-workspace .settings-master strong{font-size:14px}
+.settings-workspace .update-card{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0 0 16px;background:transparent}
+.settings-workspace .update-card strong{font-size:12px}
+.settings-workspace .choices{gap:6px;flex-wrap:wrap}
+.settings-workspace .choice{font-size:11px;padding:7px 10px;border-radius:11px}
+.settings-workspace .policy{grid-template-columns:minmax(0,max-content) minmax(0,1fr) max-content;gap:7px;padding:8px 0;border-bottom:1px solid #ffffff08;font-size:10px}
+.settings-workspace .policy .badge{font-size:10px;padding:4px 7px}
+.settings-workspace #product-version{font-size:10px;max-width:100%;color:var(--muted)}
+@media(max-width:620px){.settings-layout{grid-template-columns:minmax(0,1fr);gap:18px}.settings-navigation{flex-direction:row;flex-wrap:wrap;border:0;border-bottom:1px solid var(--line);padding:0 0 12px;gap:6px}.settings-nav-item{padding:8px 10px;font-size:11px}}
+@media(max-width:380px){.consumption-summary,.settings-workspace{padding:14px 18px 20px}.consumption-diagnostics{padding:0 18px 20px}.consumption-readings{gap:10px}.consumption-total{font-size:24px}.consumption-coverage{font-size:20px}}
+
+body.expanded.settings-view #surface{width:min(790px,100%)}
+
+body.expanded.preferences-view #surface{height:min(var(--preferences-height,540px),calc(100% - 16px))}
+body.preferences-view #pages{overflow:auto}
+body.preferences-view .page{height:auto;overflow:visible}
+body.expanded.preferences-view #height-grip{display:none}

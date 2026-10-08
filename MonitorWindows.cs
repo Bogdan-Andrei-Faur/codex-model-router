@@ -155,7 +155,7 @@ sealed class RouterMonitorWindow : Window
             core.AddWebResourceRequestedFilter("*",CoreWebView2WebResourceContext.All);
             core.WebResourceRequested += delegate(object sender,CoreWebView2WebResourceRequestedEventArgs e){
                 Uri uri; bool valid=Uri.TryCreate(e.Request.Uri,UriKind.Absolute,out uri)&&uri.Scheme=="https"&&uri.Host=="monitor.local"&&uri.Port==443&&String.IsNullOrEmpty(uri.Query)&&String.IsNullOrEmpty(uri.UserInfo);
-                string[] assets={"/index.html","/monitor.css","/icons.js","/core.js","/monitor.js","/codex.png","/fonts/Nunito-variable.ttf"};
+                string[] assets={"/index.html","/monitor.css","/icons.js","/core.js","/characters.js","/monitor.js","/codex.png","/fonts/Nunito-variable.ttf"};
                 if(!valid||!assets.Contains(uri.AbsolutePath))e.Response=environment.CreateWebResourceResponse(new MemoryStream(),403,"Blocked","");
             };
             core.WebMessageReceived += delegate(object sender,CoreWebView2WebMessageReceivedEventArgs e){
@@ -223,18 +223,22 @@ sealed class RouterMonitorWindow : Window
             case "resizeReset":heights.Remove(Screen().DeviceName);Position();SaveUi();PublishUi();break;
             case "resizeStart":break;
             case "secret":StoreKey(Text(data,"provider",""),Text(data,"value",""));break;
-            case "config":case "quality":case "taskMode":case "connection":case "update":Perform(data);break;
+            case "config":case "quality":case "taskMode":case "connection":case "update":case "appearance":Perform(data);break;
         }
     }
     async void Perform(Dictionary<string,object> data)
     {
-        if(preview||actionBusy){Feedback("Vista previa o una operación todavía en curso.");return;}
+        if(preview||actionBusy){Feedback("Vista previa o una operación todavía en curso.");AppearanceResult(data,false);return;}
         actionBusy=true;
         bool connection=Text(data,"action","")=="connection";
         if(connection)await Script("monitorConnectionState",new Dictionary<string,object>{{"pending",true},{"value",Text(data,"value","")}});
-        try{var reply=await Task.Run(()=>service.Request(data));Feedback(Text(reply,"feedback","Guardado."));}
-        catch{Feedback("No se pudo completar la operación. Tus tareas siguen abiertas.");}
+        try{var reply=await Task.Run(()=>service.Request(data));Feedback(Text(reply,"feedback","Guardado."));AppearanceResult(data,Get(reply,"ok") is bool ok && ok);}
+        catch{Feedback("No se pudo completar la operación. Tus tareas siguen abiertas.");AppearanceResult(data,false);}
         finally{if(connection)ConnectionProgress(false);actionBusy=false;lastSnapshot="";Refresh();}
+    }
+    async void AppearanceResult(Dictionary<string,object> data,bool ok)
+    {
+        if(Text(data,"action","")=="appearance")await Script("monitorAppearanceResult",new Dictionary<string,object>{{"thread",Get(data,"thread")},{"request",Get(data,"request")},{"ok",ok}});
     }
     void StoreKey(string provider,string value)
     {

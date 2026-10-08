@@ -69,6 +69,10 @@ certifies customer/owner tasks or causal savings.
 
 ## Development and native receipts
 
+Current companion states: [observed activity contract](COMPANION-ACTIVITY.md),
+[synthetic pose board](design/companion-activity-poses.png), and
+[Mac activation/validation receipt](native-validation/2026-10-08-macos-companion-activity.md).
+
 The complete receipt directory is indexed below. New dynamic-notch receipts are
 safe metadata/fixture records; installed readback and physical acceptance remain
 independent. The older [design record](design/DECISION.md) and

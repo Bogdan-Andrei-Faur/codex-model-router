@@ -34,6 +34,7 @@ from request_dispatch import Dispatcher
 from phase_control import PhaseController
 from error_diagnostics import DIAGNOSTIC_FIELDS, native_error, rpc_error, clear_error
 from process_control import CommandProcesses
+from companion_activity import CompanionActivity
 from model_catalog import MODELS, migrate_config, available_routes, estimate_standard_usage, CATALOG_VERSION
 from usage_state import AccountUsage, context_window, update_context_compaction
 import candidate_policy
@@ -86,6 +87,7 @@ class Router:
         self.metric_buckets = {}
         self.phases = PhaseController(self, self.phase_config().get("phase_routing") is True)
         self.commands = CommandProcesses()
+        self.activities = CompanionActivity()
 
     def confirm_restart_settings(self, config, telemetry_enabled):
         """Clear the UI reminder only after this bridge loaded requested settings."""
@@ -457,6 +459,8 @@ class Router:
                                 "seen_turn": old.get("seen_turn", method not in ("thread/start", "thread/fork"))}
                             if thread.get("status", {}).get("type") == "active":
                                 self.active.add(tid)
+                            self.activities.snapshot(tid, thread)
+                            self.activities.apply(tid, self.threads)
                     elif method == "turn/start":
                         tid = params.get("threadId")
                         self.pending.discard(tid)
@@ -469,6 +473,7 @@ class Router:
                                         **diagnostic,
                                         **phase_update(row, "blocked", transition=(accepted or {}).get("phase_transition"))})
                             self.log({"event": "turn_rejected", "thread": tid})
+                            self.activities.finish(tid, 'error')
                             if accepted:
                                 self.record_history("decision_rejected", decision_id=accepted.get("decision_id"),
                                                     thread=tid, status="error", **diagnostic, phase_status="blocked",
@@ -504,10 +509,22 @@ class Router:
                             rid = "personal-router-" + uuid.uuid4().hex
                             self.internal_requests.add(rid)
                             self.outbound.append({"id": rid, "method": "thread/settings/update", "params": sync})
+                        if "error" not in message:
+                            self.activities.begin(tid, (result.get('turn') or {}).get('id'))
+                        self.activities.apply(tid, self.threads)
                 method = message.get("method")
                 params = message.get("params") or {}
                 self.inventory.notification(method, params)
                 tid = params.get("threadId")
+                if method == 'turn/started':
+                    previous_activity = self.activities.states.get(tid, {})
+                    started_id = (params.get('turn') or {}).get('id')
+                    if started_id in previous_activity.get('retired', set()):
+                        return True  # Observed old-turn replay; wire still unchanged.
+                    if started_id and started_id == previous_activity.get('turn') and previous_activity.get('closed'):
+                        return True  # Duplicate start after this turn ended.
+                self.activities.observe(message, self.threads)
+                self.activities.apply(tid, self.threads)
                 if method == "thread/closed":
                     self.phases.end(tid)
                 if method == "turn/started":
@@ -547,7 +564,7 @@ class Router:
                     turn = params.get("turn") or {}
                     turn_id = turn.get("id")
                     self.commands.finish_turn(tid, turn_id)
-                    if turn_id and self.current_decisions.get(tid) and turn_id != row.get("turn_id"):
+                    if turn_id and row.get("turn_id") and turn_id != row.get("turn_id"):
                         return True  # Forward unchanged, but do not alter current evidence.
                     self.flush_metrics(thread=tid)
                     self.phases.end(tid)
@@ -612,6 +629,10 @@ class Router:
                             row.setdefault("model", thread["model"])
                             row.setdefault("effort", thread.get("reasoningEffort"))
                             row.setdefault("confirmation", "Configurado; sin envío observado")
+                        if isinstance(thread.get('status'), dict):
+                            row['status'] = thread['status'].get('type', 'unknown')
+                            self.activities.snapshot(thread['id'], thread)
+                            self.activities.apply(thread['id'], self.threads)
                 elif method in ("item/started", "item/completed"):
                     item = params.get("item", {})
                     if tid and item.get('type') == 'contextCompaction':
@@ -709,7 +730,10 @@ class Router:
                 if tid and tid in self.threads:
                     row = self.threads[tid]
                     before = (row.get('context_compaction') or {}).get('state')
-                    update_context_compaction(row, method, params)
+                    projection = self.activities.project(tid)
+                    ended = projection and projection['kind'] in ('done', 'error', 'interrupted', 'idle')
+                    if not (ended and method == 'item/started' and (params.get('item') or {}).get('type') == 'contextCompaction'):
+                        update_context_compaction(row, method, params)
                     after = (row.get('context_compaction') or {}).get('state')
                     if before != after:
                         self.log({'event': 'context_compaction', 'thread': tid, 'state': after or 'cleared'})
@@ -738,6 +762,8 @@ class Router:
             if not isinstance(params, dict):
                 return raw
             with self.lock:
+                for response_thread in self.activities.response(message):
+                    self.activities.apply(response_thread, self.threads)
                 if method == "thread/start":
                     prepared = self.phases.prepare(message, self.phase_config())
                     if prepared is not message:
@@ -772,6 +798,8 @@ class Router:
                     self.log({"event": "preserved", "reason": "active_turn", "thread": tid})
                     return raw
                 self.pending.add(tid)
+                self.activities.preparing(tid)
+                self.activities.apply(tid, self.threads)
                 mode_at_submission = mode_at_submission or read_mode(self.state_dir, tid)
             routed = self.route_turn(message, raw, mode_at_submission)
             with self.lock:

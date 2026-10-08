@@ -331,9 +331,10 @@ class Monitor(Gtk.Application):
             self.refresh()
         elif action == 'bounds':
             self.input_region(data)
-        elif action in ('config', 'quality', 'taskMode', 'secret', 'connection', 'update'):
+        elif action in ('config', 'quality', 'taskMode', 'secret', 'connection', 'update', 'appearance'):
             if self.preview or self.action_busy:
                 self.feedback('Vista previa: cambios desactivados.' if self.preview else 'Espera a que termine la operación actual.')
+                self.appearance_result(data, False)
                 return
             self.action_busy = True
             self.executor.submit(self.perform_action, data)
@@ -360,6 +361,7 @@ class Monitor(Gtk.Application):
 
     def perform_action(self, data):
         message = 'Guardado.'
+        ok = False
         try:
             action = data['action']
             if action == 'secret':
@@ -371,15 +373,21 @@ class Monitor(Gtk.Application):
                 message = 'Clave guardada en el llavero de Linux.'
             else:
                 message = self.model.action(data)
+            ok = True
         except ValueError as error:
             message = str(error) if type(error) is ValueError else 'No se pudo completar la operación.'
         except Exception:
             message = 'No se pudo completar la operación. Tus tareas siguen abiertas.'
-        GLib.idle_add(self.action_finished, message)
+        GLib.idle_add(self.action_finished, message, data, ok)
 
-    def action_finished(self, message):
+    def appearance_result(self, data, ok):
+        if data.get('action') == 'appearance':
+            self.emit('monitorAppearanceResult', {'thread': data.get('thread'), 'request': data.get('request'), 'ok': ok})
+
+    def action_finished(self, message, data=None, ok=False):
         self.action_busy = False
         self.last_payload = None
+        self.appearance_result(data or {}, ok)
         self.feedback(message)
         self.refresh()
         return False

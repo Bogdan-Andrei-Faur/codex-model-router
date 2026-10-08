@@ -66,7 +66,7 @@ class PreviewHandler(BaseHTTPRequestHandler):
             data, mime = (ROOT / 'monitor-ui/fonts/Nunito-variable.ttf').read_bytes(), 'font/ttf'
         elif name == 'codex.png':
             data, mime = (ROOT / 'assets/codex-official.png').read_bytes(), 'image/png'
-        elif name in ('monitor.css', 'icons.js', 'core.js', 'monitor.js'):
+        elif name in ('monitor.css', 'icons.js', 'core.js', 'characters.js', 'monitor.js'):
             data = (ROOT / 'monitor-ui' / name).read_bytes()
             mime = 'text/css' if name.endswith('.css') else 'text/javascript'
         else:
