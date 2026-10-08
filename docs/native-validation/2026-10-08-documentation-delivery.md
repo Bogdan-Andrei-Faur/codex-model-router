@@ -93,13 +93,51 @@ Follow-up corrections before final publication:
 - The fixed loopback preview binds without `HTTPServer`'s reverse-DNS lookup,
   which introduces an unnecessary resolver-dependent startup delay. The new
   guard passes with DNS resolution forbidden; the existing browser adapter
-  fixture passes locally. This addresses the macOS 15-second startup timeout;
-  the next hosted execution must establish its result on macOS.
+  fixture passes locally. The follow-up macOS job passes all ten browser groups,
+  including preview startup, without extending the 15-second timeout.
 - The Mac lifecycle fixture now expects opaque/hidden legacy material, Home's
   principal and no inactive Home rows. Its historical script/capture names stay
   compatible, and synthetic lifecycle ignores physical pointer projection.
   It remains NOT_RUN on this Ubuntu host.
 
-Current follow-up publication and its complete 14-job matrix: pending push/readback.
+Follow-up source: `c5ff3d985648d07b168d7cb92bded45fcb536181`, pushed and
+remote branch identity verified.
+[Run 37799872117](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37799872117)
+attempt 1 finished with 11 successful jobs and three failures. The six Python
+jobs, two Docker architectures, two APT lifecycles and macOS monitor passed.
+Windows native compilation/self-test passed (including the bundled font), but
+the Windows and Ubuntu monitor jobs then failed in the previously intermittent
+quota Escape assertion. Their snapshots retained `quotaOpen=true` at different
+width/DPI combinations. The frozen Windows installer failure also recurred.
+
+Only the three failed jobs were requested once more on the same source to
+distinguish intermittent behavior from the remaining installer failure. This
+retry does not establish a quota root fix. Attempt 2 finished with the same
+three failed jobs and 11 successful jobs in the combined latest matrix. Ubuntu
+quota failed at 390px/1× DPI, Windows at 320px/2×; these differ from attempt 1's
+600px cases. The installer again reported the same frozen protocol failure.
+
+| Job family | Final result for `c5ff3d9` |
+| --- | --- |
+| Python — Windows/macOS/Ubuntu × 3.9/3.14 | PASS, all six jobs |
+| Real Docker graders — Linux x86_64/ARM64 | PASS, both jobs |
+| APT lifecycle — Ubuntu 24.04/26.04 | PASS, both jobs |
+| macOS monitor | PASS: Swift compile, core and all ten browser groups, including preview |
+| Windows monitor | FAIL in quota Escape browser assertion; native build/self-test/font PASS |
+| Ubuntu monitor | FAIL in quota Escape browser assertion; native package step not reached in this run |
+| Windows installer | FAIL: frozen bridge closed before protocol response, also present at baseline |
+
+Final delivery documentation is an evidence-only follow-up to this tested source;
+its commit skips duplicate CI and changes no runtime, assets or fixtures. Source,
+documentation commit, installed artifact and loaded bridge remain separate.
 Native compilation/hosted fixtures are CI evidence for the tested SHA, not
 physical acceptance of the owner's installation.
+
+## Remaining work
+
+Reproduce and correct quota Escape behavior with the failing width/DPI cases;
+retain native and browser event evidence without owner data. Diagnose the frozen
+Windows installer protocol failure on an isolated native fixture before changing
+its PASS gate. Then run the affected checks again on the correcting revision.
+Neither issue was silently disabled or relabeled successful for publication.
+Owner-host physical/macOS/Windows acceptance still follows the native runbook.

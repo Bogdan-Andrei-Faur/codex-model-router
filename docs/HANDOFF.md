@@ -9,7 +9,8 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 
 ## Current source and delivery
 
-- Working branch: `feature/dynamic-notch-monitor`, based on
+- Published implementation `30ad758`, native/preview follow-up `c5ff3d9`.
+  Working branch: `feature/dynamic-notch-monitor`, based on
   `48760d78e35c7bd31263308f74cbc39b8a501611`. Use `git rev-parse HEAD` and
   `git status --short --branch` for the published revision and local divergence.
 - Product baseline: `0.9.6`. Development Debian revisions `1~notchN` identify
@@ -55,12 +56,16 @@ and six offline JEV constraint cases pass. Skips do not validate optional Docker
 execution or native platform behavior. Exact `1~notch43` isolated GTK/WebKit
 package smoke and Home opening metric regression also pass. The metric probe
 forces X11 to stay in Xvfb instead of inheriting the owner's Wayland compositor.
-The dedicated quota Escape group passed
-this run, but the previously reproduced intermittent failure has no demonstrated
-root fix and remains an open physical/input gate.
+The quota Escape group passed locally and on macOS CI, but failed the Ubuntu/
+Windows browser jobs on both follow-up CI attempts at different width/DPI cases.
+No root fix is demonstrated; shared fixture and physical/input gates remain open.
 
-Mac/Windows redesign native execution and physical display/input/sleep acceptance
-remain separate. Check the current published SHA's complete CI matrix; old runs
+Mac/Windows owner-host redesign execution and physical display/input/sleep
+acceptance remain separate. Hosted Windows native compilation/self-test and
+macOS compilation/all ten browser groups pass for `c5ff3d9`; the delivery receipt
+records the complete matrix: 11/14 jobs PASS after one retry; Windows installer
+and Ubuntu/Windows quota Escape jobs FAIL. These gates remain open.
+Check the current published SHA's complete CI matrix; old runs
 cannot validate it. The previous baseline run had a Windows installer fixture
 failure (`Frozen bridge closed before protocol response`), documented in the
 [delivery receipt](native-validation/2026-10-08-documentation-delivery.md).

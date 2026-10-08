@@ -16,9 +16,9 @@ The current implementation is in [NOTCH-MONITOR.md](../NOTCH-MONITOR.md);
 | Ubuntu installed pilot | `0.9.6-1~notch43`, monitor `2e0a5284b2aa9c8e`, connected router `2fec36051e3ccedb`; last readback PASS | Physical owner input/display/sleep/scaling acceptance remains open |
 | Ubuntu native fixture | Exact `1~notch43` full GTK/WebKit package smoke, History spacing/detail/ratings and Home opening metric probe PASS | Synthetic isolated windows do not accept physical input/compositor behavior |
 | History performance | Incremental transport/projection, parity/recovery and lazy/cached UI PASS; isolated measurements in receipt | Measurements exclude owner-perceived latency acceptance |
-| Intermittent quota Escape | Dedicated browser group passed current run | Earlier intermittent failure has no demonstrated root fix; keep gate open |
-| macOS/Windows redesign | Shared hosts/source supplied; new native execution on owner machines NOT_RUN | Hosted CI and physical owner receipts are separate |
-| Published delivery CI | See current-SHA evidence in [delivery receipt](2026-10-08-documentation-delivery.md) | Prior baseline had a Windows installer fixture failure |
+| Intermittent quota Escape | Local/macOS browser group PASS; Ubuntu/Windows CI failed both follow-up attempts at different width/DPI cases | No demonstrated root fix; shared fixture and physical/input gates remain open |
+| macOS/Windows redesign | `c5ff3d9`: hosted Windows native self-test/font PASS; macOS compilation/all ten browser groups PASS. New execution on owner machines NOT_RUN | Hosted fixtures and physical owner receipts are separate |
+| Published delivery CI | `c5ff3d9`, complete 14-job matrix: 11 PASS, 3 FAIL after one retry; [delivery receipt](2026-10-08-documentation-delivery.md) | Windows installer protocol and Ubuntu/Windows quota Escape browser failures remain open |
 
 Current artifact details: [ratings/spacing](2026-10-08-linux-notch-history-ratings.md).
 Feature receipts: [detail cleanup](2026-10-08-linux-notch-history-detail.md),

@@ -212,7 +212,8 @@ spacing/detail fixture and full onboarding/pointer/single-instance smoke.
 The [delivery receipt](native-validation/2026-10-08-documentation-delivery.md)
 separates source checks, prior CI and the current published SHA's remote result.
 
-The quota Escape group passed the current local run; the earlier intermittent
+The quota Escape group passed locally and on macOS CI; Ubuntu/Windows CI failed
+the same assertion at different width/DPI cases on both attempts. The intermittent
 failure has no demonstrated root fix and remains open. Installed physical
 interaction/startup/sleep/scaling acceptance remains pending. macOS/Windows native
 execution is NOT_RUN on this Ubuntu host. CI compilation/self-tests, when available,
