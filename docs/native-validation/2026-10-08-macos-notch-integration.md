@@ -82,7 +82,7 @@ is inferred from these checks.
 
 Runtime commit `9bddadc73d8d41e27d67b0ac84b07cd7b30f11eb` is published on
 remote `main`, including the three integrated notch commits and the corrections.
-[Run 37812220808](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37812220808)
+[Run 37812220808](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/37812220808)
 completed with 13 successful jobs and one failed Windows installer job.
 All six Python OS/version jobs, both Docker grader architectures, both Debian
 lifecycles and all three native-monitor/browser jobs pass. Thus the correcting

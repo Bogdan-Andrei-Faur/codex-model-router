@@ -17,12 +17,13 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
   remain separate. Windows/Ubuntu apply remains disabled pending native adapters.
   See [managed updates](MANAGED-UPDATES.md) and its native receipt. No installer
   release, owner migration, installation replacement or Desktop restart occurred.
-- Public-source preparation: the owner approved retaining the original repository
-  privately under a new name and publishing a clean one at the canonical URL.
+- Public source published on 2026-10-09: clean main `5dac586b` includes the
+  authenticated updater. The canonical repository is PUBLIC; the original is
+  PRIVATE and archived as `codex-model-router-private-archive-20261009`.
   The isolated history candidate removes three retired icon paths and preserves
   the current tree; GitHub-managed PR history motivates the separate archive.
   See [history-cleanup review and execution receipt](HISTORY-CLEANUP.md) for the
-  actual publication status. Other machines must preserve old local work and
+  exact publication and local-backup receipt. Other machines must preserve old local work and
   use a fresh clone after the changed history, not merge old history back.
 
 
@@ -184,7 +185,7 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 - Main integration on 2026-10-08 includes `cef7fee`, corrected quota dismissal
   and the native Mac fixture. The owner authorized publication and installation.
   Runtime commit `9bddadc` is published on `main`;
-  [CI 37812220808](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37812220808)
+  [CI 37812220808](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/37812220808)
   passes 13/14 jobs, including all three monitor/browser jobs. Only the existing
   Windows frozen-installer protocol failure remains; no Actions quota block was observed.
   At that installation, the Mac monitor ran notch build `840e7d1e86cceab6`; its
@@ -409,7 +410,7 @@ forzar un salto. Separar solicitud, decisión aceptada e inferencia identificada
 ## Obtener y verificar el código
 
 Baseline posterior: `02d0be1efe98c9f2c30751b4ee4a532a0c5ed1fb` pasó
-[los 13 jobs de CI](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37315933675),
+[los 13 jobs de CI](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/37315933675),
 incluidos 482 tests sin omisiones en cada arquitectura Docker Linux.
 El [registro de aceptación](native-validation/STATUS.md) separa ese resultado
 de las pruebas pendientes en los equipos físicos.

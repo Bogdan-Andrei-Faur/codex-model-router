@@ -9,6 +9,11 @@ El código es visible, con redistribución restringida y la excepción de los fo
 permitidos por GitHub. Consulta [LICENSE](LICENSE) y los
 [avisos de terceros](THIRD_PARTY_NOTICES.md); no es una licencia open source.
 
+El repositorio público contiene el código; todavía no hay instaladores publicados
+en Releases. La actualización firmada para Mac está implementada y probada con
+paquetes aislados; quedan validaciones nativas y los adaptadores de Windows/Ubuntu.
+Consulta [el estado de distribución](docs/MANAGED-UPDATES.md).
+
 Catálogo, tarifas, migración y evidencia de compatibilidad: [modelos 0.6.0](docs/MODEL-CATALOG.md).
 
 Para continuar desde otro equipo o con un agente nuevo, empieza por
@@ -524,8 +529,8 @@ suscripción. La calidad y el ahorro real requieren observar tareas representati
   del motor y sus auxiliares; macOS utiliza el bundle descubierto. Si una actualización
   cambia el protocolo, usa **Desconectar integración** antes de abrir Desktop normalmente.
   La detección de rutas no garantiza compatibilidad con futuras versiones del protocolo.
-- Todo es personal, fuera de Grimaldi. El código está respaldado en el repositorio
-  privado [Bogdan-Andrei-Faur/codex-model-router](https://github.com/Bogdan-Andrei-Faur/codex-model-router).
+- El código está publicado con licencia de uso personal en
+  [Bogdan-Andrei-Faur/codex-model-router](https://github.com/Bogdan-Andrei-Faur/codex-model-router).
 
 Pruebas y límites de validación: [VALIDATION.md](docs/VALIDATION.md).
 

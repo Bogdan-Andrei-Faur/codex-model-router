@@ -108,7 +108,7 @@ Falta probar un lateral real después de reiniciar Desktop; no reiniciar tareas
 activas para activarlo. La integración nativa del MacBook sigue pendiente.
 
 La base 0.3.0 se publicó como `c129beb` y pasó las cinco comprobaciones de
-[CI Windows/macOS](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/36113819551).
+[CI Windows/macOS](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/36113819551).
 Ese resultado corresponde a 0.3.0, no valida retrospectivamente este cambio.
 En aquella sesión no estaban disponibles las herramientas de Atlas.
 

@@ -17,7 +17,8 @@ Nunito license texts in `licenses/Lucide.txt` and `licenses/Nunito.txt`, beside
 The current application brand in `assets/brand/` is the owner-approved generated
 routing artwork, covered by the project license. Historical third-party Codex
 images were retired from the current tree and package consumers on 2026-10-09;
-they remain in Git history. The root license grants no rights to those historical
+they remain only in the preserved private original repository and private local
+backups. The clean public history excludes those three image paths. The root license grants no rights to those historical
 images or marks. Their recorded provenance did not establish redistribution
 permission; changing current assets does not resolve historical exposure review.
 

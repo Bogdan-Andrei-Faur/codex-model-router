@@ -51,7 +51,7 @@ all redesign receipts; their stated earlier artifacts remain historical evidence
 ## Baseline recorded 2026-10-05
 
 Source `02d0be1efe98c9f2c30751b4ee4a532a0c5ed1fb` passed
-[all 13 CI jobs](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37315933675).
+[all 13 CI jobs](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/37315933675).
 Real Linux x86_64/ARM64 Docker jobs each passed 482 tests without skips. Hosted
 Python 3.9/3.14 and native monitor/UI checks passed on all three OSes, with two
 Ubuntu APT lifecycle jobs. Those are CI results for that source, not acceptance

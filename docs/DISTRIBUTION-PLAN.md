@@ -1,5 +1,9 @@
 # Public distribution and managed updates — 2026-10-09
 
+Current status: clean canonical source is PUBLIC; the original repository is
+PRIVATE and archived. No installer release exists yet. See the executed
+[publication receipt](HISTORY-CLEANUP.md) and [update contract](MANAGED-UPDATES.md).
+
 ## Owner decisions
 
 The owner selected the canonical source repository itself as the public release

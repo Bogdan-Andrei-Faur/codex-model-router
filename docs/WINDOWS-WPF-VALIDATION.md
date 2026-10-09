@@ -42,7 +42,7 @@ primer clic/hover en uso real, bandeja, multi-DPI, transparencias y DPAPI.
 ## Self-test nativo en CI — 05/10/2026
 
 El trabajo `monitor (windows-latest)` de la
-[CI 37266579456](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37266579456),
+[CI 37266579456](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/37266579456),
 fuente `b1c0935e3c6c352f7af6af8c3059b9a6de1c9cfe`, pasa compilación,
 `--self-test` WebView2 nativo y los grupos de navegador. Ese run completo
 no está verde: falló un test de tiempo de Python 3.9 en Ubuntu. No trasladar

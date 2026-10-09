@@ -97,7 +97,7 @@ contadores pendiente de reinicio de Desktop.
 
 ## Comprobaciones para publicación y traspaso — 05/10/2026
 
-La [primera CI de la publicación](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37265778417)
+La [primera CI de la publicación](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/37265778417)
 detectó evaluadores Seatbelt ejecutados fuera de macOS, conversión CRLF de
 fixtures en Windows, dos supuestos de paths POSIX en pruebas y un shim que
 asumía `window.chrome` en Chromium. Corregidos con omisiones explícitas solo
@@ -111,7 +111,7 @@ simulada no es ejecución Linux nativa. Nueva fuente build `dd696111d3ce2381`,
 motor `de67953b7ece48ce`; el paquete Mac anterior sigue siendo histórico.
 El resultado de CI posterior debe consultarse por el SHA de la corrección.
 
-La [segunda CI](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37266282702)
+La [segunda CI](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/37266282702)
 ya pasa Python 3.9/3.14 en Ubuntu. Reveló una comprobación de bits POSIX usada
 en Windows (no representa ACL) y una espera fija de 260 ms para un cierre de
 hover de 220 ms, insuficiente bajo carga de CI. La comprobación de bits queda
@@ -119,7 +119,7 @@ solo en POSIX y el test de hover espera el estado oculto con límite de dos
 segundos; no cambia el comportamiento del producto. Las matrices ya no cancelan
 los demás sistemas ante un fallo, para conservar todos los diagnósticos.
 
-La [tercera CI](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37266579456)
+La [tercera CI](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/37266579456)
 pasa ocho de nueve trabajos, incluidos los tres monitores y Python en Windows
 y Mac. Ubuntu 3.9 detectó una aserción de tiempo de un test histórico: 352 ms
 frente a un límite de 300 ms que incluía planificación y escritura del circuito.
@@ -861,7 +861,7 @@ Python 3.12.3, GNOME/Wayland x86_64, Desktop 26.924.22138 y motor
   de dispositivo 1×, 1,25×, 1,5× y 2×. En las ocho combinaciones, documento,
   cuerpo y superficie permanecieron dentro del viewport y sin desbordamiento
   horizontal.
-- GitHub Actions [36401583079](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/36401583079)
+- GitHub Actions [36401583079](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/36401583079)
   pasó los nueve trabajos: Python 3.9/3.14 y monitor en Ubuntu, macOS y Windows.
   La primera ejecución expuso una carrera en macOS 3.14: la prueba acortaba a la
   vez la espera del decodificador y el cierre total del socket. Ambos plazos se
@@ -1892,7 +1892,7 @@ from Linux-only results.
 
 ## First delivery CI and native grader gate — 2026-10-05
 
-[Router checks #37](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37306907185)
+[Router checks #37](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/37306907185)
 ran the complete 11-job matrix for `1efc979`. Both Ubuntu APT lifecycle jobs,
 Windows Python 3.9/3.14, Ubuntu Python 3.9/3.14 and native Windows/macOS monitor
 jobs passed. The Ubuntu GUI assertions all passed, but temporary-directory

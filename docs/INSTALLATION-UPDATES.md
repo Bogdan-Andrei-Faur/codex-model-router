@@ -2,9 +2,10 @@
 
 2026-10-09 distribution decision: the owner selected the canonical repository
 itself for eventual public installers, accepted GitHub platform forks and chose
-personal/noncommercial source-available licensing. The source repository remains
-private during preparation. This supersedes the artifact-only channel proposal
-below; see [DISTRIBUTION-PLAN.md](DISTRIBUTION-PLAN.md) for the exact update flow,
+personal/noncommercial source-available licensing. The clean canonical source
+repository is now public; the original is retained as a private archive. See
+[the publication receipt](HISTORY-CLEANUP.md). This supersedes the historical
+artifact-only channel proposal below; see [DISTRIBUTION-PLAN.md](DISTRIBUTION-PLAN.md) for the exact update flow,
 publication prerequisites and current implementation gaps.
 
 Owner-approved direction (2026-10-04): one shared product, distributed as a macOS

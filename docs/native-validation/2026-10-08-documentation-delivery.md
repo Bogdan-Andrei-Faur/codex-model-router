@@ -68,7 +68,7 @@ patch, routing-policy activation or model-attribution confirmation is claimed.
 ## Remote CI and publication
 
 Previous baseline source `48760d78e35c7bd31263308f74cbc39b8a501611`:
-[run 37609750802](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37609750802)
+[run 37609750802](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/37609750802)
 finished with 13 successful jobs and one failed `windows-installer` job. The
 failure was in frozen payload/isolated installer validation:
 `Frozen bridge closed before protocol response`. It predates this redesign and
@@ -76,7 +76,7 @@ must not be hidden by citing the older successful 13-job matrix.
 
 First published implementation: `30ad758cf1d0c95ea4bed546ea3aa95ebf410971`,
 remote branch identity verified, no uncommitted project files.
-[Run 37799063084](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37799063084)
+[Run 37799063084](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/37799063084)
 finished with 11 successful jobs and three failures: the previous frozen Windows
 installer failure, the Windows native monitor fixture, and macOS browser preview
 startup. Python on all six OS/version combinations, both real Docker grader
@@ -102,7 +102,7 @@ Follow-up corrections before final publication:
 
 Follow-up source: `c5ff3d985648d07b168d7cb92bded45fcb536181`, pushed and
 remote branch identity verified.
-[Run 37799872117](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/37799872117)
+[Run 37799872117](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009/actions/runs/37799872117)
 attempt 1 finished with 11 successful jobs and three failures. The six Python
 jobs, two Docker architectures, two APT lifecycles and macOS monitor passed.
 Windows native compilation/self-test passed (including the bundled font), but

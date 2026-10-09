@@ -1,10 +1,10 @@
-# Reviewable history-cleanup candidate — 2026-10-09
+# Clean public source publication — 2026-10-09
 
-Status: **prepared locally; no remote history or visibility changed**. The owner
-asked to see this result before authorizing a remote rewrite. The existing
-checkout and all new uncommitted updater work are preserved.
+Status: **executed after owner review and approval**. The canonical repository
+is public with clean history; the original remains private and archived. No remote
+history was force-rewritten, no repository was deleted and no installer was released.
 
-## Exact candidate
+## Initial review candidate (before updater source commit)
 
 A fresh mirror of the canonical remote at main
 `63d3f39985dc426d0e0339f99d549917324ce5dd` was backed up as a verified full Git
@@ -47,8 +47,8 @@ renamed archive, then create a fresh repository at the canonical name/URL with
 only the reviewed clean branches/tags. This preserves the original backup,
 Actions records and PR privately. It does require separate owner authorization
 for the rename, creation, source publication and eventual visibility change.
-No such action has been taken. Existing integrations, redirects, settings and
-links must be inventoried before executing it. Do not delete either repository.
+The owner subsequently selected this alternative. The execution receipt below
+records the result. Do not delete either repository.
 
 Alternatively, the owner may retain this same repository and defer public
 visibility until a satisfactory resolution of the PR/cached-history exposure is
@@ -71,3 +71,37 @@ Use a fresh clone to validate the new remote history before migrating local work
 Do not merge the old history back, and do not use reset/clean to discard owner
 changes. Installed applications and their private data are independent and must
 not be replaced merely to synchronize source history.
+
+## Executed publication and local synchronization
+
+- Public canonical repository:
+  [codex-model-router](https://github.com/Bogdan-Andrei-Faur/codex-model-router).
+- Original repository preserved PRIVATE and archived:
+  [codex-model-router-private-archive-20261009](https://github.com/Bogdan-Andrei-Faur/codex-model-router-private-archive-20261009).
+  Its original main, PR and Actions records remain intact. No releases, webhooks,
+  deployment keys, Actions secrets/variables or environments needed transfer.
+- Updated source was committed as `b3cbac3c190018ed5fb2c7b7382737e7c8d80d93` in the pre-public local history.
+  A fresh backed-up mirror produced clean public main `5dac586bf6d74cea6a58da7e89798cbf1218ad06`.
+  Its file tree is exactly equal to that source commit, with the three old image
+  paths absent from every published branch/tag history. Object checks pass.
+- Published exactly2 branches and10 tags, with atomic normal push. No PR refs,
+  private backups, runtime state or installers were uploaded. New repository
+  Actions were temporarily disabled during historical ref import and reenabled
+  afterwards; no result of the new CI is asserted.
+- Latest verified private pre-filter bundle SHA-256:
+  `c62084a997f045f7f3633b02b96f8886a6ee29deb118abdc77af55bdab4b4e2e`.
+  Local evidence lives in the ignored path referenced by `state/public-source-path.txt`.
+- Local `main` tracks the new `origin/main`. The old main is preserved as
+  `codex/pre-public-20261009`, all previous local branch/tag refs are retained
+  under `refs/archive/pre-public-20261009/`, and a full local bundle was verified.
+  Local version tags now match the clean public tags. The `private-archive`
+  remote points to the preserved original. No reset/clean or owner-data deletion
+  was used. Never push archival refs or use `git push --mirror` from this checkout.
+- Historical CI links now point to the private archive and require owner access.
+  Historical receipt commit IDs describe their original evidence; they are not
+  the rewritten public commit IDs. Documentation-only publication receipts may
+  follow the clean main commit named above.
+
+The repository is public; the application is **not** yet a published installer
+release. Signing/managed-update and native acceptance limits remain in
+[MANAGED-UPDATES.md](MANAGED-UPDATES.md).

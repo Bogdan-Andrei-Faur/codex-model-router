@@ -66,9 +66,10 @@ exportados incluidos; el usuario final no necesita Pillow ni compilar imágenes.
 
 Los antiguos `codex-official.png`, `codex-ui-1024.png` y `codex.ico`, obtenidos de
 un espejo de un listado de Product Hunt, se han retirado del árbol actual y de
-sus consumidores. Se conservan únicamente en el historial Git y en una copia
-privada local. Esto no reescribe el historial ni acredita permisos sobre aquellas
-imágenes históricas. La integración en código no sustituye la instalación activa.
+sus consumidores. Tras la publicación del repositorio limpio se conservan solo
+en el repositorio original archivado como privado y en las copias privadas
+locales. No se acreditan permisos sobre aquellas imágenes históricas. Consulta
+[el recibo de publicación](../docs/HISTORY-CLEANUP.md). La integración en código no sustituye la instalación activa.
 
 ## Tipografía del monitor
 
