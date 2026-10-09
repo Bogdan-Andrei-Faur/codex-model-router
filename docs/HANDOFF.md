@@ -9,6 +9,65 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 
 ## Current source and delivery
 
+- The owner authorized direct-main publication of all pending project work on
+  2026-10-09: original brand/assets, rigid companion scenes and 26 GIF previews,
+  compact capsule/Consumption geometry, personal-use license/notices and package
+  integration. Use local HEAD and remote main for the delivery revision. Private
+  runtime data and build artifacts remain excluded. This source delivery does not
+  replace the active installation, restart Desktop, change repository visibility
+  or publish installers/a release. New CI is not awaited or asserted successful.
+  GIF manifests retain the actual source hashes from their earlier capture; the
+  subsequent brand/header changes do not rewrite that historical render provenance.
+  Pre-publication checks: 23 focused Python tests, 33 JS core tests and all 15
+  browser groups PASS, including 576 rigidity samples; brand metadata/hash checks
+  and staged whitespace checks PASS. A bounded credential/private-path scan of
+  the staged source found no matches; it is not a full public-exposure audit.
+
+- Owner-approved brand (2026-10-09): original three-destination routing artwork
+  replaces current third-party Codex icon files/consumers. Canonical master,
+  PNG256/1024, multi-size ICO and ICNS are in `assets/brand/`, with hashes and
+  deterministic export/check tooling. README, Settings, Mac bundle metadata,
+  Windows executable/setup/tray and Ubuntu icons use it. Functional Lucide icons
+  and unrelated animation work are preserved. Installed apps are unchanged;
+  native/physical acceptance and publication remain separate. Historical third-
+  party artwork remains in Git history. See [brand guide](../assets/README.md).
+
+- Public distribution preparation (2026-10-09): owner selected the same source
+  repository for Releases, accepted GitHub forks, and chose free personal,
+  noncommercial use with private modifications and restricted redistribution.
+  Root license/notices and package inclusion accompany the source delivery.
+  Repository still private; visibility awaits remaining exposure/
+  third-party branding review. Settings apply/recovery/relaunch and Mac packaged
+  migration remain implementation work, not delivered self-update. See
+  [DISTRIBUTION-PLAN.md](DISTRIBUTION-PLAN.md).
+
+- Owner-directed rigid companion revision: all26GIFs and contact sheet rebuilt;
+  body/components keep their shape, with scene-specific actions and contrasting
+  Lucide signals.900ms entry/exit preserves the camera exclusion during contraction.
+  Installed Mac monitor `e20402820c674648`, matching router `5aa7726ffeba863f`;
+  one monitor/connection, config/preferences retained.33JS,15browser groups,
+  576rigidity samples,3preview tests and native18-state fixture PASS. Owner visual
+  and natural-event acceptance remain separate. See [receipt](native-validation/2026-10-09-macos-rigid-companions.md)
+  and [updated gallery](design/companion-animations/index.html).
+
+- Mac compact capsule reduced from64 to48 points at the owner request; installed
+  monitor `d90a78874b17fb92`, router `5aa7726ffeba863f`, one monitor/connection
+  and no build mismatch. Config/preferences retained. Camera, usage/layout and
+  interaction browser checks PASS; physical visual acceptance remains open.
+  See [receipt](native-validation/2026-10-09-macos-capsule-height.md).
+
+- Local Mac Consumption width follow-up: all five screens share the 790px cap.
+  Installed monitor `af7bc672a28ff37e`; one monitor/connection, loaded router now
+  matches `5aa7726ffeba863f`. Config/preferences preserved, Desktop untouched.
+  Equal-width responsive checks and Consumption/Settings browser group PASS;
+  natural observer/physical acceptance remains open. See [receipt](native-validation/2026-10-09-macos-consumption-width.md).
+
+- Mac update installed from `c82e1ea` on 2026-10-09: source-backed monitor
+  `0e4670784e5b2672`, expected router `5aa7726ffeba863f`; one monitor and one
+  connection, config/preferences preserved. Loaded Desktop router remains
+  `80e86c3d7accf253`; owner-controlled restart and natural event acceptance remain
+  pending. Only monitor restarted. See [installation receipt](native-validation/2026-10-09-macos-remote-installation.md).
+
 - The owner authorized direct-main publication of the companion gesture changes,
   GIF catalogue, generator and documentation from `fix/companion-activity-gestures`,
   based on `dc317cb`. Use local HEAD and remote `main` for the delivery revision;

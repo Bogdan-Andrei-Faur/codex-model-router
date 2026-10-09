@@ -1,4 +1,13 @@
-# Codex automático — selector personal
+<img src="assets/brand/router-256.png" width="96" height="96" alt="Codex Model Router">
+
+# Codex Model Router
+
+Enrutamiento automático de modelos y monitor personal de agentes para Codex.
+
+Uso personal y no comercial gratuito; se permiten modificaciones privadas.
+El código es visible, con redistribución restringida y la excepción de los forks
+permitidos por GitHub. Consulta [LICENSE](LICENSE) y los
+[avisos de terceros](THIRD_PARTY_NOTICES.md); no es una licencia open source.
 
 Catálogo, tarifas, migración y evidencia de compatibilidad: [modelos 0.6.0](docs/MODEL-CATALOG.md).
 
@@ -74,6 +83,8 @@ mediante APT. Windows 0.9.0 añade un [instalador por usuario](docs/WINDOWS-INST
 con runtime incluido, importación y datos independientes. La distribución firmada,
 el canal público de descargas y la aplicación automática de actualizaciones siguen pendientes.
 Estado y límites: [INSTALLATION-UPDATES.md](docs/INSTALLATION-UPDATES.md).
+Canal del mismo repositorio, licencia y flujo de actualización acordado:
+[DISTRIBUTION-PLAN.md](docs/DISTRIBUTION-PLAN.md).
 
 ### Evidencia comparable y evaluación
 

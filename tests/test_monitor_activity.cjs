@@ -18,16 +18,16 @@ const assert=require('node:assert/strict');
   const portrait=page.locator('.hero-character');
   assert.equal(await portrait.getAttribute('data-state'),'thinking');
   assert.match(await portrait.getAttribute('aria-label'),/Pensando/);
-  assert.equal(await portrait.locator('.character-body').evaluate(n=>getComputedStyle(n).animationName),'companion-think');
+  assert.equal(await portrait.locator('.thought-cloud').evaluate(n=>getComputedStyle(n).animationName),'companion-cloud');
   const look=await portrait.getAttribute('data-appearance');
   const signatures=new Set();
   for(const kind of ['thinking','planning','writing','executing','editing','searching','tool','collaborating','inspecting','generating','reviewing','compacting','retrying','preparing']){
    await update(kind);assert.equal(await portrait.getAttribute('data-state'),kind);
    assert.equal(await portrait.getAttribute('data-appearance'),look);
-   assert.notEqual(await portrait.locator(kind==='collaborating'?'.hand-right':'.character-body').evaluate(n=>getComputedStyle(n).animationName),'none');
+   assert.ok(await portrait.evaluate(n=>n.getAnimations({subtree:true}).length>0));
    const signature=await portrait.evaluate(n=>{
     const prop=n.querySelector('.activity-prop');
-    return {kind:prop.dataset.kind,shape:prop.innerHTML,motion:getComputedStyle(n.querySelector('.character-body')).animationName};
+    return {kind:prop.dataset.kind,shape:prop.innerHTML,motion:[...n.querySelectorAll('.activity-prop *,.hand-left,.hand-right')].map(x=>getComputedStyle(x).animationName).filter(x=>x!=='none').join(',')};
    });
    assert.equal(signature.kind,kind);
    assert.ok(!signatures.has(signature.motion),'specific activities must have distinct movement');
@@ -57,7 +57,7 @@ const assert=require('node:assert/strict');
   await update('thinking');
   await page.emulateMedia({reducedMotion:'reduce'});
   assert.equal(await portrait.locator('.character-body').evaluate(n=>getComputedStyle(n).animationName),'none');
-  assert.equal(await portrait.locator('.activity-prop[data-kind=thinking] circle').count(),3,'static thinking remains recognizable with motion disabled');
+  assert.equal(await portrait.locator('.thought-cloud').count(),1,'static thinking remains recognizable with motion disabled');
   await page.emulateMedia({reducedMotion:'no-preference'});
   await page.evaluate(()=>window.receive({ui:{reduced:true}}));
   assert.equal(await portrait.locator('.character-body').evaluate(n=>getComputedStyle(n).animationName),'none');

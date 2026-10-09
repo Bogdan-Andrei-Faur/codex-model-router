@@ -17,7 +17,7 @@ const assert=require('node:assert/strict');
         if(m.action==='mode')queueMicrotask(()=>window.receiveUI({mode:m.value,modeRequest:m.request}));
       }};
     });
-    await page.route('**/codex.png',r=>r.fulfill({path:path.resolve(__dirname,'../assets/codex-official.png')}));
+    await page.route('**/codex.png',r=>r.fulfill({path:path.resolve(__dirname,'../assets/brand/router-256.png')}));
     await page.goto(pathToFileURL(path.resolve(__dirname,'../monitor-ui/index.html')).href);
     assert.ok(await page.evaluate(()=>window.nativeMessages.some(m=>m.action==='ready')));
     await page.evaluate(()=>window.receive({platform:'windows',secretStorage:'Windows DPAPI',historyLoaded:false,

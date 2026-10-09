@@ -1,5 +1,12 @@
 # Graphical installation and updates
 
+2026-10-09 distribution decision: the owner selected the canonical repository
+itself for eventual public installers, accepted GitHub platform forks and chose
+personal/noncommercial source-available licensing. The source repository remains
+private during preparation. This supersedes the artifact-only channel proposal
+below; see [DISTRIBUTION-PLAN.md](DISTRIBUTION-PLAN.md) for the exact update flow,
+publication prerequisites and current implementation gaps.
+
 Owner-approved direction (2026-10-04): one shared product, distributed as a macOS
 `.pkg`, Windows `-setup.exe` and Ubuntu `.deb`. The installed application must work
 without a checkout, development Python, compilation or terminal commands. Settings

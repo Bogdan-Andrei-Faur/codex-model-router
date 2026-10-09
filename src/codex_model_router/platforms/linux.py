@@ -65,7 +65,7 @@ def setup(app=None, entry=None):
     # Every launch reads the same UI sources as macOS; no Linux fork of the UI.
     ui = dist / 'linux-ui'
     shutil.copytree(ROOT / 'monitor-ui', ui, dirs_exist_ok=True)
-    shutil.copyfile(ROOT / 'assets/codex-ui-1024.png', ui / 'codex.png')
+    shutil.copyfile(ROOT / 'assets/brand/router-1024.png', ui / 'codex.png')
     commands = {'codex-router': [sys.executable, ROOT / 'router.py'],
                 'codex-monitor-linux': [sys.executable, ROOT / 'monitor_linux.py'],
                 'codex-desktop': [sys.executable, ROOT / 'linux.py', 'launch-native', '--']}
@@ -76,7 +76,7 @@ def setup(app=None, entry=None):
     for identifier, name, command in [('codex-router-monitor.desktop', 'Monitor de Codex', [dist / 'codex-monitor-linux']),
                                       ('codex-router.desktop', 'Codex automático', [sys.executable, ROOT / 'linux.py', 'open'])]:
         target = applications() / identifier
-        content = '[Desktop Entry]\nType=Application\nName=' + name + '\nExec=' + ' '.join(entry_quote(x) for x in command) + '\nIcon=' + str(ROOT / 'assets/codex-official.png') + '\nTerminal=false\nCategories=Utility;Development;\nX-Codex-Router-Root=' + str(ROOT) + '\n'
+        content = '[Desktop Entry]\nType=Application\nName=' + name + '\nExec=' + ' '.join(entry_quote(x) for x in command) + '\nIcon=' + str(ROOT / 'assets/brand/router-256.png') + '\nTerminal=false\nCategories=Utility;Development;\nX-Codex-Router-Root=' + str(ROOT) + '\n'
         if target.exists() and ('X-Codex-Router-Root=' + str(ROOT) + '\n') not in target.read_text():
             raise DiscoveryError('Existe un acceso del monitor de otra instalación; no se ha sustituido.')
         atomic_text(target, content, 0o644)

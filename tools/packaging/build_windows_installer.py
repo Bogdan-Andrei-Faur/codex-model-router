@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from codex_model_router.build_identity import identity, router_identity
+from tools.packaging.legal import copy_legal_notices
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -69,7 +70,7 @@ def build(python, compiler, bootstrapper, output, framework=None):
     resources=application/'Resources'; resources.mkdir(parents=True); binaries=application/'bin'; binaries.mkdir()
     windows=os.environ['WINDIR']; csc=Path(windows)/'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
     run([csc,'/nologo','/target:winexe','/optimize+','/r:System.Core.dll','/r:System.Web.Extensions.dll','/r:System.Windows.Forms.dll',
-         '/win32icon:'+str(source/'assets/codex.ico'),'/out:'+str(stable/'codex-router.exe'),source/'native/windows/InstalledLauncher.cs',source/'native/windows/WindowsLayout.cs',source/'dist/BuildInfo.cs'],log)
+         '/win32icon:'+str(source/'assets/brand/router.ico'),'/out:'+str(stable/'codex-router.exe'),source/'native/windows/InstalledLauncher.cs',source/'native/windows/WindowsLayout.cs',source/'dist/BuildInfo.cs'],log)
     spec=workspace/'runtime.spec'
     spec.write_text('a=Analysis(['+repr(str(source/'tools/packaging/runtime_entry.py'))+'],pathex=['+repr(str(source/'src'))+','+repr(str(source))+'],hiddenimports=["build_stamp"])\n'
                     'pyz=PYZ(a.pure)\nexe=EXE(pyz,a.scripts,[],exclude_binaries=True,name="router-runtime",console=True,upx=False)\n'
@@ -79,8 +80,9 @@ def build(python, compiler, bootstrapper, output, framework=None):
     shutil.copy2(source/'dist/codex-monitor-v24.exe',binaries/'codex-monitor.exe')
     for name in ('Microsoft.Web.WebView2.Core.dll','Microsoft.Web.WebView2.Wpf.dll'):shutil.copy2(source/'dist'/name,binaries/name)
     shutil.copytree(source/'dist/runtimes',binaries/'runtimes')
-    shutil.copytree(source/'monitor-ui',resources/'ui'); shutil.copy2(source/'assets/codex-ui-1024.png',resources/'ui/codex.png')
+    shutil.copytree(source/'monitor-ui',resources/'ui'); shutil.copy2(source/'assets/brand/router-1024.png',resources/'ui/codex.png')
     shutil.copytree(source/'assets',resources/'assets');shutil.copy2(source/'VERSION',resources/'VERSION')
+    copy_legal_notices(source, resources)
     defaults=json.loads((source/'config.example.json').read_text())
     for key in ('python','router_runtime','monitor_runtime','desktop_runtime'):defaults.pop(key,None)
     defaults['comparison_engines']=[]

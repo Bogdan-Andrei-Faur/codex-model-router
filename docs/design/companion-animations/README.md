@@ -4,7 +4,7 @@
 
 [Abrir la galería visual](index.html) · [Contrato de actividad](../../COMPANION-ACTIVITY.md)
 
-Usa el número o la clave para pedir cambios, por ejemplo: **03 Pensando** o **thinking**. Los gestos únicos y las transiciones se repiten en el GIF para revisarlos; en la app se ejecutan una vez. Los estados estáticos se incluyen como referencia.
+Usa el número o la clave para pedir cambios, por ejemplo: **03 Pensando** o **thinking**. Los gestos únicos y las transiciones se repiten en el GIF para revisarlos; en la app se ejecutan una vez. Reposo, espera y desconexión incluyen sus movimientos suaves. El cuerpo y los objetos conservan su forma.
 
 Los bucles cubren un ciclo completo de todos los movimientos combinados, incluido el parpadeo. El código de producción determina la duración; no se acelera el movimiento.
 
@@ -34,10 +34,10 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 | 20 | [Turno terminado](#done) | `done` | Gesto único |
 | 21 | [Entrada del personaje](#enter) | `enter` | Transición |
 | 22 | [Salida del personaje](#leave) | `leave` | Transición |
-| 23 | [En reposo](#idle) | `idle` | Referencia estática |
-| 24 | [Actividad sin confirmar](#unknown) | `unknown` | Referencia estática |
-| 25 | [Sin conexión](#offline) | `offline` | Referencia estática |
-| 26 | [Espera genérica · compatibilidad](#waiting) | `waiting` | Referencia estática |
+| 23 | [En reposo](#idle) | `idle` | Bucle |
+| 24 | [Actividad sin confirmar](#unknown) | `unknown` | Bucle |
+| 25 | [Sin conexión](#offline) | `offline` | Bucle |
+| 26 | [Espera genérica · compatibilidad](#waiting) | `waiting` | Bucle |
 
 <a id="preparing"></a>
 
@@ -53,7 +53,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Trabajando](02-working.gif)
 
-`working` · Bucle · 46.8 s
+`working` · Bucle · 4 s
 
 <a id="thinking"></a>
 
@@ -61,7 +61,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Pensando](03-thinking.gif)
 
-`thinking` · Bucle · 47.6 s
+`thinking` · Bucle · 4 s
 
 <a id="planning"></a>
 
@@ -69,7 +69,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Planificando](04-planning.gif)
 
-`planning` · Bucle · 3.2 s
+`planning` · Bucle · 4 s
 
 <a id="writing"></a>
 
@@ -77,7 +77,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Escribiendo](05-writing.gif)
 
-`writing` · Bucle · 3.6 s
+`writing` · Bucle · 4 s
 
 <a id="executing"></a>
 
@@ -93,7 +93,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Editando archivos](07-editing.gif)
 
-`editing` · Bucle · 11.2 s
+`editing` · Bucle · 4 s
 
 <a id="searching"></a>
 
@@ -101,7 +101,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Buscando en la web](08-searching.gif)
 
-`searching` · Bucle · 5.2 s
+`searching` · Bucle · 4 s
 
 <a id="tool"></a>
 
@@ -109,7 +109,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Usando una herramienta](09-tool.gif)
 
-`tool` · Bucle · 7.2 s
+`tool` · Bucle · 4 s
 
 <a id="collaborating"></a>
 
@@ -117,7 +117,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Colaborando](10-collaborating.gif)
 
-`collaborating` · Bucle · 16.8 s
+`collaborating` · Bucle · 4 s
 
 <a id="inspecting"></a>
 
@@ -125,7 +125,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Observando una imagen](11-inspecting.gif)
 
-`inspecting` · Bucle · 3 s
+`inspecting` · Bucle · 4 s
 
 <a id="generating"></a>
 
@@ -133,7 +133,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Generando una imagen](12-generating.gif)
 
-`generating` · Bucle · 15.4 s
+`generating` · Bucle · 4 s
 
 <a id="reviewing"></a>
 
@@ -149,7 +149,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Compactando contexto](14-compacting.gif)
 
-`compacting` · Bucle · 3.6 s
+`compacting` · Bucle · 4 s
 
 <a id="approval"></a>
 
@@ -157,7 +157,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Esperando aprobación](15-approval.gif)
 
-`approval` · Bucle · 5.6 s
+`approval` · Bucle · 4 s
 
 <a id="question"></a>
 
@@ -165,7 +165,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Esperando tu respuesta](16-question.gif)
 
-`question` · Bucle · 4.8 s
+`question` · Bucle · 4 s
 
 <a id="retrying"></a>
 
@@ -221,7 +221,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![En reposo](23-idle.gif)
 
-`idle` · Referencia estática · 0.05 s
+`idle` · Bucle · 4 s
 
 <a id="unknown"></a>
 
@@ -229,7 +229,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Actividad sin confirmar](24-unknown.gif)
 
-`unknown` · Referencia estática · 0.05 s
+`unknown` · Bucle · 4 s
 
 <a id="offline"></a>
 
@@ -237,7 +237,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Sin conexión](25-offline.gif)
 
-`offline` · Referencia estática · 0.05 s
+`offline` · Bucle · 4 s
 
 <a id="waiting"></a>
 
@@ -245,7 +245,7 @@ Los bucles cubren un ciclo completo de todos los movimientos combinados, incluid
 
 ![Espera genérica · compatibilidad](26-waiting.gif)
 
-`waiting` · Referencia estática · 0.05 s
+`waiting` · Bucle · 4 s
 
 
 ## Regenerar después de corregir una animación
@@ -255,6 +255,8 @@ Requiere las dependencias Node del proyecto, Chromium de Playwright y Python con
 ```sh
 node tools/render_companion_gifs.cjs           # todos
 node tools/render_companion_gifs.cjs thinking # solo Pensando
+# Si Pillow está en un entorno virtual:
+ROUTER_GIF_PYTHON=/ruta/al/venv/bin/python node tools/render_companion_gifs.cjs
 ```
 
 Los GIFs y el índice se guardan en esta carpeta. `manifest.json` registra las animaciones, tiempos y hashes del código renderizado.

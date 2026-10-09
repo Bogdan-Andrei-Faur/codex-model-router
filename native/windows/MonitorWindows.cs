@@ -173,7 +173,7 @@ sealed class RouterMonitorWindow : Window
     void MakeTray()
     {
         if(preview)return;
-        tray=new Forms.NotifyIcon {Icon=new System.Drawing.Icon(Path.Combine(codeRoot,"assets","codex.ico")),Text="Codex automático",Visible=true};
+        tray=new Forms.NotifyIcon {Icon=new System.Drawing.Icon(Path.Combine(codeRoot,"assets","brand","router.ico")),Text="Codex automático",Visible=true};
         var menu=new Forms.ContextMenuStrip();
         menu.Items.Add("Cápsula",null,delegate{SetMode("Compact");});menu.Items.Add("Desplegar isla",null,delegate{SetMode("Expanded");});
         menu.Items.Add("Ocultar",null,delegate{SetMode("Hidden");});menu.Items.Add("Mantener delante",null,delegate{Topmost=!Topmost;SaveUi();PublishUi();});

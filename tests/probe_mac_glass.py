@@ -113,7 +113,7 @@ app.run()
         binary.parent.mkdir(parents=True)
         ui = contents / 'Resources' / 'ui'
         shutil.copytree(ROOT / 'monitor-ui', ui)
-        shutil.copyfile(ROOT / 'assets/codex-ui-1024.png', ui / 'codex.png')
+        shutil.copyfile(ROOT / 'assets/brand/router-1024.png', ui / 'codex.png')
         script=ui/'monitor.js'
         script.write_text(script.read_text().replace("native({action:'bounds',x:r.x", "window.fixtureBounds={x:r.x,y:r.y,width:r.width,height:r.height};native({action:'bounds',x:r.x"))
         (ui / 'probe-errors.js').write_text("window.fixtureErrors=[];window.addEventListener('error',e=>window.fixtureErrors.push(e.message));\n")

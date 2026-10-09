@@ -15,6 +15,7 @@ import tempfile
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+from tools.packaging.legal import copy_legal_notices
 
 ROOT = Path(__file__).resolve().parents[2]
 DEPENDENCIES = ('python3 (>= 3.9), python3-gi, python3-gi-cairo, '
@@ -42,6 +43,7 @@ def build(output, revision='1'):
         application = stage / 'usr/lib/codex-model-router'
         resources = application / 'Resources'
         resources.mkdir(parents=True)
+        copy_legal_notices(ROOT, resources)
         # Explicit source patterns: never include local config, state or Git data.
         shutil.copytree(ROOT / "src", resources / "src",
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
@@ -49,7 +51,7 @@ def build(output, revision='1'):
             shutil.copyfile(ROOT / name, resources / name)
         shutil.copytree(ROOT / 'monitor-ui', resources / 'ui')
         shutil.copytree(ROOT / 'assets', resources / 'assets')
-        shutil.copyfile(ROOT / 'assets/codex-ui-1024.png', resources / 'ui/codex.png')
+        shutil.copyfile(ROOT / 'assets/brand/router-1024.png', resources / 'ui/codex.png')
         write(resources / 'application.json', json.dumps({'schema': 1, 'layout': 'linux-deb-v1',
             'runtime': 'bin/router-runtime', 'bridge': 'bin/codex-router', 'launcher': 'bin/codex-desktop',
             'monitor': 'bin/codex-monitor-linux'}) + '\n')
@@ -70,12 +72,8 @@ def build(output, revision='1'):
             'Icon=codex-model-router\nTerminal=false\nCategories=Development;\n')
         icon = stage / 'usr/share/icons/hicolor/1024x1024/apps/codex-model-router.png'
         icon.parent.mkdir(parents=True)
-        shutil.copyfile(ROOT / 'assets/codex-ui-1024.png', icon)
-        for name in ('LICENSE',):
-            if (ROOT / name).is_file():
-                destination = stage / 'usr/share/doc/codex-model-router' / name
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(ROOT / name, destination)
+        shutil.copyfile(ROOT / 'assets/brand/router-1024.png', icon)
+        copy_legal_notices(ROOT, stage / 'usr/share/doc/codex-model-router')
         write(stage / 'DEBIAN/control',
             'Package: codex-model-router\nVersion: ' + version + '-' + revision + '\n'
             'Section: utils\nPriority: optional\nArchitecture: all\n'

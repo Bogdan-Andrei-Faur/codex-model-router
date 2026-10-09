@@ -1,8 +1,8 @@
-# Icono del acceso personal
+# Marca e iconos de Codex Model Router
 
 ## Iconos funcionales de la aplicación
 
-El catálogo funcional se unifica con **Lucide 1.51.0**: 33 SVG originales
+El catálogo funcional se unifica con **Lucide 1.51.0**: 39 SVG originales
 en `assets/lucide/icons`, licencia íntegra en `assets/lucide/LICENSE` y versión,
 integridad del paquete y SHA-256 de cada SVG en `assets/lucide/manifest.json`.
 Proceden de `lucide-static` publicado por Lucide; no son dibujos propios.
@@ -35,26 +35,40 @@ python3 tools/vendor_icons.py --tarball /ruta/lucide-static-1.51.0.tgz --check
 Referencia y licencia: [Lucide](https://lucide.dev/),
 [licencia ISC y avisos Feather](https://lucide.dev/license).
 
-## Recurso de marca del acceso
+## Imagen de marca aprobada — 2026-10-09
 
-`codex-official.png` reproduce el icono azul/violeta de Codex con terminal blanco
-de su ficha pública de lanzamiento. Se obtuvo de la imagen del listado de
-Product Hunt, enlazada por [ProductCool](https://www.productcool.com/product/codex-by-openai-3):
+![Codex Model Router](brand/router-256.png)
 
-https://ph-files.imgix.net/64f50b38-7e9e-47ca-b2e9-2939ff10431a.png?w=256&h=256&fit=crop&fm=png
+El propietario aprobó el símbolo de una entrada que se ramifica hacia tres
+modelos: turquesa, dorado y lila sobre grafito. La propuesta se generó con
+`image_gen`, sin imágenes de entrada, y se conserva píxel a píxel en
+`brand/router-source.png`. El [brief y prompt](../docs/design/brand/README.md)
+documentan la procedencia. La licencia del proyecto se aplica a esta marca.
 
-El icono se inspeccionó visualmente y se utiliza para identificar el acceso
-personal a Codex. La descarga procede del espejo del listado, no de un paquete
-oficial de recursos de marca verificado. No se reivindica autoría de la imagen.
+| Archivo | Uso |
+| --- | --- |
+| `brand/router-source.png` | Máster aprobado, 1254 × 1254 |
+| `brand/router-1024.png` | Interfaz, paquetes y acceso Ubuntu |
+| `brand/router-256.png` | Documentación, vista previa y ventanas/bandeja Ubuntu |
+| `brand/router.ico` | Windows: 16, 24, 32, 48, 64, 128 y 256 px |
+| `brand/router.icns` | Bundles de monitor, lanzador y paquete macOS |
+| `brand/manifest.json` | Procedencia, paleta, tamaños y SHA-256 |
 
-`build.ps1` empaqueta el PNG sin alterarlo en `codex.ico`, para los ejecutables y
-accesos de Windows. No modifica los recursos de la aplicación instalada.
+Los exportados solo cambian formato y resolución: no redibujan ni recortan el
+máster. Conserva la proporción cuadrada, los colores y el espacio de seguridad;
+no estires el símbolo ni lo uses para representar un modelo concreto. La bandeja
+monocroma de Mac sigue usando el pictograma funcional Lucide `route`.
 
-`codex-ui-1024.png` es la imagen original de 1024 x 1024 del mismo listado,
-descargada sin los parametros de reduccion el 2026-09-21:
-https://ph-files.imgix.net/64f50b38-7e9e-47ca-b2e9-2939ff10431a.png
-El monitor usa esta version con escalado de alta calidad. El ICO conserva la
-version de 256 x 256 para compatibilidad con el formato de iconos de Windows.
+Para regenerar, usa un entorno aislado con `tools/requirements-brand.txt` y
+ejecuta `python tools/render_brand_assets.py`. Para verificar sin Pillow:
+`python3 tools/render_brand_assets.py --check`. Los paquetes consumen los
+exportados incluidos; el usuario final no necesita Pillow ni compilar imágenes.
+
+Los antiguos `codex-official.png`, `codex-ui-1024.png` y `codex.ico`, obtenidos de
+un espejo de un listado de Product Hunt, se han retirado del árbol actual y de
+sus consumidores. Se conservan únicamente en el historial Git y en una copia
+privada local. Esto no reescribe el historial ni acredita permisos sobre aquellas
+imágenes históricas. La integración en código no sustituye la instalación activa.
 
 ## Tipografía del monitor
 

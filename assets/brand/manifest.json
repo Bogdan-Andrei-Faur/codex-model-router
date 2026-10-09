@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "approved": "2026-10-09",
+  "generator": "Pillow 11.3.0",
+  "origin": "Owner-approved built-in image_gen routing icon proposal; no input images",
+  "palette": {
+    "mint": "#87D8C2",
+    "gold": "#E6C585",
+    "lilac": "#C4AFE9"
+  },
+  "license": "LicenseRef-Codex-Model-Router-Personal-Use-1.0",
+  "files": {
+    "router-source.png": {
+      "sha256": "ffdf30dd279c1822abcafafa62ea2babb20f13d37b130f7fdf0baa7dbfb06783",
+      "bytes": 1514259
+    },
+    "router-256.png": {
+      "sha256": "b9867571c1c15389d950a58265ebfa5a92cd4dcb4a54f81153473650fff1b17f",
+      "bytes": 61972
+    },
+    "router-1024.png": {
+      "sha256": "8a9e1c0d402330760fc191a697e65bed9b5d674a12db1a780a7413caca2a79e8",
+      "bytes": 939915
+    },
+    "router.ico": {
+      "sha256": "b0fe91f125bbd0b544c0b937c84e20a51b106f581f16bedb95284a5c3db3b1ec",
+      "bytes": 100912
+    },
+    "router.icns": {
+      "sha256": "842441e5c35ce0e8b6b996e6bbe132672c3ca5ba794d06cdc0e5fa370af4395f",
+      "bytes": 1666781
+    }
+  }
+}

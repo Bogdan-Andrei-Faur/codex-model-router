@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from codex_model_router.build_identity import identity, router_identity
 from codex_model_router.updates import installer_name, architecture
+from tools.packaging.legal import copy_legal_notices
 
 ROOT = Path(__file__).resolve().parents[2]
 APP_NAME = 'Codex Model Router.app'
@@ -73,8 +74,10 @@ def build(python, output_parent):
     run(['/usr/bin/xcrun','swiftc',source/'native/macos/BridgeMac.swift','-o',bridge,
          '-target',platform.machine()+'-apple-macosx12.0'],log)
     shutil.copytree(ROOT / 'monitor-ui', resources / 'ui')
-    shutil.copy2(ROOT / 'assets/codex-ui-1024.png', resources / 'ui/codex.png')
+    shutil.copy2(ROOT / 'assets/brand/router-1024.png', resources / 'ui/codex.png')
+    shutil.copy2(ROOT / 'assets/brand/router.icns', resources / 'router.icns')
     shutil.copy2(ROOT / 'VERSION', resources / 'VERSION')
+    copy_legal_notices(source, resources)
     config = json.loads((ROOT / 'config.example.json').read_text())
     for key in ('python', 'desktop_runtime', 'router_runtime', 'monitor_runtime'): config.pop(key, None)
     config['comparison_engines'] = []
@@ -86,6 +89,7 @@ def build(python, output_parent):
     (contents / 'Info.plist').write_bytes(plistlib.dumps({'CFBundleExecutable':'codex-monitor-mac',
         'CFBundleIdentifier':'local.codex-model-router.application', 'CFBundleName':'Codex Model Router',
         'CFBundlePackageType':'APPL', 'CFBundleVersion':version, 'CFBundleShortVersionString':version,
+        'CFBundleIconFile':'router.icns',
         'RouterBuildId':fingerprint, 'RouterEngineBuildId':engine, 'RouterPackaged':True,
         'LSMinimumSystemVersion':'12.0', 'LSUIElement':True}))
     run(['/usr/bin/codesign','--force','--deep','--sign','-',app],log)

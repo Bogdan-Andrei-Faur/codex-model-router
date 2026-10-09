@@ -44,7 +44,7 @@ def main():
     for name,sources,entry in (('monitor',[ROOT/s for s in SOURCES]+[stamp],'RouterMonitorProgram'),
                                ('launcher',[ROOT/'native/windows/Launcher.cs'],None)):
         flags=['/nologo','/noconfig','/nostdlib+','/langversion:5','/target:winexe','/optimize+',
-               '/out:'+str(args.output/(name+'.exe')),'/win32icon:'+str(ROOT/'assets/codex.ico')]
+               '/out:'+str(args.output/(name+'.exe')),'/win32icon:'+str(ROOT/'assets/brand/router.ico')]
         if entry:flags.append('/main:'+entry)
         active_refs=refs+([args.webview2/'lib/net462'/('Microsoft.Web.WebView2.'+part+'.dll') for part in ('Core','Wpf')] if entry else [])
         flags += ['/reference:'+str(ref) for ref in active_refs]

@@ -95,7 +95,7 @@ class Monitor(Gtk.Application):
         self.hold()
         self.window = Gtk.ApplicationWindow(application=self)
         self.window.set_title('Codex automático · Monitor · v' + self.model.version)
-        self.window.set_default_icon_from_file(str(ROOT / 'assets/codex-official.png'))
+        self.window.set_default_icon_from_file(str(ROOT / 'assets/brand/router-256.png'))
         self.window.set_decorated(False)
         self.window.set_app_paintable(True)
         self.window.set_focus_on_map(False)
@@ -188,7 +188,7 @@ class Monitor(Gtk.Application):
         try:
             gi.require_version('AyatanaAppIndicator3', '0.1')
             from gi.repository import AyatanaAppIndicator3 as Indicator
-            self.tray = Indicator.Indicator.new(self.get_application_id(), str(ROOT / 'assets/codex-official.png'), Indicator.IndicatorCategory.APPLICATION_STATUS)
+            self.tray = Indicator.Indicator.new(self.get_application_id(), str(ROOT / 'assets/brand/router-256.png'), Indicator.IndicatorCategory.APPLICATION_STATUS)
             self.tray.set_status(Indicator.IndicatorStatus.ACTIVE)
             self.tray.set_menu(menu)
         except (ValueError, ImportError):

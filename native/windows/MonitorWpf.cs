@@ -117,8 +117,8 @@ internal sealed partial class ModernRouterMonitor : Window
   </Grid>
  </ControlTemplate></Setter.Value></Setter>
 </Style>");
-        var iconPath = Path.Combine(Root, "assets", "codex.ico");
-        var windowIconPath = Path.Combine(Root, "assets", "codex-official.png");
+        var iconPath = Path.Combine(Root, "assets", "brand", "router.ico");
+        var windowIconPath = Path.Combine(Root, "assets", "brand", "router-256.png");
         if (File.Exists(windowIconPath)) Icon = new BitmapImage(new Uri(windowIconPath));
 
         shell.Background = Panel;
@@ -238,8 +238,8 @@ internal sealed partial class ModernRouterMonitor : Window
     Image Logo(double size)
     {
         var image = new Image { Width = size, Height = size, Stretch = Stretch.Uniform };
-        var path = Path.Combine(Root, "assets", "codex-ui-1024.png");
-        if (!File.Exists(path)) path = Path.Combine(Root, "assets", "codex-official.png");
+        var path = Path.Combine(Root, "assets", "brand", "router-1024.png");
+        if (!File.Exists(path)) path = Path.Combine(Root, "assets", "brand", "router-256.png");
         if (File.Exists(path)) image.Source = new BitmapImage(new Uri(path));
         RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
         return image;

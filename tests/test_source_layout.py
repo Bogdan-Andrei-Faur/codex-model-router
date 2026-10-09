@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / 'src'))
 from codex_model_router.build_identity import identity, router_identity
 from tools.packaging.source_tree import stage_source
 from tools.packaging import build_linux_package
+from tools.packaging.legal import copy_legal_notices, NOTICES
 
 
 class SourceLayoutTests(unittest.TestCase):
@@ -50,6 +51,8 @@ class SourceLayoutTests(unittest.TestCase):
             self.assertFalse((destination / 'state').exists())
             self.assertFalse((destination / 'config.local.json').exists())
             self.assertFalse((destination / 'build_stamp.py').exists())
+            for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md'):
+                self.assertEqual((destination / name).read_bytes(), (ROOT / name).read_bytes())
             output = self.child([destination / 'tools/packaging/runtime_entry.py', 'identity'], folder)
             self.assertEqual(json.loads(output.stdout)['routerBuild'], router_identity(ROOT))
 
@@ -82,6 +85,39 @@ class SourceLayoutTests(unittest.TestCase):
             self.assertEqual({str(p.relative_to(destination)) for p in destination.rglob('*') if p.is_file()},
                              {'run.py', 'build.ps1', 'VERSION', 'config.example.json'})
 
+    def test_package_notices_retain_exact_original_terms(self):
+        with tempfile.TemporaryDirectory() as folder:
+            destination = Path(folder) / 'legal'
+            copy_legal_notices(ROOT, destination)
+            self.assertEqual({p.relative_to(destination).as_posix()
+                              for p in destination.rglob('*') if p.is_file()}, set(NOTICES))
+            for target, source in NOTICES.items():
+                self.assertEqual((destination / target).read_bytes(), (ROOT / source).read_bytes())
+
+    def test_missing_or_symlink_notice_aborts_before_copy(self):
+        with tempfile.TemporaryDirectory() as folder:
+            fixture = Path(folder) / 'source'
+            fixture.mkdir()
+            destination = Path(folder) / 'payload'
+            for relative in NOTICES.values():
+                source = fixture / relative
+                source.parent.mkdir(parents=True, exist_ok=True)
+                source.write_text('notice')
+            missing = fixture / 'monitor-ui/fonts/OFL-Nunito.txt'
+            missing.unlink()
+            with self.assertRaises(ValueError):
+                copy_legal_notices(fixture, destination)
+            self.assertFalse(destination.exists())
+            external = Path(folder) / 'external.txt'
+            external.write_text('private sentinel')
+            try:
+                missing.symlink_to(external)
+            except OSError:
+                self.skipTest('Symlink creation is unavailable on this host')
+            with self.assertRaises(ValueError):
+                copy_legal_notices(fixture, destination)
+            self.assertFalse(destination.exists())
+
     def test_generated_linux_runtime_executes_the_actual_payload(self):
         # Only the host's missing Debian/desktop-validation tools are substituted.
         # Execute the real generated shell launcher against the real staged code.
@@ -95,6 +131,10 @@ class SourceLayoutTests(unittest.TestCase):
                     self.assertTrue((resources / 'src/codex_model_router/bridge/router.py').is_file())
                     self.assertFalse((resources / 'config.local.json').exists())
                     self.assertFalse((resources / 'state').exists())
+                    for target, source in NOTICES.items():
+                        self.assertEqual((resources / target).read_bytes(), (ROOT / source).read_bytes())
+                        self.assertEqual((Path(command[-2]) / 'usr/share/doc/codex-model-router' / target).read_bytes(),
+                                         (ROOT / source).read_bytes())
                     env = {key: value for key, value in os.environ.items()
                            if not key.startswith('PERSONAL_CODEX_ROUTER_')
                            and key not in ('PYTHONPATH', 'PYTHONHOME')}

@@ -76,12 +76,14 @@ def setup(app_path=None):
                     "-target", platform.machine() + "-apple-macosx12.0"], check=True)
     ui = MONITOR.parent.parent / "Resources" / "ui"
     shutil.copytree(ROOT / "monitor-ui", ui, dirs_exist_ok=True)
-    shutil.copyfile(ROOT / "assets" / "codex-ui-1024.png", ui / "codex.png")
+    shutil.copyfile(ROOT / "assets" / "brand" / "router-1024.png", ui / "codex.png")
+    shutil.copyfile(ROOT / "assets/brand/router.icns", ui.parent / "router.icns")
     os.replace(staged_monitor, MONITOR)
     with (MONITOR.parent.parent / "Info.plist").open("wb") as stream:
         from codex_model_router.build_identity import identity, router_identity
         plistlib.dump({"CFBundleExecutable": MONITOR.name, "CFBundleIdentifier": "local.codex-model-router.monitor",
                       "CFBundleName": "Monitor de Codex", "CFBundlePackageType": "APPL",
+                      "CFBundleIconFile": "router.icns",
                       "CFBundleVersion": version,
                       "CFBundleShortVersionString": version,
                       "RouterBuildId": identity(ROOT)[1],
@@ -98,9 +100,12 @@ def setup(app_path=None):
     bundle = DIST / "Codex automático.app"
     contents = bundle / "Contents"
     (contents / "MacOS").mkdir(parents=True, exist_ok=True)
+    (contents / "Resources").mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(ROOT / "assets/brand/router.icns", contents / "Resources/router.icns")
     with (contents / "Info.plist").open("wb") as stream:
         plistlib.dump({"CFBundleExecutable": "launcher", "CFBundleIdentifier": "local.codex-model-router.launcher",
                       "CFBundleName": "Codex automático", "CFBundlePackageType": "APPL",
+                      "CFBundleIconFile": "router.icns",
                       "CFBundleVersion": version, "CFBundleShortVersionString": version,
                       "LSUIElement": True}, stream)
     wrapper(contents / "MacOS/launcher", [sys.executable, ROOT / "macos.py", "open"])

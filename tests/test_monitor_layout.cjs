@@ -14,7 +14,7 @@ const assert = require('node:assert/strict');
       window.nativeMessages=[];
       window.webkit={messageHandlers:{monitor:{postMessage:message=>window.nativeMessages.push(message)}}};
     });
-    await page.route('**/codex.png',route=>route.fulfill({path:path.resolve(__dirname,'../assets/codex-official.png')}));
+    await page.route('**/codex.png',route=>route.fulfill({path:path.resolve(__dirname,'../assets/brand/router-256.png')}));
     await page.goto(pathToFileURL(path.resolve(__dirname,'../monitor-ui/index.html')).href);
     // The native Windows clip region must follow position changes even when
     // the top-anchored notch keeps exactly the same width and height.
@@ -152,7 +152,7 @@ const assert = require('node:assert/strict');
           window.nativeMessages=[];
           window.webkit={messageHandlers:{monitor:{postMessage:message=>window.nativeMessages.push(message)}}};
         });
-        await dpiPage.route('**/codex.png',route=>route.fulfill({path:path.resolve(__dirname,'../assets/codex-official.png')}));
+        await dpiPage.route('**/codex.png',route=>route.fulfill({path:path.resolve(__dirname,'../assets/brand/router-256.png')}));
         await dpiPage.goto(pathToFileURL(path.resolve(__dirname,'../monitor-ui/index.html')).href);
         await dpiPage.evaluate(height=>window.receive({ui:{mode:'Expanded',reduced:true,panelHeight:height}}),viewport.height);
         const metrics=await dpiPage.evaluate(()=>({

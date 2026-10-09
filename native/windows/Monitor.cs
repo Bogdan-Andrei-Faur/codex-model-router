@@ -93,7 +93,7 @@ internal sealed class RouterMonitor : Form
     {
         startHidden = hidden; Text = WindowTitle; Size = new Size(1100, 650); MinimumSize = new Size(820, 520);
         StartPosition = FormStartPosition.CenterScreen; Font = new Font("Segoe UI", 10); BackColor = Bg; ForeColor = Ink;
-        var icon = Path.Combine(Root, "assets", "codex.ico"); if (File.Exists(icon)) Icon = new Icon(icon);
+        var icon = Path.Combine(Root, "assets", "brand", "router.ico"); if (File.Exists(icon)) Icon = new Icon(icon);
         layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(18) };
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 62));

@@ -164,7 +164,7 @@ def lifecycle(temporary,report,compiler,bootstrapper,previous,env,shortcuts=Fals
     install=temporary/'installed';data=temporary/'installed-data';builds=temporary/'setups';builds.mkdir()
     group='Codex Router QA '+temporary.name
     fixture_script=temporary/'fixture.iss'
-    script=(ROOT/'installer/windows.iss').read_text(encoding='utf-8')
+    script=(ROOT/'tools/packaging/windows.iss').read_text(encoding='utf-8')
     assert script.count('DefaultGroupName=Codex Model Router')==1
     fixture_script.write_text(script.replace('DefaultGroupName=Codex Model Router','DefaultGroupName='+group),encoding='utf-8')
     def compile_setup(item,name):

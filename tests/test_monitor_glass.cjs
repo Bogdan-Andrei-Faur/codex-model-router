@@ -10,7 +10,7 @@ const assert=require('node:assert/strict');
     const page=await browser.newPage({viewport:{width:432,height:900}}),errors=[];
     page.on('pageerror',e=>errors.push(String(e)));
     await page.addInitScript(()=>{window.nativeMessages=[];window.webkit={messageHandlers:{monitor:{postMessage:m=>window.nativeMessages.push(m)}}};});
-    await page.route('**/codex.png',r=>r.fulfill({path:path.resolve(__dirname,'../assets/codex-official.png')}));
+    await page.route('**/codex.png',r=>r.fulfill({path:path.resolve(__dirname,'../assets/brand/router-256.png')}));
     await page.goto(pathToFileURL(path.resolve(__dirname,'../monitor-ui/index.html')).href);
     await page.evaluate(()=>window.receive({connections:1,ui:{mode:'Expanded',nativeGlass:true},
       accountUsage:{remaining_percent:3,valid_until:Date.now()/1000+60,windows:[{duration_minutes:300,remaining_percent:3},{duration_minutes:10080,remaining_percent:68}]},

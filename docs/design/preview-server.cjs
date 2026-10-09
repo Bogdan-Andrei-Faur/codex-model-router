@@ -2,7 +2,7 @@
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const routes={'/':['monitor-directions.html','text/html; charset=utf-8'],
   '/monitor-directions.html':['monitor-directions.html','text/html; charset=utf-8'],
-  '/assets/codex-official.png':['../../assets/codex-official.png','image/png']};
+  '/assets/brand/router-256.png':['../../assets/brand/router-256.png','image/png']};
 http.createServer((req,res)=>{
   const entry=routes[new URL(req.url,'http://localhost').pathname];
   if(req.method!=='GET'||!entry){res.writeHead(404);res.end();return}

@@ -6,6 +6,8 @@ import shutil
 def stage_source(root, destination):
     root, destination = Path(root), Path(destination)
     paths = [*root.glob('*.py'), root / 'build.ps1', root / 'VERSION', root / 'config.example.json']
+    paths.extend(root / name for name in ('LICENSE', 'THIRD_PARTY_NOTICES.md')
+                 if (root / name).is_file())
     for directory, extensions in {
         'src': {'.py'}, 'native': {'.swift', '.cs'},
         'tools': {'.py', '.ps1', '.json', '.txt', '.iss', '.js'},

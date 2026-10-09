@@ -1,18 +1,19 @@
 /* Original companions, shared by AppKit, WebView2 and WebKitGTK. */
 @font-face{font-family:'Router Nunito';src:url('fonts/Nunito-variable.ttf') format('truetype');font-style:normal;font-weight:200 1000;font-display:swap}
-:root{color-scheme:dark;--panel:#08090a;--panel2:#ffffff0a;--ink:#f5f5f6;--muted:#9b9da4;--line:#ffffff16;--accent:#96cfff;--good:#81d7bd;--warning:#ffbf96;--duration:420ms;--surface-duration:360ms;font-family:'Router Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;font-weight:500;color:var(--ink)}
+:root{color-scheme:dark;--panel:#08090a;--panel2:#ffffff0a;--ink:#f5f5f6;--muted:#9b9da4;--line:#ffffff16;--accent:#96cfff;--good:#81d7bd;--warning:#ffbf96;--duration:420ms;--surface-duration:360ms;--compact-height:48px;font-family:'Router Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;font-weight:500;color:var(--ink)}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}body{user-select:none;-webkit-user-select:none}[hidden]{display:none!important}button,input,select{font:inherit}button{color:var(--ink);border:1px solid transparent;border-radius:14px;background:transparent;cursor:pointer;padding:7px 10px;min-height:34px;line-height:18px}button:hover,button.native-hover{background:var(--panel2)}button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}button:disabled{opacity:.65;cursor:default}button.selected{background:#ffffff10;color:var(--ink);font-weight:600}
 /* The transparent 20px shoulders live inside the reported native bounds. */
-#surface{position:absolute;left:50%;top:0;transform:translateX(-50%);width:min(var(--compact-width,350px),100%);height:64px;padding:0 20px;isolation:isolate;transition:width var(--surface-duration) cubic-bezier(.22,.8,.25,1),height var(--surface-duration) cubic-bezier(.22,.8,.25,1)}
+#surface{position:absolute;left:50%;top:0;transform:translateX(-50%);width:min(var(--compact-width,350px),100%);height:var(--compact-height);padding:0 20px;isolation:isolate;transition:width var(--surface-duration) cubic-bezier(.22,.8,.25,1),height var(--surface-duration) cubic-bezier(.22,.8,.25,1)}
 #surface:before{content:'';position:absolute;inset:0 20px;background:var(--panel);border-radius:0 0 32px 32px;z-index:-1;box-shadow:0 12px 30px #00000035}
+body:not(.expanded):not(.peek) #surface:before{border-radius:0 0 24px 24px}
 #surface:after{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(circle at 0 100%,transparent 19.5px,var(--panel) 20px) left top/20px 20px no-repeat,radial-gradient(circle at 100% 100%,transparent 19.5px,var(--panel) 20px) right top/20px 20px no-repeat}
 body.expanded #surface{width:min(590px,100%);height:min(var(--panel-height,90%),calc(100% - 16px))}body.expanded.overview #surface{width:min(790px,100%);height:min(var(--overview-height,450px),calc(100% - 16px))}body.peek #surface{height:min(var(--peek-height,300px),calc(100% - 16px))}body.hidden #surface{visibility:hidden}body.hidden *{animation-play-state:paused!important}
 #height-grip{display:none;position:absolute;bottom:0;left:52px;right:52px;height:16px;min-height:0;padding:0;border:0;background:transparent;cursor:ns-resize;touch-action:none;z-index:3}#height-grip:after{content:'';display:block;width:36px;height:4px;border-radius:4px;background:#606168;margin:auto}body.expanded:not(.overview) #height-grip{display:block}body.resizing #surface{transition:none}
-#compact{height:100%;display:flex;flex-direction:column}.capsule-bar{order:-1;height:64px;min-height:64px;display:grid;grid-template-columns:auto minmax(0,1fr) 44px 24px;gap:5px;align-items:center;padding:5px 16px}.crew{min-width:0;text-align:center}#agents{height:48px;display:flex;align-items:center;justify-content:center;gap:0}#agents .avatar{width:38px;height:44px;flex-basis:38px}#compact-summary{min-width:0;padding:0 3px;text-align:left;border-radius:10px}#compact-summary strong,#compact-summary span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#compact-summary strong{font-size:12px;line-height:19px;font-weight:800}#compact-summary span{font-size:10px;color:var(--muted);line-height:16px}.divider{display:flex;justify-content:center;align-items:center}.icon{width:32px;min-width:32px;height:32px;padding:7px;color:var(--muted);display:flex;align-items:center;justify-content:center}.icon svg{width:18px;height:18px}#expand{min-width:24px;width:24px;padding:4px}#expand svg{transform:rotate(90deg)}#collapse svg{transform:rotate(-90deg)}.overflow{min-width:23px;width:23px;padding:0;font-size:10px;color:var(--muted)}
-.avatar{position:relative;display:block;flex:0 0 48px;width:48px;height:54px;min-height:0;border:0;padding:0;border-radius:14px;background:transparent;--character:#ff9e88}.avatar:hover,.avatar.native-hover{background:transparent;filter:brightness(1.1)}.character{width:100%;height:100%;overflow:visible;display:block}.character-body{transform-origin:50px 80px}.character-face,.limbs{fill:var(--character)}.character-light{pointer-events:none}.happy-eyes{display:none;fill:none;stroke:#28282b;stroke-width:3.5;stroke-linecap:round}.limbs{filter:brightness(.88)}.character-mark{fill:none;stroke:#ffffff65;stroke-width:5;stroke-linecap:round}.eye{fill:#28282b;transform-box:fill-box;transform-origin:center}.mouth{fill:none;stroke:#28282b;stroke-width:3;stroke-linecap:round}.avatar[data-companion=mint] .character-face,.avatar[data-companion=mint] .character-light{transform:translate(5px,-3px) scale(.9,1.03);transform-origin:50px 50px}.avatar[data-companion=lilac] .character-face,.avatar[data-companion=lilac] .character-light{transform:scale(1.05,.94);transform-origin:50px 50px}
-.avatar[data-state=working] .character-body{animation:companion-breathe 3.6s ease-in-out infinite}.avatar[data-state=compacting] .character-body{animation:companion-sort 2.8s ease-in-out infinite}.avatar[data-state=compacting] .eye,.avatar[data-state=idle] .eye{transform:scaleY(.2)}.avatar[data-state=waiting] .eye,.avatar[data-state=error] .eye{transform:scale(1.25)}.avatar[data-state=error] .mouth{transform:rotate(180deg);transform-origin:50px 66px}.avatar[data-state=done] .mouth{stroke-width:4}.avatar[data-state=done] .eye{display:none}.avatar[data-state=done] .happy-eyes{display:block}.avatar[data-state=waiting] .eye{translate:1px -2px}.avatar[data-state=idle] .character-body{transform:rotate(-4deg)}.avatar[data-state=working] .eye{animation:companion-blink 5.2s infinite}@keyframes companion-blink{0%,43%,48%,100%{transform:scaleY(1)}45%{transform:scaleY(.1)}}.avatar[data-state=offline]{opacity:.45}.avatar.enter{animation:companion-enter var(--duration) ease}.avatar.leave{animation:companion-leave var(--duration) ease forwards;pointer-events:none}.character-context{position:absolute;bottom:0;left:12px;right:12px;height:3px;overflow:hidden;border-radius:3px;background:#ffffff16}.character-context span{display:block;height:100%;background:var(--character);border-radius:inherit}.character-context.unavailable{background:repeating-linear-gradient(90deg,#ffffff28 0 2px,transparent 2px 4px)}.avatar.compacting .character-context{visibility:hidden}.idle .character-context{display:none}
-@keyframes companion-breathe{50%{transform:translateY(-3px) scale(1.025,1.035)}}@keyframes companion-sort{25%{transform:rotate(-7deg) scale(1.06,.94)}75%{transform:rotate(7deg) scale(.96,1.04)}}@keyframes companion-enter{from{opacity:0;transform:translateY(-8px)}}@keyframes companion-leave{to{opacity:0;width:0;flex-basis:0;transform:translateY(-8px)}}
-.quota{width:44px;min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;border-radius:13px;color:var(--accent);font-variant-numeric:tabular-nums;line-height:18px}.quota-number{font-size:15px;font-weight:800}.quota small{font-size:10px;color:var(--muted);line-height:14px}.quota.unavailable{color:var(--muted)}
+#compact{height:100%;display:flex;flex-direction:column}.capsule-bar{order:-1;height:var(--compact-height);min-height:var(--compact-height);display:grid;grid-template-columns:auto minmax(0,1fr) 44px 24px;gap:5px;align-items:center;padding:4px 16px}.crew{min-width:0;text-align:center}#agents{position:relative;min-width:38px;height:40px;display:flex;align-items:center;justify-content:center;gap:0}#agents .avatar{width:38px;height:40px;flex-basis:38px}#compact-summary{min-width:0;padding:0 3px;text-align:left;border-radius:10px}#compact-summary strong,#compact-summary span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#compact-summary strong{font-size:12px;line-height:19px;font-weight:800}#compact-summary span{font-size:10px;color:var(--muted);line-height:16px}.divider{display:flex;justify-content:center;align-items:center}.icon{width:32px;min-width:32px;height:32px;padding:7px;color:var(--muted);display:flex;align-items:center;justify-content:center}.icon svg{width:18px;height:18px}#expand{min-width:24px;width:24px;padding:4px}#expand svg{transform:rotate(90deg)}#collapse svg{transform:rotate(-90deg)}.overflow{min-width:23px;width:23px;padding:0;font-size:10px;color:var(--muted)}
+.avatar{position:relative;display:block;flex:0 0 48px;width:48px;height:54px;min-height:0;border:0;padding:0;border-radius:14px;background:transparent;--character:#ff9e88}.avatar:hover,.avatar.native-hover{background:transparent;filter:brightness(1.1)}.character{width:100%;height:100%;overflow:visible;display:block}.character-body{transform-origin:50px 80px}.character-face,.limbs{fill:var(--character)}.character-light{pointer-events:none}.happy-eyes{display:none;fill:none;stroke:#28282b;stroke-width:3.5;stroke-linecap:round}.limbs{filter:brightness(.88)}.character-mark{fill:none;stroke:#ffffff65;stroke-width:5;stroke-linecap:round}.eye{fill:#28282b;transform-box:fill-box;transform-origin:center}.mouth{fill:none;stroke:#28282b;stroke-width:3;stroke-linecap:round}
+.character-context{position:absolute;bottom:0;left:12px;right:12px;height:3px;overflow:hidden;border-radius:3px;background:#ffffff16}.character-context span{display:block;height:100%;background:var(--character);border-radius:inherit}.character-context.unavailable{background:repeating-linear-gradient(90deg,#ffffff28 0 2px,transparent 2px 4px)}.avatar.compacting .character-context{visibility:hidden}.idle .character-context{display:none}
+
+.quota{width:44px;min-height:40px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;border-radius:13px;color:var(--accent);font-variant-numeric:tabular-nums;line-height:18px}.quota-number{font-size:15px;font-weight:800}.quota small{font-size:10px;color:var(--muted);line-height:14px}.quota.unavailable{color:var(--muted)}
 #peek{padding:0 20px 20px;overflow:auto;flex:1;min-height:0}.peek-content{border-top:1px solid var(--line);padding-top:15px}.peek-category{font-size:10px;letter-spacing:.06em;color:var(--muted)}.peek-title{font-size:15px;font-weight:600;margin:8px 0;overflow-wrap:anywhere}.peek-meta{margin-top:12px;color:var(--muted)}.quota-details{white-space:pre-line;overflow-wrap:anywhere}
 #expanded{height:100%;display:flex;flex-direction:column;overflow:hidden;border-radius:0 0 32px 32px}.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}#connection{font-size:10px;color:var(--muted)}#connection:not(.sr-only){flex-basis:100%;padding-bottom:4px}nav{display:flex;align-items:center;gap:4px;margin:12px 24px 4px;padding:4px 0;flex-shrink:0}nav button{display:grid;place-items:center;flex:0 0 44px;width:44px;height:38px;padding:0;border:0;border-radius:16px;color:var(--muted);transition:background .15s,color .15s}nav button .ui-glyph{width:20px;height:20px;stroke-width:2.2}nav button.selected{background:#ffffff16;color:var(--ink)}nav button[data-tab=settings]{margin-left:auto}
 #pages{flex:1;min-height:0;overflow:hidden}body.overview #pages{overflow:auto}body.overview #activity{height:auto;overflow:visible}.page{height:100%;overflow:auto;overscroll-behavior:contain}#notices{flex-shrink:0}#feedback{display:block;font-size:11px;color:var(--warning);line-height:16px;margin:4px 24px 8px}#feedback:empty{display:none}#connection:not(.sr-only){margin:4px 24px 8px}#product-version{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}h2{font-size:17px;margin:0 0 7px}h3,.label{font-size:11px;color:var(--muted);font-weight:600;margin:0 0 8px}.section{padding:0 20px 20px}.section-title{margin:14px 20px 5px}.muted,.small{color:var(--muted)}.small{font-size:11px;line-height:17px}p{font-size:12px;color:var(--muted);line-height:19px;margin:6px 0 10px}.heading{margin:22px 0 8px}.warning{color:var(--warning)}
@@ -226,7 +227,7 @@ body.camera-wings #agents{gap:0}
 body.camera-wings .capsule-right{justify-content:flex-end}
 body.camera-wings .camera-gap{display:block;height:var(--camera-top);align-self:start;pointer-events:none}
 body.camera-wings.expanded #surface,body.camera-inset #surface{padding-top:var(--camera-top)}
-body.camera-inset:not(.expanded):not(.peek) #surface{height:calc(64px + var(--camera-top))}
+body.camera-inset:not(.expanded):not(.peek) #surface{height:calc(var(--compact-height) + var(--camera-top))}
 body.camera-inset.peek #surface{height:min(calc(var(--peek-height,300px) + var(--camera-top)),calc(100% - 16px))}
 
 /* Open island: use both safe menu-bar wings instead of a blank camera-height row. */
@@ -265,89 +266,141 @@ body.camera-nav nav button[data-tab=settings]{margin-left:0}
 .appearance-option .character{width:54px;height:54px}
 .appearance-option .character-body,.appearance-option .eye{animation:none;transform:none}
 
-/* Distinct silhouettes and props remain readable in the small capsule. */
+/* Rigid 2D choreography. Never scale/skew the body, limbs, face or props. */
 .hand-left{transform-origin:17px 55px}.hand-right{transform-origin:83px 55px}
-.activity-prop{fill:none;stroke:#28282b;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
-.activity-prop .prop-surface{fill:#202327;stroke:var(--character);stroke-width:3}.activity-prop .prop-clip{fill:var(--character);stroke:#202327;stroke-width:2}
-.activity-prop[data-kind=writing],.activity-prop[data-kind=executing],.activity-prop[data-kind=planning],.activity-prop[data-kind=reviewing],.activity-prop[data-kind=searching],.activity-prop[data-kind=inspecting]{stroke:var(--character);stroke-width:3}
-.activity-prop .thought{fill:var(--character);stroke:#28282b;stroke-width:2}.activity-prop[data-kind=thinking]{animation:companion-thoughts 2.8s ease-in-out infinite}
-.activity-prop[data-kind=compacting],.activity-prop[data-kind=retrying],.activity-prop[data-kind=preparing],.activity-prop[data-kind=done],.activity-prop[data-kind=error],.activity-prop[data-kind=generating]{stroke:var(--character)}
-.avatar[data-state=thinking] .character-body{transform:rotate(-8deg);animation:companion-think 3.4s ease-in-out infinite}
-.avatar[data-state=thinking] .eye{translate:2px -5px}.avatar[data-state=thinking] .hand-right{transform:translate(-25px,8px) rotate(-95deg)}
-.avatar[data-state=planning] .character-body{transform:rotate(7deg);animation:companion-plan 3.2s ease-in-out infinite}
-.avatar[data-state=planning] .eye{translate:4px 4px}.avatar[data-state=planning] .hand-right{transform:translate(-12px,13px) rotate(25deg)}
-.avatar[data-state=writing] .character-body{transform:translateY(3px);animation:companion-type 1.2s ease-in-out infinite}
-.avatar[data-state=writing] .eye{translate:0 5px;transform:scaleY(.75)}
-.avatar[data-state=writing] .hand-left{transform:translate(12px,10px) rotate(-30deg);animation:companion-type-left .45s ease-in-out infinite}
-.avatar[data-state=writing] .hand-right{transform:translate(-12px,10px) rotate(30deg);animation:companion-type-right .45s .22s ease-in-out infinite}
-.avatar[data-state=executing] .character-body{animation:companion-execute 1s ease-in-out infinite}
-.avatar[data-state=executing] .foot-left{animation:companion-step .5s ease-in-out infinite}.avatar[data-state=executing] .foot-right{animation:companion-step .5s .25s ease-in-out infinite}
-.avatar[data-state=executing] .eye{transform:scaleY(.7)}.avatar[data-state=executing] .hand-right{transform:translate(-13px,8px) rotate(30deg)}
-.avatar[data-state=editing] .character-body{transform:rotate(-6deg);animation:companion-edit 1.6s ease-in-out infinite}
-.avatar[data-state=editing] .eye{translate:3px 4px}.avatar[data-state=editing] .hand-right{transform:translate(-3px,5px) rotate(-25deg)}
-.activity-prop[data-kind=editing]{transform-origin:63px 81px;animation:companion-pencil .7s ease-in-out infinite}
-.avatar[data-state=searching] .character-body{animation:companion-look 2.6s ease-in-out infinite}
-.avatar[data-state=searching] .eye{opacity:0}.avatar[data-state=searching] .hand-left{transform:translate(15px,-7px) rotate(-30deg)}.avatar[data-state=searching] .hand-right{transform:translate(-15px,-7px) rotate(30deg)}
-.avatar[data-state=tool] .character-body{transform:rotate(8deg);animation:companion-tool 1.8s ease-in-out infinite}
-.avatar[data-state=tool] .hand-right{transform:translate(0,-8px) rotate(-30deg)}.activity-prop[data-kind=tool]{transform-origin:75px 70px;animation:companion-wrench .8s ease-in-out infinite}
-.avatar[data-state=inspecting] .character-body{transform:translateY(4px) rotate(8deg);animation:companion-inspect 3s ease-in-out infinite}
-.avatar[data-state=inspecting] .eye{translate:4px 1px;transform:scale(1.3)}.avatar[data-state=inspecting] .hand-right{transform:translate(-1px,11px) rotate(-20deg)}
-.avatar[data-state=reviewing] .character-body{transform:rotate(5deg);animation:companion-review 2s ease-in-out infinite}
-.avatar[data-state=reviewing] .eye{translate:4px 4px;transform:scaleY(.55)}.avatar[data-state=reviewing] .hand-right{transform:translate(-12px,14px) rotate(20deg)}
-.avatar[data-state=generating] .character-body{animation:companion-create 2.2s ease-in-out infinite}
-.avatar[data-state=generating] .eye{translate:4px -3px}.avatar[data-state=generating] .hand-right{transform:translate(2px,-5px) rotate(-40deg)}.activity-prop[data-kind=generating]{transform-origin:67px 81px;animation:companion-brush 1.4s ease-in-out infinite}
-.avatar[data-state=collaborating] .character-body{animation:companion-greet 2.4s ease-in-out infinite}
-.avatar[data-state=collaborating] .hand-right{transform:translate(7px,-14px) rotate(-95deg);animation:companion-wave 1.4s ease-in-out infinite}
-.avatar[data-state=collaborating] .hand-left{transform:translate(-3px,-3px) rotate(25deg)}
-.avatar[data-state=compacting] .character-body{transform:scale(1.1,.84);animation:companion-pack 1.8s ease-in-out infinite}
-.avatar[data-state=compacting] .hand-left{transform:translate(15px,-26px) rotate(-95deg)}.avatar[data-state=compacting] .hand-right{transform:translate(-15px,-26px) rotate(95deg)}
-.avatar[data-state=approval] .hand-right{transform:translate(4px,-18px) rotate(-110deg)}
-.avatar[data-state=approval] .character-body{animation:companion-attention 2.8s ease-in-out infinite}
-.avatar[data-state=question] .hand-left{transform:translate(-5px,-7px) rotate(60deg)}.avatar[data-state=question] .hand-right{transform:translate(5px,-7px) rotate(-60deg)}
-.avatar[data-state=question] .character-body{animation:companion-shrug 2.4s ease-in-out infinite}
-.avatar[data-state=approval] .eye,.avatar[data-state=question] .eye{translate:0 -3px}
-.avatar[data-state=retrying] .character-body{animation:companion-recover 2s ease-in-out infinite}
-.avatar[data-state=preparing] .character-body{transform:translateY(4px) scale(1.08,.9);animation:companion-ready 2s ease-in-out infinite}
-.avatar[data-state=preparing] .hand-left{transform:translate(-3px,-10px) rotate(55deg)}.avatar[data-state=preparing] .hand-right{transform:translate(3px,-10px) rotate(-55deg)}
+.character{overflow:hidden}
+.character-body{transform:none}
+.character-mood{opacity:0;pointer-events:none}
+.eye{animation:companion-blink 4s steps(1,end) infinite}
+.closed-eyes{fill:none;stroke:#28343b;stroke-width:2.6;stroke-linecap:round;opacity:0;animation:companion-lids 4s steps(1,end) infinite}
+.happy-eyes{stroke:#28343b;stroke-width:2.6}
+.activity-prop{pointer-events:none}
+.activity-prop .scene-symbol{overflow:visible}
+.avatar[data-state=thinking] .eye{translate:2px -3px}
+.avatar[data-state=thinking] .thought-cloud{animation:companion-cloud 4s ease-in-out infinite}
+.avatar[data-state=writing] .eye,.avatar[data-state=executing] .eye,.avatar[data-state=working] .eye,.avatar[data-state=editing] .eye,.avatar[data-state=planning] .eye,.avatar[data-state=reviewing] .eye,.avatar[data-state=compacting] .eye,.avatar[data-state=preparing] .eye{translate:0 3px}
+.avatar[data-state=writing] .hand-left{animation:companion-type-left 1s ease-in-out infinite}
+.avatar[data-state=writing] .hand-right{animation:companion-type-right 1s ease-in-out infinite}
+.avatar[data-state=executing] .hand-left,.avatar[data-state=working] .hand-left{animation:companion-laptop-left 1s ease-in-out infinite}
+.avatar[data-state=executing] .hand-right,.avatar[data-state=working] .hand-right{animation:companion-laptop-right 1s ease-in-out infinite}
+.terminal-cursor{animation:companion-cursor 1s steps(1,end) infinite}
+.work-indicator{animation:companion-work 4s ease-in-out infinite}
+.avatar[data-state=editing] .hand-left{transform:translate(12px,24px) rotate(-20deg)}
+.avatar[data-state=editing] .hand-right{animation:companion-write-hand 2s ease-in-out infinite}
+.pencil{transform-origin:56px 90px;animation:companion-pencil 2s ease-in-out infinite}
+.avatar[data-state=planning] .hand-left{transform:translate(12px,24px)}
+.avatar[data-state=planning] .hand-right{animation:companion-point 4s ease-in-out infinite}
+.plan-marker{animation:companion-plan 4s steps(1,end) infinite}
+.avatar[data-state=reviewing] .hand-left{transform:translate(12px,24px)}
+.avatar[data-state=reviewing] .hand-right{animation:companion-review-hand 4s ease-in-out infinite}
+.review-scan{animation:companion-read 4s ease-in-out infinite}
+.avatar[data-state=searching] .eye,.avatar[data-state=searching] .closed-eyes,.avatar[data-state=searching] .mouth,.avatar[data-state=searching] [data-slot=glasses],.avatar[data-state=searching] [data-slot=detail],.avatar[data-state=searching] [data-slot=neck]{visibility:hidden}
+.avatar[data-state=searching] .character-mark{opacity:.3}
+.avatar[data-state=searching] .hand-left{animation:companion-search-left 1s ease-in-out infinite}
+.avatar[data-state=searching] .hand-right{animation:companion-search-right 1s ease-in-out infinite}
+.search-highlight{opacity:.2;animation:companion-search 4s steps(1,end) infinite}
+.avatar[data-state=tool] .hand-left{transform:translate(16px,21px) rotate(-25deg)}
+.avatar[data-state=tool] .hand-right{animation:companion-tool-hand 2s ease-in-out infinite}
+.spanner{transform-origin:67px 80px;animation:companion-wrench 2s ease-in-out infinite}
+.screwdriver{transform-origin:31px 84px;animation:companion-driver 2s ease-in-out infinite}
+.avatar[data-state=inspecting] .eye{translate:3px 0}
+.avatar[data-state=inspecting] .hand-right{animation:companion-inspect-hand 4s ease-in-out infinite}
+.magnifier{animation:companion-inspect 4s ease-in-out infinite}
+.avatar[data-state=generating] .eye{translate:3px 2px}
+.avatar[data-state=generating] .hand-right{animation:companion-paint-hand 4s ease-in-out infinite}
+.paint-brush{transform-origin:50px 85px;animation:companion-paint 4s ease-in-out infinite}
+.paint-reveal{animation:companion-pigment 4s steps(1,end) infinite}
+.avatar[data-state=collaborating] .hand-left{animation:companion-share-left 4s ease-in-out infinite}
+.avatar[data-state=collaborating] .hand-right{animation:companion-share-right 4s ease-in-out infinite}
+.shared-note-left{animation:companion-note-left 4s ease-in-out infinite}
+.shared-note-right{animation:companion-note-right 4s ease-in-out infinite}
+.avatar[data-state=compacting] .hand-left{animation:companion-sort-left 4s ease-in-out infinite}
+.avatar[data-state=compacting] .hand-right{transform:translate(-6px,23px) rotate(20deg)}
+.sort-sheet{animation:companion-sort 4s ease-in-out infinite}
+.sort-sheet.sheet-1{animation-name:companion-sort-second}.sort-sheet.sheet-2{animation-name:companion-sort-third}
+.avatar[data-state=preparing] .hand-left{animation:companion-ready-hand 4s ease-in-out infinite}
+.avatar[data-state=preparing] .hand-right{transform:translate(-14px,20px)}
+.prepare-folder{animation:companion-ready 4s ease-in-out infinite}
+.prepare-pencil{animation:companion-ready-pencil 4s ease-in-out infinite}
+.avatar[data-state=waiting] .hand-left,.avatar[data-state=waiting] .hand-right{visibility:hidden}
+.avatar[data-state=waiting] .eye{translate:2px 1px}
+.avatar[data-state=waiting] .foot-right{animation:companion-tap 4s ease-in-out infinite}
+.avatar[data-state=offline]{opacity:.8}
+.avatar[data-state=offline] .eye{display:none}
+.avatar[data-state=offline] .closed-eyes{animation:none;opacity:1}
+.avatar[data-state=offline] .mouth{animation:companion-sleep-mouth 4s ease-in-out infinite}
+.sleep-marks{animation:companion-sleep 4s ease-in-out infinite}
+.avatar[data-state=unknown] .eye{animation:companion-blink 4s steps(1,end) infinite,companion-unsure 4s ease-in-out infinite}
+.unknown-dashes{opacity:.7}
+.retry-arrow{transform-box:view-box;transform-origin:12px 12px;animation:companion-retry 2s linear infinite}
+.avatar[data-state=approval] .status-symbol,.avatar[data-state=question] .status-symbol{animation:companion-wait-signal 4s ease-in-out infinite}
+.avatar[data-state=approval] .eye,.avatar[data-state=question] .eye{translate:0 -1px}
+.avatar[data-state=error]{--mood-color:#e88798}
+.avatar[data-state=interrupted]{--mood-color:#879cbe}
+.avatar[data-state=error] .character-mood,.avatar[data-state=interrupted] .character-mood{opacity:.65}
 .avatar[data-state=error] .character-body{animation:companion-flinch .6s ease-out both}
 .avatar[data-state=interrupted] .character-body{animation:companion-settle .6s ease-out both}
-.avatar[data-state=interrupted] .eye{transform:scaleY(.5)}
-.avatar[data-state=done] .character-body{animation:companion-celebrate .8s ease-out both}
-.avatar[data-state=done] .hand-left{transform:translate(-3px,-14px) rotate(100deg)}.avatar[data-state=done] .hand-right{transform:translate(3px,-14px) rotate(-100deg)}
-.character-attention{position:absolute;right:-2px;top:2px;display:grid;place-items:center;width:18px;height:18px;border-radius:7px;background:#202327;border:1px solid #ffffff35;color:var(--accent);pointer-events:none}
-.character-attention[data-kind=approval]{color:#f0d19c}.character-attention .ui-glyph{width:12px;height:12px}
-.hero-character .character-attention,.agent-portrait .character-attention{width:25px;height:25px;border-radius:9px;right:2px;top:20px}.hero-character .character-attention .ui-glyph,.agent-portrait .character-attention .ui-glyph{width:16px;height:16px}
+.avatar[data-state=interrupted] .eye{display:none}
+.avatar[data-state=interrupted] .closed-eyes{animation:none;opacity:1}
+.avatar[data-state=done] .character-body{animation:companion-celebrate .9s ease-out both}
+.avatar[data-state=done] .eye,.avatar[data-state=done] .closed-eyes{display:none}
+.avatar[data-state=done] .happy-eyes{display:block}
+.avatar.enter{animation:companion-enter .9s ease-out}
+.avatar.leave{animation:companion-leave .9s ease-in forwards;pointer-events:none}
+#agents .avatar.leave{position:absolute;top:0;left:clamp(0px,var(--exit-left,0px),calc(100% - 38px))}
+.character-attention{position:absolute;right:0;top:0;display:grid;place-items:center;width:15px;height:15px;border-radius:6px;background:#202d3c;border:1px solid #ffffff35;color:#a8d8ff;pointer-events:none}
+.character-attention[data-kind=approval]{color:#f0cb80}.character-attention .ui-glyph{width:10px;height:10px}
+.hero-character .character-attention,.agent-portrait .character-attention{width:25px;height:25px;border-radius:9px;right:2px;top:4px}.hero-character .character-attention .ui-glyph,.agent-portrait .character-attention .ui-glyph{width:16px;height:16px}
 .character-attention[hidden]{display:none}
-@keyframes companion-think{0%,100%{transform:rotate(-8deg)}50%{transform:translateY(-4px) rotate(-3deg)}}
-@keyframes companion-thoughts{0%,100%{opacity:.65;translate:0 1px}50%{opacity:1;translate:0 -2px}}
-@keyframes companion-plan{0%,100%{transform:rotate(7deg)}50%{transform:translateY(2px) rotate(1deg)}}
-@keyframes companion-type{0%,100%{transform:translateY(3px)}50%{transform:translateY(5px) scale(1.02,.97)}}
-@keyframes companion-type-left{0%,100%{transform:translate(12px,10px) rotate(-30deg)}50%{transform:translate(15px,16px) rotate(-5deg)}}
-@keyframes companion-type-right{0%,100%{transform:translate(-12px,10px) rotate(30deg)}50%{transform:translate(-15px,16px) rotate(5deg)}}
-@keyframes companion-execute{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(2deg)}}
-@keyframes companion-step{50%{transform:translateY(-7px)}}
-@keyframes companion-edit{0%,100%{transform:rotate(-6deg)}50%{transform:translate(3px,2px) rotate(-2deg)}}
-@keyframes companion-pencil{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(12deg)}}
-@keyframes companion-look{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(12deg)}}
-@keyframes companion-tool{0%,100%{transform:rotate(8deg)}50%{transform:translateY(3px) rotate(2deg)}}
-@keyframes companion-wrench{0%,100%{transform:rotate(-15deg)}50%{transform:rotate(15deg)}}
-@keyframes companion-inspect{0%,100%{transform:translateY(4px) rotate(8deg)}50%{transform:translate(3px,5px) scale(1.04) rotate(12deg)}}
-@keyframes companion-review{0%,100%{transform:rotate(5deg)}35%,65%{transform:translateY(4px) rotate(0)}}
-@keyframes companion-create{0%,100%{transform:rotate(-4deg)}50%{transform:translateY(-3px) rotate(6deg)}}
-@keyframes companion-brush{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(15deg)}}
-@keyframes companion-greet{0%,100%{transform:rotate(-4deg)}50%{transform:translateY(-4px) rotate(4deg)}}
-@keyframes companion-wave{0%,100%{transform:translate(7px,-14px) rotate(-95deg)}50%{transform:translate(7px,-14px) rotate(-45deg)}}
-@keyframes companion-pack{0%,100%{transform:scale(1.1,.84)}50%{transform:translateY(5px) scale(1.18,.68)}}
-@keyframes companion-attention{0%,75%,100%{transform:translateY(0)}85%{transform:translateY(-6px)}}
-@keyframes companion-shrug{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-4px) rotate(5deg)}}
-@keyframes companion-recover{0%,100%{transform:rotate(-10deg)}40%{transform:translateY(-3px) rotate(10deg)}65%{transform:rotate(-3deg)}}
-@keyframes companion-ready{0%,100%{transform:translateY(4px) scale(1.08,.9)}50%{transform:translateY(-3px) scale(.96,1.06)}}
-@keyframes companion-flinch{20%{transform:translateX(-3px) rotate(-5deg)}40%{transform:translateX(3px) rotate(4deg)}100%{transform:rotate(-3deg)}}
-@keyframes companion-settle{to{transform:translateY(2px) rotate(-3deg)}}
-@keyframes companion-celebrate{30%{transform:translateY(-8px) scale(.97,1.04)}65%{transform:translateY(1px) scale(1.04,.97)}100%{transform:translateY(0)}}
+@keyframes companion-blink{0%,43%,49%,100%{opacity:1}44%,48%{opacity:0}}
+@keyframes companion-lids{0%,43%,49%,100%{opacity:0}44%,48%{opacity:1}}
+@keyframes companion-cloud{0%,100%{translate:0 0}50%{translate:0 -2px}}
+@keyframes companion-type-left{0%,100%{transform:translate(18px,21px) rotate(-20deg)}50%{transform:translate(18px,24px) rotate(-20deg)}}
+@keyframes companion-type-right{0%,100%{transform:translate(-18px,24px) rotate(20deg)}50%{transform:translate(-18px,21px) rotate(20deg)}}
+@keyframes companion-laptop-left{0%,100%{transform:translate(13px,36px) rotate(-15deg)}50%{transform:translate(13px,33px) rotate(-15deg)}}
+@keyframes companion-laptop-right{0%,100%{transform:translate(-13px,33px) rotate(15deg)}50%{transform:translate(-13px,36px) rotate(15deg)}}
+@keyframes companion-cursor{50%{opacity:0}}
+@keyframes companion-work{0%,100%{translate:0 0}50%{translate:-7px 0}}
+@keyframes companion-pencil{0%,100%{rotate:0deg}50%{rotate:8deg}}
+@keyframes companion-write-hand{0%,100%{transform:translate(-17px,23px) rotate(15deg)}50%{transform:translate(-13px,22px) rotate(20deg)}}
+@keyframes companion-point{0%,100%{transform:translate(-18px,19px)}50%{transform:translate(-18px,31px)}}
+@keyframes companion-plan{0%,100%{translate:0 0}35%{translate:0 7px}65%{translate:0 14px}}
+@keyframes companion-review-hand{0%,100%{transform:translate(-43px,21px) rotate(10deg)}50%{transform:translate(-20px,28px) rotate(10deg)}}
+@keyframes companion-read{0%,100%{translate:0 0}50%{translate:0 13px}}
+@keyframes companion-search-left{50%{translate:0 -2px}}
+@keyframes companion-search-right{0%,100%{translate:0 -2px}50%{translate:0 0}}
+@keyframes companion-search{0%,100%{translate:0 0}35%{translate:0 7px}65%{translate:0 14px}}
+@keyframes companion-tool-hand{0%,100%{transform:translate(-8px,25px) rotate(10deg)}50%{transform:translate(-5px,24px) rotate(25deg)}}
+@keyframes companion-wrench{0%,100%{rotate:-7deg}50%{rotate:10deg}}
+@keyframes companion-driver{0%,100%{rotate:4deg}50%{rotate:-4deg}}
+@keyframes companion-inspect-hand{0%,100%{transform:translate(0px,20px)}50%{transform:translate(-7px,18px)}}
+@keyframes companion-inspect{0%,100%{translate:0 0}50%{translate:-7px -2px}}
+@keyframes companion-paint-hand{0%,100%{transform:translate(-29px,28px) rotate(15deg)}50%{transform:translate(-27px,22px) rotate(25deg)}}
+@keyframes companion-paint{0%,100%{rotate:0deg}50%{rotate:-14deg}}
+@keyframes companion-pigment{0%,100%{opacity:.3}50%{opacity:1}}
+@keyframes companion-note-left{0%,100%{translate:0 0}35%,65%{translate:9px 7px}}
+@keyframes companion-note-right{0%,100%{translate:0 0}35%,65%{translate:-9px 7px}}
+@keyframes companion-share-left{0%,100%{transform:translate(13px,17px)}35%,65%{transform:translate(22px,24px)}}
+@keyframes companion-share-right{0%,100%{transform:translate(-13px,17px)}35%,65%{transform:translate(-22px,24px)}}
+@keyframes companion-sort{0%,10%,100%{translate:0 0}25%,85%{translate:40px 10px}}
+@keyframes companion-sort-second{0%,30%,100%{translate:0 0}45%,85%{translate:40px -3px}}
+@keyframes companion-sort-third{0%,50%,100%{translate:0 0}65%,85%{translate:40px -16px}}
+@keyframes companion-sort-left{0%,100%{transform:translate(9px,15px)}25%,45%,65%{transform:translate(43px,17px)}35%,55%{transform:translate(9px,24px)}}
+@keyframes companion-ready{0%,100%{translate:0 0}40%,70%{translate:3px 10px}}
+@keyframes companion-ready-hand{0%,100%{transform:translate(12px,10px)}40%,70%{transform:translate(15px,20px)}}
+@keyframes companion-ready-pencil{0%,100%{translate:0 0}40%,70%{translate:0 -5px}}
+@keyframes companion-tap{0%,65%,85%,100%{translate:0 0}75%{translate:0 -3px}}
+@keyframes companion-sleep{0%,100%{translate:0 0;opacity:.4}50%{translate:0 -4px;opacity:1}}
+@keyframes companion-sleep-mouth{50%{translate:0 1px}}
+@keyframes companion-unsure{0%,20%,100%{translate:0 0}40%,60%{translate:2px 0}80%{translate:-2px 0}}
+@keyframes companion-retry{to{rotate:360deg}}
+@keyframes companion-wait-signal{0%,100%{opacity:.8}50%{opacity:1}}
+@keyframes companion-flinch{20%{translate:-2px 0}40%{translate:2px 0}100%{translate:0 0}}
+@keyframes companion-settle{to{translate:0 2px}}
+@keyframes companion-celebrate{35%{translate:0 -3px}70%{translate:0 1px}100%{translate:0 0}}
+@keyframes companion-enter{from{opacity:0;translate:0 -4px}to{opacity:1;translate:0 0}}
+@keyframes companion-leave{from{opacity:1;translate:0 0}to{opacity:0;translate:0 -4px}}
 .avatar[data-state] .character *{animation-delay:var(--pose-phase,0s)}
-.avatar[data-state=writing] .hand-right{animation-delay:calc(var(--pose-phase,0s) + .22s)}
-.avatar[data-state=executing] .foot-right{animation-delay:calc(var(--pose-phase,0s) + .25s)}
 body.motion-hidden .character *,body.compact #pages .character *,.page[hidden] .character *{animation-play-state:paused!important}
 .appearance-option:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:380px){.appearance-options{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -396,10 +449,11 @@ body.motion-hidden .character *,body.compact #pages .character *,.page[hidden] .
 .settings-workspace .policy{grid-template-columns:minmax(0,max-content) minmax(0,1fr) max-content;gap:7px;padding:8px 0;border-bottom:1px solid #ffffff08;font-size:10px}
 .settings-workspace .policy .badge{font-size:10px;padding:4px 7px}
 .settings-workspace #product-version{font-size:10px;max-width:100%;color:var(--muted)}
+.settings-brand{display:flex;align-items:center;gap:9px;min-width:0}.settings-brand img{width:32px;height:32px;flex-shrink:0;border-radius:9px;object-fit:contain}.settings-brand h2{margin:0}
 @media(max-width:620px){.settings-layout{grid-template-columns:minmax(0,1fr);gap:18px}.settings-navigation{flex-direction:row;flex-wrap:wrap;border:0;border-bottom:1px solid var(--line);padding:0 0 12px;gap:6px}.settings-nav-item{padding:8px 10px;font-size:11px}}
 @media(max-width:380px){.consumption-summary,.settings-workspace{padding:14px 18px 20px}.consumption-diagnostics{padding:0 18px 20px}.consumption-readings{gap:10px}.consumption-total{font-size:24px}.consumption-coverage{font-size:20px}}
 
-body.expanded.settings-view #surface{width:min(790px,100%)}
+body.expanded.preferences-view #surface{width:min(790px,100%)}
 
 body.expanded.preferences-view #surface{height:min(var(--preferences-height,540px),calc(100% - 16px))}
 body.preferences-view #pages{overflow:auto}

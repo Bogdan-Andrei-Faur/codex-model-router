@@ -19,7 +19,7 @@ const assert=require('node:assert/strict');
         assert.equal(bounds.y,0);assert.ok(bounds.x>=0 && bounds.x+bounds.width<=800);
         for(const button of await page.locator('.capsule-bar button:visible').all()) {
           const r=await button.boundingBox();
-          assert.ok(r.x+r.width<=307.5 || r.x>=492.5 || r.y>=32,'Control intersects camera');
+          assert.ok(r.x+r.width<=307.5 || r.x>=492.5 || r.y>=32,'Control intersects camera at agent count '+count+': '+JSON.stringify(r));
         }
         assert.equal(await page.locator('.camera-gap').evaluate(n=>n.getBoundingClientRect().x+n.getBoundingClientRect().width/2),400);
       }
@@ -47,7 +47,7 @@ const assert=require('node:assert/strict');
       await page.waitForTimeout(500);
       assert.equal(await page.locator('body').evaluate(n=>n.classList.contains('camera-wings')),false);
       assert.equal((await page.locator('#surface').boundingBox()).y,0);
-      assert.equal((await page.locator('#surface').boundingBox()).height,64);
+      assert.equal((await page.locator('#surface').boundingBox()).height,48);
       assert.ok((await page.locator('#surface').boundingBox()).width<=430);
       // Narrow/unknown cutout geometry uses a safe vertical inset instead.
       await page.setViewportSize({width:390,height:900});

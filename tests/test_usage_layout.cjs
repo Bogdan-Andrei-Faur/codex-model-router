@@ -10,7 +10,7 @@ const {pathToFileURL}=require('node:url');
     for(const width of [320,390,432,600])for(const deviceScaleFactor of [1,1.25,1.5,2]){
       const page=await browser.newPage({viewport:{width,height:850},deviceScaleFactor}),errors=[];
       page.on('pageerror',e=>errors.push(String(e)));await page.clock.install({time:new Date('2026-10-08T08:00:00Z')});
-      await page.route('**/codex.png',r=>r.fulfill({path:path.resolve(__dirname,'../assets/codex-official.png')}));
+      await page.route('**/codex.png',r=>r.fulfill({path:path.resolve(__dirname,'../assets/brand/router-256.png')}));
       await page.goto(pathToFileURL(path.resolve(__dirname,'../monitor-ui/index.html')).href);
       // Expiry is driven by explicit advances, never by host load during assertions.
       await page.clock.pauseAt(new Date('2026-10-08T10:00:00Z'));
@@ -79,10 +79,10 @@ const {pathToFileURL}=require('node:url');
       await page.evaluate(()=>window.receive({threads:{a0:{name:'Tarea segura',status:'completed',context_window:{used_percent:90,used_tokens:90000,capacity_tokens:100000},context_compaction:{state:'compacting'}}},ui:{reduced:false}}));
       assert.equal(await avatar.getAttribute('data-state'),'compacting');assert.match(await avatar.getAttribute('aria-label'),/Compactando contexto/);
       assert.equal(await avatar.locator('.character-context').evaluate(n=>getComputedStyle(n).visibility),'hidden');
-      const motion=await avatar.locator('.character-body').evaluate(n=>{
-        const animation=n.getAnimations()[0];animation.currentTime=0;const first=getComputedStyle(n).transform;animation.currentTime=800;
-        window.testCharacter=n;return {name:getComputedStyle(n).animationName,moves:first!==getComputedStyle(n).transform};
-      });assert.equal(motion.name,'companion-pack');assert.ok(motion.moves);
+      const motion=await avatar.locator('.sort-sheet').first().evaluate(n=>{
+        const animation=n.getAnimations()[0];animation.currentTime=0;const first=getComputedStyle(n).translate;animation.currentTime=800;
+        window.testCharacter=n.closest('.character-body');return {name:getComputedStyle(n).animationName,moves:first!==getComputedStyle(n).translate};
+      });assert.equal(motion.name,'companion-sort');assert.ok(motion.moves);
       await page.evaluate(()=>window.receive({}));assert.ok(await avatar.locator('.character-body').evaluate(n=>n===window.testCharacter),'Heartbeat replaced the animation DOM');
       await page.evaluate(()=>window.receive({ui:{reduced:true}}));assert.equal(await avatar.locator('.character-body').evaluate(n=>getComputedStyle(n).animationName),'none');
       await page.locator('#expand').click();assert.equal(await page.locator('.companion-headline').innerText(),'Poniendo orden.');

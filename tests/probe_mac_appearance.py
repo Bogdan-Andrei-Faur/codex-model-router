@@ -57,7 +57,7 @@ app.run()
         base=Path(folder);contents=base/'Probe.app/Contents';binary=contents/'MacOS/probe'
         binary.parent.mkdir(parents=True)
         ui=contents/'Resources/ui';shutil.copytree(ROOT/'monitor-ui',ui)
-        shutil.copyfile(ROOT/'assets/codex-ui-1024.png',ui/'codex.png')
+        shutil.copyfile(ROOT/'assets/brand/router-1024.png',ui/'codex.png')
         root=base/'fixture';(root/'state').mkdir(parents=True)
         (root/'config.local.json').write_text(json.dumps({'updates_auto_check':False}))
         (root/'state/status-fixture.json').write_text(json.dumps({'pid':os.getpid(),'heartbeat':time.time(),'client_name':'fixture','threads':{'fixture':{'name':'Synthetic agent','status':'active'}},'agent_threads':{'fixture':{'name':'Synthetic agent','status':'active'}}}))

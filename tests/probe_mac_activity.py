@@ -32,9 +32,8 @@ let timer=Timer.scheduledTimer(withTimeInterval:0.1,repeats:true){timer in
         window.receive({connections:1,ui:{mode:'Expanded',reduced:false},threads:{fixture:{name:'Synthetic agent',status:'active',turn_id:'synthetic',activity:{version:1,source:'native',turn_id:'synthetic',kind,attention:kind==='approval'?['approval']:kind==='question'?['input']:[],observed_at:Date.now()/1000}}}});
         const pet=document.querySelector('.hero-character');
         if(pet?.dataset.state!==kind)throw Error('pose: '+kind);
-        const target=pet.querySelector(kind==='collaborating'?'.hand-right':'.character-body');
-        if(getComputedStyle(target).animationName==='none')throw Error('animation: '+kind);
-        if(['approval','question'].includes(kind)&&pet.querySelector('.character-attention').hidden)throw Error('attention: '+kind);
+        if(!pet.getAnimations({subtree:true}).length)throw Error('animation: '+kind);
+        if(['approval','question'].includes(kind)&&!pet.querySelector('.status-symbol .scene-symbol'))throw Error('attention: '+kind);
       }
       window.receive({ui:{reduced:true}});
       if(getComputedStyle(document.querySelector('.hero-character .character-body')).animationName!=='none')throw Error('reduced motion');
@@ -55,7 +54,7 @@ app.run()
         base = Path(folder); contents = base / 'Probe.app/Contents'
         binary = contents / 'MacOS/probe'; binary.parent.mkdir(parents=True)
         ui = contents / 'Resources/ui'; shutil.copytree(ROOT / 'monitor-ui', ui)
-        shutil.copyfile(ROOT / 'assets/codex-ui-1024.png', ui / 'codex.png')
+        shutil.copyfile(ROOT / 'assets/brand/router-1024.png', ui / 'codex.png')
         root = base / 'fixture'; (root / 'state').mkdir(parents=True)
         (root / 'config.local.json').write_text(json.dumps({'updates_auto_check': False}))
         swift = base / 'main.swift'; swift.write_text(source + harness)

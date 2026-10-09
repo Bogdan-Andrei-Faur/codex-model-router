@@ -14,6 +14,7 @@ import tempfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 import zipfile
+from tools.packaging.legal import copy_legal_notices
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -67,6 +68,7 @@ def main():
         shutil.copy2(ROOT / "BUILD.json", STAGE / "BUILD.json")
         shutil.copytree(ROOT / "assets", STAGE / "assets")
         shutil.copy2(ROOT / "README.md", STAGE / "README.md")
+        copy_legal_notices(ROOT, STAGE)
         shutil.copytree(ROOT / "docs", STAGE / "docs")
         (STAGE / "INSTALAR.txt").write_text(
             "Requisitos: .NET Framework 4.8 y Microsoft Edge WebView2 Runtime (Evergreen).\n"

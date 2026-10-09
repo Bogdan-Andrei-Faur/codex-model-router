@@ -5,25 +5,57 @@ Implementation: `src/codex_model_router/bridge/companion_activity.py` observes t
 The [App Server reference](https://learn.chatgpt.com/docs/app-server) and installed
 CLI schema supply the event vocabulary. Actual Desktop delivery is a separate gate.
 
-| Observed metadata | Presentation |
-| --- | --- |
-| Local turn submission | Preparing |
-| Active thread/turn, unspecified activity | Working; never inferred thinking |
-| `reasoning` lifecycle/delta envelope | Thinking, hand at the chin, upward gaze and thought bubbles |
-| `agentMessage` lifecycle/delta envelope | Writing at a keyboard, alternating hands and downward gaze |
-| Active `plan` item/plan step | Planning with a clipboard and focused pose |
-| `commandExecution`, `fileChange` | Executing at a terminal with stepping feet; editing with a moving pencil |
-| `webSearch` | Searching through binoculars, sweeping from side to side |
-| `mcpToolCall`, `dynamicToolCall` | Using a moving wrench |
-| `collabAgentToolCall` or `collabToolCall` | Collaborating, broad raised-hand wave |
-| `imageView`, `imageGeneration` | Inspecting with a magnifying glass; creating with a brush and sparkle |
-| Review mode entry/exit items | Reviewing a checklist with a deliberate nod |
-| `contextCompaction` lifecycle | Compacting, stacked sheets and pronounced compression |
-| Approval request or `waitingOnApproval` | Raised hand and Lucide lock badge |
-| User-input request/elicitation or `waitingOnUserInput` | Two-hand shrug and Lucide message badge; neutral “waiting for your response” |
-| Current-turn error with `willRetry=true` | Retrying with a curved arrow and recovery movement; distinct from terminal failure |
-| Failure/interruption/completion | Concerned expression and exclamation / pause bars / raised arms, check and one happy bounce |
-| Idle / absent evidence / lost connection | Resting / unknown / muted last reading |
+## Visual contract — rigid character revision
+
+The owner requires the same rounded rectangular body in every pose: no squashing,
+stretching, skew or animated scale on the body, limbs, face or props. Rigid translation
+and rotation are allowed. Blinks swap open eyes and closed eyelid strokes through
+opacity; they do not flatten eye shapes. Original mint/lilac body scale overrides
+are removed. Depth comes from static highlights and subtle mood gradients.
+
+Artwork stays 2D. `scenes.js` owns original illustrated props; semantic symbols are
+original Lucide1.51.0 vectors. Neutral paper/device/tool palettes are independent
+of character color. Permission is amber, response blue, retry yellow, error coral
+and completion pale mint, each on a dark contrasting badge clear of the body.
+
+| GIF | State / evidence | Visual action |
+| --- | --- | --- |
+| 01 | Preparing / local submission | Arrange a folder and pencil in a desk tray |
+| 02 | Working / active without specific activity | Work at a laptop; no inference of thinking |
+| 03 | Thinking / reasoning envelope | Upward gaze and a white thought cloud |
+| 04 | Planning / plan item or step | Follow rows on a paper checklist with a finger |
+| 05 | Writing / agentMessage | Hands type above a detailed keyboard |
+| 06 | Executing / commandExecution | Type on a laptop with terminal lines/cursor |
+| 07 | Editing / fileChange | Write in a notebook with a wood pencil |
+| 08 | Searching / webSearch | Back-facing character at a laptop with moving search highlight |
+| 09 | Tool / MCP or dynamic tool | Silver Lucide wrench and amber screwdriver |
+| 10 | Collaborating / collab tool | Exchange notes on a shared board with a small illustrative partner |
+| 11 | Inspecting / imageView | Move a silver magnifier with a contrasting blue lens |
+| 12 | Generating / imageGeneration | Brush a picture on a small easel |
+| 13 | Reviewing / review mode | Read along a paper and point to the checked line |
+| 14 | Compacting / contextCompaction | Sort separate sheets into a stack; body never compresses |
+| 15 | Approval / explicit approval wait | Amber lock badge; permission stays in Desktop |
+| 16 | Question / explicit user input wait | Blue question symbol; response stays in Desktop |
+| 17 | Retrying / willRetry | Yellow circular arrow rotates within its own badge |
+| 18 | Error / terminal failure | Concerned face, red warning and subtle forehead tint |
+| 19 | Interrupted / interrupted turn | Settled pose, closed eyes and cool forehead tint |
+| 20 | Done / completed turn | Modest smile, happy eyes, attached resting hands and separate check |
+| 21–22 | Entry / exit | Rigid fade/translation over900ms; no width/scale compression |
+| 23 | Idle / no active work | Upright, mild smile and occasional blink |
+| 24 | Unknown / insufficient evidence | Neutral gaze and subdued dashes; no user-question badge |
+| 25 | Offline / lost connection | Resting with closed eyes and drifting sleep marks |
+| 26 | Waiting / legacy generic wait | Folded arms and occasional foot tap |
+
+Idle is the default resting pose; unknown means evidence is insufficient; offline
+means the connection is absent. The sleepy drawing does not assert the process is
+literally asleep. The small collaboration partner is illustration, not another
+observed agent. A question and an approval always need their existing explicit
+metadata. No new backend event classification or retention is introduced.
+
+A fixed square-proportion scene viewport reserves room for props above/beside the
+body. Capsule buttons remain38×40px inside the48px bar; the artwork is uniformly
+fitted within them. Exit avatars leave layout flow, clamp to the safe crew width
+and fade for900ms so shrinking the island cannot push them over the camera.
 
 ## Projection invariants
 
@@ -54,7 +86,7 @@ CLI schema supply the event vocabulary. Actual Desktop delivery is a separate ga
   Terminal completion says “Turno terminado”, not independently verified success.
 - Specific activities use different silhouettes, props and movement, including in
   the 38px capsule. Props change only with the pose or appearance; hands render
-  in front of clothes. Reduced motion retains those static visual differences.
+  in front of clothes and held objects. Reduced motion retains those static visual differences.
 - Body, hand and prop animations use a common monotonic phase across polling;
   terminal gestures do not replay on every poll. Reduced-motion preferences disable animations; hidden pages and
   a hidden document pause them. A blocking wait pauses the live pipeline.
@@ -70,10 +102,11 @@ The synthetic [pose board](design/companion-activity-poses.png) uses production
 artwork/styles; it does not assert real Desktop event delivery.
 The [numbered GIF catalogue](design/companion-animations/README.md) and
 [visual gallery](design/companion-animations/index.html) capture each activity,
-entry/exit transition and static fallback at portrait and capsule sizes.
+entry/exit transition and animated fallback at portrait and capsule sizes.
 Regenerate all previews or an individual activity with
 `node tools/render_companion_gifs.cjs [activity-key]`; timings come from production
-CSS and the catalogue records source hashes. Synthetic previews do not change
+CSS and the catalogue records source hashes, including scenes.js and icons.js.
+The renderer also rebuilds the contact sheet using render_companion_board.py. Synthetic previews do not change
 the active monitor or establish native event delivery.
 The Mac receipt records its own pending bridge activation; it is not a statement
 about other hosts. Ubuntu has a matching installed/loaded bridge and observed

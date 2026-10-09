@@ -1,0 +1,82 @@
+Codex Model Router Personal Use License 1.0
+SPDX-License-Identifier: LicenseRef-Codex-Model-Router-Personal-Use-1.0
+
+Copyright (c) 2026 Bogdan Andrei Faur and contributors.
+All rights reserved except as expressly granted below.
+
+1. Scope
+
+This license applies to original Codex Model Router code, documentation and
+assets made available under this license (the "Software"). Each copyright
+holder licenses only the rights they hold. Third-party components and assets
+remain subject to their own licenses or permissions; see THIRD_PARTY_NOTICES.md.
+
+This is a source-available license for free personal, noncommercial use. It is
+not an open-source license and does not grant general redistribution rights.
+
+2. Permitted personal use
+
+Subject to these terms, you may, without paying a license fee:
+
+(a) download, install and run the Software for your own personal,
+    noncommercial purposes;
+(b) read and study its source code;
+(c) make private copies and backups, and build or modify the Software solely
+    for your own personal, noncommercial use.
+
+Personal, noncommercial use excludes use for an employer, client or business,
+paid professional work, revenue-generating activity, or a service offered to
+others. Separate written permission from the relevant copyright holders is
+required for uses outside the permission above.
+
+3. Restrictions
+
+Except as allowed by sections 4 and 5 or by separate written permission, you
+may not:
+
+(a) publish, redistribute, sublicense, sell or otherwise provide copies of
+    the Software, modified or unmodified, in source or binary form;
+(b) distribute or publish a derivative project or incorporate original parts
+    of the Software into another distributed product;
+(c) use the Software for commercial or professional purposes, or make it
+    available as a hosted service;
+(d) remove or misrepresent applicable copyright, license or attribution
+    notices in copies you are permitted to make.
+
+You may share links to the official repository and official releases.
+
+4. GitHub platform rights
+
+The official repository is https://github.com/Bogdan-Andrei-Faur/codex-model-router.
+Publication on GitHub grants rights under GitHub's applicable Terms of Service,
+including viewing and forking public repositories within GitHub. This license
+does not limit those platform rights or purport to disable GitHub forks.
+
+A fork does not, by itself, grant additional rights under this license for
+commercial use or redistribution outside those platform rights. Private
+modifications are allowed under section 2; public modifications are not granted
+by this license. Any rights independently granted by GitHub's applicable terms
+remain unaffected.
+
+5. Third parties and mandatory law
+
+Restrictions in this license do not replace or narrow the licenses of
+third-party components, or any rights that applicable law does not allow to be
+restricted. No ownership of third-party code, images, fonts or marks is claimed.
+No trademark, endorsement or affiliation permission is granted by this license.
+
+6. Warranty and liability
+
+To the extent permitted by applicable law, the Software is provided as is,
+without a promise of fitness, reliability, continuing support or availability.
+The copyright holders are not liable for loss or damage arising from its use
+to the extent such liability may lawfully be excluded. Mandatory consumer
+rights and liabilities that cannot legally be excluded remain unaffected.
+
+7. Termination
+
+Permissions under this license terminate if you violate its terms. Upon
+termination, stop the uses that depended on this license. Rights independently
+granted by third-party licenses, GitHub's applicable terms or mandatory law
+remain unaffected. Reinstatement requires written permission from the relevant
+copyright holders.

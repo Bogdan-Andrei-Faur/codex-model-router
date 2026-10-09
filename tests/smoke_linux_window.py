@@ -85,7 +85,7 @@ def main():
         # This fixture exercises the current checkout's UI in private storage.
         ui = root / 'ui'
         shutil.copytree(ROOT / 'monitor-ui', ui)
-        shutil.copyfile(ROOT / 'assets/codex-ui-1024.png', ui / 'codex.png')
+        shutil.copyfile(ROOT / 'assets/brand/router-1024.png', ui / 'codex.png')
         app.page = (ui / 'index.html').resolve().as_uri()
         payloads = []
         original_emit = app.emit

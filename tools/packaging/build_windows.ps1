@@ -8,16 +8,9 @@ $routerOutput = Join-Path $routerRoot 'dist'
 New-Item -ItemType Directory -Path $routerOutput -Force | Out-Null
 $routerCompiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 $routerFramework = $FrameworkReferencePath
-$routerIcon = Join-Path $routerRoot 'assets\codex.ico'
-$routerPng = [IO.File]::ReadAllBytes((Join-Path $routerRoot 'assets\codex-official.png'))
-$routerWriter = [IO.BinaryWriter]::new([IO.File]::Create($routerIcon))
-try {
-    $routerWriter.Write([UInt16]0); $routerWriter.Write([UInt16]1); $routerWriter.Write([UInt16]1)
-    1..4 | ForEach-Object { $routerWriter.Write([Byte]0) }
-    $routerWriter.Write([UInt16]1); $routerWriter.Write([UInt16]32)
-    $routerWriter.Write([UInt32]$routerPng.Length); $routerWriter.Write([UInt32]22)
-    $routerWriter.Write($routerPng)
-} finally { $routerWriter.Dispose() }
+$routerIcon = Join-Path $routerRoot 'assets\brand\router.ico'
+python (Join-Path $routerRoot 'tools\render_brand_assets.py') --check
+if ($LASTEXITCODE -ne 0) { throw 'Brand asset verification failed' }
 python (Join-Path $routerRoot 'run.py') build-identity
 if ($LASTEXITCODE -ne 0) { throw 'Build identity failed' }
 $routerBuild = Get-Content -LiteralPath (Join-Path $routerRoot 'BUILD.json') -Raw | ConvertFrom-Json
@@ -43,7 +36,7 @@ foreach ($routerArchitecture in @('win-x64','win-x86','win-arm64')) {
 $routerUi = Join-Path $routerOutput 'windows-ui'
 New-Item -ItemType Directory -Path $routerUi -Force | Out-Null
 Copy-Item -Path (Join-Path $routerRoot 'monitor-ui\*') -Destination $routerUi -Recurse -Force
-Copy-Item -LiteralPath (Join-Path $routerRoot 'assets\codex-ui-1024.png') -Destination (Join-Path $routerUi 'codex.png') -Force
+Copy-Item -LiteralPath (Join-Path $routerRoot 'assets\brand\router-1024.png') -Destination (Join-Path $routerUi 'codex.png') -Force
 if ($BuildOnly) { Write-Output 'Compilación preparada sin cambiar los accesos.'; return }
 $routerStable = Join-Path $routerOutput 'codex-router.exe'
 Copy-Item -LiteralPath (Join-Path $routerOutput 'codex-router-v19.exe') -Destination ($routerStable + '.new') -Force

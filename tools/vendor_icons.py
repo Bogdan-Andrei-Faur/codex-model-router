@@ -25,7 +25,7 @@ CATEGORIES = {'audit':'clipboard-check', 'tests':'flask-conical', 'architecture'
 CONTROLS = ['panel-left-open','panel-left-close','sliders-horizontal','x','pause','play',
             'circle-check','circle','check','plus','route','chevron-right',
             'house','users-round','history','chart-no-axes-combined','settings',
-            'lock-keyhole','message-circle']
+            'lock-keyhole','message-circle','circle-help','rotate-cw','triangle-alert','wrench']
 
 
 def geometry(tag, attrs):
