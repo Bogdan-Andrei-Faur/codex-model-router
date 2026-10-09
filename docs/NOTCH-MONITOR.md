@@ -161,6 +161,21 @@ surface is deliberately opaque. X11/XWayland can honor position/topmost hints;
 plain Wayland retains compositor restrictions. Multiple physical displays,
 fractional scaling, first-click focus, startup and sleep require native receipts.
 
+On Linux, a pinned X11/XWayland monitor uses the full display's top edge in compact
+and expanded modes. It creates no strut; the lower boundary respects the work area.
+GNOME additionally needs an override-redirect accessory: a managed dock can reach
+the edge but still renders below Shell's panel. A centered 122 logical-pixel clock
+slot uses the panel height derived from the work area, inset 3 pixels vertically
+and rounded into a pill (122×26 on a 32-pixel panel). Its native visual and input
+shapes are cut out so the clock stays visible/clickable; shared controls use the
+same side wings as the Mac camera layout. This fitted slot targets GNOME's
+default centered clock, not arbitrary extensions that relocate or enlarge it.
+Clicks explicitly focus WebKit; mapping alone does not take keyboard focus.
+Other X11 desktops keep a managed dock. Disabling always-on-top restores a normal
+window and work-area placement. Role changes remap the window to preserve its
+display under Mutter. Native Wayland keeps compositor-controlled placement.
+Owner visual/input acceptance remains separate from coordinate and shape tests.
+
 Compact agent/context/quota details use the integrated hover panel and accessible
 labels, without duplicate native `title` tooltips. Leaving the island starts one
 220ms close deadline; repeated outside samples cannot postpone it. Returning to

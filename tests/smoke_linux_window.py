@@ -1,15 +1,17 @@
 """Check real GTK placement/stacking in a logged-in Linux desktop session.
 
-Run after linux.py setup with the system Python, without inheriting the shell's
+Run with the system Python, without inheriting the shell's
 backend: env -u GDK_BACKEND /usr/bin/python3 tests/smoke_linux_window.py
 Uses an isolated preview and synthetic preferences; never reads user secrets.
 Requires an X11/XWayland window manager and xprop (x11-utils).
 """
 import argparse
+import ctypes
 import json
 from pathlib import Path
 import sys
 import subprocess
+import shutil
 import tempfile
 import time
 
@@ -20,6 +22,46 @@ from codex_model_router.monitor.monitor_linux import Gdk, GLib, Monitor
 import gi
 gi.require_version('GdkX11', '3.0')
 from gi.repository import GdkX11
+
+
+def clock_hole(native, width, height):
+    """Read the X server's actual bounding/input shapes without moving input."""
+    class Rectangle(ctypes.Structure):
+        _fields_ = [('x', ctypes.c_short), ('y', ctypes.c_short),
+                    ('width', ctypes.c_ushort), ('height', ctypes.c_ushort)]
+    x11 = ctypes.CDLL('libX11.so.6')
+    extension = ctypes.CDLL('libXext.so.6')
+    x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
+    x11.XOpenDisplay.restype = ctypes.c_void_p
+    x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+    x11.XFree.argtypes = [ctypes.c_void_p]
+    extension.XShapeGetRectangles.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_int,
+                                             ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)]
+    extension.XShapeGetRectangles.restype = ctypes.POINTER(Rectangle)
+    connection = x11.XOpenDisplay(None)
+    if not connection:
+        return False
+    try:
+        center = native.get_width() // 2
+        for kind in (0, 2):  # ShapeBounding and ShapeInput
+            count, ordering = ctypes.c_int(), ctypes.c_int()
+            rectangles = extension.XShapeGetRectangles(connection, GdkX11.X11Window.get_xid(native),
+                                                      kind, ctypes.byref(count), ctypes.byref(ordering))
+            try:
+                def contains(x, y):
+                    return any(r.x <= x < r.x + r.width and r.y <= y < r.y + r.height
+                               for r in rectangles[:count.value])
+                if (contains(center, height // 2)
+                        or not contains(center - width // 2 - 40, height // 2)
+                        or not contains(center - width // 2 + 1, 3)
+                        or not contains(center, 0)
+                        or not contains(center, height + 8)):
+                    return False
+            finally:
+                x11.XFree(rectangles)
+        return True
+    finally:
+        x11.XCloseDisplay(connection)
 
 
 def main():
@@ -39,6 +81,12 @@ def main():
         prefs_path = root / 'state/monitor-ui-linux.json'
         prefs_path.write_text(json.dumps(preferences))
         app = Monitor(root, preview=True)
+        # Never display an obsolete dist/linux-ui left by an earlier setup.
+        # This fixture exercises the current checkout's UI in private storage.
+        ui = root / 'ui'
+        shutil.copytree(ROOT / 'monitor-ui', ui)
+        shutil.copyfile(ROOT / 'assets/codex-ui-1024.png', ui / 'codex.png')
+        app.page = (ui / 'index.html').resolve().as_uri()
         payloads = []
         original_emit = app.emit
 
@@ -59,6 +107,9 @@ def main():
             ('compact', {'action': 'mode', 'value': 'Compact'}, True, 'Compact'),
         ]
         results = []
+        initial_monitor = display.get_primary_monitor() or display.get_monitor(0)
+        initial_area = initial_monitor.get_workarea()
+        initial_workarea = (initial_area.x, initial_area.y, initial_area.width, initial_area.height)
         index = 0
         deadline = time.monotonic() + 20
         failure = None
@@ -75,21 +126,42 @@ def main():
                         matched = not window.get_mapped()
                     elif window.get_mapped():
                         native = window.get_window()
-                        area = display.get_monitor_at_window(native).get_workarea()
-                        width = min(800, max(1, area.width - 20))
-                        expected = (area.x + (area.width - width) // 2, area.y)
+                        monitor = display.get_monitor_at_window(native)
+                        area = monitor.get_workarea()
+                        bounds = monitor.get_geometry() if topmost else area
+                        width = min(800, max(1, bounds.width - 20))
+                        expected = (bounds.x + (bounds.width - width) // 2, bounds.y)
+                        expected_height = max(1, area.y + area.height - bounds.y - 20)
                         # GTK's cached ABOVE flag can lag the actual WM state.
                         # Query only this synthetic window's EWMH property.
                         wm_state = subprocess.check_output(
                             ['xprop', '-id', str(GdkX11.X11Window.get_xid(native)), '_NET_WM_STATE'],
                             text=True, timeout=2)
                         above = '_NET_WM_STATE_ABOVE' in wm_state
+                        wm_type = subprocess.check_output(
+                            ['xprop', '-id', str(GdkX11.X11Window.get_xid(native)), '_NET_WM_WINDOW_TYPE'],
+                            text=True, timeout=2)
+                        dock = '_NET_WM_WINDOW_TYPE_DOCK' in wm_type
+                        info = subprocess.check_output(
+                            ['xwininfo', '-id', str(GdkX11.X11Window.get_xid(native))],
+                            text=True, timeout=2)
+                        overlay = 'Override Redirect State: yes' in info
+                        clock_clear = (not app.clock_height
+                                       or clock_hole(native, app.clock_width, app.clock_height))
+                        workarea = (area.x, area.y, area.width, area.height)
                         observed = {'position': tuple(window.get_position()),
-                                    'size': tuple(window.get_size()), 'above': above,
+                                    'size': tuple(window.get_size()), 'above': above, 'dock': dock, 'overlay': overlay,
+                                    'clockClear': clock_clear,
+                                    'expected': expected, 'expectedHeight': expected_height,
                                     'ui': payloads[-1]['ui']}
                         matched = (tuple(window.get_position()) == expected
-                                   and tuple(window.get_size()) == (width, max(1, area.height - 20))
-                                   and above == topmost
+                                   and tuple(window.get_size()) == (width, expected_height)
+                                   and (above or overlay) == topmost
+                                   and dock == topmost
+                                   and overlay == app.edge_overlay
+                                   and clock_clear
+                                   and monitor == initial_monitor
+                                   and workarea == initial_workarea
                                    and payloads[-1]['desktopCapabilities']['positioning'] is True
                                    and payloads[-1]['ui']['mode'] == mode
                                    and payloads[-1]['ui']['topmost'] == topmost)

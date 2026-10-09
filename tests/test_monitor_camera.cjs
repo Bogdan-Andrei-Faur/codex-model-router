@@ -57,6 +57,24 @@ const assert=require('node:assert/strict');
       await page.evaluate(()=>window.receiveUI({mode:'Expanded'}));
       await page.waitForTimeout(500);
       assert.ok((await page.locator('nav').boundingBox()).y>=40,'Narrow layout keeps safe vertical fallback');
+      // Ubuntu uses the same wings around the real clock; GTK cuts the native
+      // visual/input hole. Verify that no shared control enters that slot.
+      await page.setViewportSize({width:800,height:1000});
+      await page.evaluate(()=>window.receiveUI({mode:'Compact',cameraWidth:0,cameraHeight:0,clockWidth:122,clockHeight:32}));
+      for(const tab of ['compact','home','activity','history','statistics','settings']) {
+        if(tab==='home')await page.locator('#expand').click();
+        else if(tab!=='compact')await page.locator('nav [data-tab="'+tab+'"]').click();
+        await page.waitForTimeout(500);
+        const controls=tab==='compact'?'.capsule-bar button:visible':'nav button';
+        for(const button of await page.locator(controls).all()) {
+          const r=await button.boundingBox();
+          assert.ok(r.x+r.width<=339 || r.x>=461 || r.y>=32,'Control intersects Ubuntu clock');
+          const surface=await page.locator('#surface').boundingBox();
+          assert.ok(r.x>=surface.x && r.x+r.width<=surface.x+surface.width,'Clock wings clip a control');
+        }
+      }
+      await page.evaluate(()=>window.receiveUI({mode:'Compact',clockWidth:0,clockHeight:0}));
+      assert.equal(await page.locator('body').evaluate(n=>n.classList.contains('clock-slot')),false);
       assert.deepEqual(errors,[]);
       await page.close();
     }

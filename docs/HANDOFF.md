@@ -1,4 +1,4 @@
-# Current project handoff — 2026-10-08
+# Current project handoff — 2026-10-09
 
 Canonical project: `codex-model-router`,
 `https://github.com/Bogdan-Andrei-Faur/codex-model-router.git`.
@@ -8,6 +8,14 @@ This checkout is sufficient; no other agent, personal memory or external knowled
 service is needed. Preserve local work and coordinate disruptive owner actions.
 
 ## Current source and delivery
+
+- The owner approved the Ubuntu top-edge/clock fit and authorized publication
+  directly to `main`. The GNOME/XWayland accessory uses a rounded clock cutout,
+  shared side-wing controls and explicit click focus; source/native/browser checks
+  and installed readback are in [the receipt](native-validation/2026-10-09-linux-top-edge.md).
+  Use local HEAD and remote `main` for the publication revision. This delivery
+  includes the earlier Ubuntu main-installation/bridge-activation receipt.
+  Generated packages, private backups and runtime data remain outside Git.
 
 - The owner authorized direct-main publication of source reorganization on top
   of `5b050fc`. It groups Python responsibilities
@@ -123,7 +131,18 @@ retains the full feedback/install progression and every linked safe receipt.
 
 ## Recorded installed state and verification
 
-Ubuntu pilot `0.9.6-1~notch43` is installed: monitor `2e0a5284b2aa9c8e`,
+Current Ubuntu pilot (2026-10-09): `0.9.6-2~main20261009.5`, monitor
+`484dca514488a5d7`, installed/loaded router `88a0be134bc26eb9`, one connection,
+settings preserved, no mismatch/restart flags. The GNOME/XWayland overlay reaches
+the display top and excludes the centered clock from both visual/input shapes.
+The earlier `.2` managed-dock attempt reached the edge but failed owner visual
+acceptance because Shell covered the companions. Current native shape/position,
+isolated keyboard/package smoke and browser checks pass, with broader checks
+scoped to their artifact in the receipt. The owner accepted the final `.5` visual
+fit. Physical input/display/scaling/sleep checks remain separate. See
+[receipt](native-validation/2026-10-09-linux-top-edge.md).
+
+Historical Ubuntu pilot `0.9.6-1~notch43`: monitor `2e0a5284b2aa9c8e`,
 packaged/connected router `2fec36051e3ccedb`. Its last installed readback passed:
 one connected monitor, matching UI files, preserved settings, WebKit ready,
 no startup traceback, bridge mismatch/unknown=false, restartRequired=false.

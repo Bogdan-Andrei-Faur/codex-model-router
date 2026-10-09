@@ -60,6 +60,8 @@ class Monitor(Gtk.Application):
         self.mode_request = None
         self.page = (ROOT / ('ui/index.html' if manifest(ROOT) else 'dist/linux-ui/index.html')).resolve().as_uri()
         self.panel_height = 760
+        self.edge_overlay = False
+        self.clock_width = self.clock_height = 0
         self.hit_rect = None
         self.last_pointer = object()
         self.last_pointer_sent = 0
@@ -96,12 +98,14 @@ class Monitor(Gtk.Application):
         self.window.set_default_icon_from_file(str(ROOT / 'assets/codex-official.png'))
         self.window.set_decorated(False)
         self.window.set_app_paintable(True)
+        self.window.set_focus_on_map(False)
         self.window.set_keep_above(self.topmost)
         visual = self.window.get_screen().get_rgba_visual()
         if visual:
             self.window.set_visual(visual)
         self.window.connect('delete-event', self.on_delete)
         self.window.connect('map-event', self.on_map)
+        self.window.connect('realize', lambda *_: self.apply_window_role())
         manager = WebKit2.UserContentManager()
         manager.connect('script-message-received::monitor', self.message)
         manager.register_script_message_handler('monitor')
@@ -119,6 +123,7 @@ class Monitor(Gtk.Application):
         self.web.connect('permission-request', lambda _web, request: (request.deny(), True)[1])
         self.web.connect('create', lambda *_: None)
         self.web.connect('context-menu', lambda *_: True)
+        self.web.connect('button-press-event', self.focus_overlay)
         self.web.connect('web-process-terminated', self.reload_page)
         self.web.connect('load-failed', self.load_failed)
         self.window.add(self.web)
@@ -208,12 +213,41 @@ class Monitor(Gtk.Application):
         monitor = display.get_monitor_at_window(self.window.get_window()) if self.window.get_window() else display.get_primary_monitor()
         monitor = monitor or display.get_monitor(0)
         area = monitor.get_workarea()
-        width, height = min(800, max(1, area.width - 20)), max(1, area.height - 20)
+        # A normal Mutter window is constrained below the system panel even
+        # after an explicit move. A pinned X11/XWayland accessory can occupy
+        # that band as a dock, without reserving any desktop space (no strut).
+        edge = self.topmost and display.__gtype__.name == 'GdkX11Display'
+        bounds = monitor.get_geometry() if edge else area
+        self.edge_overlay = edge and 'GNOME' in os.environ.get('XDG_CURRENT_DESKTOP', '').upper().split(':')
+        self.clock_height = max(0, area.y - bounds.y) if self.edge_overlay else 0
+        # Fit the default centered date/time pill with a small surrounding gap.
+        self.clock_width = 122 if self.clock_height else 0
+        hint = Gdk.WindowTypeHint.DOCK if edge else Gdk.WindowTypeHint.NORMAL
+        self.window.set_type_hint(hint)
+        if self.window.get_window():
+            # Gtk's type hint alone only takes effect before realization.
+            self.window.get_window().set_type_hint(hint)
+            self.apply_window_role()
+        width = min(800, max(1, bounds.width - 20))
+        height = max(1, area.y + area.height - bounds.y - 20)
         self.panel_height = min(height, max(560, area.height * self.ratio))
         self.window.resize(width, height)
         # A positioning request on X11; the compositor chooses placement on Wayland.
-        self.window.move(area.x + (area.width - width) // 2, area.y)
+        self.window.move(bounds.x + (bounds.width - width) // 2, bounds.y)
         self.last_payload = None
+
+    def apply_window_role(self):
+        native = self.window.get_window()
+        if native and Gdk.Display.get_default().__gtype__.name == 'GdkX11Display':
+            # Mutter places override-redirect accessories above its panel.
+            # A managed DOCK alone remains below GNOME Shell's chrome.
+            native.set_override_redirect(self.edge_overlay)
+
+    def focus_overlay(self, _web, event):
+        # Unmanaged overlays receive keyboard focus only after an owner click.
+        if self.edge_overlay:
+            self.window.get_window().focus(event.time)
+        return False
 
     def update_pointer(self):
         # Input-shaped windows can lose DOM leave events when the pointer moves
@@ -277,8 +311,16 @@ class Monitor(Gtk.Application):
     def set_topmost(self, value):
         if type(value) is not bool:
             return
+        mapped = self.window.get_mapped()
+        # Remap the role change so Mutter does not re-place a still-mapped
+        # dock as a new normal window on a different display.
+        if mapped:
+            self.window.hide()
         self.topmost = value
+        self.position()
         self.window.set_keep_above(value)
+        if mapped:
+            self.window.show_all()
         self.save_ui()
         self.last_payload = None
         self.refresh()
@@ -358,6 +400,24 @@ class Monitor(Gtk.Application):
             if right > left:
                 region.union(cairo.RectangleInt(left, max(0, int(y) + line), right - left, 1))
         self.window.input_shape_combine_region(region)
+        if self.clock_width and self.clock_height:
+            left = (self.window.get_size()[0] - self.clock_width) // 2
+            top = min(3, max(0, (self.clock_height - 1) // 2))
+            cut_height = max(1, self.clock_height - top * 2)
+            radius = min(cut_height / 2, self.clock_width / 2)
+            cutout = cairo.Region()
+            for line in range(cut_height):
+                dy = max(0, abs(line + .5 - cut_height / 2) - (cut_height / 2 - radius))
+                inset = radius - math.sqrt(max(0, radius * radius - dy * dy))
+                start, end = math.floor(left + inset), math.ceil(left + self.clock_width - inset)
+                cutout.union(cairo.RectangleInt(start, top + line, end - start, 1))
+            region.subtract(cutout)
+            self.window.input_shape_combine_region(region)
+            visual = cairo.Region(cairo.RectangleInt(0, 0, *self.window.get_size()))
+            visual.subtract(cutout)
+            self.window.shape_combine_region(visual)
+        else:
+            self.window.shape_combine_region(None)
 
     def perform_action(self, data):
         message = 'Guardado.'
@@ -426,6 +486,7 @@ class Monitor(Gtk.Application):
 
     def ui_snapshot(self):
         return {'mode': self.mode, 'topmost': self.topmost, 'panelHeight': self.panel_height,
+                'clockWidth': self.clock_width, 'clockHeight': self.clock_height,
                 'reduced': not Gtk.Settings.get_default().get_property('gtk-enable-animations'),
                 'lazyHistory': True, 'acknowledgesMode': True, 'modeRequest': self.mode_request}
 

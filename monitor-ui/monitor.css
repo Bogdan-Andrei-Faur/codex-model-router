@@ -215,6 +215,7 @@ body.expanded.history-view #surface{width:min(790px,100%)}
 
 /* AppKit supplies camera geometry in points; other hosts keep the original layout. */
 .capsule-left,.capsule-right{display:contents}.camera-gap{display:none}
+body.clock-slot.expanded:not(.overview):not(.preferences-view) #surface{width:min(640px,100%)}
 body.camera-wings,body.camera-inset{--panel:#000}
 body.camera-wings .capsule-bar{grid-template-columns:minmax(0,1fr) var(--camera-gap) minmax(0,1fr);gap:0}
 body.camera-wings .capsule-left,body.camera-wings .capsule-right{display:flex;align-items:center;gap:5px;min-width:0}

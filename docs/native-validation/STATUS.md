@@ -3,10 +3,10 @@
 Use [the runbook](../NATIVE-VALIDATION.md) and [report template](REPORT-TEMPLATE.md).
 This ledger is repository-owned; no external knowledge/memory service is needed.
 
-## Current dynamic notch — 2026-10-08
+## Current dynamic notch — 2026-10-09
 
-The notch is integrated into `main`; last verified publication is `5b050fc`, product baseline `0.9.6`.
-The owner authorized direct-main publication of the source layout below; use
+The notch is integrated into `main`; publication baseline is `a4af030`, product `0.9.6`.
+The owner authorized direct-main publication of the Ubuntu clock/top-edge changes; use
 local HEAD and remote `main` for its delivery revision. Source publication does
 not replace earlier installed/loaded artifacts. Rows describe their receipt times.
 The current implementation is in [NOTCH-MONITOR.md](../NOTCH-MONITOR.md);
@@ -21,14 +21,16 @@ The current implementation is in [NOTCH-MONITOR.md](../NOTCH-MONITOR.md);
 | Per-agent editor | Local Mac monitor `a0a5ea7bcfe28228`; shared persistence/browser tests and native isolated save/acknowledgement PASS; [receipt](2026-10-08-macos-agent-editor.md) | Physical owner acceptance and Windows/Linux native editor checks pending; richer activity reducer implemented, real delivery pending |
 | macOS camera/top-edge integration | Camera iteration monitor `6d5ce16a097573ca` (superseded by editor build), actual window Y=0/level25; eleven browser groups and native fixtures PASS; [receipt](2026-10-08-macos-camera-integration.md) | Physical camera/menu appearance and real external-display transition pending |
 | Shared/offline source checks | 518 Python tests, 37 optional/platform skips; 31 JS core tests; all 10 browser groups; routing 27/27 and six offline JEV cases PASS | Skips are not optional Docker/native execution proof |
-| Ubuntu installed pilot | `0.9.6-1~notch43`, monitor `2e0a5284b2aa9c8e`, connected router `2fec36051e3ccedb`; last readback PASS | Physical owner input/display/sleep/scaling acceptance remains open |
-| Ubuntu native fixture | Exact `1~notch43` full GTK/WebKit package smoke, History spacing/detail/ratings and Home opening metric probe PASS | Synthetic isolated windows do not accept physical input/compositor behavior |
+| Ubuntu installed pilot | `0.9.6-2~main20261009.5`, monitor `484dca514488a5d7`, installed/loaded router `88a0be134bc26eb9`; one connection, matching current UI, seven preserved settings files; rounded 122×26 clock visual/input hole verified, final visual fit accepted by owner; [receipt](2026-10-09-linux-top-edge.md) | Earlier managed-dock `.2` failed owner visual acceptance because GNOME covered the companions. Physical input/display/sleep/scaling and current telemetry/inference acceptance remain open |
+| Ubuntu native fixture | Exact `2~main20261009.1` full GTK/WebKit package smoke PASS; 544 Python (37 skips), 33 JS and 14 browser groups PASS; [receipt](2026-10-09-linux-main-installation.md) | Synthetic isolated windows do not accept physical input/compositor behavior; no current CI claim |
 | History performance | Incremental transport/projection, parity/recovery and lazy/cached UI PASS; isolated measurements in receipt | Measurements exclude owner-perceived latency acceptance |
 | Quota Escape | Stationary hover replay reproduced and corrected; `9bddadc` passes all three hosted monitor/browser jobs, including quota cases | Prior failures retained; physical/input acceptance remains separate |
 | macOS/Windows redesign | Mac isolated AppKit/WebKit and first-click fixtures PASS; installed monitor `840e7d1e86cceab6` and ordinary loaded router `80e86c3d7accf253` match. Windows hosted native self-test/font PASS | Windows owner-host redesign and physical input/display/sleep remain separate |
 | Published delivery CI | `9bddadc`, complete 14-job matrix: 13 PASS, 1 FAIL; [Mac delivery receipt](2026-10-08-macos-notch-integration.md) | Existing Windows installer frozen protocol failure remains; no usage-limit block observed |
 
-Current artifact details: [ratings/spacing](2026-10-08-linux-notch-history-ratings.md).
+Current Ubuntu artifact: [top edge and clock](2026-10-09-linux-top-edge.md).
+Previous main activation: [main installation](2026-10-09-linux-main-installation.md).
+Earlier artifact details: [ratings/spacing](2026-10-08-linux-notch-history-ratings.md).
 Feature receipts: [detail cleanup](2026-10-08-linux-notch-history-detail.md),
 [History performance](2026-10-08-linux-notch-history-performance.md),
 [Home opening layout](2026-10-08-linux-notch-home-spacing.md),

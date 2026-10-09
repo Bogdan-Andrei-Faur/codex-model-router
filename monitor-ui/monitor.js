@@ -43,9 +43,14 @@ function ensureHistory() {
 function selectAgent(id) {
   if(currentTab==='activity')selectedWorkspaceAgent=id;else selectedAgent=id;reasonOpen=false;activity();
 }
+function topObstruction() {
+  const clock=Number.isFinite(state.ui.clockHeight) && state.ui.clockHeight>0;
+  const w=clock?state.ui.clockWidth:state.ui.cameraWidth,h=clock?state.ui.clockHeight:state.ui.cameraHeight;
+  return {width:Number.isFinite(w)?Math.max(0,w):0,height:Number.isFinite(h)?Math.max(0,h):0};
+}
 function cameraLayout() {
-  const width=Number.isFinite(state.ui.cameraWidth)?Math.max(0,state.ui.cameraWidth):0;
-  const height=Number.isFinite(state.ui.cameraHeight)?Math.max(0,state.ui.cameraHeight):0;
+  const {width,height}=topObstruction();
+  document.body.classList.toggle('clock-slot',Number.isFinite(state.ui.clockHeight) && state.ui.clockHeight>0);
   const wings=width>0 && innerWidth>=width+300;
   document.body.classList.toggle('camera-wings',wings);
   document.body.classList.toggle('camera-nav',wings && innerWidth>=width+24+72+280);
@@ -255,7 +260,7 @@ function schedulePeekClose() {
   peekTimer=setTimeout(closePeek,220);
 }
 function closePeek() {cancelPeekClose();peekId=null;quotaOpen=false;$('peek').hidden=true;document.body.classList.remove('peek');}
-function capsuleLimit() {return document.body.classList.contains('camera-wings') ? Math.max(1,Math.min(4,Math.floor((innerWidth-state.ui.cameraWidth-24-72-46)/76))) : Math.max(1,Math.min(6,Math.floor((Math.min(430,window.innerWidth)-177)/42)));}
+function capsuleLimit() {return document.body.classList.contains('camera-wings') ? Math.max(1,Math.min(4,Math.floor((innerWidth-topObstruction().width-24-72-46)/76))) : Math.max(1,Math.min(6,Math.floor((Math.min(430,window.innerWidth)-177)/42)));}
 function capsule() {
   const rows=state.threads;
   order=C.stableOrder(order,rows);compactOrder=C.companionOrder(compactOrder,rows);
@@ -263,7 +268,7 @@ function capsule() {
   $('compact').classList.toggle('multi-agent',compactOrder.length>1);
   // Symmetric wings grow with visible companions; reserve overflow space only when needed.
   const wing=Math.max(76,visible.length*38+(compactOrder.length>limit?23:0));
-  const width=document.body.classList.contains('camera-wings') ? state.ui.cameraWidth+24+72+2*wing : Math.max(350,Math.min(430,visible.length*42+177));
+  const width=document.body.classList.contains('camera-wings') ? topObstruction().width+24+72+2*wing : Math.max(350,Math.min(430,visible.length*42+177));
   $('surface').style.setProperty('--compact-width',width+'px');
   const focus=rows[visible[0]]||{status:'idle'},visual=C.companionState(focus,!!state.connections);
   $('compact-summary').replaceChildren(el('strong','',visual.headline),el('span','',focus.name||'Codex'));
