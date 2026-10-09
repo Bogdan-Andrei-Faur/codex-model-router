@@ -9,20 +9,20 @@ CLI schema supply the event vocabulary. Actual Desktop delivery is a separate ga
 | --- | --- |
 | Local turn submission | Preparing |
 | Active thread/turn, unspecified activity | Working; never inferred thinking |
-| `reasoning` lifecycle/delta envelope | Thinking, upward gaze and gentle tilt |
-| `agentMessage` lifecycle/delta envelope | Writing, small hand taps |
-| Active `plan` item/plan step | Planning |
-| `commandExecution`, `fileChange` | Executing, editing; shared work pose |
-| `webSearch` | Searching, looking side to side |
-| `mcpToolCall`, `dynamicToolCall` | Using a tool |
-| `collabAgentToolCall` or `collabToolCall` | Collaborating, brief wave |
-| `imageView`, `imageGeneration` | Looking closely, creating |
-| Review mode entry/exit items | Reviewing |
-| `contextCompaction` lifecycle | Compacting, compress/settle pose |
+| `reasoning` lifecycle/delta envelope | Thinking, hand at the chin, upward gaze and thought bubbles |
+| `agentMessage` lifecycle/delta envelope | Writing at a keyboard, alternating hands and downward gaze |
+| Active `plan` item/plan step | Planning with a clipboard and focused pose |
+| `commandExecution`, `fileChange` | Executing at a terminal with stepping feet; editing with a moving pencil |
+| `webSearch` | Searching through binoculars, sweeping from side to side |
+| `mcpToolCall`, `dynamicToolCall` | Using a moving wrench |
+| `collabAgentToolCall` or `collabToolCall` | Collaborating, broad raised-hand wave |
+| `imageView`, `imageGeneration` | Inspecting with a magnifying glass; creating with a brush and sparkle |
+| Review mode entry/exit items | Reviewing a checklist with a deliberate nod |
+| `contextCompaction` lifecycle | Compacting, stacked sheets and pronounced compression |
 | Approval request or `waitingOnApproval` | Raised hand and Lucide lock badge |
-| User-input request/elicitation or `waitingOnUserInput` | Raised hand and Lucide message badge; neutral “waiting for your response” |
-| Current-turn error with `willRetry=true` | Retrying; distinct from terminal failure |
-| Failure/interruption/completion | Concerned expression / stop / one short happy bounce |
+| User-input request/elicitation or `waitingOnUserInput` | Two-hand shrug and Lucide message badge; neutral “waiting for your response” |
+| Current-turn error with `willRetry=true` | Retrying with a curved arrow and recovery movement; distinct from terminal failure |
+| Failure/interruption/completion | Concerned expression and exclamation / pause bars / raised arms, check and one happy bounce |
 | Idle / absent evidence / lost connection | Resting / unknown / muted last reading |
 
 ## Projection invariants
@@ -52,8 +52,11 @@ CLI schema supply the event vocabulary. Actual Desktop delivery is a separate ga
 - The same character, clothes and colors render in every pose. Attention badges
   supplement accessible text. No sounds or color changes signal model selection.
   Terminal completion says “Turno terminado”, not independently verified success.
-- Infinite poses keep phase across polling; terminal gestures do not replay on
-  every poll. Reduced-motion preferences disable animations; hidden pages and
+- Specific activities use different silhouettes, props and movement, including in
+  the 38px capsule. Props change only with the pose or appearance; hands render
+  in front of clothes. Reduced motion retains those static visual differences.
+- Body, hand and prop animations use a common monotonic phase across polling;
+  terminal gestures do not replay on every poll. Reduced-motion preferences disable animations; hidden pages and
   a hidden document pause them. A blocking wait pauses the live pipeline.
 
 The monitor never answers questions, approves permissions, retries commands,
@@ -65,5 +68,17 @@ responses pass through unchanged. Astra boundaries and approval authority remain
 See the [Mac receipt](native-validation/2026-10-08-macos-companion-activity.md).
 The synthetic [pose board](design/companion-activity-poses.png) uses production
 artwork/styles; it does not assert real Desktop event delivery.
-The local monitor is installed, but Desktop must load the new bridge on its next
-owner-controlled restart. Do not interrupt active agent tasks to validate it.
+The [numbered GIF catalogue](design/companion-animations/README.md) and
+[visual gallery](design/companion-animations/index.html) capture each activity,
+entry/exit transition and static fallback at portrait and capsule sizes.
+Regenerate all previews or an individual activity with
+`node tools/render_companion_gifs.cjs [activity-key]`; timings come from production
+CSS and the catalogue records source hashes. Synthetic previews do not change
+the active monitor or establish native event delivery.
+The Mac receipt records its own pending bridge activation; it is not a statement
+about other hosts. Ubuntu has a matching installed/loaded bridge and observed
+current-scope native activity. See its [gesture receipt](native-validation/2026-10-09-linux-companion-gestures.md)
+for the current UI artifact and acceptance boundaries. No event retention or
+classification changed: short events can remain brief, and unspecified activity
+continues to use the generic Working pose. Do not interrupt active tasks merely
+to validate animation.

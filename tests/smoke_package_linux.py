@@ -217,6 +217,14 @@ def exercise(package, base):
     hover_started = []
     hover_passed = []
     hover_pending = []
+    activity_started = []
+    activity_passed = []
+    def activity_result(web, result, _):
+        try:
+            assert web.evaluate_javascript_finish(result).to_int32() == 18
+            activity_passed.append(True)
+        except Exception as failure:
+            error.append('Packaged activity check failed: ' + str(failure))
     def hover_result(web, result, _):
         hover_pending.clear()
         try:
@@ -235,7 +243,27 @@ def exercise(package, base):
     def check():
         if error:
             app.quit(); return False
-        if app.ready and received and font_loaded and hover_passed:
+        if hover_passed and not activity_started:
+            activity_started.append(True)
+            app.web.evaluate_javascript("""
+                (()=>{
+                  const kinds=['thinking','writing','planning','executing','editing','searching','tool','collaborating','inspecting','generating','reviewing','compacting','approval','question','retrying','error','interrupted','done'];
+                  const motions=new Set();
+                  for(const kind of kinds){
+                    window.receive({connections:1,ui:{mode:'Expanded',reduced:false},threads:{'fixture-agent':{name:'Synthetic agent',status:'active',turn_id:'synthetic',activity:{version:1,source:'native',turn_id:'synthetic',kind,attention:kind==='approval'?['approval']:kind==='question'?['input']:[],observed_at:Date.now()/1000}}}});
+                    const pet=document.querySelector('.hero-character'),prop=pet.querySelector('.activity-prop');
+                    if(pet.dataset.state!==kind||prop.dataset.kind!==kind)throw Error('pose '+kind);
+                    const motion=getComputedStyle(pet.querySelector('.character-body')).animationName;
+                    if(motion==='none'||motions.has(motion))throw Error('distinct motion '+kind);
+                    motions.add(motion);
+                    if(!['collaborating','approval','question'].includes(kind)&&!prop.children.length)throw Error('prop '+kind);
+                  }
+                  window.receive({ui:{reduced:true}});
+                  if(getComputedStyle(document.querySelector('.hero-character .character-body')).animationName!=='none')throw Error('reduced motion');
+                  return kinds.length;
+                })()
+            """, -1, None, app.page, None, activity_result, None)
+        if app.ready and received and font_loaded and hover_passed and activity_passed:
             app.quit(); return False
         if font_loaded and app.hit_rect is not None and not hover_started:
             hover_started.append(True)
@@ -293,7 +321,7 @@ def exercise(package, base):
         return True
     GLib.timeout_add(100, check)
     app.run(['router-package-smoke'])
-    assert not error and received and app.ready and font_loaded and hover_passed, error
+    assert not error and received and app.ready and font_loaded and hover_passed and activity_passed, error
     assert (migrated / 'config.local.json').read_bytes() == (source / 'config.local.json').read_bytes()
     # Exercise the actual executable/dispatcher as well as the GTK object.
     child_env = dict(os.environ, PERSONAL_CODEX_ROUTER_ROOT=str(base / 'launcher-preview'))
@@ -342,7 +370,8 @@ def exercise(package, base):
                       'stale_foreign_pointer_rejected': True, 'missed_exit_recovers': True,
                       'mapped_gtk_pointer_ownership': True,
                       'stopped_pid_reuse_import': True, 'active_bridge_specific_error': True,
-                      'cached_monitor_single_instance': True}))
+                      'cached_monitor_single_instance': True,
+                      'activity_distinct_webkit_poses': 18, 'activity_reduced_motion': True}))
 
 if __name__ == '__main__':
     main()

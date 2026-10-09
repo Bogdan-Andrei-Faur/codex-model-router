@@ -1,0 +1,998 @@
+{
+  "schema": 1,
+  "fps": 20,
+  "synthetic": true,
+  "renderer": "Chromium / production monitor-ui",
+  "sourceSha256": {
+    "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+    "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+    "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+    "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+  },
+  "previews": [
+    {
+      "key": "preparing",
+      "label": "Preparando turno",
+      "category": "Bucle",
+      "number": 1,
+      "file": "01-preparing.gif",
+      "frames": 80,
+      "durationMs": 4000,
+      "width": 480,
+      "height": 296,
+      "bytes": 362585,
+      "animations": [
+        {
+          "name": "companion-ready",
+          "duration": 2000,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-ready",
+          "duration": 2000,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "working",
+      "label": "Trabajando",
+      "category": "Bucle",
+      "number": 2,
+      "file": "02-working.gif",
+      "frames": 936,
+      "durationMs": 46800,
+      "width": 480,
+      "height": 296,
+      "bytes": 2468710,
+      "animations": [
+        {
+          "name": "companion-breathe",
+          "duration": 3600,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-blink",
+          "duration": 5200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-blink",
+          "duration": 5200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-breathe",
+          "duration": 3600,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-blink",
+          "duration": 5200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-blink",
+          "duration": 5200,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "thinking",
+      "label": "Pensando",
+      "category": "Bucle",
+      "number": 3,
+      "file": "03-thinking.gif",
+      "frames": 952,
+      "durationMs": 47600,
+      "width": 480,
+      "height": 296,
+      "bytes": 3186361,
+      "animations": [
+        {
+          "name": "companion-think",
+          "duration": 3400,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-thoughts",
+          "duration": 2800,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-think",
+          "duration": 3400,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-thoughts",
+          "duration": 2800,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "planning",
+      "label": "Planificando",
+      "category": "Bucle",
+      "number": 4,
+      "file": "04-planning.gif",
+      "frames": 64,
+      "durationMs": 3200,
+      "width": 480,
+      "height": 296,
+      "bytes": 188647,
+      "animations": [
+        {
+          "name": "companion-plan",
+          "duration": 3200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-plan",
+          "duration": 3200,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "writing",
+      "label": "Escribiendo",
+      "category": "Bucle",
+      "number": 5,
+      "file": "05-writing.gif",
+      "frames": 72,
+      "durationMs": 3600,
+      "width": 480,
+      "height": 296,
+      "bytes": 233975,
+      "animations": [
+        {
+          "name": "companion-type",
+          "duration": 1200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-type-left",
+          "duration": 450,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-type-right",
+          "duration": 450,
+          "iterations": "infinite",
+          "delay": 220
+        },
+        {
+          "name": "companion-type",
+          "duration": 1200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-type-left",
+          "duration": 450,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-type-right",
+          "duration": 450,
+          "iterations": "infinite",
+          "delay": 220
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "executing",
+      "label": "Ejecutando comandos",
+      "category": "Bucle",
+      "number": 6,
+      "file": "06-executing.gif",
+      "frames": 80,
+      "durationMs": 4000,
+      "width": 480,
+      "height": 296,
+      "bytes": 321160,
+      "animations": [
+        {
+          "name": "companion-execute",
+          "duration": 1000,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-step",
+          "duration": 500,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-step",
+          "duration": 500,
+          "iterations": "infinite",
+          "delay": 250
+        },
+        {
+          "name": "companion-execute",
+          "duration": 1000,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-step",
+          "duration": 500,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-step",
+          "duration": 500,
+          "iterations": "infinite",
+          "delay": 250
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "editing",
+      "label": "Editando archivos",
+      "category": "Bucle",
+      "number": 7,
+      "file": "07-editing.gif",
+      "frames": 224,
+      "durationMs": 11200,
+      "width": 480,
+      "height": 296,
+      "bytes": 965594,
+      "animations": [
+        {
+          "name": "companion-edit",
+          "duration": 1600,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-pencil",
+          "duration": 700,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-edit",
+          "duration": 1600,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-pencil",
+          "duration": 700,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "searching",
+      "label": "Buscando en la web",
+      "category": "Bucle",
+      "number": 8,
+      "file": "08-searching.gif",
+      "frames": 104,
+      "durationMs": 5200,
+      "width": 480,
+      "height": 296,
+      "bytes": 415572,
+      "animations": [
+        {
+          "name": "companion-look",
+          "duration": 2600,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-look",
+          "duration": 2600,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "tool",
+      "label": "Usando una herramienta",
+      "category": "Bucle",
+      "number": 9,
+      "file": "09-tool.gif",
+      "frames": 144,
+      "durationMs": 7200,
+      "width": 480,
+      "height": 296,
+      "bytes": 570981,
+      "animations": [
+        {
+          "name": "companion-tool",
+          "duration": 1800,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-wrench",
+          "duration": 800,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-tool",
+          "duration": 1800,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-wrench",
+          "duration": 800,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "collaborating",
+      "label": "Colaborando",
+      "category": "Bucle",
+      "number": 10,
+      "file": "10-collaborating.gif",
+      "frames": 336,
+      "durationMs": 16800,
+      "width": 480,
+      "height": 296,
+      "bytes": 1105381,
+      "animations": [
+        {
+          "name": "companion-greet",
+          "duration": 2400,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-wave",
+          "duration": 1400,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-greet",
+          "duration": 2400,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-wave",
+          "duration": 1400,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "inspecting",
+      "label": "Observando una imagen",
+      "category": "Bucle",
+      "number": 11,
+      "file": "11-inspecting.gif",
+      "frames": 60,
+      "durationMs": 3000,
+      "width": 480,
+      "height": 296,
+      "bytes": 222744,
+      "animations": [
+        {
+          "name": "companion-inspect",
+          "duration": 3000,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-inspect",
+          "duration": 3000,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "generating",
+      "label": "Generando una imagen",
+      "category": "Bucle",
+      "number": 12,
+      "file": "12-generating.gif",
+      "frames": 308,
+      "durationMs": 15400,
+      "width": 480,
+      "height": 296,
+      "bytes": 1222477,
+      "animations": [
+        {
+          "name": "companion-create",
+          "duration": 2200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-brush",
+          "duration": 1400,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-create",
+          "duration": 2200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-brush",
+          "duration": 1400,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "reviewing",
+      "label": "Revisando",
+      "category": "Bucle",
+      "number": 13,
+      "file": "13-reviewing.gif",
+      "frames": 56,
+      "durationMs": 4000,
+      "width": 480,
+      "height": 296,
+      "bytes": 219126,
+      "animations": [
+        {
+          "name": "companion-review",
+          "duration": 2000,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-review",
+          "duration": 2000,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "compacting",
+      "label": "Compactando contexto",
+      "category": "Bucle",
+      "number": 14,
+      "file": "14-compacting.gif",
+      "frames": 72,
+      "durationMs": 3600,
+      "width": 480,
+      "height": 296,
+      "bytes": 263566,
+      "animations": [
+        {
+          "name": "companion-pack",
+          "duration": 1800,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-pack",
+          "duration": 1800,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "approval",
+      "label": "Esperando aprobación",
+      "category": "Bucle",
+      "number": 15,
+      "file": "15-approval.gif",
+      "frames": 28,
+      "durationMs": 5600,
+      "width": 480,
+      "height": 296,
+      "bytes": 107031,
+      "animations": [
+        {
+          "name": "companion-attention",
+          "duration": 2800,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-attention",
+          "duration": 2800,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "question",
+      "label": "Esperando tu respuesta",
+      "category": "Bucle",
+      "number": 16,
+      "file": "16-question.gif",
+      "frames": 96,
+      "durationMs": 4800,
+      "width": 480,
+      "height": 296,
+      "bytes": 327057,
+      "animations": [
+        {
+          "name": "companion-shrug",
+          "duration": 2400,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-shrug",
+          "duration": 2400,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "retrying",
+      "label": "Reintentando",
+      "category": "Bucle",
+      "number": 17,
+      "file": "17-retrying.gif",
+      "frames": 80,
+      "durationMs": 4000,
+      "width": 480,
+      "height": 296,
+      "bytes": 376887,
+      "animations": [
+        {
+          "name": "companion-recover",
+          "duration": 2000,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-recover",
+          "duration": 2000,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "error",
+      "label": "Error",
+      "category": "Gesto único",
+      "number": 18,
+      "file": "18-error.gif",
+      "frames": 13,
+      "durationMs": 2400,
+      "width": 480,
+      "height": 296,
+      "bytes": 66275,
+      "animations": [
+        {
+          "name": "companion-flinch",
+          "duration": 600,
+          "iterations": 1,
+          "delay": 0
+        },
+        {
+          "name": "companion-flinch",
+          "duration": 600,
+          "iterations": 1,
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "interrupted",
+      "label": "Turno interrumpido",
+      "category": "Gesto único",
+      "number": 19,
+      "file": "19-interrupted.gif",
+      "frames": 13,
+      "durationMs": 2400,
+      "width": 480,
+      "height": 296,
+      "bytes": 45476,
+      "animations": [
+        {
+          "name": "companion-settle",
+          "duration": 600,
+          "iterations": 1,
+          "delay": 0
+        },
+        {
+          "name": "companion-settle",
+          "duration": 600,
+          "iterations": 1,
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "done",
+      "label": "Turno terminado",
+      "category": "Gesto único",
+      "number": 20,
+      "file": "20-done.gif",
+      "frames": 17,
+      "durationMs": 2400,
+      "width": 480,
+      "height": 296,
+      "bytes": 81090,
+      "animations": [
+        {
+          "name": "companion-celebrate",
+          "duration": 800,
+          "iterations": 1,
+          "delay": 0
+        },
+        {
+          "name": "companion-celebrate",
+          "duration": 800,
+          "iterations": 1,
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "enter",
+      "label": "Entrada del personaje",
+      "category": "Transición",
+      "number": 21,
+      "file": "21-enter.gif",
+      "frames": 48,
+      "durationMs": 2400,
+      "width": 480,
+      "height": 296,
+      "bytes": 137646,
+      "animations": [
+        {
+          "name": "companion-enter",
+          "duration": 420,
+          "iterations": 1,
+          "delay": 0
+        },
+        {
+          "name": "companion-breathe",
+          "duration": 3600,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-blink",
+          "duration": 5200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-blink",
+          "duration": 5200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-enter",
+          "duration": 420,
+          "iterations": 1,
+          "delay": 0
+        },
+        {
+          "name": "companion-breathe",
+          "duration": 3600,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-blink",
+          "duration": 5200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-blink",
+          "duration": 5200,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "leave",
+      "label": "Salida del personaje",
+      "category": "Transición",
+      "number": 22,
+      "file": "22-leave.gif",
+      "frames": 8,
+      "durationMs": 2400,
+      "width": 480,
+      "height": 296,
+      "bytes": 17677,
+      "animations": [
+        {
+          "name": "companion-leave",
+          "duration": 420,
+          "iterations": 1,
+          "delay": 0
+        },
+        {
+          "name": "companion-breathe",
+          "duration": 3600,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-blink",
+          "duration": 5200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-blink",
+          "duration": 5200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-leave",
+          "duration": 420,
+          "iterations": 1,
+          "delay": 0
+        },
+        {
+          "name": "companion-breathe",
+          "duration": 3600,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-blink",
+          "duration": 5200,
+          "iterations": "infinite",
+          "delay": 0
+        },
+        {
+          "name": "companion-blink",
+          "duration": 5200,
+          "iterations": "infinite",
+          "delay": 0
+        }
+      ],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "idle",
+      "label": "En reposo",
+      "category": "Referencia estática",
+      "number": 23,
+      "file": "23-idle.gif",
+      "frames": 1,
+      "durationMs": 50,
+      "width": 480,
+      "height": 296,
+      "bytes": 7609,
+      "animations": [],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "unknown",
+      "label": "Actividad sin confirmar",
+      "category": "Referencia estática",
+      "number": 24,
+      "file": "24-unknown.gif",
+      "frames": 1,
+      "durationMs": 50,
+      "width": 480,
+      "height": 296,
+      "bytes": 8529,
+      "animations": [],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "offline",
+      "label": "Sin conexión",
+      "category": "Referencia estática",
+      "number": 25,
+      "file": "25-offline.gif",
+      "frames": 1,
+      "durationMs": 50,
+      "width": 480,
+      "height": 296,
+      "bytes": 7271,
+      "animations": [],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    },
+    {
+      "key": "waiting",
+      "label": "Espera genérica · compatibilidad",
+      "category": "Referencia estática",
+      "number": 26,
+      "file": "26-waiting.gif",
+      "frames": 1,
+      "durationMs": 50,
+      "width": 480,
+      "height": 296,
+      "bytes": 9093,
+      "animations": [],
+      "sourceSha256": {
+        "monitor.css": "6a08a81f356e07566e6cb1761a5f4459d886372dc0fc0462381ba56bc2c430a8",
+        "monitor.js": "358ae039c276dd7eb7cffd0399afe97a14c1eb52ac7bb54bce74dd121e7ed46d",
+        "characters.js": "d256bdca3670afa78807e36ca40ea254e7984e6e7df8b65d5936088d3c7cc0c3",
+        "core.js": "9f8b9a20c2deab91f96868deb026fcf25acdb7382c57515ed5cba64730692db7"
+      }
+    }
+  ]
+}

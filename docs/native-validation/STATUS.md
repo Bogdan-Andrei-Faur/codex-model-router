@@ -9,6 +9,9 @@ The notch is integrated into `main`; publication baseline is `a4af030`, product 
 The owner authorized direct-main publication of the Ubuntu clock/top-edge changes; use
 local HEAD and remote `main` for its delivery revision. Source publication does
 not replace earlier installed/loaded artifacts. Rows describe their receipt times.
+The later companion gesture/GIF catalogue delivery is also owner-authorized for
+`main`; its source checks and installed `.6` receipt remain separate from CI and
+owner visual acceptance.
 The current implementation is in [NOTCH-MONITOR.md](../NOTCH-MONITOR.md);
 [HANDOFF.md](../HANDOFF.md) contains continuation steps and
 [NOTCH-CHANGELOG.md](../NOTCH-CHANGELOG.md) preserves all iteration notes.
@@ -17,11 +20,12 @@ The current implementation is in [NOTCH-MONITOR.md](../NOTCH-MONITOR.md);
 | --- | --- | --- |
 | Source organization | Source `37359ff46664c768` / router `5aa7726ffeba863f`;544 Python (53 skips),33 JS,14 browser groups, isolated Mac package smoke and C#5 WPF cross-compilation PASS; [receipt](2026-10-08-source-layout.md) | Active installation unchanged; Windows native installer/runtime and Ubuntu real package lifecycle/GTK acceptance remain separate. Current CI result not asserted |
 | Observed activity/animations | Mac monitor `4891f87b980d518e`;538 Python (53 skips),33 JS,14 browser groups and isolated18-pose WebKit fixture PASS; [receipt](2026-10-08-macos-companion-activity.md) | Expected router `281078dcf3e49517`; Desktop still loads `80e86c3d7accf253`. Owner restart and real event/physical acceptance pending; Windows/Linux native separate |
+| Distinct companion gestures | Ubuntu monitor `752a92efa0d22e29`;33 JS tests,14 browser groups and exact GTK/WebKit18-pose package fixture PASS; current-scope native activity present; [receipt](2026-10-09-linux-companion-gestures.md) | Owner visual acceptance pending; event classification/retention unchanged, unspecified activity remains Working. Mac/Windows native activation separate |
 | Consumption/Settings alignment | Local Mac monitor `ca01f55f5cdab9d4`, source/assets match; thirteen browser groups PASS, settings drafts/actions/read-only states verified; [receipt](2026-10-08-macos-consumption-settings.md) | Current isolated Mac glass fixture fails on initial bounds delivery, also with prior UI; cause unresolved. Physical Mac and Windows/Linux native acceptance separate |
 | Per-agent editor | Local Mac monitor `a0a5ea7bcfe28228`; shared persistence/browser tests and native isolated save/acknowledgement PASS; [receipt](2026-10-08-macos-agent-editor.md) | Physical owner acceptance and Windows/Linux native editor checks pending; richer activity reducer implemented, real delivery pending |
 | macOS camera/top-edge integration | Camera iteration monitor `6d5ce16a097573ca` (superseded by editor build), actual window Y=0/level25; eleven browser groups and native fixtures PASS; [receipt](2026-10-08-macos-camera-integration.md) | Physical camera/menu appearance and real external-display transition pending |
 | Shared/offline source checks | 518 Python tests, 37 optional/platform skips; 31 JS core tests; all 10 browser groups; routing 27/27 and six offline JEV cases PASS | Skips are not optional Docker/native execution proof |
-| Ubuntu installed pilot | `0.9.6-2~main20261009.5`, monitor `484dca514488a5d7`, installed/loaded router `88a0be134bc26eb9`; one connection, matching current UI, seven preserved settings files; rounded 122×26 clock visual/input hole verified, final visual fit accepted by owner; [receipt](2026-10-09-linux-top-edge.md) | Earlier managed-dock `.2` failed owner visual acceptance because GNOME covered the companions. Physical input/display/sleep/scaling and current telemetry/inference acceptance remain open |
+| Ubuntu installed pilot | `0.9.6-2~main20261009.6`, monitor `752a92efa0d22e29`, installed/loaded router `88a0be134bc26eb9`; one connection, matching current UI, seven preserved settings files; rounded 122×26 clock visual/input hole verified, clock visual fit accepted by owner on `.5`; `.6` adds distinctive gestures; [clock receipt](2026-10-09-linux-top-edge.md), [gesture receipt](2026-10-09-linux-companion-gestures.md) | Earlier managed-dock `.2` failed owner visual acceptance because GNOME covered the companions. Physical input/display/sleep/scaling and current telemetry/inference acceptance remain open |
 | Ubuntu native fixture | Exact `2~main20261009.1` full GTK/WebKit package smoke PASS; 544 Python (37 skips), 33 JS and 14 browser groups PASS; [receipt](2026-10-09-linux-main-installation.md) | Synthetic isolated windows do not accept physical input/compositor behavior; no current CI claim |
 | History performance | Incremental transport/projection, parity/recovery and lazy/cached UI PASS; isolated measurements in receipt | Measurements exclude owner-perceived latency acceptance |
 | Quota Escape | Stationary hover replay reproduced and corrected; `9bddadc` passes all three hosted monitor/browser jobs, including quota cases | Prior failures retained; physical/input acceptance remains separate |
@@ -78,6 +82,10 @@ For missing hardware use NOT_RUN; for unavailable required infrastructure use
 BLOCKED. Keep per-host limitations and historical dates visible.
 
 ## Receipt index
+
+The [Ubuntu gesture refinement](2026-10-09-linux-companion-gestures.md) records
+installed `.6`, matching unchanged bridge, distinct native pose checks and
+preserved settings. Owner visual acceptance of the gestures remains open.
 
 The [0.9.6 owner repair](2026-10-07-windows-connection-repair-host-a.md) supersedes
 owner installation/registration state below: installed native monitor 0.9.6,

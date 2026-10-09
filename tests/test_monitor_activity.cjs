@@ -20,10 +20,19 @@ const assert=require('node:assert/strict');
   assert.match(await portrait.getAttribute('aria-label'),/Pensando/);
   assert.equal(await portrait.locator('.character-body').evaluate(n=>getComputedStyle(n).animationName),'companion-think');
   const look=await portrait.getAttribute('data-appearance');
-  for(const kind of ['writing','executing','editing','searching','tool','collaborating','inspecting','generating','reviewing','compacting','retrying','preparing']){
+  const signatures=new Set();
+  for(const kind of ['thinking','planning','writing','executing','editing','searching','tool','collaborating','inspecting','generating','reviewing','compacting','retrying','preparing']){
    await update(kind);assert.equal(await portrait.getAttribute('data-state'),kind);
    assert.equal(await portrait.getAttribute('data-appearance'),look);
    assert.notEqual(await portrait.locator(kind==='collaborating'?'.hand-right':'.character-body').evaluate(n=>getComputedStyle(n).animationName),'none');
+   const signature=await portrait.evaluate(n=>{
+    const prop=n.querySelector('.activity-prop');
+    return {kind:prop.dataset.kind,shape:prop.innerHTML,motion:getComputedStyle(n.querySelector('.character-body')).animationName};
+   });
+   assert.equal(signature.kind,kind);
+   assert.ok(!signatures.has(signature.motion),'specific activities must have distinct movement');
+   signatures.add(signature.motion);
+   if(kind!=='collaborating')assert.ok(signature.shape.length,'specific work needs a readable prop');
   }
   await update('thinking',['input']);
   assert.equal(await portrait.getAttribute('data-state'),'thinking');
@@ -48,11 +57,21 @@ const assert=require('node:assert/strict');
   await update('thinking');
   await page.emulateMedia({reducedMotion:'reduce'});
   assert.equal(await portrait.locator('.character-body').evaluate(n=>getComputedStyle(n).animationName),'none');
+  assert.equal(await portrait.locator('.activity-prop[data-kind=thinking] circle').count(),3,'static thinking remains recognizable with motion disabled');
   await page.emulateMedia({reducedMotion:'no-preference'});
   await page.evaluate(()=>window.receive({ui:{reduced:true}}));
   assert.equal(await portrait.locator('.character-body').evaluate(n=>getComputedStyle(n).animationName),'none');
   await page.evaluate(()=>window.receive({ui:{reduced:false,mode:'Compact'}}));
   assert.equal(await page.locator('#agents .avatar').first().getAttribute('data-state'),'thinking');
+  const compact=page.locator('#agents .avatar').first();
+  await compact.evaluate(n=>{window.retainedPose={body:n.querySelector('.character-body'),prop:n.querySelector('.activity-prop'),phase:n.style.getPropertyValue('--pose-phase')};});
+  await update('thinking');
+  assert.equal(await compact.evaluate(n=>n.querySelector('.character-body')===window.retainedPose.body&&n.querySelector('.activity-prop')===window.retainedPose.prop&&n.style.getPropertyValue('--pose-phase')===window.retainedPose.phase),true,'polling must preserve compact artwork and motion phase');
+  await update('writing');
+  assert.equal(await compact.evaluate(n=>n.querySelector('.character-body')===window.retainedPose.body&&n.querySelector('.activity-prop')!==window.retainedPose.prop),true,'activity changes only replace the prop, preserving identity');
+  assert.equal(await compact.locator('.activity-prop').getAttribute('data-kind'),'writing');
+  await page.evaluate(()=>window.receive({ui:{mode:'Compact'}}));
+  assert.equal(await compact.locator('.character').evaluate(n=>Math.round(n.getBoundingClientRect().width)),38);
   await page.evaluate(()=>document.body.classList.add('motion-hidden'));
   assert.equal(await page.locator('#agents .character-body').first().evaluate(n=>getComputedStyle(n).animationPlayState),'paused');
   assert.deepEqual(errors,[]);

@@ -82,7 +82,7 @@ const {pathToFileURL}=require('node:url');
       const motion=await avatar.locator('.character-body').evaluate(n=>{
         const animation=n.getAnimations()[0];animation.currentTime=0;const first=getComputedStyle(n).transform;animation.currentTime=800;
         window.testCharacter=n;return {name:getComputedStyle(n).animationName,moves:first!==getComputedStyle(n).transform};
-      });assert.equal(motion.name,'companion-sort');assert.ok(motion.moves);
+      });assert.equal(motion.name,'companion-pack');assert.ok(motion.moves);
       await page.evaluate(()=>window.receive({}));assert.ok(await avatar.locator('.character-body').evaluate(n=>n===window.testCharacter),'Heartbeat replaced the animation DOM');
       await page.evaluate(()=>window.receive({ui:{reduced:true}}));assert.equal(await avatar.locator('.character-body').evaluate(n=>getComputedStyle(n).animationName),'none');
       await page.locator('#expand').click();assert.equal(await page.locator('.companion-headline').innerText(),'Poniendo orden.');

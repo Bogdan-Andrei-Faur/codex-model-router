@@ -9,6 +9,25 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 
 ## Current source and delivery
 
+- The owner authorized direct-main publication of the companion gesture changes,
+  GIF catalogue, generator and documentation from `fix/companion-activity-gestures`,
+  based on `dc317cb`. Use local HEAD and remote `main` for the delivery revision;
+  the installation receipt records its earlier uncommitted observation. Specific activities now
+  use distinct movements/props and foreground hands, readable in the 38px capsule.
+  Ubuntu pilot `0.9.6-2~main20261009.6` is installed: monitor `752a92efa0d22e29`,
+  unchanged matching router `88a0be134bc26eb9`, one connection, settings retained.
+  All 14 browser groups, 33 JS tests and exact GTK/WebKit 18-pose package fixture
+  pass. Current-scope native activity is present; owner visual acceptance remains
+  open. Only the monitor restarted. See [receipt](native-validation/2026-10-09-linux-companion-gestures.md)
+  and [pose comparison](design/companion-activity-poses.png).
+  The owner-requested [GIF catalogue](design/companion-animations/README.md) keeps
+  numbered synthetic previews in Git, with a local HTML gallery and selective
+  regeneration using `node tools/render_companion_gifs.cjs [activity-key]`.
+  All 26 GIFs pass frame/duration/source-hash checks; gallery search/layout and
+  selective regeneration pass. There are 22 animated previews and four static
+  references. This publication adds no installation/restart or release/tag;
+  new CI and physical visual acceptance are not asserted.
+
 - The owner approved the Ubuntu top-edge/clock fit and authorized publication
   directly to `main`. The GNOME/XWayland accessory uses a rounded clock cutout,
   shared side-wing controls and explicit click focus; source/native/browser checks
@@ -131,16 +150,18 @@ retains the full feedback/install progression and every linked safe receipt.
 
 ## Recorded installed state and verification
 
-Current Ubuntu pilot (2026-10-09): `0.9.6-2~main20261009.5`, monitor
-`484dca514488a5d7`, installed/loaded router `88a0be134bc26eb9`, one connection,
+Current Ubuntu pilot (2026-10-09): `0.9.6-2~main20261009.6`, monitor
+`752a92efa0d22e29`, installed/loaded router `88a0be134bc26eb9`, one connection,
 settings preserved, no mismatch/restart flags. The GNOME/XWayland overlay reaches
 the display top and excludes the centered clock from both visual/input shapes.
 The earlier `.2` managed-dock attempt reached the edge but failed owner visual
 acceptance because Shell covered the companions. Current native shape/position,
 isolated keyboard/package smoke and browser checks pass, with broader checks
 scoped to their artifact in the receipt. The owner accepted the final `.5` visual
-fit. Physical input/display/scaling/sleep checks remain separate. See
-[receipt](native-validation/2026-10-09-linux-top-edge.md).
+fit; `.6` preserves that source and adds more distinctive companion gestures.
+Owner acceptance of those new gestures and physical input/display/scaling/sleep
+checks remain separate. See the [clock receipt](native-validation/2026-10-09-linux-top-edge.md)
+and [gesture receipt](native-validation/2026-10-09-linux-companion-gestures.md).
 
 Historical Ubuntu pilot `0.9.6-1~notch43`: monitor `2e0a5284b2aa9c8e`,
 packaged/connected router `2fec36051e3ccedb`. Its last installed readback passed:
@@ -181,7 +202,9 @@ The owner requested independent companion customization using the rounded
 rectangle reference and richer activity animations. See
 [the editor contract and event proposal](COMPANION-EDITOR-PROPOSAL.md). The editor
 is implemented and installed on Mac; the richer event reducer and animations are
-now implemented in source and await owner-controlled bridge activation.
+implemented in source. The Mac receipt records pending owner-controlled bridge
+activation; Ubuntu now has matching installed/loaded activity code. Its newer
+gesture refinement is installed locally and awaits owner visual acceptance.
 The installed CLI schema
 supports more states than the monitor currently projects; runtime delivery and
 human-request semantics require validation before binding animations.

@@ -265,41 +265,89 @@ body.camera-nav nav button[data-tab=settings]{margin-left:0}
 .appearance-option .character{width:54px;height:54px}
 .appearance-option .character-body,.appearance-option .eye{animation:none;transform:none}
 
-/* Observed activity uses a small shared pose set; identity colors stay stable. */
+/* Distinct silhouettes and props remain readable in the small capsule. */
 .hand-left{transform-origin:17px 55px}.hand-right{transform-origin:83px 55px}
-.avatar[data-state=thinking] .character-body,.avatar[data-state=planning] .character-body{animation:companion-think 4.2s ease-in-out infinite}
-.avatar[data-state=thinking] .eye,.avatar[data-state=planning] .eye{translate:1px -3px}
-.avatar[data-state=writing] .character-body,.avatar[data-state=executing] .character-body,.avatar[data-state=editing] .character-body,.avatar[data-state=generating] .character-body,.avatar[data-state=tool] .character-body{animation:companion-work 2.4s ease-in-out infinite}
-.avatar[data-state=writing] .hand-left,.avatar[data-state=executing] .hand-left,.avatar[data-state=editing] .hand-left,.avatar[data-state=generating] .hand-left{animation:companion-tap .9s ease-in-out infinite}
-.avatar[data-state=writing] .hand-right,.avatar[data-state=executing] .hand-right,.avatar[data-state=editing] .hand-right,.avatar[data-state=generating] .hand-right{animation:companion-tap .9s .45s ease-in-out infinite}
-.avatar[data-state=searching] .character-body{animation:companion-look 4s ease-in-out infinite}
-.avatar[data-state=inspecting] .character-body,.avatar[data-state=reviewing] .character-body{animation:companion-inspect 4s ease-in-out infinite}
-.avatar[data-state=reviewing] .eye{transform:scaleY(.65)}
-.avatar[data-state=collaborating] .hand-right{animation:companion-wave 3.8s ease-in-out infinite}
-.avatar[data-state=approval] .hand-right,.avatar[data-state=question] .hand-right{transform:translate(7px,-10px) rotate(-70deg)}
-.avatar[data-state=approval] .character-body,.avatar[data-state=question] .character-body{animation:companion-attention 4.6s ease-in-out infinite}
-.avatar[data-state=approval] .eye,.avatar[data-state=question] .eye{translate:0 -2px}
-.avatar[data-state=retrying] .character-body{animation:companion-recover 3s ease-in-out infinite}
-.avatar[data-state=preparing] .character-body{animation:companion-inspect 3.5s ease-in-out infinite}
+.activity-prop{fill:none;stroke:#28282b;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.activity-prop .prop-surface{fill:#202327;stroke:var(--character);stroke-width:3}.activity-prop .prop-clip{fill:var(--character);stroke:#202327;stroke-width:2}
+.activity-prop[data-kind=writing],.activity-prop[data-kind=executing],.activity-prop[data-kind=planning],.activity-prop[data-kind=reviewing],.activity-prop[data-kind=searching],.activity-prop[data-kind=inspecting]{stroke:var(--character);stroke-width:3}
+.activity-prop .thought{fill:var(--character);stroke:#28282b;stroke-width:2}.activity-prop[data-kind=thinking]{animation:companion-thoughts 2.8s ease-in-out infinite}
+.activity-prop[data-kind=compacting],.activity-prop[data-kind=retrying],.activity-prop[data-kind=preparing],.activity-prop[data-kind=done],.activity-prop[data-kind=error],.activity-prop[data-kind=generating]{stroke:var(--character)}
+.avatar[data-state=thinking] .character-body{transform:rotate(-8deg);animation:companion-think 3.4s ease-in-out infinite}
+.avatar[data-state=thinking] .eye{translate:2px -5px}.avatar[data-state=thinking] .hand-right{transform:translate(-25px,8px) rotate(-95deg)}
+.avatar[data-state=planning] .character-body{transform:rotate(7deg);animation:companion-plan 3.2s ease-in-out infinite}
+.avatar[data-state=planning] .eye{translate:4px 4px}.avatar[data-state=planning] .hand-right{transform:translate(-12px,13px) rotate(25deg)}
+.avatar[data-state=writing] .character-body{transform:translateY(3px);animation:companion-type 1.2s ease-in-out infinite}
+.avatar[data-state=writing] .eye{translate:0 5px;transform:scaleY(.75)}
+.avatar[data-state=writing] .hand-left{transform:translate(12px,10px) rotate(-30deg);animation:companion-type-left .45s ease-in-out infinite}
+.avatar[data-state=writing] .hand-right{transform:translate(-12px,10px) rotate(30deg);animation:companion-type-right .45s .22s ease-in-out infinite}
+.avatar[data-state=executing] .character-body{animation:companion-execute 1s ease-in-out infinite}
+.avatar[data-state=executing] .foot-left{animation:companion-step .5s ease-in-out infinite}.avatar[data-state=executing] .foot-right{animation:companion-step .5s .25s ease-in-out infinite}
+.avatar[data-state=executing] .eye{transform:scaleY(.7)}.avatar[data-state=executing] .hand-right{transform:translate(-13px,8px) rotate(30deg)}
+.avatar[data-state=editing] .character-body{transform:rotate(-6deg);animation:companion-edit 1.6s ease-in-out infinite}
+.avatar[data-state=editing] .eye{translate:3px 4px}.avatar[data-state=editing] .hand-right{transform:translate(-3px,5px) rotate(-25deg)}
+.activity-prop[data-kind=editing]{transform-origin:63px 81px;animation:companion-pencil .7s ease-in-out infinite}
+.avatar[data-state=searching] .character-body{animation:companion-look 2.6s ease-in-out infinite}
+.avatar[data-state=searching] .eye{opacity:0}.avatar[data-state=searching] .hand-left{transform:translate(15px,-7px) rotate(-30deg)}.avatar[data-state=searching] .hand-right{transform:translate(-15px,-7px) rotate(30deg)}
+.avatar[data-state=tool] .character-body{transform:rotate(8deg);animation:companion-tool 1.8s ease-in-out infinite}
+.avatar[data-state=tool] .hand-right{transform:translate(0,-8px) rotate(-30deg)}.activity-prop[data-kind=tool]{transform-origin:75px 70px;animation:companion-wrench .8s ease-in-out infinite}
+.avatar[data-state=inspecting] .character-body{transform:translateY(4px) rotate(8deg);animation:companion-inspect 3s ease-in-out infinite}
+.avatar[data-state=inspecting] .eye{translate:4px 1px;transform:scale(1.3)}.avatar[data-state=inspecting] .hand-right{transform:translate(-1px,11px) rotate(-20deg)}
+.avatar[data-state=reviewing] .character-body{transform:rotate(5deg);animation:companion-review 2s ease-in-out infinite}
+.avatar[data-state=reviewing] .eye{translate:4px 4px;transform:scaleY(.55)}.avatar[data-state=reviewing] .hand-right{transform:translate(-12px,14px) rotate(20deg)}
+.avatar[data-state=generating] .character-body{animation:companion-create 2.2s ease-in-out infinite}
+.avatar[data-state=generating] .eye{translate:4px -3px}.avatar[data-state=generating] .hand-right{transform:translate(2px,-5px) rotate(-40deg)}.activity-prop[data-kind=generating]{transform-origin:67px 81px;animation:companion-brush 1.4s ease-in-out infinite}
+.avatar[data-state=collaborating] .character-body{animation:companion-greet 2.4s ease-in-out infinite}
+.avatar[data-state=collaborating] .hand-right{transform:translate(7px,-14px) rotate(-95deg);animation:companion-wave 1.4s ease-in-out infinite}
+.avatar[data-state=collaborating] .hand-left{transform:translate(-3px,-3px) rotate(25deg)}
+.avatar[data-state=compacting] .character-body{transform:scale(1.1,.84);animation:companion-pack 1.8s ease-in-out infinite}
+.avatar[data-state=compacting] .hand-left{transform:translate(15px,-26px) rotate(-95deg)}.avatar[data-state=compacting] .hand-right{transform:translate(-15px,-26px) rotate(95deg)}
+.avatar[data-state=approval] .hand-right{transform:translate(4px,-18px) rotate(-110deg)}
+.avatar[data-state=approval] .character-body{animation:companion-attention 2.8s ease-in-out infinite}
+.avatar[data-state=question] .hand-left{transform:translate(-5px,-7px) rotate(60deg)}.avatar[data-state=question] .hand-right{transform:translate(5px,-7px) rotate(-60deg)}
+.avatar[data-state=question] .character-body{animation:companion-shrug 2.4s ease-in-out infinite}
+.avatar[data-state=approval] .eye,.avatar[data-state=question] .eye{translate:0 -3px}
+.avatar[data-state=retrying] .character-body{animation:companion-recover 2s ease-in-out infinite}
+.avatar[data-state=preparing] .character-body{transform:translateY(4px) scale(1.08,.9);animation:companion-ready 2s ease-in-out infinite}
+.avatar[data-state=preparing] .hand-left{transform:translate(-3px,-10px) rotate(55deg)}.avatar[data-state=preparing] .hand-right{transform:translate(3px,-10px) rotate(-55deg)}
 .avatar[data-state=error] .character-body{animation:companion-flinch .6s ease-out both}
 .avatar[data-state=interrupted] .character-body{animation:companion-settle .6s ease-out both}
 .avatar[data-state=interrupted] .eye{transform:scaleY(.5)}
 .avatar[data-state=done] .character-body{animation:companion-celebrate .8s ease-out both}
+.avatar[data-state=done] .hand-left{transform:translate(-3px,-14px) rotate(100deg)}.avatar[data-state=done] .hand-right{transform:translate(3px,-14px) rotate(-100deg)}
 .character-attention{position:absolute;right:-2px;top:2px;display:grid;place-items:center;width:18px;height:18px;border-radius:7px;background:#202327;border:1px solid #ffffff35;color:var(--accent);pointer-events:none}
 .character-attention[data-kind=approval]{color:#f0d19c}.character-attention .ui-glyph{width:12px;height:12px}
 .hero-character .character-attention,.agent-portrait .character-attention{width:25px;height:25px;border-radius:9px;right:2px;top:20px}.hero-character .character-attention .ui-glyph,.agent-portrait .character-attention .ui-glyph{width:16px;height:16px}
 .character-attention[hidden]{display:none}
-@keyframes companion-think{0%,100%{transform:rotate(-3deg)}50%{transform:translateY(-2px) rotate(4deg)}}
-@keyframes companion-work{50%{transform:translateY(-2px) rotate(2deg)}}
-@keyframes companion-tap{50%{transform:translateY(-4px) rotate(18deg)}}
-@keyframes companion-look{0%,100%{transform:rotate(0)}25%{transform:rotate(-7deg)}75%{transform:rotate(7deg)}}
-@keyframes companion-inspect{50%{transform:translateY(2px) scale(1.04,.97) rotate(-3deg)}}
-@keyframes companion-wave{15%,35%{transform:translate(7px,-10px) rotate(-80deg)}25%{transform:translate(7px,-10px) rotate(-55deg)}50%,100%{transform:rotate(0)}}
-@keyframes companion-attention{0%,80%,100%{transform:translateY(0)}86%{transform:translateY(-3px)}92%{transform:translateY(0)}}
-@keyframes companion-recover{15%{transform:rotate(-5deg)}30%{transform:rotate(4deg)}45%,100%{transform:rotate(0)}}
+@keyframes companion-think{0%,100%{transform:rotate(-8deg)}50%{transform:translateY(-4px) rotate(-3deg)}}
+@keyframes companion-thoughts{0%,100%{opacity:.65;translate:0 1px}50%{opacity:1;translate:0 -2px}}
+@keyframes companion-plan{0%,100%{transform:rotate(7deg)}50%{transform:translateY(2px) rotate(1deg)}}
+@keyframes companion-type{0%,100%{transform:translateY(3px)}50%{transform:translateY(5px) scale(1.02,.97)}}
+@keyframes companion-type-left{0%,100%{transform:translate(12px,10px) rotate(-30deg)}50%{transform:translate(15px,16px) rotate(-5deg)}}
+@keyframes companion-type-right{0%,100%{transform:translate(-12px,10px) rotate(30deg)}50%{transform:translate(-15px,16px) rotate(5deg)}}
+@keyframes companion-execute{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(2deg)}}
+@keyframes companion-step{50%{transform:translateY(-7px)}}
+@keyframes companion-edit{0%,100%{transform:rotate(-6deg)}50%{transform:translate(3px,2px) rotate(-2deg)}}
+@keyframes companion-pencil{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(12deg)}}
+@keyframes companion-look{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(12deg)}}
+@keyframes companion-tool{0%,100%{transform:rotate(8deg)}50%{transform:translateY(3px) rotate(2deg)}}
+@keyframes companion-wrench{0%,100%{transform:rotate(-15deg)}50%{transform:rotate(15deg)}}
+@keyframes companion-inspect{0%,100%{transform:translateY(4px) rotate(8deg)}50%{transform:translate(3px,5px) scale(1.04) rotate(12deg)}}
+@keyframes companion-review{0%,100%{transform:rotate(5deg)}35%,65%{transform:translateY(4px) rotate(0)}}
+@keyframes companion-create{0%,100%{transform:rotate(-4deg)}50%{transform:translateY(-3px) rotate(6deg)}}
+@keyframes companion-brush{0%,100%{transform:rotate(-12deg)}50%{transform:rotate(15deg)}}
+@keyframes companion-greet{0%,100%{transform:rotate(-4deg)}50%{transform:translateY(-4px) rotate(4deg)}}
+@keyframes companion-wave{0%,100%{transform:translate(7px,-14px) rotate(-95deg)}50%{transform:translate(7px,-14px) rotate(-45deg)}}
+@keyframes companion-pack{0%,100%{transform:scale(1.1,.84)}50%{transform:translateY(5px) scale(1.18,.68)}}
+@keyframes companion-attention{0%,75%,100%{transform:translateY(0)}85%{transform:translateY(-6px)}}
+@keyframes companion-shrug{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-4px) rotate(5deg)}}
+@keyframes companion-recover{0%,100%{transform:rotate(-10deg)}40%{transform:translateY(-3px) rotate(10deg)}65%{transform:rotate(-3deg)}}
+@keyframes companion-ready{0%,100%{transform:translateY(4px) scale(1.08,.9)}50%{transform:translateY(-3px) scale(.96,1.06)}}
 @keyframes companion-flinch{20%{transform:translateX(-3px) rotate(-5deg)}40%{transform:translateX(3px) rotate(4deg)}100%{transform:rotate(-3deg)}}
 @keyframes companion-settle{to{transform:translateY(2px) rotate(-3deg)}}
 @keyframes companion-celebrate{30%{transform:translateY(-8px) scale(.97,1.04)}65%{transform:translateY(1px) scale(1.04,.97)}100%{transform:translateY(0)}}
+.avatar[data-state] .character *{animation-delay:var(--pose-phase,0s)}
+.avatar[data-state=writing] .hand-right{animation-delay:calc(var(--pose-phase,0s) + .22s)}
+.avatar[data-state=executing] .foot-right{animation-delay:calc(var(--pose-phase,0s) + .25s)}
 body.motion-hidden .character *,body.compact #pages .character *,.page[hidden] .character *{animation-play-state:paused!important}
 .appearance-option:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(max-width:380px){.appearance-options{grid-template-columns:repeat(2,minmax(0,1fr))}}

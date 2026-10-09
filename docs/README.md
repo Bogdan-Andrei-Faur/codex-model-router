@@ -13,6 +13,7 @@ it does not validate a later implementation or a different owner's machine.
 | [MONITOR-UI.md](MONITOR-UI.md) | Five screens, companions, tags, controls, pipeline and useful History |
 | [NOTCH-MONITOR.md](NOTCH-MONITOR.md) | Geometry, native hover, preview, live plan, projection and layout contracts |
 | [SHARED-MONITOR.md](SHARED-MONITOR.md) | UI/hosts, data/action channels, key custody, caching and packaging |
+| [Companion animation GIFs](design/companion-animations/README.md) | Numbered review catalogue, visual gallery and per-activity regeneration |
 | [NOTCH-CHANGELOG.md](NOTCH-CHANGELOG.md) | Full 2026-10-08 iteration archive and original receipt links |
 | [../CHANGELOG.md](../CHANGELOG.md) | Product releases and current development work |
 | [../assets/README.md](../assets/README.md) | Brand provenance, Lucide subset, original companions, Nunito/OFL manifests |
