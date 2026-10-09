@@ -26,3 +26,11 @@ identify third-party services or platforms. This project does not claim their
 marks or imply their endorsement. Bundled runtimes and libraries retain their
 respective license terms; public release preparation must verify their notices
 and redistribution conditions for the exact packaged artifact.
+
+Frozen Mac/Windows builds additionally copy the installed `cryptography`, `cffi`
+and `pycparser` distribution license files into `licenses/<distribution>/`.
+Their exact versions come from the pinned build inputs. Ubuntu declares its
+system `python3-cryptography` dependency instead of vendoring that wheel.
+This does not complete the release artifact inventory: Python/PyInstaller,
+OpenSSL and statically linked/transitive Rust library notices must be verified
+for each exact public installer before distribution.

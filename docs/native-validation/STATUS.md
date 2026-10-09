@@ -18,6 +18,7 @@ The current implementation is in [NOTCH-MONITOR.md](../NOTCH-MONITOR.md);
 
 | Gate | Current evidence | Remaining boundary |
 | --- | --- | --- |
+| Mac managed-update fixture | Signed packaged0.9.6→0.9.7, native new-monitor readiness, preflight cancellation and data retention PASS;557 Python (53 skips),33 JS,15 browser groups; [receipt](2026-10-09-macos-managed-update.md) | Owner installation unchanged; native Settings click, Installer/Gatekeeper, import/transfer, login recovery and Windows/Ubuntu apply remain open |
 | Mac rigid companions | Monitor `e20402820c674648`, matching router `5aa7726ffeba863f`;26updated GIFs,33JS,15browser groups,576rigidity samples,3preview tests and native18-state fixture PASS; [receipt](2026-10-09-macos-rigid-companions.md) | Owner visual review, real event coverage and physical/other-host acceptance remain separate |
 | Mac compact height | Local64→48pt capsule; monitor `d90a78874b17fb92`, router `5aa7726ffeba863f`, one monitor/connection and no mismatch; camera/usage/interaction checks PASS; [receipt](2026-10-09-macos-capsule-height.md) | Physical visual acceptance remains open; expanded height and camera fallback retained |
 | Mac Consumption width follow-up | Local CSS on `c82e1ea`, monitor `af7bc672a28ff37e`, loaded/expected router `5aa7726ffeba863f`; one monitor/connection, config/preferences retained; five-screen widths and settings browser checks PASS; [receipt](2026-10-09-macos-consumption-width.md) | Natural event coverage and physical/visual acceptance remain open; earlier readbacks are historical |

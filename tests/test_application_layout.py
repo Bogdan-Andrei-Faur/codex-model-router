@@ -66,6 +66,7 @@ class ApplicationLayoutTests(unittest.TestCase):
         (root/'state').mkdir()
         (root/'state/history.jsonl').write_text('{"fixture":true}\n')
         (root/'state/prompts.jsonl').write_text('{"synthetic":true}\n')
+        (root/'state/agent-appearances.json').write_text('{"schema":1,"agents":{}}')
         atomic_json(root/'state/task-modes'/('a'*64+'.json'),{'thread':'synthetic','mode':'manual'})
         (root/'state/jev-typesafe.secret').write_bytes(b'opaque ciphertext fixture')
         (root/'state/build-fixture').mkdir();(root/'state/build-fixture/ignored').write_text('not product data')
@@ -77,7 +78,7 @@ class ApplicationLayoutTests(unittest.TestCase):
             result=import_legacy(source,target)
             self.assertTrue(result['sourcePreserved']);self.assertTrue(result['integrationPending'])
             for name,body in before.items():self.assertEqual((source/name).read_bytes(),body)
-            for name in ('config.local.json','state/history.jsonl','state/prompts.jsonl','state/jev-typesafe.secret'):
+            for name in ('config.local.json','state/history.jsonl','state/prompts.jsonl','state/jev-typesafe.secret','state/agent-appearances.json'):
                 self.assertEqual((target/name).read_bytes(),before[name])
             self.assertFalse((target/'state/build-fixture').exists());self.assertFalse((target/'state/desktop-integration.json').exists())
             self.assertEqual(layout.credential_namespace(source),layout.credential_namespace(target))

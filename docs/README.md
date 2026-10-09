@@ -116,3 +116,9 @@ independent. The older [design record](design/DECISION.md) and
 - [2026-10-08-linux-notch-tags](native-validation/2026-10-08-linux-notch-tags.md)
 - [2026-10-08-linux-notch-typography](native-validation/2026-10-08-linux-notch-typography.md)
 - [2026-10-08 documentation delivery](native-validation/2026-10-08-documentation-delivery.md)
+
+## Authenticated update and publication follow-up
+
+- [Managed updates, signing custody and platform boundaries](MANAGED-UPDATES.md)
+- [History-cleanup candidate and owner-approved publication strategy](HISTORY-CLEANUP.md)
+- [Mac managed-update native receipt](native-validation/2026-10-09-macos-managed-update.md)

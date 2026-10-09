@@ -1,4 +1,4 @@
-"""Shared stable-release discovery and integrity-checked staging. Never executes code.
+"""Shared release discovery, authenticated staging and installed update handoff.
 
 Native installer trust, apply/rollback and managed relaunch are a separate gate.
 Only the canonical repository is queried; no config, prompts, tokens or keys leave
@@ -143,10 +143,13 @@ def candidate(release, installed, platform, arch):
 
 
 class UpdateManager:
-    def __init__(self, root, installed, platform, arch=None, fetcher=fetch_release, opener=open_url):
+    def __init__(self, root, installed, platform, arch=None, fetcher=fetch_release, opener=open_url, resources=None, applier=None):
         self.root, self.installed, self.platform = Path(root), installed, platform
         self.arch = arch or architecture()
         self.fetcher, self.opener = fetcher, opener
+        self.resources = Path(resources or root)
+        self.applier = applier
+        self.envelope = None
         self.lock = threading.RLock()
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='router-update')
         self.generation = 0
@@ -155,7 +158,18 @@ class UpdateManager:
         self.package = None
         self.next_check = 0
         self.state = {'status': 'idle', 'installedVersion': installed, 'latestVersion': None, 'checkedAt': None,
-                      'progress': 0, 'error': None, 'canDownload': False, 'canInstall': False}
+                      'progress': 0, 'error': None, 'canDownload': False, 'canInstall': False,
+                      'publisherVerified': False, 'canUpdate': False, 'shutdownForUpdate': False}
+        try:
+            receipt = self.root / 'state/updates/result.json'
+            if receipt.stat().st_size <= 2048:
+                result = json.loads(receipt.read_bytes())
+                if (result.get('status') in ('completed', 'rolled_back', 'failed')
+                        and type(result.get('at')) in (int, float) and 0 <= time.time() - result['at'] < 86400
+                        and (result['status'] != 'completed' or result.get('version') == installed)):
+                    self.state['status'] = result['status']
+        except (OSError, ValueError, AttributeError, TypeError):
+            pass
 
     def snapshot(self):
         with self.lock:
@@ -166,7 +180,7 @@ class UpdateManager:
         with self.lock:
             if (enabled is True and time.monotonic() >= self.next_check
                     and (self.future is None or self.future.done())
-                    and self.state['status'] not in ('available', 'downloaded')):
+                    and self.state['status'] not in ('available', 'downloaded', 'preparing_install', 'installing')):
                 self.start('check')
 
     def _set(self, generation, **fields):
@@ -177,24 +191,28 @@ class UpdateManager:
         return False
 
     def start(self, operation):
-        if operation not in ('check', 'download', 'cancel'):
+        if operation not in ('check', 'download', 'install', 'cancel'):
             raise ValueError('Acción de actualización no válida.')
         with self.lock:
+            if self.state['shutdownForUpdate']:
+                return 'La instalación ya está preparada; espera a que termine.'
             if operation == 'cancel':
                 self.stop.set(); self.generation += 1
-                self.state.update(status='cancelled', progress=0, error=None, canDownload=self.package is not None)
+                self.state.update(status='cancelled', progress=0, error=None, canInstall=False, canDownload=self.package is not None)
                 return 'Operación de actualización cancelada.'
             if self.future is not None and not self.future.done():
                 return 'Espera a que termine la operación actual.'
-            if operation == 'download' and self.package is None:
+            if operation in ('download', 'install') and self.package is None:
                 raise ValueError('Comprueba primero las actualizaciones disponibles.')
+            if operation == 'install' and not (self.state['canUpdate'] and self.applier):
+                raise ValueError('La instalación automática aún no está disponible para esta entrega.')
             self.stop = threading.Event(); self.generation += 1
             generation = self.generation
             self.state.update(status='checking' if operation == 'check' else 'downloading', error=None, progress=0, canDownload=False)
             if operation == 'check':
-                self.package = None
+                self.package = None; self.envelope = None
                 self.next_check = time.monotonic() + 86400
-                self.state.update(latestVersion=None, checkedAt=None)
+                self.state.update(latestVersion=None, checkedAt=None, publisherVerified=False, canUpdate=False, canInstall=False)
             package = dict(self.package) if self.package else None
             self.future = self.executor.submit(self._work, operation, generation, self.stop, package)
             return 'Comprobando actualizaciones…' if operation == 'check' else 'Descargando actualización…'
@@ -202,18 +220,51 @@ class UpdateManager:
     def _work(self, operation, generation, stop, package):
         try:
             if operation == 'check':
-                version, selected = candidate(self.fetcher(), self.installed, self.platform, self.arch)
+                release = self.fetcher()
+                version, selected = candidate(release, self.installed, self.platform, self.arch)
+                envelope = self._authenticate(release, selected) if selected else None
                 with self.lock:
                     if generation != self.generation or stop.is_set():
                         return
                     self.package = selected
+                    self.envelope = envelope
                     newer = version_key(version) > version_key(self.installed)
                     self.state.update(status='available' if newer and selected else 'package_unavailable' if newer else 'up_to_date',
-                                      latestVersion=version, checkedAt=time.time(), canDownload=selected is not None, error=None)
+                                      latestVersion=version, checkedAt=time.time(), canDownload=selected is not None, error=None,
+                                      publisherVerified=envelope is not None,
+                                      canUpdate=envelope is not None and self.applier is not None)
             else:
-                self._download(package, generation, stop)
+                path = self._download(package, generation, stop)
+                if operation == 'install' and path and not stop.is_set():
+                    from codex_model_router.update_trust import verify, load_keys
+                    verify(self.envelope, load_keys(self.resources), package, self.platform, self.arch)
+                    self._set(generation, status='preparing_install')
+                    # The installed helper re-verifies signature and bytes before apply.
+                    handed_off = self.applier.prepare(path, package, self.envelope, stop)
+                    if handed_off:
+                        self._set(generation, status='installing', canInstall=False, canUpdate=False,
+                                  shutdownForUpdate=True)
         except Exception as error:
-            self._set(generation, status='error', error=error.code if isinstance(error, UpdateError) else 'network_error', canDownload=False)
+            from codex_model_router.update_trust import TrustError
+            self._set(generation, status='error', error=error.code if isinstance(error, (UpdateError, TrustError)) else 'network_error', canDownload=False, canInstall=False)
+
+    def _authenticate(self, release, package):
+        from codex_model_router.update_trust import load_keys, verify, MANIFEST_NAME, MAX_ENVELOPE
+        keys = load_keys(self.resources)
+        if not keys:
+            return None
+        matches = [a for a in release['assets'] if isinstance(a, dict) and a.get('name') == MANIFEST_NAME]
+        expected = 'https://github.com/' + REPOSITORY + '/releases/download/' + urllib.parse.quote(release['tag_name'], safe='') + '/' + MANIFEST_NAME
+        if (len(matches) != 1 or matches[0].get('browser_download_url') != expected
+                or matches[0].get('state') != 'uploaded' or type(matches[0].get('size')) is not int
+                or not 0 < matches[0]['size'] <= MAX_ENVELOPE):
+            raise UpdateError('missing_signature')
+        with self.opener(expected) as response:
+            raw = response.read(MAX_ENVELOPE + 1)
+        if len(raw) != matches[0]['size']:
+            raise UpdateError('invalid_signature')
+        verify(raw, keys, package, self.platform, self.arch)
+        return raw
 
     def _download(self, package, generation, stop):
         directory = self.root / 'state' / 'updates'
@@ -250,6 +301,7 @@ class UpdateManager:
                 # Receipt documents integrity only, never publisher authenticity.
                 atomic_json(directory / 'staged.json', {key: package[key] for key in ('version', 'name', 'size', 'sha256')})
                 self.state.update(status='downloaded', progress=100, canDownload=False, canInstall=False)
+                return destination
         finally:
             try:
                 Path(temporary).unlink()

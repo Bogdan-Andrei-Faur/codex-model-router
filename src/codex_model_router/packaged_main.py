@@ -11,7 +11,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data-root', type=Path)
     parser.add_argument('--resources', type=Path, help=argparse.SUPPRESS)
-    parser.add_argument('service', choices=('bootstrap', 'import-legacy', 'monitor-service', 'monitor', 'launch-native', 'desktop', 'bridge', 'identity'))
+    parser.add_argument('service', choices=('bootstrap', 'import-legacy', 'monitor-service', 'monitor', 'launch-native', 'desktop', 'bridge', 'identity', 'update-helper'))
     args, remaining = parser.parse_known_args()
     if args.resources is not None and not getattr(sys, 'frozen', False):
         resources = args.resources.resolve()
@@ -27,17 +27,23 @@ def main():
     os.environ['PERSONAL_CODEX_ROUTER_ROOT'] = str(root)
     os.environ['PERSONAL_CODEX_ROUTER_CONFIG'] = str(root / 'config.local.json')
     os.environ['PERSONAL_CODEX_ROUTER_STATE'] = str(root / 'state')
+    if args.service == 'update-helper':
+        if len(remaining) != 1:
+            raise ValueError('Solicitud de actualización no válida.')
+        from codex_model_router.update_install import run_helper
+        run_helper(root, resources, remaining[0])
+        return 0
     if args.service == 'identity':
         from codex_model_router.build_identity import identity, router_identity
         version, build = identity(resources)
         print(json.dumps({'version': version, 'build': build, 'routerBuild': router_identity(resources), 'packaged': bool(getattr(sys, 'frozen', False) or manifest(resources))}))
         return 0
     if args.service == 'import-legacy':
-        if sys.platform != 'win32' or len(remaining) != 1:
+        if sys.platform not in ('win32', 'darwin') or len(remaining) != 1:
             raise ValueError('Importación no compatible.')
         from codex_model_router.platforms.installation_migration import import_legacy, MigrationError
         try:
-            result = import_legacy(remaining[0], root, platform='win32', record_source=True)
+            result = import_legacy(remaining[0], root, platform=sys.platform, record_source=True)
         except MigrationError as error:
             print(json.dumps({'error': {'code': error.code}}))
             return 1

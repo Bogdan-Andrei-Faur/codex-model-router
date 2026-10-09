@@ -127,6 +127,7 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:path.path)
     }
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if !preparePackagedData() { NSApp.terminate(nil); return }
         do { try FileManager.default.createDirectory(at:state,withIntermediateDirectories:true) } catch { NSApp.terminate(nil); return }
         lockFD = Darwin.open(state.appendingPathComponent("monitor-mac.lock").path,O_CREAT|O_RDWR,0o600)
         guard lockFD >= 0, flock(lockFD,LOCK_EX|LOCK_NB) == 0 else { NSApp.terminate(nil); return }
@@ -163,6 +164,47 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         RunLoop.main.add(hitTimer!,forMode:.common)
         NotificationCenter.default.addObserver(self,selector:#selector(displayChanged),name:NSApplication.didChangeScreenParametersNotification,object:nil)
         NSWorkspace.shared.notificationCenter.addObserver(self,selector:#selector(displayChanged),name:NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,object:nil)
+    }
+    func preparePackagedData() -> Bool {
+        guard Bundle.main.object(forInfoDictionaryKey:"RouterPackaged") as? Bool == true,
+              !preview, !FileManager.default.fileExists(atPath:configPath.path) else { return true }
+        while true {
+            let welcome=NSAlert()
+            welcome.messageText="Bienvenido a Codex Model Router"
+            welcome.informativeText="Puedes importar tus ajustes, personajes, historial y referencias a las claves. Para importar, termina las tareas y cierra Codex y el monitor anterior. La carpeta original se conserva."
+            welcome.addButton(withTitle:"Importar instalación…")
+            welcome.addButton(withTitle:"Empezar de cero")
+            welcome.addButton(withTitle:"Cancelar")
+            let answer=welcome.runModal()
+            if answer == .alertThirdButtonReturn { return false }
+            var arguments=["--data-root",root.path]
+            if answer == .alertFirstButtonReturn {
+                let picker=NSOpenPanel();picker.canChooseDirectories=true;picker.canChooseFiles=false;picker.allowsMultipleSelection=false
+                picker.message="Selecciona la carpeta de la instalación anterior que contiene config.local.json."
+                guard picker.runModal() == .OK, let source=picker.url else { continue }
+                arguments += ["import-legacy",source.path]
+            } else { arguments += ["bootstrap"] }
+            let child=Process(),pipe=Pipe()
+            child.executableURL=Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/RouterRuntime.app/Contents/MacOS/router-runtime")
+            child.arguments=arguments;child.standardOutput=pipe;child.standardError=FileHandle.nullDevice
+            do {
+                try child.run()
+                let data=pipe.fileHandleForReading.readDataToEndOfFile();child.waitUntilExit()
+                if child.terminationStatus == 0 { return true }
+                let result=(try? JSONSerialization.jsonObject(with:data)) as? [String:Any]
+                let error=result?["error"] as? [String:Any]
+                let messages=["occupied_destination":"El destino ya contiene datos. No se importará encima de ellos.",
+                              "active_bridge":"Codex sigue usando la instalación anterior. Ciérralo cuando terminen tus tareas.",
+                              "busy_source":"El monitor anterior sigue abierto o hay datos en uso.",
+                              "missing_config":"La carpeta elegida no contiene config.local.json.",
+                              "foreign_platform":"Elige una instalación de este mismo Mac."]
+                let alert=NSAlert();alert.messageText="No se pudo preparar la instalación"
+                alert.informativeText=messages[error?["code"] as? String ?? ""] ?? "La instalación original y tus datos se han conservado."
+                alert.runModal()
+            } catch {
+                let alert=NSAlert();alert.messageText="No se pudo iniciar la preparación";alert.informativeText="Tus datos se han conservado.";alert.runModal()
+            }
+        }
     }
     func loadPage() { sentJournalRevision = -1; ready = false; web.loadFileURL(resources.appendingPathComponent("index.html"),allowingReadAccessTo:resources) }
     func position() {
@@ -259,7 +301,8 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
         guard message.frameInfo.isMainFrame, message.frameInfo.request.url?.standardizedFileURL == resources.appendingPathComponent("index.html").standardizedFileURL,
               let data = message.body as? [String:Any], let action = data["action"] as? String else { return }
         switch action {
-        case "ready": ready = true; lastPayload = Data(); refresh(); if mode != "Hidden" { panel.orderFrontRegardless() }
+        case "ready":
+            ready = true; lastPayload = Data(); refresh(); if mode != "Hidden" { panel.orderFrontRegardless() }
         case "bounds":
             if let x = data["x"] as? Double, let y = data["y"] as? Double, let width = data["width"] as? Double, let height = data["height"] as? Double,
                x.isFinite,y.isFinite,width.isFinite,height.isFinite {
@@ -332,6 +375,10 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
                 self.busy=false
                 defer {if self.refreshPending {self.refreshPending=false;self.refresh()}}
                 guard var payload=snapshot else {self.feedback(reply?["feedback"] as? String ?? "No se pudo leer el estado. Se conserva la última vista.");return}
+                if let updates=payload["updates"] as? [String:Any], updates["shutdownForUpdate"] as? Bool == true,
+                   Bundle.main.object(forInfoDictionaryKey:"RouterPackaged") as? Bool == true, !self.preview {
+                    NSApp.terminate(nil); return
+                }
                 let deliverHistory=payload["history"] != nil && self.mode == "Expanded" && self.historyRequested
                 if !deliverHistory {payload.removeValue(forKey:"history")}
                 payload["historyLoaded"]=self.sentJournalRevision >= 0 || deliverHistory
@@ -342,7 +389,18 @@ final class Monitor: NSObject, NSApplicationDelegate, WKScriptMessageHandler, WK
                 let revision=payload["journalRevision"] as? Int ?? -1
                 self.web.callAsyncJavaScript("window.receive(payload)",arguments:["payload":payload],in:nil,in:.page){ result in
                     if case .failure=result {self.lastPayload=Data();self.sentJournalRevision = -1}
-                    else if deliverHistory {self.sentJournalRevision=revision}
+                    else {
+                        if deliverHistory {self.sentJournalRevision=revision}
+                        if let argument=CommandLine.arguments.first(where:{$0.hasPrefix("--update-ready=")}) {
+                            let token=String(argument.dropFirst("--update-ready=".count))
+                            if token.range(of:"^[0-9a-f]{32}$",options:.regularExpression) != nil {
+                                let path=self.state.appendingPathComponent("updates/jobs/"+token+"/ready")
+                                if FileManager.default.fileExists(atPath:path.deletingLastPathComponent().appendingPathComponent("operation.json").path) {
+                                    try? Data("ready".utf8).write(to:path,options:.atomic)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

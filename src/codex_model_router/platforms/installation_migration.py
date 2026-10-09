@@ -20,7 +20,7 @@ from codex_model_router.storage.state_store import atomic_json, file_lock
 
 FILES = ('history.jsonl', 'history.recovered.jsonl', 'prompts.jsonl', 'jev-health.json',
          'keychain-revision.json', 'credential-namespace.json', 'monitor-ui-mac.json',
-         'monitor-ui-linux.json', 'monitor-ui-windows.json', 'monitor-ui.json', 'jev-typesafe.secret', 'jev-vercel.secret')
+         'monitor-ui-linux.json', 'monitor-ui-windows.json', 'monitor-ui.json', 'agent-appearances.json', 'jev-typesafe.secret', 'jev-vercel.secret')
 DIRECTORIES = ('task-modes', 'workloads')
 
 
@@ -150,7 +150,7 @@ def import_legacy(source, destination, platform=None, record_source=False):
     try:
         with ExitStack() as locks:
             locks.enter_context(file_lock(destination.parent/'.router-import.lock'))
-            for name in ('config.lock','history.lock','prompts.lock','workloads.lock','monitor-mac.lock','monitor-linux.lock'):
+            for name in ('config.lock','history.lock','prompts.lock','workloads.lock','agent-appearances.lock','monitor-mac.lock','monitor-linux.lock'):
                 locks.enter_context(file_lock(state/name,timeout=.1))
             reject_active(state)
             copy_stable(config_path,temporary/'config.local.json')

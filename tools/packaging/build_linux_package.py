@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from tools.packaging.legal import copy_legal_notices
 
 ROOT = Path(__file__).resolve().parents[2]
-DEPENDENCIES = ('python3 (>= 3.9), python3-gi, python3-gi-cairo, '
+DEPENDENCIES = ('python3 (>= 3.9), python3-cryptography, python3-gi, python3-gi-cairo, '
                 'gir1.2-gtk-3.0, gir1.2-webkit2-4.1, gir1.2-secret-1, '
                 'gir1.2-ayatanaappindicator3-0.1')
 

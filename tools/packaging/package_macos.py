@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import xml.etree.ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
@@ -76,8 +77,11 @@ def build(python, output_parent):
     shutil.copytree(ROOT / 'monitor-ui', resources / 'ui')
     shutil.copy2(ROOT / 'assets/brand/router-1024.png', resources / 'ui/codex.png')
     shutil.copy2(ROOT / 'assets/brand/router.icns', resources / 'router.icns')
+    (resources / 'assets').mkdir()
+    shutil.copy2(source / 'assets/update-trust.json', resources / 'assets/update-trust.json')
     shutil.copy2(ROOT / 'VERSION', resources / 'VERSION')
     copy_legal_notices(source, resources)
+    run([python, source / 'tools/packaging/bundled_notices.py', resources / 'licenses'], log)
     config = json.loads((ROOT / 'config.example.json').read_text())
     for key in ('python', 'desktop_runtime', 'router_runtime', 'monitor_runtime'): config.pop(key, None)
     config['comparison_engines'] = []
@@ -100,9 +104,24 @@ def build(python, output_parent):
     for description in descriptions:
         description.update(BundleIsRelocatable=False, BundleHasStrictIdentifier=True, BundleOverwriteAction='upgrade')
     components.write_bytes(plistlib.dumps(descriptions))
-    artifact=workspace / installer_name(version,'macos',architecture())
+    component = workspace / 'router-component.pkg'
     run(['/usr/bin/pkgbuild','--root',workspace/'payload','--component-plist',components,
-         '--identifier','local.codex-model-router.installer','--version',version,'--install-location','/',artifact],log)
+         '--identifier','local.codex-model-router.installer','--version',version,'--install-location','/',component],log)
+    # User-domain installation makes subsequent owned-app swaps possible without
+    # administrator privileges; user data remains in Application Support.
+    distribution = ET.Element('installer-gui-script', {'minSpecVersion': '2'})
+    ET.SubElement(distribution, 'title').text = 'Codex Model Router'
+    ET.SubElement(distribution, 'options', {'customize': 'never', 'require-scripts': 'false'})
+    ET.SubElement(distribution, 'domains', {'enable_anywhere': 'false', 'enable_currentUserHome': 'true', 'enable_localSystem': 'false'})
+    outline = ET.SubElement(distribution, 'choices-outline')
+    ET.SubElement(outline, 'line', {'choice': 'router'})
+    choice = ET.SubElement(distribution, 'choice', {'id': 'router', 'visible': 'false'})
+    ET.SubElement(choice, 'pkg-ref', {'id': 'local.codex-model-router.installer'})
+    ET.SubElement(distribution, 'pkg-ref', {'id': 'local.codex-model-router.installer', 'version': version, 'auth': 'none'}).text = component.name
+    recipe = workspace / 'Distribution.xml'
+    ET.ElementTree(distribution).write(recipe, encoding='utf-8', xml_declaration=True)
+    artifact=workspace / installer_name(version,'macos',architecture())
+    run(['/usr/bin/productbuild','--distribution',recipe,'--package-path',workspace,artifact],log)
     if identity(ROOT) != (version,fingerprint) or router_identity(ROOT) != engine:
         raise ValueError('Las fuentes cambiaron durante el build; el artefacto no es publicable.')
     report={'version':version,'build':fingerprint,'routerBuild':engine,'architecture':architecture(),

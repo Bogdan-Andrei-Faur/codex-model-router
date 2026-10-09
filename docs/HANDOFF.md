@@ -9,6 +9,23 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 
 ## Current source and delivery
 
+- Authenticated update implementation (2026-10-09): bundled Ed25519 public key,
+  owner-approved private key in Mac Keychain, signed Settings flow and installed
+  Mac helper with retained previous app/relaunch/recovery. Graphical first-run
+  guarded import is connected. Real isolated old/new Mac packages pass update
+  and native acknowledgement; owner installation/Settings click/login recovery
+  remain separate. Windows/Ubuntu apply remains disabled pending native adapters.
+  See [managed updates](MANAGED-UPDATES.md) and its native receipt. No installer
+  release, owner migration, installation replacement or Desktop restart occurred.
+- Public-source preparation: the owner approved retaining the original repository
+  privately under a new name and publishing a clean one at the canonical URL.
+  The isolated history candidate removes three retired icon paths and preserves
+  the current tree; GitHub-managed PR history motivates the separate archive.
+  See [history-cleanup review and execution receipt](HISTORY-CLEANUP.md) for the
+  actual publication status. Other machines must preserve old local work and
+  use a fresh clone after the changed history, not merge old history back.
+
+
 - The owner authorized direct-main publication of all pending project work on
   2026-10-09: original brand/assets, rigid companion scenes and 26 GIF previews,
   compact capsule/Consumption geometry, personal-use license/notices and package
@@ -36,9 +53,9 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
   repository for Releases, accepted GitHub forks, and chose free personal,
   noncommercial use with private modifications and restricted redistribution.
   Root license/notices and package inclusion accompany the source delivery.
-  Repository still private; visibility awaits remaining exposure/
-  third-party branding review. Settings apply/recovery/relaunch and Mac packaged
-  migration remain implementation work, not delivered self-update. See
+  This was the initial private-source preparation. The current signing, Mac
+  apply and approved clean-repository publication follow-up is recorded above;
+  native owner migration and all-platform update acceptance remain pending. See
   [DISTRIBUTION-PLAN.md](DISTRIBUTION-PLAN.md).
 
 - Owner-directed rigid companion revision: all26GIFs and contact sheet rebuilt;

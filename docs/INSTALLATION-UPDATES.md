@@ -24,9 +24,12 @@ through the shared monitor model. Preview cannot start updates.
 Discovery queries only the canonical repository's public GitHub latest-release
 endpoint, without account tokens or application data. A missing/private/inaccessible
 release, network error or rate limit is an unknown state, never proof of being up to
-date. Daily checks are opt-in and rate bounded per running monitor. No installer is
-executed. Download success proves SHA-256 integrity against GitHub metadata;
-**it does not independently prove publisher authenticity**.
+date. Daily checks are opt-in and rate bounded per running monitor. Legacy keyless
+installations provide hash-only downloads. New builds additionally require an
+Ed25519 release manifest authenticated by bundled public keys. Eligible packaged
+Mac builds can apply through the installed helper; Windows, Ubuntu and source-backed
+Mac still disable apply. See [MANAGED-UPDATES.md](MANAGED-UPDATES.md) for custody,
+recovery and acceptance limits.
 
 Asset naming contract (version excludes the optional `v` tag prefix):
 
@@ -78,7 +81,7 @@ coordination lock files may be created. Active bridge snapshots, occupied target
 symlinks, cross-platform config and changing files are rejected. Keychain/Secret
 Service namespace is retained without retrieving/decrypting keys. Build trees,
 unknown state, caches, status snapshots and Desktop registration are not copied.
-On macOS import is currently a guarded library. Ubuntu now integrates it in its
+On macOS import is now connected to the first-run native dialog. Ubuntu now integrates it in its
 first-run GUI, with a separately requested connection transfer. The existing live
 source-based installation has not been migrated by the package validation.
 
@@ -115,7 +118,7 @@ do not certify a full GNOME session, ARM, publisher identity or live migration o
 the owner's installation. Local artifacts use Debian version/revision names;
 mapping tested targets to public update assets remains part of release delivery.
 
-## Required next delivery stages
+## Remaining delivery stages (historical baseline below)
 
 Windows 0.9.6 has a per-user Inno setup builder with a frozen runtime,
 side-by-side version folders, independent user data, native first-run import,
@@ -153,6 +156,7 @@ not change the shared update boundary: no trusted automatic installer execution.
    retention and relaunch on real macOS, Ubuntu and Windows machines. Cross-builds
    and browser fixtures do not establish native installation acceptance.
 
-No release, signing identity, installer publication, automatic execution or complete
-self-update acceptance is implied by the discovery/staging slice. Windows/Ubuntu
+The historical discovery/staging slice did not imply self-update acceptance.
+The current [managed-update contract](MANAGED-UPDATES.md) supersedes its
+Mac apply and signing boundaries, without claiming all-platform acceptance. Windows/Ubuntu
 native validation requires access to those systems.

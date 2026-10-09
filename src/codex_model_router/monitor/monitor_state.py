@@ -264,7 +264,9 @@ class MonitorState:
         self.journals = [MonitorJournal(), MonitorJournal()]
         self.journal_revision = 0
         self.lock = threading.RLock()
-        self.updater = UpdateManager(self.root, self.version, self.platform)
+        from codex_model_router.update_install import installed_applier
+        applier = None if preview or read_only else installed_applier(self.root, self.code_root, self.platform)
+        self.updater = UpdateManager(self.root, self.version, self.platform, resources=self.code_root, applier=applier)
 
     def close(self):
         self.updater.close()

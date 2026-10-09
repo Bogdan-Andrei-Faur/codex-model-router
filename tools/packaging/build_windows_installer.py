@@ -83,6 +83,7 @@ def build(python, compiler, bootstrapper, output, framework=None):
     shutil.copytree(source/'monitor-ui',resources/'ui'); shutil.copy2(source/'assets/brand/router-1024.png',resources/'ui/codex.png')
     shutil.copytree(source/'assets',resources/'assets');shutil.copy2(source/'VERSION',resources/'VERSION')
     copy_legal_notices(source, resources)
+    run([python, source/'tools/packaging/bundled_notices.py', resources/'licenses'], log)
     defaults=json.loads((source/'config.example.json').read_text())
     for key in ('python','router_runtime','monitor_runtime','desktop_runtime'):defaults.pop(key,None)
     defaults['comparison_engines']=[]
