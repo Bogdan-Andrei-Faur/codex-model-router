@@ -24,13 +24,24 @@ def main():
     os.environ['PERSONAL_CODEX_ROUTER_CODE_ROOT'] = str(resources)
     from codex_model_router.platforms.application_layout import data_root, bootstrap, manifest
     root = args.data_root.resolve() if args.data_root else data_root(resources)
+    if sys.platform == 'linux' and args.service not in ('update-helper', 'identity', 'import-legacy') and manifest(resources):
+        from codex_model_router.update_portable import linux_selected
+        from codex_model_router.update_install import clean_environment
+        from codex_model_router.platforms.application_layout import installed_path
+        selected = linux_selected(root, resources)
+        if selected != resources:
+            command = [str(installed_path(selected, 'runtime')), '--data-root', str(root), args.service, *remaining]
+            os.execve(command[0], command, clean_environment())
     os.environ['PERSONAL_CODEX_ROUTER_ROOT'] = str(root)
     os.environ['PERSONAL_CODEX_ROUTER_CONFIG'] = str(root / 'config.local.json')
     os.environ['PERSONAL_CODEX_ROUTER_STATE'] = str(root / 'state')
     if args.service == 'update-helper':
         if len(remaining) != 1:
             raise ValueError('Solicitud de actualización no válida.')
-        from codex_model_router.update_install import run_helper
+        if sys.platform == 'darwin':
+            from codex_model_router.update_install import run_helper
+        else:
+            from codex_model_router.update_portable import run_helper
         run_helper(root, resources, remaining[0])
         return 0
     if args.service == 'identity':

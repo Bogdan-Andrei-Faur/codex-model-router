@@ -81,7 +81,7 @@ sealed class MonitorPipe : IDisposable
             }
         }
     }
-    void Stop() { if(child!=null){try{if(!child.HasExited)child.Kill();}catch{} child.Dispose();child=null;} }
+    void Stop() { if(child!=null){try{if(!child.HasExited){child.Kill();child.WaitForExit(5000);}}catch{} child.Dispose();child=null;} }
     public void Dispose() { lock(gate){Stop();} }
 }
 
@@ -126,9 +126,15 @@ sealed class RouterMonitorWindow : Window
         SourceInitialized += delegate {source=HwndSource.FromHwnd(new WindowInteropHelper(this).Handle);source.AddHook(Hook);};
         Loaded += async delegate {await Initialize();};
         Closing += delegate(object sender,System.ComponentModel.CancelEventArgs e){if(!quitting&&!preview){e.Cancel=true;SetMode("Hidden");}};
-        Closed += delegate {poll.Stop();pointer.Stop();if(tray!=null)tray.Dispose();web.Dispose();Task.Run((Action)service.Dispose);};
+        Closed += delegate {poll.Stop();pointer.Stop();if(tray!=null)tray.Dispose();web.Dispose();service.Dispose();};
         poll.Interval=TimeSpan.FromSeconds(2);poll.Tick += delegate {if(reveal!=null&&reveal.WaitOne(0)){SetMode(mode=="Hidden"?"Compact":mode);Activate();}Refresh();};
         pointer.Interval=TimeSpan.FromSeconds(1.0/30);pointer.Tick += delegate {UpdatePointer();};
+        string updateArgument=Environment.GetCommandLineArgs().FirstOrDefault(a=>a.StartsWith("--update-ready="));
+        string updateToken=updateArgument==null?"":updateArgument.Substring("--update-ready=".Length);
+        if(!preview && System.Text.RegularExpressions.Regex.IsMatch(updateToken,"\\A[0-9a-f]{32}\\z")){
+            var deadline=new DispatcherTimer {Interval=TimeSpan.FromSeconds(55)};
+            deadline.Tick+=delegate{deadline.Stop();if(!File.Exists(Path.Combine(root,"state","updates","jobs",updateToken,"ready")))Quit();};deadline.Start();
+        }
         Position();
     }
     internal static Dictionary<string,object> Read(string path) {try{return Json.Deserialize<Dictionary<string,object>>(File.ReadAllText(path,Encoding.UTF8))??new Dictionary<string,object>();}catch{return new Dictionary<string,object>();}}
@@ -254,9 +260,18 @@ sealed class RouterMonitorWindow : Window
             var reply=await Task.Run(()=>service.Request(new Dictionary<string,object>{{"action","snapshot"},{"history",needs},{"revision",sent}}));
             if(!(Get(reply,"ok") as bool? ?? false)){Feedback(Text(reply,"feedback","No se pudo leer el estado."));return;}
             var payload=Dict(Get(reply,"payload"));bool history=payload.ContainsKey("history")&&mode=="Expanded"&&historyRequested;
+            if(!preview && WindowsLayout.Installed(codeRoot) && (Get(Dict(Get(payload,"updates")),"shutdownForUpdate") as bool? ?? false)){Quit();return;}
             if(!history)payload.Remove("history");payload["historyLoaded"]=journalRevision>=0||history;payload["keys"]=keys;payload["ui"]=Ui();
             var small=new Dictionary<string,object>(payload);small.Remove("history");string encoded=Json.Serialize(small);
             if(encoded!=lastSnapshot||history){if(await Script("receive",payload)){lastSnapshot=encoded;if(history)journalRevision=Convert.ToInt32(payload["journalRevision"]);}}
+            if(!preview && lastSnapshot==encoded){
+                string argument=Environment.GetCommandLineArgs().FirstOrDefault(a=>a.StartsWith("--update-ready="));
+                string token=argument==null?"":argument.Substring("--update-ready=".Length);
+                if(System.Text.RegularExpressions.Regex.IsMatch(token,"\\A[0-9a-f]{32}\\z")){
+                    string job=Path.Combine(root,"state","updates","jobs",token);
+                    if(File.Exists(Path.Combine(job,"operation.json")))Atomic(Path.Combine(job,"ready"),Encoding.UTF8.GetBytes("ready"));
+                }
+            }
             if(selfTest&&!testStarted){testStarted=true;RunSelfTest();}
         }catch{Feedback("No se pudo leer el estado. Se conserva la última vista.");}
         finally{busy=false;if(pending){pending=false;Refresh();}}
@@ -381,11 +396,13 @@ static class RouterMonitorProgram
         bool created;using(var mutex=new Mutex(true,"Local\\CodexRouterMonitor-"+hash,out created))
         using(var reveal=new EventWaitHandle(false,EventResetMode.AutoReset,"Local\\CodexRouterMonitorReveal-"+hash)) {
             if(!created){reveal.Set();return 0;}
+            FileStream updateLease=null;
             try{
+                if(!preview){updateLease=new FileStream(Path.Combine(root,"state","monitor-windows.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.ReadWrite);if(updateLease.Length==0)updateLease.WriteByte(0);updateLease.Lock(0,1);}
                 var app=new Application();var window=new RouterMonitorWindow(root,codeRoot,preview,selfTest,reveal,args.Contains("--tray"));
                 if(selfTest){var deadline=new DispatcherTimer {Interval=TimeSpan.FromSeconds(50)};deadline.Tick+=delegate{File.WriteAllText(Path.Combine(WindowsLayout.Installed(codeRoot)?root:codeRoot,"state","ui-review-checks.txt"),"FAIL: native fixture timeout");Environment.ExitCode=1;app.Shutdown();};deadline.Start();}
                 app.Run(window);return Environment.ExitCode;
-            }finally{mutex.ReleaseMutex();}
+            }catch(IOException){return 1;}finally{if(updateLease!=null)updateLease.Dispose();mutex.ReleaseMutex();}
         }
     }
 }

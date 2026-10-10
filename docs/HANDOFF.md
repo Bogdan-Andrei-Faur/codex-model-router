@@ -1,4 +1,4 @@
-# Current project handoff — 2026-10-10
+# Current project handoff — 2026-10-11
 
 Canonical project: `codex-model-router`,
 `https://github.com/Bogdan-Andrei-Faur/codex-model-router.git`.
@@ -7,7 +7,32 @@ links current contracts, installation, routing/evidence and historical receipts.
 This checkout is sufficient; no other agent, personal memory or external knowledge
 service is needed. Preserve local work and coordinate disruptive owner actions.
 
+## Windows/Ubuntu managed updates — current source work
+
+Windows Inno handoff and Ubuntu per-user signed runtime updates are implemented
+with native shutdown/readiness hooks, previous-version selection and login
+recovery. Ubuntu arm64 Docker signed-package/helper/GTK scenarios pass; physical Ubuntu
+and all Windows native acceptance remain pending. No production installer/release
+was published or owner installation replaced for this work. Existing packages
+need one protocol-aware baseline installation before Settings can apply updates.
+Ubuntu keeps apt's package as its system dependency/bootstrap baseline; Settings
+reports the selected per-user runtime. Do not claim apt's version was upgraded.
+Local verification: 575 Python tests (53 skips), 33 JS, browser Settings checks
+and C#5/.NET4.8 cross-compilation passed; [source receipt](native-validation/2026-10-11-managed-update-adapters.md).
+Fresh Mac native Settings success/rollback/interrupted fixtures also pass; see
+[the follow-up receipt](native-validation/2026-10-11-update-followup.md).
+Follow [the independent Windows/Ubuntu checklist](native-validation/WINDOWS-UBUNTU-UPDATES.md)
+and [the shared update contract](MANAGED-UPDATES.md). WPF only needs validation
+when using Windows. Mac public 0.9.7 remains the validated delivery below.
+
 ## Current source and delivery
+
+- Current Mac connection repair (2026-10-11): the installed bridge executable was
+  missing while registration still pointed to it. Restored only that file from
+  the exact published0.9.7 package; all other payload files matched, entire app
+  signature and isolated initialize/catalog probe PASS. No app closed/replaced.
+  Ordinary Desktop connection is now reverified: one session, completed handshake,
+  matching 0.9.7 monitor/router identities. Removal cause remains unknown. See [repair receipt](native-validation/2026-10-11-macos-missing-bridge.md).
 
 - Public Mac release (2026-10-10): [v0.9.7](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.7)
   targets immutable source `8d6fb670010311239c657ee676c8b6d8183be193` and ships the
@@ -56,7 +81,8 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
   Settings DOM clicks, automatic exit/relaunch, cancellation, rollback and
   interrupted-helper replay on isolated signed fixtures; owner installation,
   real GitHub release download and actual login recovery remain separate. See
-  [the portable Settings receipt](native-validation/2026-10-09-macos-portable-settings.md). Windows/Ubuntu apply remains disabled pending native adapters.
+  [the portable Settings receipt](native-validation/2026-10-09-macos-portable-settings.md). Windows/Ubuntu adapters were added in the 11/10 source work above; native
+  acceptance remains separate.
   See [managed updates](MANAGED-UPDATES.md) and its native receipt. No installer
   release, owner migration, installation replacement or Desktop restart occurred.
 - Public source published on 2026-10-09: clean main `5dac586b` includes the
@@ -433,9 +459,9 @@ la aceptación física de la instalación del propietario.
 | Hosts | `native/macos/MonitorMac.swift`, `native/windows/MonitorWindows.cs`, `monitor_linux.py` | Windows activo usa WebView2/WPF; los C# anteriores quedan preservados fuera del build |
 | Routing | Referencia 8 y candidata 9 separadas; Manual y peticiones explícitas prevalecen | Comparaciones y fixtures no autorizan activar categorías ni prueban ahorro causal |
 | Evidencia | `src/codex_model_router/telemetry/evidence.py`, `src/codex_model_router/telemetry/inference_attribution.py`, evaluadores y contadores estrictos | ACK/`applied` no prueba inferencia posterior; coste estimado no es facturación |
-| Actualizaciones | Firma Ed25519 del proyecto, descarga/cancelación y helper Mac con relanzamiento/recuperación | Solo el Mac empaquetado admite aplicar; aceptación de Installer, migración del propietario y recuperación en login pendientes. Windows/Ubuntu necesitan adaptadores nativos |
+| Actualizaciones | Firma Ed25519, helper Mac y adaptadores Windows/Ubuntu; ver recibos actuales al inicio | Mac Installer/importación/conexión y GitHub aislado verificados; quedan login real, Windows nativo y aceptación física de Ubuntu. El contenedor Ubuntu no cierra esas puertas |
 | Mac portátil | `tools/packaging/package_macos.py`, `src/codex_model_router/packaged_main.py`, `native/macos/BridgeMac.swift`, `src/codex_model_router/platforms/application_layout.py` | `.pkg` local ad-hoc con runtime; no Installer/Gatekeeper en máquina limpia, firma de editor ni notarización |
-| Windows instalado | `tools/packaging/build_windows_installer.py`, `installer/windows.iss`, entrada estable y versiones independientes | Piloto 0.9.6 sin firma instalado; registro, puente instalado 0.9.6 y telemetría activos tras reinicio del propietario. VM limpia validada en 0.9.4 |
+| Windows instalado | `tools/packaging/build_windows_installer.py`, `tools/packaging/windows.iss`, entrada estable y versiones independientes | Piloto 0.9.6 sin firma instalado; registro, puente instalado 0.9.6 y telemetría activos tras reinicio del propietario. VM limpia validada en 0.9.4 |
 | Migración | `src/codex_model_router/platforms/installation_migration.py`: copia offline y bienvenida gráfica en las tres plataformas; traspaso separado de conexión | Importación real del propietario en Mac pendiente; no migra claves entre usuarios/sistemas |
 
 Detalles: [monitor compartido](SHARED-MONITOR.md), [diseño](MONITOR-UI.md),
@@ -597,8 +623,8 @@ registros privados para rellenar una muestra incompleta.
 2. Mantener la Release 0.9.7 y renovar su manifiesto antes de la caducidad de 30 días,
    sin reemplazar el paquete publicado. La actualización real desde GitHub y
    Ajustes ya pasa en una instalación aislada; no implica aceptación física.
-3. Completar recuperación nativa en login/reinicio Mac y los adaptadores de
-   aplicación/rollback Windows y Ubuntu. Los tres escenarios nativos aislados de
+3. Completar recuperación nativa en login/reinicio Mac y validar los adaptadores
+   de aplicación/rollback Windows y Ubuntu ya implementados. Los tres escenarios nativos aislados de
    Mac no sustituyen Installer/Gatekeeper, login real ni aceptación en otros OS.
 4. Completar QA nativo de instalación limpia/upgrade/cancelación/fallo/recuperación
    y desinstalación en cada OS; mantener separados fuente, paquete instalado,

@@ -64,6 +64,10 @@ def installed_path(resources, key):
     if relative.is_absolute() or '..' in relative.parts:
         raise ValueError('Ruta de instalación no válida.')
     base = resources.parent
+    if value['layout'] == 'linux-deb-v1' and key == 'bridge' and base.name == 'candidate' and re.fullmatch('[0-9a-f]{32}', base.parent.name):
+        # Managed user runtimes retain the system-owned entry point. Future
+        # updates and apt baseline upgrades must not pin Desktop to this job.
+        base = Path('/usr/lib/codex-model-router')
     if value['layout'] == 'windows-install-v1' and key == 'bridge':
         # Windows keeps an owned stable bridge above side-by-side versions.
         if base.parent.name != 'versions' or relative != Path('bin/codex-router.exe'):

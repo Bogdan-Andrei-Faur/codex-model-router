@@ -62,7 +62,11 @@ def config():
 
 def wrapper_path():
     if manifest(CODE_ROOT):
-        return installed_path(CODE_ROOT, 'bridge')
+        try:
+            return installed_path(CODE_ROOT, 'bridge')
+        except (OSError, ValueError) as error:
+            raise DiscoveryError('La instalación está incompleta: el puente de conexión no está disponible. Repara o reinstala Codex Model Router.',
+                                 code='bridge_unavailable') from error
     return ROOT / "dist" / ("codex-router.exe" if sys.platform == "win32" else "codex-router")
 
 

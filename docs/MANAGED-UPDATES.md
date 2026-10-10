@@ -1,4 +1,4 @@
-# Authenticated managed updates — public Mac release, 2026-10-10
+# Authenticated managed updates — 2026-10-11
 
 ## What is implemented
 
@@ -14,8 +14,8 @@ silently fall back to hash-only updates. Preview/read-only views cannot update.
 | --- | --- | --- |
 | Packaged macOS, app writable by its user | Check → Update → real GitHub download/verify → installation-owned helper → replace → launch → WebKit/data acknowledgement PASS in isolated native Settings; owner Installer/import/connection also verified; restore previous app on launch failure tested locally | Downloaded-quarantine/clean-machine Gatekeeper, actual login/power-loss recovery, physical input and real provider credential use |
 | Source-backed macOS | Signed download only; no managed replacement of a checkout | Migrate to packaged app when owner is ready |
-| Packaged Windows | Shared signed discovery/download; apply disabled | Implement/test native transaction adapter and native relaunch/recovery |
-| Packaged Ubuntu | Shared signed discovery/download; apply disabled | Implement/test package-manager authorization/transaction adapter and native relaunch/recovery |
+| Packaged Windows with managed protocol 1 | Signed installer handoff, automatic native close/relaunch, version-selector rollback and login recovery implemented | Native Inno/WebView2/WPF, locked files, cancellation/recovery and real GitHub run pending |
+| Packaged Ubuntu with managed protocol 1 | Signed per-user payload update, automatic GTK close/relaunch, atomic selection/rollback and login recovery implemented; apt baseline retained | Real signed-helper/new GTK readiness and rollback/replay pass in Ubuntu24.04 arm64 Docker; Settings actions, physical XDG/login/apt coexistence and real GitHub run pending |
 
 The [public 0.9.7 Release](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.7)
 contains the arm64 Mac installer, signed manifest, checksums and public build
@@ -154,3 +154,26 @@ the success case; the local cancellation/recovery cases remain separate evidence
 The supplied package is an expected-byte comparison, never a download substitute.
 Recovery registration is redirected into the fixture. The owner's installation,
 Desktop processes and data are not replaced or stopped.
+
+## Windows/Ubuntu transaction contract (source implementation)
+
+`update_portable.py` copies the old installed runtime before handoff, rechecks the
+signed bytes in the helper, refuses active bridge snapshots, waits for the native
+monitor's lifecycle lease and preserves the old selection. Both native hosts
+close only themselves when the shared updater requests it. Completion requires a
+successful new UI snapshot acknowledgement, not merely installer exit status.
+Recovery uses HKCU Run on Windows and XDG autostart on Ubuntu; retained runtimes
+and jobs are not pruned automatically. Native execution remains unverified here.
+
+Windows runs the authenticated per-user Inno installer with explicit
+[no-restart/no-application-close switches](https://jrsoftware.org/ishelp/topic_setupcmdline.htm).
+Rollback restores the previous version selection; stable launcher compatibility
+and uninstall-registry behavior are native gates. Ubuntu installs a signed
+user-scoped runtime while keeping the system .deb as its dependency/bootstrap
+baseline. It does not claim to update dpkg's installed version. Changes to system
+dependencies require a new baseline package/protocol.
+
+The existing public packages do not gain new host hooks retroactively. A native
+protocol-1 baseline must be installed once before testing Settings updates. No
+Windows/Ubuntu Release assets have been published for this implementation. Follow
+[the complete per-machine runbook](native-validation/WINDOWS-UBUNTU-UPDATES.md).

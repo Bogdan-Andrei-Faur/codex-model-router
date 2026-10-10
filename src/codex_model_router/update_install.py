@@ -3,7 +3,7 @@
 Only a user-writable packaged app is eligible. Downloaded PKG scripts are never
 run: the authenticated, script-free app payload replaces the owned app. Mutable
 user data is not copied, deleted or migrated by an update. Windows and Ubuntu
-remain explicitly disabled until their native transaction adapters are tested.
+adapters live in update_portable and require a protocol-aware native package.
 """
 import hashlib
 import json
@@ -170,10 +170,16 @@ class MacApplier:
 
 def installed_applier(root, resources, platform):
     from codex_model_router.platforms.application_layout import manifest
-    if platform != 'macos' or sys.platform != 'darwin':
-        return None
     try:
         value = manifest(resources)
+        if platform in ('windows', 'linux'):
+            expected = {'windows': ('win32', 'windows-install-v1'), 'linux': ('linux', 'linux-deb-v1')}[platform]
+            if sys.platform != expected[0] or not value or value['layout'] != expected[1] or value.get('managedUpdateProtocol') != 1:
+                return None
+            from codex_model_router.update_portable import PortableApplier
+            return PortableApplier(root, resources, platform)
+        if platform != 'macos' or sys.platform != 'darwin':
+            return None
         if not value or value['layout'] != 'macos-bundle-v1':
             return None
         app_info(Path(resources).resolve().parent.parent)

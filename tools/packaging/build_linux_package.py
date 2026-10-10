@@ -29,13 +29,16 @@ def write(path, text, executable=False):
     path.chmod(0o755 if executable else 0o644)
 
 
-def build(output, revision='1'):
+def build(output, revision='1', release_name=False):
     version = (ROOT / 'VERSION').read_text().strip()
     if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version) or not re.fullmatch(r'[0-9][a-zA-Z0-9.+~]*', revision):
         raise ValueError('Invalid Debian version or revision')
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     artifact = output / ('codex-model-router_' + version + '-' + revision + '_all.deb')
+    if release_name:
+        from codex_model_router.updates import architecture, installer_name
+        artifact = output / installer_name(version, 'linux', architecture())
     if artifact.exists():
         raise ValueError('Output already exists; choose a new output directory or revision')
     with tempfile.TemporaryDirectory(prefix='router-deb-') as directory:
@@ -52,7 +55,7 @@ def build(output, revision='1'):
         shutil.copytree(ROOT / 'monitor-ui', resources / 'ui')
         shutil.copytree(ROOT / 'assets', resources / 'assets')
         shutil.copyfile(ROOT / 'assets/brand/router-1024.png', resources / 'ui/codex.png')
-        write(resources / 'application.json', json.dumps({'schema': 1, 'layout': 'linux-deb-v1',
+        write(resources / 'application.json', json.dumps({'schema': 1, 'layout': 'linux-deb-v1', 'managedUpdateProtocol': 1, 'runtimeDependencies': DEPENDENCIES,
             'runtime': 'bin/router-runtime', 'bridge': 'bin/codex-router', 'launcher': 'bin/codex-desktop',
             'monitor': 'bin/codex-monitor-linux'}) + '\n')
         write(application / 'bin/router-runtime', '#!/bin/sh\nset -eu\n'
@@ -100,8 +103,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ROOT / 'release/linux')
     parser.add_argument('--revision', default='1')
+    parser.add_argument('--release-name', action='store_true', help='Use the exact GitHub update asset name for this build host architecture.')
     args = parser.parse_args()
-    print(build(args.output, args.revision))
+    print(build(args.output, args.revision, args.release_name))
 
 
 if __name__ == '__main__':

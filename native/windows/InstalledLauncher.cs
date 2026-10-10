@@ -26,6 +26,12 @@ static class InstalledLauncher
             if(args.Length==2 && args[0]=="--check-uninstall")return CheckInstallation(args[1],true);
             string root=WindowsLayout.DataRoot;
             if(args.Length>=2 && args[0]=="--data-root"){root=Path.GetFullPath(args[1]);args=args.Skip(2).ToArray();}
+            if(args.Length==2 && args[0]=="--recover-update") {
+                if(!System.Text.RegularExpressions.Regex.IsMatch(args[1],"\\A[0-9a-f]{32}\\z"))return 1;
+                string worker=WindowsLayout.Owned(root,"state/updates/jobs/"+args[1]+"/worker/Resources");
+                Process.Start(WindowsLayout.Runtime(worker,root,"update-helper",args[1]));
+                return 0;
+            }
             if(args.SequenceEqual(new[]{"--remove-integration-json"})||args.SequenceEqual(new[]{"--remove-integration"}))return Disconnect(root);
             if(args.Length==2 && args[0]=="--activate-version")return Activate(args[1],root);
             if(args.SequenceEqual(new[]{"--rollback"}))return Rollback(root);

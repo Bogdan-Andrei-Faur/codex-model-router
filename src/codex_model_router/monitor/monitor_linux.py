@@ -32,12 +32,19 @@ ROOT = code_root()
 
 
 class Monitor(Gtk.Application):
-    def __init__(self, root=None, preview=False):
+    def __init__(self, root=None, preview=False, update_ready=None):
         root = Path(root) if root is not None else data_root(ROOT)
         app_id = 'local.codex.modelrouter.m' + hashlib.sha256(str(root.resolve()).encode()).hexdigest()[:20]
         super().__init__(application_id=app_id, flags=Gio.ApplicationFlags.FLAGS_NONE)
         self.root = root
         self.preview = preview
+        self.update_ready = update_ready
+        if update_ready and not preview:
+            def readiness_timeout():
+                if self.update_ready:
+                    self.quit()
+                return False
+            GLib.timeout_add_seconds(55, readiness_timeout)
         self.model = MonitorState(root, ROOT, preview)
         self.ui_path = root / 'state/monitor-ui-linux.json'
         saved = read_json(self.ui_path)
@@ -325,9 +332,9 @@ class Monitor(Gtk.Application):
         self.last_payload = None
         self.refresh()
 
-    def emit(self, function, value):
+    def emit(self, function, value, callback=None):
         script = 'window.' + function + '(' + json.dumps(value, ensure_ascii=True) + ')'
-        self.web.evaluate_javascript(script, -1, None, self.page, None, None, None)
+        self.web.evaluate_javascript(script, -1, None, self.page, None, callback, None)
 
     def feedback(self, message):
         self.emit('monitorFeedback', message)
@@ -470,6 +477,9 @@ class Monitor(Gtk.Application):
         if payload is None:
             self.feedback('No se pudo leer el estado. Se conserva la última vista.')
             return False
+        if not self.preview and manifest(ROOT) and payload.get('updates', {}).get('shutdownForUpdate') is True:
+            self.quit()
+            return False
         if self.mode != 'Expanded' or not self.history_requested:
             payload.pop('history', None)
         payload['historyLoaded'] = self.history_revision >= 0 or 'history' in payload
@@ -478,7 +488,16 @@ class Monitor(Gtk.Application):
         comparison = {key: value for key, value in payload.items() if key != 'history'}
         encoded = json.dumps(comparison, sort_keys=True)
         if encoded != self.last_payload or 'history' in payload:
-            self.emit('receive', payload)
+            def delivered(web, result, *_):
+                try:
+                    web.evaluate_javascript_finish(result)
+                    if not self.preview and self.update_ready:
+                        from codex_model_router.update_portable import native_ready
+                        native_ready(self.root, self.update_ready)
+                        self.update_ready = None
+                except Exception:
+                    self.last_payload = None
+            self.emit('receive', payload, delivered)
             self.last_payload = encoded
             if 'history' in payload:
                 self.history_revision = payload['journalRevision']
@@ -495,9 +514,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('root', nargs='?', type=Path, default=data_root(ROOT))
     parser.add_argument('--preview', action='store_true')
+    parser.add_argument('--update-ready')
     args = parser.parse_args()
     (args.root / 'state').mkdir(mode=0o700, parents=True, exist_ok=True)
-    return Monitor(args.root, args.preview).run([sys.argv[0]])
+    return Monitor(args.root, args.preview, args.update_ready).run([sys.argv[0]])
 
 
 if __name__ == '__main__':

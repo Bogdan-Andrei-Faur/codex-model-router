@@ -38,7 +38,8 @@ class MonitorServiceTests(unittest.TestCase):
             finally:model.close()
     def test_connection_feedback_uses_known_codes_without_echoing_stderr(self):
         cases = [('source_bridge_active','cierra Desktop'),('source_monitor_open','monitor de la instalación anterior'),
-                 ('source_status_unreadable','leer el estado'),('source_connection_unverified','verificar la conexión')]
+                 ('source_status_unreadable','leer el estado'),('source_connection_unverified','verificar la conexión'),
+                 ('bridge_unavailable','falta el puente')]
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);atomic_json(root/'config.local.json',{})
             model=MonitorState(root,ROOT,platform='windows')
@@ -51,7 +52,7 @@ class MonitorServiceTests(unittest.TestCase):
                 for stderr in (b'PRIVATE_SENTINEL',b'[]',b'{"code":[],"error":"PRIVATE_SENTINEL"}',b'{"code":"unknown","error":"PRIVATE_SENTINEL"}'):
                     with patch('codex_model_router.monitor.monitor_state.subprocess.run',return_value=subprocess.CompletedProcess([],1,b'[]',stderr)):
                         feedback=model.action({'action':'connection','value':'install'})
-                    self.assertEqual(feedback,'No se pudo completar la conexión. Tus tareas siguen abiertas.')
+                    self.assertEqual(feedback,'No se pudo completar la conexión. No se han cerrado aplicaciones ni tareas.')
             finally:model.close()
 
     def test_three_platform_projections_share_counters_and_custody_boundary(self):

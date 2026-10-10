@@ -405,6 +405,7 @@ class MonitorState:
                         failure = {}
                     code = failure.get('code') if isinstance(failure, dict) else None
                     messages = {
+                        'bridge_unavailable': 'La instalación está incompleta: falta el puente de conexión o no se puede leer. Repara o reinstala Codex Model Router.',
                         'source_monitor_open': 'Cierra el monitor de la instalación anterior y vuelve a conectar desde este monitor.',
                         'source_bridge_active': 'Desktop todavía usa la instalación anterior. Termina tus tareas, cierra Desktop por completo y vuelve a conectar.',
                         'source_status_unreadable': 'No se puede leer el estado de la instalación anterior. Revisa su diagnóstico antes de volver a conectar.',
@@ -412,7 +413,7 @@ class MonitorState:
                     }
                     if isinstance(code, str) and code in messages:
                         return messages[code]
-                    return 'No se pudo completar la conexión. Tus tareas siguen abiertas.'
+                    return 'No se pudo completar la conexión. No se han cerrado aplicaciones ni tareas.'
                 if status.get('connection') == 'desktop_connected':
                     return 'Desktop conectado al selector.'
                 if status.get('registered') is True:

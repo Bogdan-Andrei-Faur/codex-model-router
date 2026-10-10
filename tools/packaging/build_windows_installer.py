@@ -88,7 +88,7 @@ def build(python, compiler, bootstrapper, output, framework=None):
     for key in ('python','router_runtime','monitor_runtime','desktop_runtime'):defaults.pop(key,None)
     defaults['comparison_engines']=[]
     (resources/'config.example.json').write_text(json.dumps(defaults,indent=2)+'\n')
-    manifest={'schema':1,'layout':'windows-install-v1','runtime':'runtime/router-runtime.exe','bridge':'bin/codex-router.exe',
+    manifest={'schema':1,'layout':'windows-install-v1','managedUpdateProtocol':1,'runtime':'runtime/router-runtime.exe','bridge':'bin/codex-router.exe',
               'monitor':'bin/codex-monitor.exe','version':version,'build':fingerprint,'routerBuild':engine,
               'publisherVerified':False,'distribution':'unsigned-local'}
     (resources/'application.json').write_text(json.dumps(manifest)+'\n')

@@ -18,6 +18,14 @@ import codex_model_router.platforms.desktop_runtime as runtime
 
 
 class DiscoveryTests(unittest.TestCase):
+    def test_missing_packaged_bridge_has_a_safe_specific_error(self):
+        with patch.object(desktop, 'manifest', return_value={'layout': 'macos-bundle-v1'}), \
+             patch.object(desktop, 'installed_path', side_effect=ValueError('PRIVATE_PATH')):
+            with self.assertRaises(runtime.DiscoveryError) as raised:
+                desktop.wrapper_path()
+        self.assertEqual(raised.exception.code, 'bridge_unavailable')
+        self.assertNotIn('PRIVATE_PATH', str(raised.exception))
+
     def package(self, root, version):
         install = root / version
         resources = install / 'app/resources'
