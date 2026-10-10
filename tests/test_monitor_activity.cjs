@@ -21,7 +21,7 @@ const assert=require('node:assert/strict');
   assert.equal(await portrait.locator('.thought-cloud').evaluate(n=>getComputedStyle(n).animationName),'companion-cloud');
   const look=await portrait.getAttribute('data-appearance');
   const signatures=new Set();
-  for(const kind of ['thinking','planning','writing','executing','editing','searching','tool','collaborating','inspecting','generating','reviewing','compacting','retrying','preparing']){
+  for(const kind of ['working','thinking','planning','writing','executing','editing','searching','tool','collaborating','inspecting','generating','reviewing','compacting','retrying','preparing']){
    await update(kind);assert.equal(await portrait.getAttribute('data-state'),kind);
    assert.equal(await portrait.getAttribute('data-appearance'),look);
    assert.ok(await portrait.evaluate(n=>n.getAnimations({subtree:true}).length>0));
@@ -30,6 +30,12 @@ const assert=require('node:assert/strict');
     return {kind:prop.dataset.kind,shape:prop.innerHTML,motion:[...n.querySelectorAll('.activity-prop *,.hand-left,.hand-right')].map(x=>getComputedStyle(x).animationName).filter(x=>x!=='none').join(',')};
    });
    assert.equal(signature.kind,kind);
+   assert.equal(await portrait.locator('.hand-left,.hand-right').count(),2,'Hands survive prop and facing transitions');
+   if(['working','executing'].includes(kind)){
+    assert.equal(await portrait.locator('.laptop .scene-hands .hand-left,.laptop .scene-hands .hand-right').count(),2,'Hands type behind the lid');
+    assert.equal(await portrait.locator('.scene-hands').evaluate(n=>n.nextElementSibling.getAttribute('y')),'83','Lid must paint after hands');
+   }
+   assert.equal(await portrait.getAttribute('data-facing'),kind==='searching'?'back':'front');
    assert.ok(!signatures.has(signature.motion),'specific activities must have distinct movement');
    signatures.add(signature.motion);
    if(kind!=='collaborating')assert.ok(signature.shape.length,'specific work needs a readable prop');

@@ -54,3 +54,5 @@ downgrade rejection, frozen-child environment isolation and terminal-job cleanup
 
 See [managed update contract](../MANAGED-UPDATES.md). Test/build evidence does not
 activate this source in the owner's monitor or loaded Desktop bridge.
+
+Follow-up: [portable runtime and native Settings receipt](2026-10-09-macos-portable-settings.md) closes the isolated Settings/automatic-exit path and expands fault coverage; real GitHub transport, Installer/Gatekeeper, owner migration and login remain open.

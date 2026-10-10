@@ -1,6 +1,6 @@
 /* Original companion wardrobe artwork. UI controls continue to use Lucide. */
 globalThis.RouterCharacters = {
-  draw(svg, look, clipId) {
+  draw(svg, look, clipId, facing='front') {
     const group=svg('g',{class:'character-accessories'}),cloth=svg('g',{'clip-path':'url(#'+clipId+')','data-slot':'outfit'});
     const ink='#29282c', light='#fff4e2', color='var(--accessory)';
     const path=(d,fill=color,extra={})=>svg('path',{d,fill,...extra});
@@ -9,6 +9,12 @@ globalThis.RouterCharacters = {
     const dot=(cx,cy,r,fill=light)=>svg('circle',{cx,cy,r,fill});
     // Lower-body garments follow the same rounded silhouette; the mouth stays free.
     if(look.outfit!=='none') {
+      if(facing==='back'){
+        cloth.append(rect(11,64,78,22,0,look.outfit==='labcoat'?light:color));
+        if(look.outfit==='hoodie')cloth.append(path('M29 59 Q50 53 71 59 L66 73 Q50 79 34 73 Z'),line('M34 63 Q50 60 66 63'));
+        if(look.outfit==='overalls')cloth.append(rect(29,59,7,20),rect(64,59,7,20),line('M33 68 L67 81 M67 68 L33 81',light,1.5));
+        if(look.outfit==='jacket'||look.outfit==='labcoat')cloth.append(line('M50 68 V84',look.outfit==='labcoat'?color:light,1.2));
+      }else{
       if(look.outfit==='tee')cloth.append(path('M11 64 L30 68 L37 72 L63 72 L70 68 L89 64 V85 H11 Z'),line('M38 72 Q50 79 62 72'));
       if(look.outfit==='sweater')cloth.append(rect(11,69,78,16,0),line('M35 70 Q50 78 65 70'),line('M22 81 H78'),line('M24 78 V84 M31 78 V84 M69 78 V84 M76 78 V84',light,1.4));
       if(look.outfit==='hoodie')cloth.append(path('M12 66 Q23 57 33 66 L40 72 H60 L67 66 Q77 57 88 66 V86 H12 Z'),line('M29 64 Q34 72 40 73 M71 64 Q66 72 60 73'),line('M39 73 V79 M61 73 V79'),line('M43 82 Q50 78 57 82',ink,1.8));
@@ -16,6 +22,7 @@ globalThis.RouterCharacters = {
       if(look.outfit==='vest')cloth.append(path('M16 63 L32 66 L45 76 L45 85 H11 Z M84 63 L68 66 L55 76 V85 H89 Z'),line('M32 67 L43 76 V84 M68 67 L57 76 V84'),dot(51,79,1.5,ink));
       if(look.outfit==='jacket')cloth.append(path('M12 63 L29 64 L43 73 H57 L71 64 L88 63 V86 H12 Z'),line('M31 65 L38 75 L44 72 M69 65 L62 75 L56 72'),line('M50 74 V85',ink),line('M22 78 H32 M68 78 H78',light,1.7));
       if(look.outfit==='labcoat')cloth.append(path('M12 64 L28 63 L42 72 H58 L72 63 L88 64 V86 H12 Z',light),line('M29 65 L37 77 L44 72 M71 65 L63 77 L56 72',color),line('M50 75 V85',color,1.5),rect(66,76,10,7,1,color),dot(53,79,1.2,color));
+      }
       group.append(cloth);
     }
     const detail=svg('g',{'data-slot':'detail','clip-path':'url(#'+clipId+')'});
@@ -31,7 +38,7 @@ globalThis.RouterCharacters = {
     if(look.neck==='bowtie')neck.append(path('M34 69 Q32 74 34 79 L49 75 L66 79 Q68 74 66 69 L51 73 Z'),dot(50,74,3),line('M37 72 L45 74 M63 72 L55 74',light,1.5));
     group.append(neck);
     const head=svg('g',{'data-slot':'head'});
-    if(look.head==='cap')head.append(path('M27 23 Q28 4 48 4 Q68 4 70 23 Z'),rect(25,20,53,6,3),line('M48 7 V18',light,1.5));
+    if(look.head==='cap')head.append(path('M27 23 Q28 4 48 4 Q68 4 70 23 Z'),rect(25,20,facing==='back'?46:53,6,3),line(facing==='back'?'M42 18 H56':'M48 7 V18',light,1.5));
     if(look.head==='antenna')head.append(line('M50 21 V8',color,3),dot(50,6,5,color),dot(49,4,1.5));
     if(look.head==='beanie')head.append(path('M23 23 Q26 4 50 4 Q74 4 77 23 Z'),rect(22,19,56,8,3),dot(50,3,5,color),line('M31 22 H69',light,1.5));
     if(look.head==='beret')head.append(path('M21 20 Q17 4 48 5 Q75 -1 81 16 Q72 24 24 23 Z'),rect(27,20,47,5,2),line('M55 6 L58 2',color,3));

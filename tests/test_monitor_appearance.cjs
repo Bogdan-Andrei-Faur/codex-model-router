@@ -14,6 +14,17 @@ const assert=require('node:assert/strict');
   await page.getByRole('button',{name:'Agentes',exact:true}).click();
   await page.getByRole('button',{name:'Personalizar',exact:true}).click();
   assert.equal(await page.locator('input[type=color],.appearance-mini,.appearance-sample').count(),0);
+  assert.equal(await page.locator('.agent-portrait').getAttribute('data-state'),'idle');
+  assert.equal(await page.locator('.agent-portrait .laptop').count(),0);
+  await page.evaluate(()=>window.receive({connections:0}));
+  assert.equal(await page.locator('.agent-portrait').getAttribute('data-state'),'idle','Editor must remain neutral when disconnected');
+  await page.evaluate(()=>window.receive({connections:1}));
+  for(const kind of ['working','executing','searching','compacting','approval','question','error']){
+   await page.evaluate(kind=>window.receive({threads:{a:{name:'Agent A',status:'active',turn_id:'editor-fixture',activity:{version:1,source:'native',turn_id:'editor-fixture',kind}}}}),kind);
+   assert.equal(await page.locator('.agent-portrait').getAttribute('data-state'),'idle','Live '+kind+' must not cover the draft');
+   assert.equal(await page.locator('.agent-portrait .activity-prop').getAttribute('data-kind'),'idle');
+  }
+  await page.evaluate(()=>window.receive({threads:{a:{name:'Agent A',status:'active'}}}));
   const colors=page.getByRole('group',{name:'Color del cuerpo',exact:true});
   assert.equal(await colors.getByRole('button').count(),9);
   await colors.getByRole('button',{name:'Cielo',exact:true}).click();
@@ -63,6 +74,7 @@ const assert=require('node:assert/strict');
    await categories.getByRole('button',{name:category,exact:true}).click();
    const group=page.getByRole('group',{name:category,exact:true});
    for(const choice of await group.getByRole('button').all()){
+    assert.equal(await choice.locator('.activity-prop[data-kind=idle]').count(),1,'Catalogue poses must be unobstructed');
     const value=await choice.getAttribute('data-appearance-choice');await choice.click();
     assert.equal(await group.locator('[aria-pressed=true]').getAttribute('data-appearance-choice'),value);
    }

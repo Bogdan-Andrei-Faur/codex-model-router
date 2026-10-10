@@ -32,6 +32,20 @@ def main():
         assert not any(p.name in forbidden or p.suffix=='.secret' for p in apps[0].rglob('*'))
         moved=base/'relocated/Codex Model Router.app';moved.parent.mkdir();shutil.copytree(apps[0],moved,symlinks=True)
         subprocess.run(['/usr/bin/codesign','--verify','--deep','--strict',str(moved)],check=True,capture_output=True)
+        # Check the shipped notices and runtime links, not only the build venv.
+        notices=moved/'Contents/Resources/licenses/runtime'
+        inventory=json.loads((notices/'inventory.json').read_text())
+        for relative,digest in inventory['files'].items():
+            assert hashlib.sha256((notices/relative).read_bytes()).hexdigest()==digest,'Packaged notice mismatch'
+        binaries=0
+        for path in moved.rglob('*'):
+            if path.is_symlink() or not path.is_file():continue
+            with path.open('rb') as stream:magic=stream.read(4)
+            if magic not in (b'\xcf\xfa\xed\xfe',b'\xca\xfe\xba\xbe',b'\xfe\xed\xfa\xcf'):continue
+            binaries+=1
+            for line in subprocess.check_output(['/usr/bin/otool','-L',str(path)],text=True).splitlines()[1:]:
+                dependency=line.strip().split(' (')[0]
+                assert not dependency.startswith('/') or dependency.startswith(('/usr/lib/','/System/Library/')),'Nonportable absolute library dependency'
         runtime=moved/'Contents'/manifest['runtime'];root=base/'synthetic-data'
         env=dict(os.environ)
         for key in tuple(env):
@@ -99,7 +113,9 @@ def main():
                           'package_sha256':hashlib.sha256(package.read_bytes()).hexdigest(),
                           'extracted_and_relocated':True,'empty_path_runtime_and_ipc':True,
                           'native_packaged_monitor_ready':True,'native_backend_version_forwarded':True,
-                          'preferences_preserved':True,'desktop_registered':False,'system_installer_executed':False,
+                          'preferences_preserved':True,'notice_files_verified':len(inventory['files']),
+                          'native_binaries_checked':binaries,'non_system_absolute_dependencies':False,
+                          'desktop_registered':False,'system_installer_executed':False,
                           'publisher_verified':False,'native_windows_ubuntu_validated':False}))
 
 

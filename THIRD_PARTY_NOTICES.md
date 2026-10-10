@@ -28,10 +28,20 @@ marks or imply their endorsement. Bundled runtimes and libraries retain their
 respective license terms; public release preparation must verify their notices
 and redistribution conditions for the exact packaged artifact.
 
-Frozen Mac/Windows builds additionally copy the installed `cryptography`, `cffi`
-and `pycparser` distribution license files into `licenses/<distribution>/`.
+Frozen Windows builds additionally copy the installed `cryptography`, `cffi`,
+`pycparser` and PyInstaller distribution license files into `licenses/<distribution>/`.
 Their exact versions come from the pinned build inputs. Ubuntu declares its
 system `python3-cryptography` dependency instead of vendoring that wheel.
 This does not complete the release artifact inventory: Python/PyInstaller,
 OpenSSL and statically linked/transitive Rust library notices must be verified
 for each exact public installer before distribution.
+
+Portable Mac builds additionally include `licenses/runtime/inventory.json` and
+its hash-listed texts: CPython/upstream native runtime notices, PyInstaller's
+bootloader exception, crypto wheel notices, exact SBOM crate/OpenSSL notices, and
+the compiler-matched Rust standard-library notice collection. `macos-runtime.lock.json`
+and `runtime-notices.lock.json` pin developer download inputs; generated archives
+and build environments are not committed. Some notices cover a conservative
+superset of upstream build/all-target dependencies. Consult the exact artifact
+inventory; these notices neither relicense third parties nor establish native
+acceptance on an untested architecture.

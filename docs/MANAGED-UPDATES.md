@@ -12,7 +12,7 @@ silently fall back to hash-only updates. Preview/read-only views cannot update.
 
 | Host | Current operation | Remaining acceptance |
 | --- | --- | --- |
-| Packaged macOS, app writable by its user | Check → Update → download/verify → installation-owned helper → replace → launch → WebKit/data acknowledgement; restore previous app on launch failure | Native Settings click, fresh Installer/Gatekeeper, owner import/connection transfer, login/power-loss recovery and real credentials |
+| Packaged macOS, app writable by its user | Check → Update → download/verify → installation-owned helper → replace → launch → WebKit/data acknowledgement; restore previous app on launch failure | Real GitHub release transport, fresh Installer/Gatekeeper, owner import/connection transfer, actual login/power-loss recovery and real credentials |
 | Source-backed macOS | Signed download only; no managed replacement of a checkout | Migrate to packaged app when owner is ready |
 | Packaged Windows | Shared signed discovery/download; apply disabled | Implement/test native transaction adapter and native relaunch/recovery |
 | Packaged Ubuntu | Shared signed discovery/download; apply disabled | Implement/test package-manager authorization/transaction adapter and native relaunch/recovery |
@@ -50,7 +50,16 @@ and assume existing installations will trust it.
 
 ## Developer-only release preparation
 
-Use an isolated build environment with `tools/packaging/requirements-build.txt`.
+Use the pinned portable Mac interpreter and prepared dependency notices described
+in [the handoff build recipe](HANDOFF.md#reconstruir-el-paquete-mac-experimental).
+Mac packaging rejects an unprepared interpreter (including Xcode Python). Its
+CPython archive and full licensing metadata are SHA-256 pinned for each target.
+`prepare_runtime_notices.py` reads the exact installed crypto wheel SBOMs, verifies
+source archives, collects crate/OpenSSL notices and the compiler-matched Rust
+standard-library notices. The generated inventory is a conservative superset,
+not an assertion every build/all-target dependency is shipped. Packaging copies
+only listed, reverified texts offline; no source archives enter the installer.
+The end-user needs neither this build environment nor a source checkout.
 Compile `native/macos/ReleaseSigner.swift` with Swift/CryptoKit/Security; `public`
 reads its public key and `create` creates only if absent. Do not run `create` on
 another host as a substitute for the approved publisher.
@@ -121,3 +130,23 @@ checks relocation, empty-PATH runtime/IPC and packaged WebKit readiness separate
 See the [native receipt](native-validation/2026-10-09-macos-managed-update.md).
 Windows and Ubuntu must run their own native cases. WPF only needs validation
 when using Windows; Mac evidence is not WPF acceptance.
+
+The follow-up `tests/probe_mac_settings_update.py --python <build-python>
+--package <new.pkg> --signature <signed-manifest> --output <new-fixture-dir>` builds
+a test-only old snapshot. Its native WebKit driver uses real Settings controls
+while the window remains hidden; transport is replaced with signed local fixture
+files only in that snapshot. It covers cancel/retry, automatic host exit, native
+readiness, forced-readiness rollback, and actual helper interruption after the
+first rename followed by replay. No test hook or alternate update URL is added to
+the production application. See [the portable Settings receipt](native-validation/2026-10-09-macos-portable-settings.md).
+
+For an owner-authorized public release, use the same probe with `--github-release`
+and omit `--signature`. It builds an isolated synthetic old version and retains
+the production anonymous latest-release fetcher and download transport. Its
+hidden native Settings driver clicks Check and Update once, verifies the downloaded
+package against the supplied release artifact, and requires automatic exit,
+replacement, native readiness and preserved fixture configuration. It runs only
+the success case; the local cancellation/recovery cases remain separate evidence.
+The supplied package is an expected-byte comparison, never a download substitute.
+Recovery registration is redirected into the fixture. The owner's installation,
+Desktop processes and data are not replaced or stopped.

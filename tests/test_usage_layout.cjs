@@ -30,7 +30,7 @@ const {pathToFileURL}=require('node:url');
       assert.equal(await page.locator('#agents .overflow').innerText(),'+'+(7-visible));
       const avatar=page.locator('#agents .avatar').first();
       assert.match(await avatar.getAttribute('aria-label'),/Contexto usado: 37 %/);
-      assert.equal(await avatar.locator('.character-context span').evaluate(n=>n.style.width),'37%');
+      assert.equal(await avatar.locator('.character-context').count(),0);
       const identity=await avatar.getAttribute('data-companion');
       await page.locator('#quota').click();assert.match(await page.locator('#peek').innerText(),/semanal/);
       assert.equal(await page.locator('#peek .quota-card-number').innerText(),'76%');
@@ -59,8 +59,8 @@ const {pathToFileURL}=require('node:url');
         await page.evaluate(percent=>window.receive({threads:{a0:{name:'Tarea segura',status:'active',model:'gpt-6-astra',effort:'ultra',agent_category:'audit',context_window:percent===null?{}:{used_percent:percent,used_tokens:percent*1000,capacity_tokens:100000}}}}),percent);
         await page.clock.fastForward(500);
         assert.equal(await avatar.getAttribute('data-companion'),identity,'Model/effort/category changes must preserve character');
-        assert.equal(await avatar.locator('.character-context span').evaluate(n=>n.style.width),(percent??0)+'%');
-        assert.equal(await avatar.locator('.character-context').evaluate(n=>n.classList.contains('unavailable')),percent===null);
+        assert.equal(await avatar.locator('.character-context').count(),0);
+        assert.match(await avatar.getAttribute('aria-label'),percent===null?/sin medición/:new RegExp('Contexto usado: '+percent+' %'));
       }
       await page.evaluate(()=>window.receive({threads:{a0:{name:'Tarea segura',status:'active',model:'gpt-6.1-sol',context_window:{used_percent:37,used_tokens:37000,capacity_tokens:100000}}},accountUsage:{valid_until:Date.now()/1000+60,windows:[{duration_minutes:10080,remaining_percent:76}]}}));
       await avatar.click();assert.match(await page.locator('#peek').innerText(),/37 %/);
@@ -78,7 +78,7 @@ const {pathToFileURL}=require('node:url');
       await page.keyboard.press('Escape');
       await page.evaluate(()=>window.receive({threads:{a0:{name:'Tarea segura',status:'completed',context_window:{used_percent:90,used_tokens:90000,capacity_tokens:100000},context_compaction:{state:'compacting'}}},ui:{reduced:false}}));
       assert.equal(await avatar.getAttribute('data-state'),'compacting');assert.match(await avatar.getAttribute('aria-label'),/Compactando contexto/);
-      assert.equal(await avatar.locator('.character-context').evaluate(n=>getComputedStyle(n).visibility),'hidden');
+      assert.equal(await avatar.locator('.character-context').count(),0);
       const motion=await avatar.locator('.sort-sheet').first().evaluate(n=>{
         const animation=n.getAnimations()[0];animation.currentTime=0;const first=getComputedStyle(n).translate;animation.currentTime=800;
         window.testCharacter=n.closest('.character-body');return {name:getComputedStyle(n).animationName,moves:first!==getComputedStyle(n).translate};

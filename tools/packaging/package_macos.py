@@ -41,6 +41,12 @@ def build(python, output_parent):
     dependency = subprocess.check_output([str(python), '-c', 'import PyInstaller; print(PyInstaller.__version__)'], text=True).strip()
     if dependency != '6.22.3':
         raise ValueError('El build requiere PyInstaller6.22.3 en un entorno aislado.')
+    # Fail before compiling if the build interpreter is not the prepared portable
+    # runtime or its exact dependency notices are missing. Never ship Xcode Python.
+    subprocess.run([str(python), '-c',
+        'import sys,pathlib; p=pathlib.Path; '
+        'assert (p(sys.base_prefix)/"router-runtime-provenance.json").is_file(), "Prepare the portable Mac runtime first"; '
+        'assert (p(sys.prefix)/"share/router-build-notices/inventory.json").is_file(), "Prepare runtime notices first"'], check=True)
     output_parent = Path(output_parent).resolve()
     output_parent.mkdir(parents=True, exist_ok=True)
     workspace = Path(tempfile.mkdtemp(prefix='macos-package-', dir=output_parent))
@@ -50,6 +56,11 @@ def build(python, output_parent):
     # repository copy, ignored state/config.local or developer credentials.
     from tools.packaging.source_tree import stage_source
     stage_source(ROOT, source)
+    snapshot_hash = hashlib.sha256()
+    for path in sorted(source.rglob('*')):
+        if path.is_file():
+            snapshot_hash.update(str(path.relative_to(source)).encode() + b'\0')
+            snapshot_hash.update(hashlib.sha256(path.read_bytes()).digest())
     (source / 'build_stamp.py').write_text('PRODUCT_VERSION = '+repr(version)+'\nBUILD_ID = '+repr(fingerprint)+'\nROUTER_BUILD_ID = '+repr(engine)+'\n')
     app = workspace / 'payload/Applications' / APP_NAME
     contents = app / 'Contents'
@@ -81,7 +92,9 @@ def build(python, output_parent):
     shutil.copy2(source / 'assets/update-trust.json', resources / 'assets/update-trust.json')
     shutil.copy2(ROOT / 'VERSION', resources / 'VERSION')
     copy_legal_notices(source, resources)
-    run([python, source / 'tools/packaging/bundled_notices.py', resources / 'licenses'], log)
+    run([python, source / 'tools/packaging/bundled_notices.py', resources / 'licenses', '--portable-macos'], log)
+    notices = resources / 'licenses/runtime/inventory.json'
+    notice_inventory = json.loads(notices.read_text())
     config = json.loads((ROOT / 'config.example.json').read_text())
     for key in ('python', 'desktop_runtime', 'router_runtime', 'monitor_runtime'): config.pop(key, None)
     config['comparison_engines'] = []
@@ -127,7 +140,11 @@ def build(python, output_parent):
     report={'version':version,'build':fingerprint,'routerBuild':engine,'architecture':architecture(),
             'app':str(app),'package':str(artifact),'sha256':hashlib.sha256(artifact.read_bytes()).hexdigest(),
             'publisherVerified':False,'installed':False,'notarized':False,'published':False,
-            'buildDependency':dependency}
+            'buildDependency':dependency, 'runtimeVersion':notice_inventory['python'],
+            'runtimeSource':notice_inventory['runtime']['provider'],
+            'noticeFilesCount':len(notice_inventory['files']),
+            'noticeInventorySha256':hashlib.sha256(notices.read_bytes()).hexdigest()}
+    report['sourceSnapshotSha256'] = snapshot_hash.hexdigest()
     (workspace/'build-result.json').write_text(json.dumps(report,indent=2)+'\n')
     return report
 

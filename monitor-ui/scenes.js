@@ -17,18 +17,21 @@ globalThis.RouterScenes = {
     };
     const laptop=(mode,parent=root)=>{
       const g=group('laptop',parent);
-      rect(17,66,66,27,'#354557',4,g);rect(20,68,60,21,'#101e2b',2,g);
+      // The character faces us: keyboard behind the lid, lid back toward us.
+      rect(16,72,68,14,'#b8c6d3',3,g);
+      for(let row=0;row<2;row++)for(let col=0;col<9;col++)rect(21+col*6.4,74+row*4,4.5,2.5,'#526577',.6,g);
+      group('scene-hands',g);
+      rect(14,83,72,18,'#344454',4,g);
+      rect(17,85,66,13,'#52677b',3,g);
+      line('M19 85H81','#8fa4b6',1,g);line('M19 100H81','#a8b9c8',1.5,g);
+      dot(50,91,2,'#b8c6d3',g);
       if(mode==='terminal'){
-        line('M25 73L29 76L25 79','#83dcc0',1.8,g);line('M34 77H49 M25 84H58','#b8d8ed',1.8,g);
-        rect(53,74,4,5,'#f3cc77',.5,group('terminal-cursor',g));
-      }else{
-        rect(23,71,54,4,'#607488',1,g);
-        for(let i=0;i<3;i++)rect(24,79+i*4,32-i*5,1.5,'#91bdd6',.5,g);
-        dot(68,82,5,'#5c91b0',g);
+        const terminal=group('terminal-callout',g);
+        rect(77,-12,29,25,'#182b39',5,terminal);
+        line('M82 -5L86 -2L82 1 M90 3H99','#83dcc0',1.8,terminal);
+        rect(94,-4,3,4,'#f3cc77',.5,group('terminal-cursor',terminal));
       }
-      put('path',{d:'M17 91H83L90 98H10Z',fill:'#a8b9c8',stroke:'#354557','stroke-width':1.5},g);
-      for(let i=0;i<9;i++)line(`M${21+i*6.5} 93v2`,'#526577',1,g);
-      line('M40 96H60','#6a7e90',1.3,g);return g;
+      return g;
     };
     if(kind==='thinking'){
       const g=group('thought-cloud');
@@ -38,7 +41,7 @@ globalThis.RouterScenes = {
       keyboard();
     }else if(kind==='executing'||kind==='working'){
       laptop(kind==='executing'?'terminal':'work');
-      if(kind==='working')dot(68,82,2,'#f5dc9b',group('work-indicator'));
+      if(kind==='working')dot(76,91,1.5,'#f5dc9b',group('work-indicator'));
     }else if(kind==='searching'){
       // Back-facing body sits in front of the laptop: the visible screen is above its shoulders.
       const g=group('search-laptop');rect(9,-21,82,49,'#a8bacb',5,g);rect(13,-17,74,39,'#1a2e40',3,g);

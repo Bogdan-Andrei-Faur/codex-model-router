@@ -10,3 +10,7 @@ BUILD.json
 build_stamp.py
 node_modules/
 test-results/
+
+# Local synthetic browser captures and CLI sessions
+output/playwright/
+.playwright-cli/

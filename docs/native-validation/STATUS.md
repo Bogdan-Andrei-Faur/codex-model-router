@@ -18,6 +18,7 @@ The current implementation is in [NOTCH-MONITOR.md](../NOTCH-MONITOR.md);
 
 | Gate | Current evidence | Remaining boundary |
 | --- | --- | --- |
+| Mac portable Settings fixture | Pinned Python3.14.8;98 notices; signed native Settings cancel/retry, automatic exit/relaunch, rollback and interrupted-helper replay PASS;560 Python (53 skips); [receipt](2026-10-09-macos-portable-settings.md) | Hidden DOM/local transport; no Installer/Gatekeeper, owner migration, real Release download, login/reboot or other-platform acceptance |
 | Mac managed-update fixture | Signed packaged0.9.6→0.9.7, native new-monitor readiness, preflight cancellation and data retention PASS;557 Python (53 skips),33 JS,15 browser groups; [receipt](2026-10-09-macos-managed-update.md) | Owner installation unchanged; native Settings click, Installer/Gatekeeper, import/transfer, login recovery and Windows/Ubuntu apply remain open |
 | Mac rigid companions | Monitor `e20402820c674648`, matching router `5aa7726ffeba863f`;26updated GIFs,33JS,15browser groups,576rigidity samples,3preview tests and native18-state fixture PASS; [receipt](2026-10-09-macos-rigid-companions.md) | Owner visual review, real event coverage and physical/other-host acceptance remain separate |
 | Mac compact height | Local64→48pt capsule; monitor `d90a78874b17fb92`, router `5aa7726ffeba863f`, one monitor/connection and no mismatch; camera/usage/interaction checks PASS; [receipt](2026-10-09-macos-capsule-height.md) | Physical visual acceptance remains open; expanded height and camera fallback retained |
@@ -87,6 +88,17 @@ For missing hardware use NOT_RUN; for unavailable required infrastructure use
 BLOCKED. Keep per-host limitations and historical dates visible.
 
 ## Receipt index
+
+[Mac pilot installation, 2026-10-10](2026-10-10-macos-pilot-installation.md):
+current-user graphical Installer PASS for build `992cea11bb136ed0`; native welcome
+visible and subsequent owner import199files verified. Installed monitor/runtime
+run with preserved config/characters/credential namespace. Explicit installed
+registration/catalog preflight PASS. Owner restart now verifies one ordinary
+installed Desktop connection, matching fingerprints, completed handshake and
+advancing authenticated telemetry without transport rejections. Restored 60 history
+records and one private prompt record, without added duplicates or removed
+originals. Model attribution is probable, not confirmed. No downloaded-quarantine,
+clean-machine Gatekeeper, actual reboot or public Release update proof.
 
 The [Ubuntu gesture refinement](2026-10-09-linux-companion-gestures.md) records
 installed `.6`, matching unchanged bridge, distinct native pose checks and

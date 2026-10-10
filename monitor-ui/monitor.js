@@ -145,15 +145,16 @@ function openQuota(force=false) {
   closePeek();quotaOpen=true;$('peek').hidden=false;document.body.classList.add('peek');renderQuotaPeek();
 }
 function activityArt(kind) { return RouterScenes.draw(svg,icon,kind); }
-function avatar(id,row,open,existing,appearanceOverride) {
-  const node=existing || button('',open,'avatar'),identity=appearanceOverride===undefined?companion(id):C.companion(id,appearanceOverride),visual=C.companionState(row,!!state.connections),context=C.contextGauge(row);
-  const previousKind=node.dataset.state;
+function avatar(id,row,open,existing,appearanceOverride,connected=!!state.connections) {
+  const node=existing || button('',open,'avatar'),identity=appearanceOverride===undefined?companion(id):C.companion(id,appearanceOverride),visual=C.companionState(row,connected),context=C.contextGauge(row);
+  const previousKind=node.dataset.state,previousFacing=node.dataset.facing;
   node.dataset.companion=identity.variant;node.dataset.state=visual.kind;
   node.style.setProperty('--character',identity.color);
   node.classList.toggle('working',visual.kind==='working');node.classList.toggle('compacting',visual.kind==='compacting');
   node.dataset.eyes=identity.eyes;node.style.setProperty('--accessory',identity.accessoryColor);
+  const facing=visual.kind==='searching'?'back':'front';node.dataset.facing=facing;
   const appearanceKey=JSON.stringify(identity);
-  if(!existing || node.dataset.appearance!==appearanceKey){
+  if(!existing || node.dataset.appearance!==appearanceKey || previousFacing!==facing){
     node.dataset.appearance=appearanceKey;node.replaceChildren();
     const art=svg('svg',{viewBox:'-12 -28 124 132',preserveAspectRatio:'xMidYMid meet',class:'character','aria-hidden':'true',focusable:'false'});
     const gradientId='companion-light-'+(++avatarSerial),defs=svg('defs'),gradient=svg('linearGradient',{id:gradientId,x1:0,y1:0,x2:0.7,y2:1});
@@ -173,22 +174,25 @@ function avatar(id,row,open,existing,appearanceOverride) {
       svg('path',{d:'M32 52Q37 55 42 52 M58 52Q63 55 68 52',class:'closed-eyes'}),
       svg('path',{d:'M43 64 Q50 69 57 64',class:'mouth'}));
     const clipId=gradientId+'-body',clip=svg('clipPath',{id:clipId});clip.append(svg('rect',{x:11,y:20,width:78,height:65,rx:identity.roundness}));defs.append(clip);
-    body.append(RouterCharacters.draw(svg,identity,clipId));
+    body.append(RouterCharacters.draw(svg,identity,clipId,facing));
     // Keep active hands in front of the face/clothes so their gestures remain
     // legible in the 38px capsule as well as the large portrait.
     body.append(...body.querySelectorAll('.hand-left,.hand-right'));
-    art.append(body);const meter=el('span','character-context');meter.append(el('span'));
-    node.append(art,meter,el('span','character-attention'));
+    art.append(body);node.append(art,el('span','character-attention'));
     if(identity.variant==='mint')body.querySelector('.character-mark').setAttribute('d','M43 19 Q43 8 53 12');
     if(identity.variant==='lilac')body.querySelector('.character-mark').setAttribute('d','M30 30 Q50 16 70 30');
   }
   const body=node.querySelector('.character-body');
   if(previousKind!==visual.kind || !body.querySelector('.activity-prop')){
     node.style.setProperty('--pose-phase',`-${performance.now()/1000}s`);
+    // Recover hands from the previous prop's depth plane before replacing it.
+    const hands=[...body.querySelectorAll('.hand-left,.hand-right')];body.append(...hands);
     body.querySelector('.activity-prop')?.remove();
     const prop=activityArt(visual.kind);
     if(visual.kind==='searching')body.insertBefore(prop,body.firstChild);else body.append(prop);
-    body.append(...body.querySelectorAll('.hand-left,.hand-right')); // Hands grip in front of props.
+    // A laptop lid sits in front of hands typing on the keyboard behind it.
+    // Other props are held in front, as before.
+    (prop.querySelector('.scene-hands')||body).append(...hands);
 
     const mouths={thinking:'M45 66Q50 64 55 66',writing:'M44 65Q50 67 56 65',planning:'M44 65Q50 67 56 65',question:'M47 66Q50 63 54 66',interrupted:'M43 65H56',error:'M43 67Q50 63 57 67',reviewing:'M44 66H56',waiting:'M44 66H56',offline:'M46 66Q50 68 54 66',unknown:'M45 66H55',done:'M42 63Q50 70 58 63'};
     body.querySelector('.mouth').setAttribute('d',mouths[visual.kind]||'M43 64Q50 69 57 64');
@@ -201,8 +205,6 @@ function avatar(id,row,open,existing,appearanceOverride) {
   attention.hidden=!attentionKind || ['approval','question'].includes(visual.kind);attention.dataset.kind=attentionKind||'';
   attention.replaceChildren(...(attentionKind?[icon(attentionKind==='approval'?'lock-keyhole':'circle-help')]:[]));
   attention.setAttribute('aria-hidden','true');
-  const meter=node.querySelector('.character-context');meter.classList.toggle('unavailable',context.percent===null);
-  meter.firstElementChild.style.width=(context.percent??0)+'%';
   node.setAttribute('aria-label',`${identity.name} · identidad visual de ${row.name || id || 'reposo'} · ${visual.label} · ${C.model(C.setting(row,'model'))} · ${C.efforts[C.setting(row,'effort')] || 'Sin confirmar'} · ${context.label}`);
   return node;
 }
@@ -415,16 +417,21 @@ function openAppearance(id) {
 }
 function updateAppearancePreview() {
   const id=appearanceEditing,draft=appearanceDrafts.get(id);if(!draft)return;
-  const row=(state.agentThreads??state.threads)[id]||{},value=draft.reset?C.companion(id):draft.value;
+  const value=draft.reset?C.companion(id):draft.value;
   const portrait=$('activity').querySelector('.agent-portrait');
-  const key=JSON.stringify([value,row.status,row.context_compaction,state.connections]);
+  const key=JSON.stringify(value);
   if(portrait && portrait.dataset.preview!==key){
-    const character=avatar(id,row,()=>{},undefined,draft.reset?null:value);
-    portrait.dataset.preview=key;portrait.dataset.companion=character.dataset.companion;portrait.dataset.state=character.dataset.state;portrait.dataset.eyes=character.dataset.eyes;portrait.style.cssText=character.style.cssText;
+    const character=appearanceAvatar(id,draft.reset?null:value);
+    portrait.dataset.preview=key;portrait.dataset.companion=character.dataset.companion;portrait.dataset.state=character.dataset.state;portrait.dataset.facing=character.dataset.facing;portrait.dataset.eyes=character.dataset.eyes;portrait.style.cssText=character.style.cssText;
     portrait.replaceChildren(character.querySelector('.character'));
     const copy=$('activity').querySelector('.agent-identity-copy .companion-alias');if(copy)copy.textContent=value.name||'Tu compañero';
   }
   const save=$('activity').querySelector('[data-appearance-save]');if(save)save.disabled=!!draft.pending||!draft.value.name.trim();
+}
+function appearanceAvatar(id,look) {
+  // Cosmetic preview stays frontal and neutral even while the agent works,
+  // compacts, waits for approval or disconnects. Never change the live row.
+  return avatar(id,{catalog_only:true,status:'idle'},()=>{},undefined,look,true);
 }
 const appearancePalette=[['Coral','#ff9e88'],['Menta','#81d7bd'],['Lila','#c1a0f0'],['Cielo','#96cfff'],['Miel','#e8c583'],['Rosa','#e9a9c1'],['Salvia','#b3c99b'],['Pizarra','#51698b'],['Crema','#eadbc3']];
 function renderAppearanceEditor(detail,id) {
@@ -468,7 +475,7 @@ function renderAppearanceEditor(detail,id) {
       const item=button('',()=>{draft.reset=false;draft.value[category]=value;detail.replaceChildren();renderAppearanceEditor(detail,id);updateAppearancePreview();fitIsland();},'appearance-option');
       item.setAttribute('aria-label',label);item.setAttribute('aria-pressed',String(draft.value[category]===value));item.dataset.appearanceChoice=value;item.disabled=!!draft.pending;
       const look={...draft.value,head:'none',glasses:'none',outfit:'none',neck:'none',detail:'none',[category]:value};
-      const sample=avatar(id,{status:'active'},()=>{},undefined,look),art=sample.querySelector('.character');
+      const sample=appearanceAvatar(id,look),art=sample.querySelector('.character');
       item.style.setProperty('--character',look.color);item.style.setProperty('--accessory',look.accessoryColor);item.append(art,el('span','',label));options.append(item);
     }
     box.append(options);
@@ -517,7 +524,7 @@ function agentsWorkspace() {
   const layout=el('div','agents-layout'),sidebar=el('aside','agents-sidebar');sidebar.setAttribute('aria-label','Agente y selección de tarea');layout.append(sidebar);workspace.append(layout);
   const identity=companion(id),selectedRow=rows[id],visualState=C.companionState(selectedRow,!!state.connections);
   const identityHeader=el('div','agent-identity'),character=avatar(id,selectedRow,()=>{}),portrait=el('span','avatar agent-portrait'),identityCopy=el('div','agent-identity-copy');
-  portrait.dataset.companion=character.dataset.companion;portrait.dataset.state=character.dataset.state;portrait.style.cssText=character.style.cssText;
+  portrait.dataset.companion=character.dataset.companion;portrait.dataset.state=character.dataset.state;portrait.dataset.facing=character.dataset.facing;portrait.style.cssText=character.style.cssText;
   portrait.append(character.querySelector('.character'));portrait.setAttribute('aria-hidden','true');
   identityHeader.style.setProperty('--character',identity.color);
   identityCopy.append(el('span','companion-alias',identity.name),el('h3','',selectedRow.name||'Agente'));

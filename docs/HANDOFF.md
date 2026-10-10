@@ -1,4 +1,4 @@
-# Current project handoff — 2026-10-09
+# Current project handoff — 2026-10-10
 
 Canonical project: `codex-model-router`,
 `https://github.com/Bogdan-Andrei-Faur/codex-model-router.git`.
@@ -9,12 +9,45 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 
 ## Current source and delivery
 
+- Owner-authorized graphical Mac installation (2026-10-10): fresh 0.9.7 monitor
+  `992cea11bb136ed0`, router `0c8570cfccd9a1a8`, installed in user Applications.
+  Exact package/native smoke and Installer completion PASS. Owner imported199
+  files; config/characters and original credential namespace retained. One installed
+  monitor/bundled child is running. After the owner's normal restart, ordinary
+  Desktop uses the installed managed bridge: one connection, completed handshake,
+  matching fingerprints and no restart/build-mismatch flags. Authenticated telemetry
+  advances without transport rejection; attribution remains probable, not confirmed.
+  Reconciled 60 history records and one private prompt record from the stopped source
+  bridge, preserving every existing destination record without added duplicates.
+  Original data/app/pilot and private pre-merge backups remain intact. Do not re-import. See
+  [installation receipt](native-validation/2026-10-10-macos-pilot-installation.md).
+
+- Companion follow-up (2026-10-10): working/executing laptops now show their lid
+  backs toward the viewer, with hands typing on the keyboard behind the lid.
+  Appearance editor and catalogue previews remain frontal/idle independently of
+  live activity and connection state. Compact context bars are removed; hover,
+  accessible labels and expanded context meters remain. Back-facing search uses
+  rear garment artwork. See [the wardrobe audit](design/COMPANION-WARDROBE-AUDIT.md).
+  Shared browser checks pass. The fresh 2026-10-10 installed package above includes
+  these fixes; the earlier pilot package remains preserved. Physical owner visual
+  acceptance and natural coverage of individual animations remain open.
+
+
+- Mac-first pilot selected by the owner: local source version **0.9.7**, portable
+  arm64 installer and project-signed manifest prepared; not committed, pushed or
+  published as a Release. Owner installation/import/connection transfer are now
+  verified above. Follow [the pilot guide](MACOS-PILOT.md) for remaining release,
+  recovery and native acceptance gates; coordinate disruptive owner actions.
+
 - Authenticated update implementation (2026-10-09): bundled Ed25519 public key,
   owner-approved private key in Mac Keychain, signed Settings flow and installed
   Mac helper with retained previous app/relaunch/recovery. Graphical first-run
   guarded import is connected. Real isolated old/new Mac packages pass update
-  and native acknowledgement; owner installation/Settings click/login recovery
-  remain separate. Windows/Ubuntu apply remains disabled pending native adapters.
+  and native acknowledgement. The portable-runtime follow-up also passes actual
+  Settings DOM clicks, automatic exit/relaunch, cancellation, rollback and
+  interrupted-helper replay on isolated signed fixtures; owner installation,
+  real GitHub release download and actual login recovery remain separate. See
+  [the portable Settings receipt](native-validation/2026-10-09-macos-portable-settings.md). Windows/Ubuntu apply remains disabled pending native adapters.
   See [managed updates](MANAGED-UPDATES.md) and its native receipt. No installer
   release, owner migration, installation replacement or Desktop restart occurred.
 - Public source published on 2026-10-09: clean main `5dac586b` includes the
@@ -391,10 +424,10 @@ la aceptación física de la instalación del propietario.
 | Hosts | `native/macos/MonitorMac.swift`, `native/windows/MonitorWindows.cs`, `monitor_linux.py` | Windows activo usa WebView2/WPF; los C# anteriores quedan preservados fuera del build |
 | Routing | Referencia 8 y candidata 9 separadas; Manual y peticiones explícitas prevalecen | Comparaciones y fixtures no autorizan activar categorías ni prueban ahorro causal |
 | Evidencia | `src/codex_model_router/telemetry/evidence.py`, `src/codex_model_router/telemetry/inference_attribution.py`, evaluadores y contadores estrictos | ACK/`applied` no prueba inferencia posterior; coste estimado no es facturación |
-| Actualizaciones | `src/codex_model_router/updates.py`: comprobación asíncrona, descarga exacta OS/arquitectura, integridad SHA-256 y cancelación | Solo preparación: `canInstall=false`; no ejecuta instaladores ni demuestra autenticidad del editor |
+| Actualizaciones | Firma Ed25519 del proyecto, descarga/cancelación y helper Mac con relanzamiento/recuperación | Solo el Mac empaquetado admite aplicar; aceptación de Installer, migración del propietario y recuperación en login pendientes. Windows/Ubuntu necesitan adaptadores nativos |
 | Mac portátil | `tools/packaging/package_macos.py`, `src/codex_model_router/packaged_main.py`, `native/macos/BridgeMac.swift`, `src/codex_model_router/platforms/application_layout.py` | `.pkg` local ad-hoc con runtime; no Installer/Gatekeeper en máquina limpia, firma de editor ni notarización |
 | Windows instalado | `tools/packaging/build_windows_installer.py`, `installer/windows.iss`, entrada estable y versiones independientes | Piloto 0.9.6 sin firma instalado; registro, puente instalado 0.9.6 y telemetría activos tras reinicio del propietario. VM limpia validada en 0.9.4 |
-| Migración | `src/codex_model_router/platforms/installation_migration.py`: copia offline; bienvenida gráfica Ubuntu/Windows y traspaso separado de conexión | GUI Mac pendiente; no migra claves entre usuarios/sistemas |
+| Migración | `src/codex_model_router/platforms/installation_migration.py`: copia offline y bienvenida gráfica en las tres plataformas; traspaso separado de conexión | Importación real del propietario en Mac pendiente; no migra claves entre usuarios/sistemas |
 
 Detalles: [monitor compartido](SHARED-MONITOR.md), [diseño](MONITOR-UI.md),
 [instalación/actualizaciones](INSTALLATION-UPDATES.md),
@@ -502,12 +535,15 @@ En un Mac con las herramientas anteriores y acceso a PyPI, crear un entorno
 aislado nuevo (ruta ilustrativa; no reutilizar uno desconocido):
 
 ```sh
-python3 -m venv state/handoff-build-venv
+python3 tools/packaging/prepare_macos_runtime.py --output state/handoff-runtime --cache state/runtime-cache
+state/handoff-runtime/python/bin/python3 -m venv state/handoff-build-venv
 state/handoff-build-venv/bin/python -m pip install -r tools/packaging/requirements-build.txt
+state/handoff-build-venv/bin/python tools/packaging/prepare_runtime_notices.py --output state/handoff-build-venv/share/router-build-notices --cache state/notices-cache
 python3 tools/packaging/package_macos.py --python state/handoff-build-venv/bin/python --output release
 ```
 
-El constructor requiere PyInstaller **6.22.3**, crea un directorio de salida nuevo
+El constructor requiere el runtime portátil fijado y sus avisos preparados,
+además de PyInstaller **6.22.3**; crea un directorio de salida nuevo
 y muestra el `.pkg` exacto. En ese archivo ejecutar:
 
 ```sh
@@ -535,7 +571,8 @@ Mac empaquetado usa por defecto
 su raíz de datos anterior. No moverla manualmente con un puente activo. La
 importación offline conserva los archivos originales y rechaza destino ocupado,
 symlinks, procesos activos y cambios concurrentes; Ubuntu ya la integra en su
-primer inicio gráfico. La integración GUI de Mac sigue pendiente.
+primer inicio gráfico. La GUI de importación Mac está implementada; su aceptación con los datos reales
+del propietario sigue pendiente.
 Keychain/DPAPI/Secret Service no son intercambiables entre equipos por copiar blobs.
 
 Para comparar instalaciones, exportar metadatos saneados con `evidence.py export`
@@ -545,22 +582,19 @@ registros privados para rellenar una muestra incompleta.
 
 ## Pendientes en orden de continuación
 
-1. Completar la integración gráfica de migración en Mac y aceptar físicamente la
-   migración/activación Windows desde el nuevo setup. Ubuntu ya
-   está migrado al paquete 0.8.1-8 y validado tras reiniciar Desktop: un monitor,
-   un puente empaquetado y telemetría autenticada sin rechazos. Los datos de
-   origen se conservaron. La aceptación nativa de los otros equipos sigue pendiente.
-2. Añadir aplicación de actualización con autenticidad del editor, revalidación
-   de bytes, bloqueo, recuperación/rollback y relanzamiento del monitor; mostrar
-   por separado la activación pendiente del puente/Desktop.
-3. Elegir distribución accesible: el repositorio fuente es privado y el endpoint
-   anónimo actual no sirve descargas públicas. El repositorio de solo artefactos
-   `codex-model-router-releases` es una propuesta; no se ha creado. El propietario
-   no tiene Apple Developer. No crear cuentas de pago, claves de firma, releases
-   públicas ni otro repositorio sin autorización concreta.
-4. Completar QA físico/VM del instalador GUI Windows 0.9.0, y QA real de
-   instalación limpia/upgrade/cancelación/fallo/recuperación/desinstalación en cada
-   OS. El ZIP Windows existente no es el nuevo instalador `-setup.exe`.
+1. Validar Installer/Gatekeeper y primer inicio Mac con el paquete portátil, y
+   coordinar la migración del propietario/importación y transferencia de conexión.
+   No sustituir su instalación ni cerrar Desktop mientras usa agentes.
+2. Preparar una versión de entrega desde una revisión fuente fijada, crear la
+   Release con instaladores realmente validados y manifiesto firmado, y probar
+   la descarga real desde Ajustes. El repositorio canónico ya es público; los
+   paquetes 0.9.6→0.9.7 actuales son fixtures locales, no una Release publicada.
+3. Completar recuperación nativa en login/reinicio Mac y los adaptadores de
+   aplicación/rollback Windows y Ubuntu. Los tres escenarios nativos aislados de
+   Mac no sustituyen Installer/Gatekeeper, login real ni aceptación en otros OS.
+4. Completar QA nativo de instalación limpia/upgrade/cancelación/fallo/recuperación
+   y desinstalación en cada OS; mantener separados fuente, paquete instalado,
+   puente cargado y aceptación humana. No asumir éxito de CI por pruebas locales.
 5. Recoger parejas representativas de calidad/consumo con identidad suficiente
    antes de calibrar JEV o activar candidata 9; conservar resultados fallidos.
    Ver [cobertura](EVIDENCE-COVERAGE.md) y [esfuerzo](EFFORT-TRIALS.md).
