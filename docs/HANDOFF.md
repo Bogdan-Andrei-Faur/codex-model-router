@@ -9,6 +9,15 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 
 ## Current source and delivery
 
+- Public Mac release (2026-10-10): [v0.9.7](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.7)
+  targets immutable source `8d6fb670010311239c657ee676c8b6d8183be193` and ships the
+  exact owner-installed arm64 package, signed update manifest, checksums and public
+  build provenance. Anonymous production GitHub transport and hidden native Settings
+  Check→Update→automatic exit/relaunch PASS on an isolated synthetic 0.9.6 install.
+  The downloaded 0.9.7 bytes match; previous app and fixture settings are retained.
+  Owner app/config/connection and monitor PID are unchanged. No Windows/Ubuntu/Intel
+  installer is published. See [real GitHub receipt](native-validation/2026-10-10-macos-github-update.md).
+
 - Owner-authorized graphical Mac installation (2026-10-10): fresh 0.9.7 monitor
   `992cea11bb136ed0`, router `0c8570cfccd9a1a8`, installed in user Applications.
   Exact package/native smoke and Installer completion PASS. Owner imported199
@@ -33,10 +42,10 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
   acceptance and natural coverage of individual animations remain open.
 
 
-- Mac-first pilot selected by the owner: local source version **0.9.7**, portable
-  arm64 installer and project-signed manifest prepared; not committed, pushed or
-  published as a Release. Owner installation/import/connection transfer are now
-  verified above. Follow [the pilot guide](MACOS-PILOT.md) for remaining release,
+- Mac-first pilot selected by the owner: source version **0.9.7**, portable
+  arm64 installer and project-signed manifest now published in the Release above.
+  Owner installation/import/connection transfer are verified above.
+  Follow [the pilot guide](MACOS-PILOT.md) for remaining distribution,
   recovery and native acceptance gates; coordinate disruptive owner actions.
 
 - Authenticated update implementation (2026-10-09): bundled Ed25519 public key,
@@ -571,8 +580,8 @@ Mac empaquetado usa por defecto
 su raíz de datos anterior. No moverla manualmente con un puente activo. La
 importación offline conserva los archivos originales y rechaza destino ocupado,
 symlinks, procesos activos y cambios concurrentes; Ubuntu ya la integra en su
-primer inicio gráfico. La GUI de importación Mac está implementada; su aceptación con los datos reales
-del propietario sigue pendiente.
+primer inicio gráfico. La importación Mac y la transferencia de conexión del
+propietario están verificadas en el recibo de instalación del 10/10.
 Keychain/DPAPI/Secret Service no son intercambiables entre equipos por copiar blobs.
 
 Para comparar instalaciones, exportar metadatos saneados con `evidence.py export`
@@ -582,13 +591,12 @@ registros privados para rellenar una muestra incompleta.
 
 ## Pendientes en orden de continuación
 
-1. Validar Installer/Gatekeeper y primer inicio Mac con el paquete portátil, y
-   coordinar la migración del propietario/importación y transferencia de conexión.
-   No sustituir su instalación ni cerrar Desktop mientras usa agentes.
-2. Preparar una versión de entrega desde una revisión fuente fijada, crear la
-   Release con instaladores realmente validados y manifiesto firmado, y probar
-   la descarga real desde Ajustes. El repositorio canónico ya es público; los
-   paquetes 0.9.6→0.9.7 actuales son fixtures locales, no una Release publicada.
+1. Validar el primer acceso con cuarentena de descarga/Gatekeeper en un Mac limpio.
+   Installer, importación y conexión del propietario ya están verificados. No
+   sustituir su instalación ni cerrar Desktop mientras usa agentes.
+2. Mantener la Release 0.9.7 y renovar su manifiesto antes de la caducidad de 30 días,
+   sin reemplazar el paquete publicado. La actualización real desde GitHub y
+   Ajustes ya pasa en una instalación aislada; no implica aceptación física.
 3. Completar recuperación nativa en login/reinicio Mac y los adaptadores de
    aplicación/rollback Windows y Ubuntu. Los tres escenarios nativos aislados de
    Mac no sustituyen Installer/Gatekeeper, login real ni aceptación en otros OS.

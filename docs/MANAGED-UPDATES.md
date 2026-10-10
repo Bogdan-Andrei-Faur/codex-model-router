@@ -1,4 +1,4 @@
-# Authenticated managed updates — local implementation, 2026-10-09
+# Authenticated managed updates — public Mac release, 2026-10-10
 
 ## What is implemented
 
@@ -12,13 +12,16 @@ silently fall back to hash-only updates. Preview/read-only views cannot update.
 
 | Host | Current operation | Remaining acceptance |
 | --- | --- | --- |
-| Packaged macOS, app writable by its user | Check → Update → download/verify → installation-owned helper → replace → launch → WebKit/data acknowledgement; restore previous app on launch failure | Real GitHub release transport, fresh Installer/Gatekeeper, owner import/connection transfer, actual login/power-loss recovery and real credentials |
+| Packaged macOS, app writable by its user | Check → Update → real GitHub download/verify → installation-owned helper → replace → launch → WebKit/data acknowledgement PASS in isolated native Settings; owner Installer/import/connection also verified; restore previous app on launch failure tested locally | Downloaded-quarantine/clean-machine Gatekeeper, actual login/power-loss recovery, physical input and real provider credential use |
 | Source-backed macOS | Signed download only; no managed replacement of a checkout | Migrate to packaged app when owner is ready |
 | Packaged Windows | Shared signed discovery/download; apply disabled | Implement/test native transaction adapter and native relaunch/recovery |
 | Packaged Ubuntu | Shared signed discovery/download; apply disabled | Implement/test package-manager authorization/transaction adapter and native relaunch/recovery |
 
-No release installer has been published by this implementation. Fixture versions
-0.9.6 → 0.9.7 are synthetic package builds, not a product release or owner upgrade.
+The [public 0.9.7 Release](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.7)
+contains the arm64 Mac installer, signed manifest, checksums and public build
+provenance. The real Settings update test uses an isolated synthetic 0.9.6 old
+installation and downloads the exact published 0.9.7 package anonymously. Earlier
+local transport fixtures remain separate evidence. See [the receipt](native-validation/2026-10-10-macos-github-update.md).
 Opt-in daily checking exists; installation still requires the explicit Update
 button. Desktop and active agents are never terminated by the updater.
 
@@ -110,7 +113,8 @@ and opaque credential namespaces. It does not decrypt secrets or transfer the
 Desktop connection automatically. Unknown state/caches and raw OTLP archives are
 left in the original source folder; do not claim a complete raw-archive migration.
 The native dialog calls the guarded import on first run; owner migration and
-connection transfer remain explicitly unperformed.
+connection transfer passed on 2026-10-10, with originals preserved. See
+[the installation receipt](native-validation/2026-10-10-macos-pilot-installation.md).
 
 ## Reproducible verification
 

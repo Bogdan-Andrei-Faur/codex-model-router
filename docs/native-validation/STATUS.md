@@ -18,7 +18,8 @@ The current implementation is in [NOTCH-MONITOR.md](../NOTCH-MONITOR.md);
 
 | Gate | Current evidence | Remaining boundary |
 | --- | --- | --- |
-| Mac portable Settings fixture | Pinned Python3.14.8;98 notices; signed native Settings cancel/retry, automatic exit/relaunch, rollback and interrupted-helper replay PASS;560 Python (53 skips); [receipt](2026-10-09-macos-portable-settings.md) | Hidden DOM/local transport; no Installer/Gatekeeper, owner migration, real Release download, login/reboot or other-platform acceptance |
+| Mac public GitHub update | Published 0.9.7 arm64 exact owner package; immutable source/tag, signed manifest and checksums verified. Hidden native Settings on isolated synthetic 0.9.6 finds/downloads real public Release, verifies signature/bytes, exits/replaces/relaunches and retains settings/previous app. Owner installation unchanged; [receipt](2026-10-10-macos-github-update.md) | No physical input, downloaded-quarantine/clean-machine Gatekeeper, actual login/reboot or other-platform update acceptance; cancellation/recovery use earlier local fixtures |
+| Mac portable Settings fixture | Pinned Python 3.14.8;98 notices; signed native Settings cancel/retry, automatic exit/relaunch, rollback and interrupted-helper replay PASS;560 Python (53 skips); [receipt](2026-10-09-macos-portable-settings.md) | Hidden DOM/local transport; no Installer/Gatekeeper, owner migration, real Release download, login/reboot or other-platform acceptance |
 | Mac managed-update fixture | Signed packaged0.9.6→0.9.7, native new-monitor readiness, preflight cancellation and data retention PASS;557 Python (53 skips),33 JS,15 browser groups; [receipt](2026-10-09-macos-managed-update.md) | Owner installation unchanged; native Settings click, Installer/Gatekeeper, import/transfer, login recovery and Windows/Ubuntu apply remain open |
 | Mac rigid companions | Monitor `e20402820c674648`, matching router `5aa7726ffeba863f`;26updated GIFs,33JS,15browser groups,576rigidity samples,3preview tests and native18-state fixture PASS; [receipt](2026-10-09-macos-rigid-companions.md) | Owner visual review, real event coverage and physical/other-host acceptance remain separate |
 | Mac compact height | Local64→48pt capsule; monitor `d90a78874b17fb92`, router `5aa7726ffeba863f`, one monitor/connection and no mismatch; camera/usage/interaction checks PASS; [receipt](2026-10-09-macos-capsule-height.md) | Physical visual acceptance remains open; expanded height and camera fallback retained |
@@ -88,6 +89,13 @@ For missing hardware use NOT_RUN; for unavailable required infrastructure use
 BLOCKED. Keep per-host limitations and historical dates visible.
 
 ## Receipt index
+
+[Mac real GitHub Settings update, 2026-10-10](2026-10-10-macos-github-update.md):
+public 0.9.7 Release and native isolated Check→Update→automatic exit/relaunch PASS.
+Production anonymous transport, exact package/signature and preserved fixture
+settings/previous app verified. Owner monitor PID, installed files, configuration
+and connection registration unchanged. Source/tag and artifact identities remain
+separate from physical and other-platform acceptance.
 
 [Mac pilot installation, 2026-10-10](2026-10-10-macos-pilot-installation.md):
 current-user graphical Installer PASS for build `992cea11bb136ed0`; native welcome

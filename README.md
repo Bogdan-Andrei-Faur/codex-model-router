@@ -9,10 +9,11 @@ El código es visible, con redistribución restringida y la excepción de los fo
 permitidos por GitHub. Consulta [LICENSE](LICENSE) y los
 [avisos de terceros](THIRD_PARTY_NOTICES.md); no es una licencia open source.
 
-El repositorio público contiene el código; todavía no hay instaladores publicados
-en Releases. La actualización firmada para Mac está implementada y probada con
-paquetes aislados; quedan validaciones nativas y los adaptadores de Windows/Ubuntu.
-Consulta [el estado de distribución](docs/MANAGED-UPDATES.md).
+Ya puedes descargar el [instalador 0.9.7 para Mac con Apple Silicon](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.7).
+Incluye el runtime y no necesita Git, Python ni compilación local. La actualización
+desde Ajustes está probada con descarga real de GitHub en una instalación aislada.
+El paquete no tiene firma Developer ID ni notarización de Apple. Windows, Ubuntu
+e Intel Mac no tienen instalador en esta Release; consulta [el estado de distribución](docs/MANAGED-UPDATES.md).
 
 Catálogo, tarifas, migración y evidencia de compatibilidad: [modelos 0.6.0](docs/MODEL-CATALOG.md).
 
@@ -37,21 +38,20 @@ Atlas, memoria personal ni el chat original.
 
 ## Versión
 
-El producto usa versiones semánticas. La versión actual es **0.9.6**:
+El producto usa versiones semánticas. La versión actual es **0.9.7**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en **Ajustes → Actualizaciones**
 procede del archivo común `VERSION` en modo repositorio y del sello
 incluido en la compilación en modo empaquetado. Los cambios se registran en
 [CHANGELOG.md](CHANGELOG.md); las entregas versionadas tienen una etiqueta Git
-anotada `v<versión>`. El rediseño de la rama `feature/dynamic-notch-monitor`
-mantiene la base 0.9.6 y revisiones de paquete de desarrollo independientes.
+`v<versión>`. La 0.9.7 incluye el rediseño de la isla dinámica y el monitor compartido.
 La huella de compilación y la versión de política son identificadores
 técnicos independientes; no sustituyen a la versión del producto.
 
 ## Contexto y cuota de Codex
 
-Cada personaje representa una conversación. Su pequeña barra de contexto y la
-barra de Inicio muestran la **capacidad usada**. La cuota muestra el porcentaje
+Cada personaje representa una conversación. El hover y la barra de Inicio
+muestran la **capacidad usada**. La cuota muestra el porcentaje
 **disponible** de la cuenta. Los personajes conservan su identidad visual aunque
 cambie el modelo; modelo y esfuerzo se identifican mediante tags de color.
 
@@ -81,12 +81,13 @@ compilación, instalación y aceptación física.
 
 ### Instaladores y actualizaciones
 
-Ajustes permite consultar versiones y preparar descargas compatibles. Hay un
-constructor de `.pkg` local para Mac y un `.deb` para Ubuntu, con datos separados
-del código. Ubuntu integra la importación gráfica y gestiona las dependencias
-mediante APT. Windows 0.9.0 añade un [instalador por usuario](docs/WINDOWS-INSTALLER.md),
-con runtime incluido, importación y datos independientes. La distribución firmada,
-el canal público de descargas y la aplicación automática de actualizaciones siguen pendientes.
+Ajustes → Actualizaciones → Comprobar ahora consulta las Releases públicas de este
+repositorio. En Mac empaquetado, Actualizar descarga y verifica la firma del
+proyecto, reemplaza la aplicación y la abre automáticamente, conservando los datos
+y una copia anterior. No cierra Codex/ChatGPT ni sus agentes. La firma del proyecto
+no sustituye la de Apple; consulta [la guía Mac](docs/MACOS-PILOT.md).
+Ubuntu tiene un constructor `.deb` y Windows un [instalador por usuario](docs/WINDOWS-INSTALLER.md);
+su publicación y los adaptadores de actualización automática siguen pendientes.
 Estado y límites: [INSTALLATION-UPDATES.md](docs/INSTALLATION-UPDATES.md).
 Canal del mismo repositorio, licencia y flujo de actualización acordado:
 [DISTRIBUTION-PLAN.md](docs/DISTRIBUTION-PLAN.md).

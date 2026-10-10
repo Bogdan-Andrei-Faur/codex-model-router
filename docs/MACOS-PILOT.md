@@ -2,8 +2,9 @@
 
 The owner chose a Mac-first pilot; Windows/Ubuntu follow independently. The local
 candidate targets **Apple Silicon (arm64)**. Intel Mac, Windows and Ubuntu are not
-validated by this artifact. Version 0.9.7 is prepared locally, not published as a
-GitHub Release. The source changes have not yet been committed or pushed.
+validated by this artifact. [Version 0.9.7 is published](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.7)
+from source `8d6fb670010311239c657ee676c8b6d8183be193`, with the exact owner-installed
+package and a project-signed update manifest.
 
 ## Current local installation
 
@@ -61,18 +62,18 @@ than treating it as the ordinary unidentified-developer prompt.
 6. Record the outcome with `docs/native-validation/REPORT-TEMPLATE.md`. Keep the
    previous source installation and data until native acceptance is complete.
 
-No installer Release exists yet, so **Comprobar ahora** currently reports that
-no public release is available. This is expected, not proof the installed app is
-up to date. A pilot marked prerelease on GitHub would also be excluded from the
-stable latest-release endpoint. Do not mark an unvalidated artifact stable just
-to make that check pass.
+**Comprobar ahora** now reads the public 0.9.7 Release. An older eligible packaged
+Mac can use Update; a 0.9.7 installation is already at that published version.
+The real anonymous GitHub download and native Settings update passed on an isolated
+synthetic 0.9.6 installation. See [the exact receipt](native-validation/2026-10-10-macos-github-update.md).
+Other architectures have no installer asset in this release. Prereleases remain
+excluded from the stable latest-release endpoint.
 
 ## Pilot acceptance and publication
 
-Before stable publication: current-user Installer/first-run acceptance, exact
-artifact notices/signature review, source revision fixed and published with owner
-authorization, then real GitHub discovery/download on a disposable older installed
-target. Retain precise local package hashes when rebuilding, as signing and package
+Publication is complete: current-user Installer/import, artifact notices and
+signature checks, fixed published source, and real GitHub discovery/download/update
+on a disposable older installation. Retain precise local package hashes when rebuilding, as signing and package
 timestamps can change bytes without changing the monitor build fingerprint.
 
 Actual login/reboot recovery and real provider credential use remain distinct

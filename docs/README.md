@@ -122,3 +122,5 @@ independent. The older [design record](design/DECISION.md) and
 - [Managed updates, signing custody and platform boundaries](MANAGED-UPDATES.md)
 - [History-cleanup candidate and owner-approved publication strategy](HISTORY-CLEANUP.md)
 - [Mac managed-update native receipt](native-validation/2026-10-09-macos-managed-update.md)
+- [Mac public Release and real GitHub Settings update](native-validation/2026-10-10-macos-github-update.md)
+- [Mac installation and retained owner data](native-validation/2026-10-10-macos-pilot-installation.md)

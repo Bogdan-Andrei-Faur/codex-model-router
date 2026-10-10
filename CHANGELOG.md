@@ -1,5 +1,19 @@
 # Cambios
 
+## 0.9.7 — Instalador y actualización pública para Mac, 10/10/2026
+
+- Primera [Release con instalador para Mac Apple Silicon](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.7),
+  runtime portátil y avisos de dependencias verificados.
+- Actualización desde Ajustes con manifiesto Ed25519, descarga real de GitHub,
+  reemplazo y apertura automáticos, configuración conservada y copia anterior.
+  Recorrido 0.9.6→0.9.7 verificado en una instalación nativa aislada.
+- Importación y conexión de la instalación del propietario verificadas.
+- Portátiles de los personajes corregidos, editor con vista neutral y eliminación
+  de la barra de contexto de la cápsula; incluye el monitor compartido descrito abajo.
+- Sin Developer ID/notarización. Windows, Ubuntu e Intel Mac no tienen instalador
+  en esta Release. Recuperación tras login/reinicio real y aceptación física siguen
+  separadas de las pruebas aisladas; [recibo](docs/native-validation/2026-10-10-macos-github-update.md).
+
 ## Desarrollo — Isla dinámica y monitor compartido, 08/10/2026
 
 Trabajo acumulado de `feature/dynamic-notch-monitor`, sobre la base 0.9.6.

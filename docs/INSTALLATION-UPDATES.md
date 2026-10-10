@@ -17,6 +17,14 @@ credentials, settings, task modes and private telemetry.
 
 ## Current implementation boundary
 
+The [public 0.9.7 Mac arm64 Release](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.7)
+and its real anonymous Settings download/verification/replacement/relaunch passed
+on an isolated old installation. Owner Installer/import/connection also passed.
+See [the GitHub update receipt](native-validation/2026-10-10-macos-github-update.md).
+Earlier private-repository/local-package descriptions below are historical.
+Downloaded-quarantine/clean-machine Gatekeeper, actual login/reboot recovery and
+Windows/Ubuntu managed apply remain open.
+
 `src/codex_model_router/updates.py` provides shared asynchronous stable-release discovery and download
 staging. Settings exposes installed/latest version, explicit checks, opt-in daily
 checks, progress and cancellation. All three native hosts forward the same actions
