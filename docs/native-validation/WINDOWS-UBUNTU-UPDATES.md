@@ -1,7 +1,10 @@
 # Windows and Ubuntu managed-update acceptance
 
-Status: implementation available in source; **owner-host native acceptance pending on both
-platforms**. This document is the handoff, not an installation receipt. The public
+Status: Windows/Ubuntu **installation ACCEPTED_BY_OWNER** on2026-10-11; no
+installation retest required. Publication is authorized and awaits the tested
+files from the other computers. See [the owner decision](2026-10-11-owner-installation-acceptance.md).
+Managed-update/cancel/login coverage retains its existing evidence and pending
+cases. This document is an update handoff, not a new execution receipt. The public
 0.9.7 Release still contains only the previously validated Mac arm64 artifact.
 Do not publish Windows/Linux assets as validated based on Mac unit tests.
 

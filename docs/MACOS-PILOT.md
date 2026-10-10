@@ -6,6 +6,10 @@ validated by this artifact. [Version 0.9.7 is published](https://github.com/Bogd
 from source `8d6fb670010311239c657ee676c8b6d8183be193`, with the exact owner-installed
 package and a project-signed update manifest.
 
+The owner waived a clean-Mac validation prerequisite on2026-10-11. It does not
+block this delivery; no clean-machine PASS or notarization is implied. See
+[the owner decision](native-validation/2026-10-11-owner-installation-acceptance.md).
+
 ## Current local installation
 
 The owner-authorized 2026-10-10 build `992cea11bb136ed0` is now installed through

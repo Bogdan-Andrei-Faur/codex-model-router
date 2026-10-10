@@ -3,6 +3,19 @@
 Use [the runbook](../NATIVE-VALIDATION.md) and [report template](REPORT-TEMPLATE.md).
 This ledger is repository-owned; no external knowledge/memory service is needed.
 
+## Owner acceptance — 2026-10-11
+
+| Gate | Current decision | Scope |
+| --- | --- | --- |
+| Windows installation | ACCEPTED_BY_OWNER | Owner personally tested installation; exact file/version/hash not supplied in this confirmation |
+| Ubuntu installation | ACCEPTED_BY_OWNER | Owner personally tested installation; exact file/version/hash not supplied in this confirmation |
+| Clean-Mac prerequisite | WAIVED_BY_OWNER | Not required for this delivery; not recorded as technical PASS |
+| Windows/Ubuntu installer publication | AUTHORIZED; awaiting binaries | Exact tested files are on other computers; transfer required before signing/upload |
+
+See [the owner decision](2026-10-11-owner-installation-acceptance.md). Existing
+update/cancel/recovery and hardware-specific rows keep their stated evidence;
+these installation gates no longer need agent retesting.
+
 ## Current dynamic notch — 2026-10-09
 
 The notch is integrated into `main`; publication baseline is `a4af030`, product `0.9.6`.

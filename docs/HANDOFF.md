@@ -7,6 +7,16 @@ links current contracts, installation, routing/evidence and historical receipts.
 This checkout is sufficient; no other agent, personal memory or external knowledge
 service is needed. Preserve local work and coordinate disruptive owner actions.
 
+## Owner acceptance and installer publication — 2026-10-11
+
+Windows and Ubuntu installation are **ACCEPTED_BY_OWNER** after personal tests.
+The clean-Mac prerequisite is **WAIVED_BY_OWNER** for this delivery and does not
+block publication. The owner authorizes publishing installers; exact tested EXE
+and DEB files are on other computers and must be transferred before publication.
+No version/hash was supplied by this confirmation. See
+[owner decision and publication handoff](native-validation/2026-10-11-owner-installation-acceptance.md).
+Managed update/cancel/login-recovery evidence remains separate from installation.
+
 ## Windows/Ubuntu managed updates — current source work
 
 Windows Inno handoff and Ubuntu per-user signed runtime updates are implemented
@@ -617,17 +627,19 @@ registros privados para rellenar una muestra incompleta.
 
 ## Pendientes en orden de continuación
 
-1. Validar el primer acceso con cuarentena de descarga/Gatekeeper en un Mac limpio.
-   Installer, importación y conexión del propietario ya están verificados. No
-   sustituir su instalación ni cerrar Desktop mientras usa agentes.
+1. Recibir los instaladores probados de Windows y Ubuntu desde los otros equipos,
+   verificar versión/arquitectura/hash, firmar y publicar bajo la autorización
+   del propietario. Instalación aceptada; prueba en Mac limpio dispensada por
+   el propietario. No reemplazar binarios publicados ni inventar su versión.
 2. Mantener la Release 0.9.7 y renovar su manifiesto antes de la caducidad de 30 días,
    sin reemplazar el paquete publicado. La actualización real desde GitHub y
    Ajustes ya pasa en una instalación aislada; no implica aceptación física.
 3. Completar recuperación nativa en login/reinicio Mac y validar los adaptadores
    de aplicación/rollback Windows y Ubuntu ya implementados. Los tres escenarios nativos aislados de
    Mac no sustituyen Installer/Gatekeeper, login real ni aceptación en otros OS.
-4. Completar QA nativo de instalación limpia/upgrade/cancelación/fallo/recuperación
-   y desinstalación en cada OS; mantener separados fuente, paquete instalado,
+4. Conservar como cerrada la instalación Windows/Ubuntu confirmada por el
+   propietario; completar cobertura de upgrade/cancelación/fallo/recuperación
+   y desinstalación que todavía no tenga resultado explícito; mantener separados fuente, paquete instalado,
    puente cargado y aceptación humana. No asumir éxito de CI por pruebas locales.
 5. Recoger parejas representativas de calidad/consumo con identidad suficiente
    antes de calibrar JEV o activar candidata 9; conservar resultados fallidos.

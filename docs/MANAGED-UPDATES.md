@@ -1,5 +1,11 @@
 # Authenticated managed updates — 2026-10-11
 
+The owner personally accepted Windows/Ubuntu installation and waived a clean-Mac
+prerequisite on2026-10-11. Installer publication is authorized, awaiting transfer
+of the exact tested binaries from the other computers. See
+[the owner decision](native-validation/2026-10-11-owner-installation-acceptance.md).
+This closes installation acceptance; update/recovery coverage remains as below.
+
 ## What is implemented
 
 Settings uses the canonical public GitHub latest-release endpoint. A newer release
