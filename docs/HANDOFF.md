@@ -9,6 +9,19 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 
 ## Central telemetry implementation — 2026-10-11
 
+**Current operational state:** owner completed project creation; backend deployment
+through Sentinel on P510 succeeded with source
+`e41f739b2dfcf97d3d6de219644c2257b5cc4c66`, terminal cleanup confirmed, API/DB
+healthy and public HTTPS readiness `{"ready":true}`. Owner panel requires auth.
+Eight public synthetic checks and the actual client transport passed; all test
+events were deleted (two retained installation/tombstone records, zero events and
+bytes). Autodeploy remains owner-selected at300s. Client source now sends a truthful
+product User-Agent to avoid Cloudflare's rejection of generic Python requests.
+Owner application/release was not replaced and real client sharing remains off.
+Remote backups/restores remain unsupported, as previously accepted by the owner.
+See [deployment receipt](native-validation/2026-10-11-p510-metrics-deployment.md).
+The preparation and earlier blockers below are historical, superseded by this result.
+
 Source was published to `main107d3e1`. The owner selected **P510** for the backend.
 The earlier hold is superseded: Sentinel now supports remote Compose applications
 and the owner requested normal deployment despite its explicitly disclosed lack
@@ -31,6 +44,29 @@ No backend deployment receipt or public ingestion is established yet. Cloudflare
 acknowledged creating the domain's CNAME to its existing tunnel, but workstation
 DNS resolution/public readiness were still unavailable immediately afterward.
 
+Previous blocker (resolved in installed Sentinel `05cccb5`): the owner reported
+Sentinel rejecting onboarding with
+“El despliegue en otro equipo requiere modo gestionado y Compose sin comandos
+adicionales.” Read-only source inspection identifies a matching frontend path:
+Compose inspection auto-populates `baseServices` from detected databases even
+when P510 is selected; the field is hidden for remote nodes but still serialized.
+The remote onboarding schema rejects nonempty `baseServices`. This is verified
+in controller source `e5864948`, but the owner's actual request payload was not
+inspected. The updated frontend gates database suggestions on local execution and
+omits local-only fields for remote payloads. The owner's live simulation is valid.
+
+Pre-deployment review: `El upstream no contiene el container_name seleccionado
+(router-metrics-api)` is a spurious local-container warning for P510. The frontend
+intentionally sends an empty upstream for remote execution; Sentinel assigns the
+node's actual published IP/port from its successful deployment receipt. Do not
+replace it with a Mac Docker container URL. Private controller Compose/environment
+checks passed (valid distinct secrets/private file, DB port private, API read-only,
+explicit migration, owned volumes/networks). DNS/TLS now resolve, but the domain
+returns the generic Caddy response, not backend readiness. No metrics containers
+are running on P510. The form has autodeploy enabled at300s and initial deploy off;
+the owner must complete final new-credential submission under browser-tool policy.
+After creation, deployment is owner-authorized without another permission request.
+
 Owner selected an end-user Settings switch with no URL/key/account setup, metrics
 opt-in plus additional permissions for prompts/raw OTLP, owner-only private panel,
 no automatic server deletion and `https://router.andreifaur.dev`. Sentinel must
@@ -38,9 +74,9 @@ manage deployment. Read-only Sentinel checkout354464b confirms Compose, route,
 health, env/migration and backup integration requirements. See
 [CENTRAL-TELEMETRY.md](CENTRAL-TELEMETRY.md) for data/consent contracts and [CENTRAL-TELEMETRY-OPERATIONS.md](CENTRAL-TELEMETRY-OPERATIONS.md)
 for deployment, limits, backups and native checks. Backend, outbox/uploader,
-Settings, owner panel and Sentinel artifacts are implemented locally; DNS,
-production deployment and owner client installation are not activated. Public
-Release and existing local capture settings remain unchanged. See the
+Settings, owner panel and Sentinel artifacts are implemented. DNS and production
+deployment are now verified above; owner client installation is not activated.
+Public Release and existing local capture settings remain unchanged. See the
 [local verification receipt](native-validation/2026-10-11-central-telemetry.md).
 
 ## Owner acceptance and installer publication — 2026-10-11

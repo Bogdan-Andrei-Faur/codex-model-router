@@ -28,6 +28,10 @@ have been changed. The desktop default remains no remote sharing.
 
 ## Sentinel deployment
 
+Current result: P510 backend deployment and public synthetic validation PASS;
+see [2026-10-11 deployment receipt](native-validation/2026-10-11-p510-metrics-deployment.md).
+Real owner-client sharing and a new desktop release remain separate pending gates.
+
 ### P510 deployment resumed — 2026-10-11
 
 Sentinel now supports remote application deployment, state, logs and HTTP routing
@@ -65,6 +69,60 @@ credentials and environment must remain outside source/control logs.
 Source preparation is not a deployment receipt. Confirm matching remote commit,
 terminal worker receipt with transfer cleanup, actual container health, public
 TLS/ingestion and owner panel authentication before recording activation.
+
+### Sentinel onboarding rejection — 2026-10-11
+
+Resolved in installed Sentinel `05cccb553b282588a09fe38881a23f841fed8288`.
+The frontend now gates suggestions using the current execution node and excludes
+remote-incompatible fields. Owner's live simulation is valid. The analysis below
+records the earlier failure, not an active blocker.
+
+The owner reports: “El despliegue en otro equipo requiere modo gestionado y
+Compose sin comandos adicionales.” Read-only inspection of Sentinel controller
+source `e5864948a84b7704fc86a1aa4c2931cafbf5afaa` identifies this reproducible path:
+
+1. Select P510, then inspect a Compose file containing a database service.
+2. `NewComposeProjectPage.tsx:380` auto-populates `baseServices` from databases
+   without checking the execution node. The remote form hides this field.
+3. `buildPayload` at line537 still sends it for managed remote projects.
+4. `apps/server/src/routes/projects.ts` rejects remote onboarding when
+   `baseServices` or separate migration/seed commands are nonempty.
+
+Switching to P510 clears the fields once, but a subsequent inspection repopulates
+them. The owner's actual request payload was not inspected, so attribution of
+that specific rejection remains probable. Do not expose a request body containing
+credentials to diagnose it. This validation concerns onboarding fields, not the
+API service's startup `command` in our Compose profile.
+
+Suggested Sentinel correction: restrict database suggestions to local execution,
+serialize empty local-only fields for remote nodes, and test P510 selection
+followed by inspection and reinspection of a database-bearing Compose file. Keep
+the backend rejection as a guard. The owner will coordinate with the Sentinel
+agent; no Sentinel changes, submission retry or deployment were performed here.
+
+### Remote upstream warning / pre-deployment review — 2026-10-11 (historical)
+
+The valid live simulation still warns that upstream does not contain
+`router-metrics-api`. In Sentinel `05cccb5`, `buildOnboardComposePlan` applies this
+warning without restricting it to local execution, while `buildPayload` correctly
+sends an empty remote upstream. Remote routes are created disabled with a dummy
+upstream; successful `remote-deploy.ts` finalization obtains the chosen service's
+published port, installs the node's IP/port, enables the initial route and applies
+Caddy. The warning does not invalidate the simulation and is not evidence of a
+broken remote route. Sentinel should gate this warning on local execution.
+
+Read-only controller checks passed with the actual private environment without
+printing values: distinct64-hex credentials, file mode0600, Compose normalization,
+no published database port, API read-only, explicit startup migration and owned
+named volumes/networks. P510 still has no metrics containers. Public DNS/TLS now
+work, but `/health/ready` returns `Sentinel Caddy is running`; even HTTP200 here
+is not backend readiness. Verify the backend's expected JSON after deployment.
+
+The reviewed form selects P510/api8080 and `/health/ready`, with initial deploy
+off. It currently has autodeploy every300s enabled, unlike the earlier manual-only
+preparation. Owner submission with new credentials remains a browser-tool handoff;
+after project creation the owner explicitly authorizes deployment without another
+permission request. No registration/deployment/ingestion is claimed by this review.
 
 ### Historical deployment hold (superseded)
 

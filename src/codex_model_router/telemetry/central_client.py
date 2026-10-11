@@ -98,7 +98,8 @@ def transport(path, body, token):
     if len(payload) > MAX_BATCH:
         raise ValueError('batch_too_large')
     request = urllib.request.Request(ENDPOINT + path, data=payload,
-        headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token}, method='POST')
+        headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token,
+                 'User-Agent': 'Codex-Model-Router/central-telemetry-v1'}, method='POST')
     try:
         response = urllib.request.build_opener(NoRedirect()).open(request, timeout=8)
     except urllib.error.HTTPError as error:
