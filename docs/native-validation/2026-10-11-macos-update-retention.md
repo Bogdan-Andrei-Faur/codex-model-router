@@ -67,3 +67,9 @@ The installed/loaded application remains the public0.9.8 build
 requires the next signed client release**; this turn applied cleanup once and
 did not patch or replace the active bundle. The public0.9.8 release is immutable
 for this work and was not overwritten with the test candidate.
+
+## Later delivery
+
+The next-release requirement above is resolved by public0.9.9. See the
+[public delivery receipt](2026-10-11-macos-retention-release.md). The owner
+installation remains0.9.8 until the owner applies it from Settings.

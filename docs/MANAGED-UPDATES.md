@@ -118,12 +118,12 @@ defer cleanup. Unknown apps, newer downloads and symlink targets are preserved.
 Manual rollback selection is not yet implemented. Windows/Ubuntu retention is
 unchanged; this policy currently applies to the managed Mac bundle layout.
 
-This cleanup is source-implemented and locally/native-fixture verified, **not
-included in the immutable public0.9.8 package**. The owner Mac's already completed
-0.9.8 job was cleaned once using the reviewed maintenance routine, leaving its
-0.9.7 recovery app. Include the code in the next signed release to activate
-periodic maintenance in the installed monitor. See
-[the retention receipt](native-validation/2026-10-11-macos-update-retention.md).
+Automatic retention is included in public **0.9.9** for Mac arm64. Exact signed
+package and isolated native Settings0.9.8 →0.9.9 through GitHub pass, including
+cleanup by the new monitor. The owner's app remains0.9.8 until the owner applies
+that update; its completed0.9.8 job was cleaned once with the reviewed routine,
+leaving0.9.7 for recovery. See [the source/cleanup receipt](native-validation/2026-10-11-macos-update-retention.md)
+and [the public delivery receipt](native-validation/2026-10-11-macos-retention-release.md).
 
 First launch offers Import / Start fresh / Cancel before creating data. Import
 preserves the source and refuses occupied targets, active bridges/monitors,

@@ -7,6 +7,19 @@ links current contracts, installation, routing/evidence and historical receipts.
 This checkout is sufficient; no other agent, personal memory or external knowledge
 service is needed. Preserve local work and coordinate disruptive owner actions.
 
+## Published Mac retention update — 2026-10-11
+
+Stable **0.9.9** is published on GitHub Releases from immutable source
+`053446764d4f085612b78fe41df1f0d70206306e`, with Mac arm64 installer, signed
+manifest, checksums and sanitized provenance. Exact package smoke, local native
+success/rollback/interrupted recovery and real GitHub Settings0.9.8 →0.9.9 with
+automatic cleanup PASS. See [delivery receipt](native-validation/2026-10-11-macos-retention-release.md).
+Owner installation remains0.9.8; automatic version checks are enabled. The owner
+can use Settings → Updates → Check now → Update, after finishing active Desktop
+tasks when prompted. The monitor relaunches automatically. Installing0.9.9 and
+verifying its later loaded bridge remain owner-host acceptance, not claimed here.
+The earlier next-release requirement below is resolved by this public delivery.
+
 ## Mac update retention — 2026-10-11
 
 Source now retains one identified previous Mac app and prunes terminal helper/

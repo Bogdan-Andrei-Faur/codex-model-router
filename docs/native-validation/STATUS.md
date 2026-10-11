@@ -3,13 +3,21 @@
 Use [the runbook](../NATIVE-VALIDATION.md) and [report template](REPORT-TEMPLATE.md).
 This ledger is repository-owned; no external knowledge/memory service is needed.
 
+## Latest Mac release — 2026-10-11
+
+Public0.9.9 from source0534467 includes automatic update retention. Exact package
+smoke, local native success/rollback/interrupted replay and real GitHub native
+Settings0.9.8 →0.9.9 with automatic cleanup PASS. Signed assets/checksums verified
+before promotion. Owner app remains0.9.8 and has automatic version checks enabled;
+owner installation/loaded bridge0.9.9 remain unclaimed. [Delivery receipt](2026-10-11-macos-retention-release.md).
+
 ## Owner acceptance — 2026-10-11
 
 Mac retention source:49 tests and isolated native success/rollback/interrupted
 scenarios PASS; new frozen monitor automatically cleans terminal payloads and
 keeps one previous bundle. Owner-authorized one-off cleanup completed. Installed
-public0.9.8 is unchanged; periodic maintenance delivery requires a new signed
-release. [Receipt](2026-10-11-macos-update-retention.md).
+public0.9.8 is unchanged; periodic maintenance is now delivered by public0.9.9
+as recorded above. [Receipt](2026-10-11-macos-update-retention.md).
 
 Latest Mac client: public0.9.8 signed delivery and isolated real-GitHub Settings
 update PASS. Owner completed update/restart; installed and active bridge0.9.8
