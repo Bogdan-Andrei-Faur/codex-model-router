@@ -1,0 +1,12 @@
+**
+!src/
+!src/codex_model_router/
+!src/codex_model_router/**
+!services/
+!services/metrics/
+!services/metrics/Dockerfile
+!services/metrics/requirements.txt
+!services/metrics/app.py
+!services/metrics/schema.sql
+**/__pycache__/**
+**/*.pyc

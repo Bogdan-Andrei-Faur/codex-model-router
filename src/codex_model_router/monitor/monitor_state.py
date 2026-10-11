@@ -266,10 +266,13 @@ class MonitorState:
         self.lock = threading.RLock()
         from codex_model_router.update_install import installed_applier
         applier = None if preview or read_only else installed_applier(self.root, self.code_root, self.platform)
+        from codex_model_router.telemetry.central_client import CentralTelemetry
+        self.central = CentralTelemetry(self.root, disabled=preview or read_only)
         self.updater = UpdateManager(self.root, self.version, self.platform, resources=self.code_root, applier=applier)
 
     def close(self):
         self.updater.close()
+        self.central.close()
 
     def load_history(self):
         changed = False
@@ -348,7 +351,7 @@ class MonitorState:
                 'threads': threads, 'agentThreads': agent_threads, 'connections': connections, 'config': safe,
                 'taskModes': {tid: read_mode(self.state, tid) for tid in tids}, 'telemetry': telemetry,
                 'appearances': self.appearances(),
-                'accountUsage': account_usage, 'updates': self.updater.snapshot(),
+                'accountUsage': account_usage, 'updates': self.updater.snapshot(), 'centralTelemetry': self.central.snapshot(),
                 'historyLoaded': history_revision >= 0 or needs_history, 'journalRevision': self.journal_revision,
                 'preview': self.preview, 'readOnly': self.read_only, 'platform': self.platform,
                 'secretStorage': {'linux': 'el llavero de Linux (Secret Service)', 'macos': 'el llavero de macOS',
@@ -459,6 +462,8 @@ class MonitorState:
     def configure(self, key, value):
         if self.preview or self.read_only:
             raise ValueError('Los cambios están desactivados en la vista previa.')
+        if isinstance(key, str) and key.startswith('central_'):
+            return self.central.configure(key[8:], value)
         valid = False
         if key in ('enabled', 'phase_routing', 'prompt_logging', 'inference_telemetry', 'updates_auto_check'):
             valid = type(value) is bool

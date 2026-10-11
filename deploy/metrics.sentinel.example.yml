@@ -1,0 +1,44 @@
+# Import through Sentinel on its host; choose the actual checkout path there.
+# Same-host example only. Owner target is P510; deployment is deferred until
+# Sentinel supports explicit remote placement and cross-host ingress. See runbook.
+name: Codex Model Router Metrics
+slug: router-metrics
+repoPath: /REPLACE/ON/SENTINEL/HOST/codex-model-router
+branch: main
+composeFile: deploy/compose.metrics.yml
+operationMode: managed
+autodeploy:
+  enabled: false
+  pollingInterval: 300
+services:
+  - name: api
+    containerName: router-metrics-api
+    type: http
+    publicUrl: https://router.andreifaur.dev
+    healthEndpoint: /health/ready
+  - name: db
+    containerName: router-metrics-db
+    type: database
+routes:
+  - hostname: router.andreifaur.dev
+    upstreamUrl: http://router-metrics-api:8080
+    serviceName: api
+    enabled: true
+migrations:
+  enabled: true
+  command: docker compose -f deploy/compose.metrics.yml run --rm api python -m services.metrics.app migrate
+  detectFile: services/metrics/schema.sql
+backup:
+  enabled: true
+  stateless: false
+  resources:
+    - name: metrics-postgresql
+      type: postgresql
+      service: db
+      databaseEnv: POSTGRES_DB
+      usernameEnv: POSTGRES_USER
+      passwordEnv: POSTGRES_PASSWORD
+    - name: deletion-ledger
+      type: volume
+      volume: router-metrics_metrics-ledger
+  excluded: []

@@ -276,11 +276,11 @@ requiere evidencia atribuida de inferencia.
 La telemetría de inferencia está activa por defecto y puede desactivarse en
 **Ajustes**. El
 puente crea un receptor temporal que escucha exclusivamente en el propio equipo
-(`127.0.0.1`) durante esa conexión de Codex. Solo conserva modelo,
+(`127.0.0.1`) durante esa conexión de Codex. La ruta habitual conserva modelo,
 razonamiento, tipo de evento, identificadores técnicos acotados y métricas
 numéricas de tokens, duración, primer token, intentos y estado HTTP; no conserva
 el mensaje, respuesta, adjuntos, herramientas, credenciales, errores libres ni
-los datos brutos de telemetría. Si hay
+los datos brutos de telemetría, salvo el permiso adicional de envío descrito abajo. Si hay
 dos tareas que podrían coincidir, deja el evento sin atribuir en vez de asignarlo
 incorrectamente. Se aplica al reiniciar Desktop.
 
@@ -302,7 +302,20 @@ herramientas, instrucciones internas, cabeceras ni la carga OTLP completa. Usa l
 misma retención de `history_days`. Ese archivo contiene mensajes del usuario y
 debe tratarse como datos privados.
 
-Una sonda sintética del esquema OTLP confirmó por qué no se conserva la carga
+El envío central está **desactivado por defecto** y es independiente de estas
+capturas locales. La implementación nueva añade controles en **Ajustes → Datos y
+privacidad** para compartir métricas con `router.andreifaur.dev`, sin introducir
+URL, clave ni cuenta. Prompts y OTLP crudo requieren permisos adicionales
+independientes. Las cargas OTLP pueden contener mensajes, respuestas, herramientas
+y datos sensibles: no se anonimizan ni filtran. Solo el responsable del proyecto
+consulta el panel privado; no hay borrado automático del servidor. Desactivar el
+envío vacía su cola local y desactiva permisos adicionales; eliminar datos ya
+enviados es una acción separada con confirmación. No se sube historial anterior.
+El backend y el cliente están preparados en el código; su despliegue público y
+la instalación de esta nueva versión siguen pendientes. Consulta el
+[procedimiento de Sentinel y sus límites](docs/CENTRAL-TELEMETRY-OPERATIONS.md).
+
+Una sonda sintética del esquema OTLP confirmó por qué, por defecto, no se conserva la carga
 completa: incluye el prompt, correo e identificador de cuenta, nombre del equipo,
 endpoint y mensajes de error. Para correlación solo expuso `conversation.id`, ya
 incluido en la lista blanca; no emitió identificadores de turno o respuesta. Las

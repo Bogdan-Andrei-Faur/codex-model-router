@@ -26,7 +26,7 @@ function islandPointer(inside) {
 }
 let historyDirty = true, historyRevision = 0, projectedHistoryRevision=-1, historyBase=[], historyOverlayKey='';
 const historySearchText=new WeakMap();
-let connectionPending = null,settingsSection='application',consumptionSection='routing';
+let connectionPending = null,settingsSection='application',consumptionSection='routing',centralDeleteArmed=false;
 function requestHistory() {
   if(state.ui.lazyHistory)native({action:'history',value:state.ui.mode==='Expanded' && ['history','statistics'].includes(currentTab)});
 }
@@ -952,7 +952,23 @@ function settings() {
   heading(box,'CONSERVAR HISTORIAL');choices(box,[[30,'30 días'],[90,'90 días'],[180,'180 días'],[0,'Siempre']],config.history_days??90,v=>configure('history_days',v));
   actionCard(box,config.inference_telemetry?'Desactivar telemetría local':'Activar telemetría local','Recoge evidencia del modelo ejecutado. Se aplica tras reiniciar Desktop.',()=>configure('inference_telemetry',!config.inference_telemetry));
   actionCard(box,config.prompt_logging?'Desactivar captura de prompts':'Activar captura de prompts',config.prompt_logging?'Guarda cada nuevo mensaje con su decisión para evaluar el enrutamiento. El cambio se aplica al siguiente mensaje.':'No guarda el texto de los mensajes; las estadísticas agregadas continúan disponibles.',()=>configure('prompt_logging',!config.prompt_logging));
-  heading(box,'PRIVACIDAD');box.append(el('p','small',config.prompt_logging?'Además de las métricas, se guarda el texto de tus mensajes en el archivo local privado state/prompts.jsonl para evaluar las decisiones. No guarda respuestas, adjuntos, herramientas ni credenciales. Las claves se almacenan en '+(state.secretStorage || 'el llavero de macOS')+'.':'El historial guarda tareas, ajustes, motivos, estados y contadores. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales. Las claves se almacenan en '+(state.secretStorage || 'el llavero de macOS')+'.'));
+  heading(box,'MEJORAR EL ENRUTADOR');
+  const central=state.centralTelemetry||{},sharing=central.enabled===true;
+  actionCard(box,sharing?'Dejar de compartir métricas':'Compartir métricas','Envía modelos, esfuerzo, uso y resultados a router.andreifaur.dev. No incluye mensajes. Solo el responsable del proyecto puede consultar los datos; se conservan hasta solicitar su eliminación.',()=>configure('central_enabled',!sharing));
+  if(sharing){
+    actionCard(box,central.prompts?'Dejar de enviar prompts':'Permitir envío de prompts','Permiso adicional: comparte el texto de los nuevos mensajes capturados localmente. Puede contener información privada. No envía el historial anterior.',()=>configure('central_prompts',!central.prompts));
+    actionCard(box,central.raw_otlp?'Dejar de enviar OTLP crudo':'Permitir envío de OTLP crudo','Permiso adicional: comparte cargas originales de telemetría, que pueden contener mensajes, respuestas, herramientas y datos sensibles. No se anonimizan ni se filtran. Requiere captura de telemetría local.',()=>configure('central_raw_otlp',!central.raw_otlp));
+  }
+  const syncLabels={credential_unavailable:'No se puede acceder al almacén seguro de credenciales',server_capacity:'El servicio ha alcanzado su límite; reintentaremos',access_rejected:'El servicio ha rechazado la credencial o el permiso',unavailable:'No se puede leer el estado del envío',disabled:'Envío desactivado',pending:'Preparando conexión',synced:'Sincronizado',retrying:'Sin conexión o acceso rechazado; reintentaremos',capacity_or_invalid:'Hay muestras descartadas por tamaño o formato',deleted:'Datos eliminados del servicio'};
+  box.append(el('p','small',`${syncLabels[central.status]||'Envío desactivado'} · ${central.pending||0} pendientes · ${central.rejected||0} descartadas${central.lastSync?' · Último envío: '+new Date(central.lastSync*1000).toLocaleString():''}`));
+  if(central.delete_pending)box.append(el('p','small','Eliminación pendiente de conexión. El envío está desactivado.'));
+  else if(central.canDelete || central.lastSync){
+    if(centralDeleteArmed){
+      actionCard(box,'Confirmar eliminación','Se borrarán los datos enviados por esta instalación y se desactivará el envío. Los datos locales se conservan.',()=>{centralDeleteArmed=false;configure('central_delete',true);settings();});
+      actionCard(box,'Cancelar eliminación','Conservar los datos enviados.',()=>{centralDeleteArmed=false;settings();});
+    }else actionCard(box,'Eliminar mis datos enviados','Desactiva el envío y solicita el borrado de esta instalación. Los datos locales se conservan.',()=>{centralDeleteArmed=true;settings();});
+  }
+  heading(box,'PRIVACIDAD LOCAL');box.append(el('p','small',config.prompt_logging?'Además de las métricas, se guarda el texto de tus mensajes en el archivo local privado state/prompts.jsonl para evaluar las decisiones. No guarda respuestas, adjuntos, herramientas ni credenciales. Las claves se almacenan en '+(state.secretStorage || 'el llavero de macOS')+'.':'El historial guarda tareas, ajustes, motivos, estados y contadores. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales. Las claves se almacenan en '+(state.secretStorage || 'el llavero de macOS')+'.'));
   box=groups.connection;
     box.append(el('p','small','La instalación se detecta al arrancar. Conecta el inicio habitual una vez. Cerrar el monitor no detiene el selector.'));
   connectionCard(box,'doctor','Comprobar conexión','Distingue instalación, registro y conexión observada.');
@@ -974,7 +990,7 @@ function renderPage(){
   if(currentTab==='home'||currentTab==='activity')activity();else if(currentTab==='history')renderHistory();else if(currentTab==='statistics')statistics();else settings();
 }
 window.receive = incoming => {
-  const oldReadOnly=state.readOnly,oldPreview=state.preview,oldConfig=JSON.stringify(state.config),oldUi=JSON.stringify(state.ui),oldUpdates=JSON.stringify(state.updates);
+  const oldReadOnly=state.readOnly,oldPreview=state.preview,oldConfig=JSON.stringify(state.config),oldUi=JSON.stringify(state.ui),oldUpdates=JSON.stringify(state.updates),oldCentral=JSON.stringify(state.centralTelemetry);
   if(incoming.history){historyRevision++;historyDirty=true;incoming={...incoming,historyLoaded:true};}
   if(incoming.threads)historyDirty=true;
   const staleMode=state.ui.acknowledgesMode && Number.isInteger(incoming.ui?.modeRequest) && incoming.ui.modeRequest<modeRequest;
@@ -994,7 +1010,7 @@ window.receive = incoming => {
   document.body.classList.toggle('reduce-transparency',!!state.ui.reduceTransparency);
   const signature=JSON.stringify([state.readOnly,state.threads,state.agentThreads,historyRevision,state.historyLoaded,state.connections,state.taskModes,state.appearances,state.telemetry,state.accountUsage]);
   const accessChanged=oldReadOnly!==state.readOnly||oldPreview!==state.preview;
-  const settingsChanged=accessChanged || oldConfig!==JSON.stringify(state.config) || oldUi!==JSON.stringify(state.ui) || oldUpdates!==JSON.stringify(state.updates);
+  const settingsChanged=accessChanged || oldConfig!==JSON.stringify(state.config) || oldUi!==JSON.stringify(state.ui) || oldUpdates!==JSON.stringify(state.updates) || oldCentral!==JSON.stringify(state.centralTelemetry);
   if(signature!==dataSignature || settingsChanged){
     dataSignature=signature;
     // Do not discard an API key while the owner is typing it.

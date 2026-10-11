@@ -1,9 +1,9 @@
 """Loopback-only inference evidence for the local Codex bridge.
 
-The collector deliberately discards raw OTel payloads. It retains only a typed,
-bounded allowlist sufficient to establish model/effort evidence and measure
-inference cost/latency. It never persists prompts, resources, URLs, tool calls,
-identities, headers, free-form errors or response text.
+The normal evidence path retains only typed, bounded model/effort and usage
+metadata. Original OTLP is discarded by default. An optional diagnostic callback
+may retain the original body only under separate central-sharing consent; it
+receives no HTTP authorization headers. Local evidence semantics do not change.
 """
 import gzip
 import io
@@ -205,8 +205,9 @@ def safe_records(payload, health=None):
 
 class LocalInferenceTelemetry:
     """A short-lived HTTP collector bound only to the loopback interface."""
-    def __init__(self, receive):
+    def __init__(self, receive, receive_raw=None):
         self.receive = receive
+        self.receive_raw = receive_raw
         self.token = secrets.token_hex(32)
         self.lock = threading.Lock()
         # At most eight bounded wire bodies, but only one expanded JSON batch
@@ -287,6 +288,8 @@ class LocalInferenceTelemetry:
                             raise ValueError("decoded_size")
                         delta = dict.fromkeys(RECORD_COUNTERS, 0)
                         records = list(safe_records(json.loads(raw), delta))
+                        if owner.receive_raw is not None:
+                            owner.receive_raw(raw)
                     finally:
                         raw = b""
                         owner.parse_lock.release()

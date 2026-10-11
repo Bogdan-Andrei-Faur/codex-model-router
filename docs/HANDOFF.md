@@ -7,6 +7,27 @@ links current contracts, installation, routing/evidence and historical receipts.
 This checkout is sufficient; no other agent, personal memory or external knowledge
 service is needed. Preserve local work and coordinate disruptive owner actions.
 
+## Central telemetry implementation — 2026-10-11
+
+Publication is authorized to `main`. The owner selected **P510** for the backend
+and then explicitly deferred deployment: Sentinel32a4768 observes that node and
+uses it for CI, but application deployments still execute on its Mac controller.
+Resume only after adding supported explicit P510 placement and cross-host ingress
+to Sentinel; do not silently deploy on the Mac mini. See the target/hold section
+in the operator runbook. No Sentinel source or live configuration was changed.
+
+Owner selected an end-user Settings switch with no URL/key/account setup, metrics
+opt-in plus additional permissions for prompts/raw OTLP, owner-only private panel,
+no automatic server deletion and `https://router.andreifaur.dev`. Sentinel must
+manage deployment. Read-only Sentinel checkout354464b confirms Compose, route,
+health, env/migration and backup integration requirements. See
+[CENTRAL-TELEMETRY.md](CENTRAL-TELEMETRY.md) for data/consent contracts and [CENTRAL-TELEMETRY-OPERATIONS.md](CENTRAL-TELEMETRY-OPERATIONS.md)
+for deployment, limits, backups and native checks. Backend, outbox/uploader,
+Settings, owner panel and Sentinel artifacts are implemented locally; DNS,
+production deployment and owner client installation are not activated. Public
+Release and existing local capture settings remain unchanged. See the
+[local verification receipt](native-validation/2026-10-11-central-telemetry.md).
+
 ## Owner acceptance and installer publication — 2026-10-11
 
 Windows and Ubuntu installation are **ACCEPTED_BY_OWNER** after personal tests.

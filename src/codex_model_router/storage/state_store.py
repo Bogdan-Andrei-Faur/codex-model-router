@@ -142,11 +142,15 @@ def _append_jsonl(state, filename, lockname, record):
 
 def append_record(state, record):
     _append_jsonl(state, "history.jsonl", "history.lock", record)
+    from codex_model_router.telemetry.central_client import capture
+    capture(Path(state).parent, "metrics", record)
 
 
 def append_prompt_record(state, record):
     """Append the explicitly enabled private routing dataset."""
     _append_jsonl(state, "prompts.jsonl", "prompts.lock", record)
+    from codex_model_router.telemetry.central_client import capture
+    capture(Path(state).parent, "prompts", record)
 
 
 def compact_history(state, days, now=None):

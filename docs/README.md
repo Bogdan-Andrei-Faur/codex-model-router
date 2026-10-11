@@ -39,6 +39,9 @@ preview lives in `tools/preview_monitor.py` and `tools/preview-monitor.js`.
 
 ## Routing, privacy and evidence
 
+- [Central telemetry operations](CENTRAL-TELEMETRY-OPERATIONS.md) — Sentinel deployment, opt-in delivery, private dashboard, deletion/restore and remaining native checks.
+- [CENTRAL-TELEMETRY.md](CENTRAL-TELEMETRY.md): owner-selected central sharing, private dashboard and Sentinel deployment contract; implemented locally, activation pending.
+
 - [MODEL-CATALOG.md](MODEL-CATALOG.md), [MODEL_POLICY.md](MODEL_POLICY.md), [MODEL-ROUTING-REVIEW.md](MODEL-ROUTING-REVIEW.md): catalog, reference policy and review.
 - [POLICY9-VALIDATION.md](POLICY9-VALIDATION.md), [PHASE-PROBE.md](PHASE-PROBE.md): candidate evaluation and model-switch boundaries.
 - [TELEMETRY-ATTRIBUTION.md](TELEMETRY-ATTRIBUTION.md), [EVIDENCE-COVERAGE.md](EVIDENCE-COVERAGE.md), [TOOL-EVIDENCE.md](TOOL-EVIDENCE.md): selected/accepted/probable/confirmed evidence and coverage.

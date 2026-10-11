@@ -1204,7 +1204,9 @@ def main():
     telemetry = None
     if config.get("inference_telemetry", False):
         try:
-            telemetry = LocalInferenceTelemetry(router.observe_inference)
+            from codex_model_router.telemetry.central_client import capture
+            telemetry = LocalInferenceTelemetry(router.observe_inference,
+                receive_raw=lambda raw: capture(router.state_dir.parent, "raw_otlp", raw))
             router.set_telemetry(telemetry)
             args = with_loopback_telemetry(args, telemetry.endpoint, telemetry.token, env=env)
         except OSError:

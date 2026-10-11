@@ -7,7 +7,7 @@ import sys
 import threading
 import uuid
 
-PROVIDERS = ('jev-typesafe', 'jev-vercel')
+PROVIDERS = ('jev-typesafe', 'jev-vercel', 'central-telemetry')
 _CACHE = {}
 
 
