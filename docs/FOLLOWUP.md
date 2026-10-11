@@ -10,6 +10,7 @@ No installation or live service was changed during this reconciliation.
 | Item | Evidence and exact scope |
 | --- | --- |
 | CI repairs | Main `023665a5b38989c735b84e7dbce4d2165a60fd78`; [run38169713976](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/38169713976) completed14/14. Native Windows/WebView2/installer and Ubuntu GTK package fixtures passed; no owner-host acceptance inferred. |
+| Intermittent Ubuntu hover smoke | Reproduced the later500ms startup race; native delivery/deadline synchronization preserves all eight assertions. Four native DEB/Xvfb runs and negative controls PASS. [Timing receipt](native-validation/2026-10-11-ubuntu-hover-ci.md); published repair CI remains a separate check. |
 | Shared monitor implementation | One `monitor-ui` and common Python state/actions with native AppKit, WebView2/WPF and GTK hosts. Source/runtime fixture delivery is complete; physical/DPI/login checks remain separate. [Architecture](SHARED-MONITOR.md). |
 | Public Mac0.9.9 delivery | Signed Mac arm64 package and exact-package real-GitHub Settings update/automatic retention verified in isolation. [Receipt](native-validation/2026-10-11-macos-retention-release.md). |
 | P510 deployment and Mac metrics activation | Deployment, HTTPS and real owner-Mac0.9.8 Settings enable/sync/disable/re-enable passed. [Deployment](native-validation/2026-10-11-p510-metrics-deployment.md), [activation](native-validation/2026-10-11-macos-central-sharing.md). |

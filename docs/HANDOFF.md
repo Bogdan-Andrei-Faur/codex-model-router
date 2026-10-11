@@ -14,6 +14,13 @@ superseded restart, deployment or installation prerequisites.
 
 ## CI portability and hover repairs — 2026-10-11
 
+The later intermittent native Ubuntu peek assertion is now reproduced and
+repaired in the smoke harness: it observes native outside delivery and scheduled
+closure deadlines instead of assuming500ms includes WebKit startup. Four native
+DEB/Xvfb runs and shared-probe negative controls PASS; product behavior is
+unchanged. See the [timing receipt](native-validation/2026-10-11-ubuntu-hover-ci.md).
+The earlier documentation-only run's successful retry remains historical evidence.
+
 The post0.9.9 audit found deterministic Windows portability/probe failures,
 a stale Ubuntu smoke callback and intermittent browser hover/collapse checks.
 Source now closes notice download handles before validation/rename/cleanup,

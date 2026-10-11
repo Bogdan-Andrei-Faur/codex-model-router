@@ -230,8 +230,10 @@ def exercise(package, base):
         try:
             outcome = json.loads(web.evaluate_javascript_finish(result).to_string())
             if outcome['done']:
-                if all(outcome['checks']): hover_passed.append(True)
-                else: error.append('Packaged hover assertions: ' + str(outcome['checks']))
+                if all(outcome['checks']):
+                    print('Packaged native hover: ' + json.dumps(outcome['stages']), flush=True)
+                    hover_passed.append(True)
+                else: error.append('Packaged hover assertions: ' + json.dumps(outcome))
         except Exception as failure:
             error.append('Packaged hover check failed: ' + str(failure))
     def font_result(web, result, _):
@@ -287,33 +289,15 @@ def exercise(package, base):
             # bounds; its default center can fall inside the expanded island.
             pointer.warp(screen, 0, screen.get_height() - 1)
             display.sync()
-            # Open
-            # the details without generating mouseleave: native pointer geometry
-            # must close both panels, including an unchanged outside position.
-            app.web.evaluate_javascript("""
-                window.fixtureHoverResults=[];
-                document.querySelector('#agents .avatar').click();
-                window.fixtureHoverResults.push(!document.querySelector('#peek').hidden,
-                    document.querySelectorAll('#compact [title]').length===0);
-                setTimeout(()=>{
-                    window.fixtureHoverResults.push(document.querySelector('#peek').hidden);
-                    document.querySelector('#quota').click();
-                    window.fixtureHoverResults.push(!document.querySelector('#peek').hidden);
-                    setTimeout(()=>{
-                        window.fixtureHoverResults.push(document.querySelector('#peek').hidden);
-                        document.querySelector('#expand').click();
-                        window.fixtureHoverResults.push(!document.querySelector('#expanded').hidden,
-                            document.querySelectorAll('header,#collapse,#hide').length===0);
-                        setTimeout(()=>{
-                            window.fixtureHoverResults.push(!document.querySelector('#compact').hidden);
-                            window.fixtureHoverDone=true;
-                        },850);
-                    },500);
-                },500);
-            """, -1, None, app.page, None, None, None)
+            # Click without generating DOM leave. Native pointer geometry must
+            # close every panel. Observe its asynchronous delivery first: startup
+            # can queue an old inside sample before the pointer warp above.
+            script = (Path(__file__).parent / 'fixtures/native_hover_probe.js').read_text()
+            script += "\nwindow.runNativeHoverProbe().then(result=>window.fixtureHoverResult=result);"
+            app.web.evaluate_javascript(script, -1, None, app.page, None, None, None)
         if hover_started and not hover_pending:
             hover_pending.append(True)
-            app.web.evaluate_javascript("JSON.stringify({done:window.fixtureHoverDone===true,checks:window.fixtureHoverResults||[]})", -1, None, app.page, None, hover_result, None)
+            app.web.evaluate_javascript("JSON.stringify(window.fixtureHoverResult||{done:false})", -1, None, app.page, None, hover_result, None)
         if app.ready and received and not font_loaded and not font_pending:
             font_pending.append(True)
             app.web.evaluate_javascript("[...document.fonts].some(face => face.family === 'Router Nunito' && face.status === 'loaded')", -1, None, app.page, None, font_result, None)
