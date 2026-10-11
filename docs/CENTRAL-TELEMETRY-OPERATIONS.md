@@ -28,7 +28,39 @@ have been changed. The desktop default remains no remote sharing.
 
 ## Sentinel deployment
 
-### Owner-selected target and deployment hold — 2026-10-11
+### P510 deployment resumed — 2026-10-11
+
+Sentinel now supports remote application deployment, state, logs and HTTP routing
+on P510. The live controller reports `e5864948a84b7704fc86a1aa4c2931cafbf5afaa`;
+its remote-deployment contract is documented in Sentinel's
+`docs/operations/node-app-deployment.md`. The owner explicitly requested normal
+deployment after being told remote backup/restore is **not integrated**. Do not
+describe this deployment as backed up or restored through Sentinel.
+
+Use `deploy/compose.metrics.p510.yml` via **Incorporar proyecto Compose**, select
+execution node P510, web service `api`, internal port8080 and readiness endpoint
+`/health/ready`. Set the two private variables below and leave autodeploy and
+backup disabled. The remote profile uses only project-owned networks and named
+volumes; no external `sentinel-public` network or host mount is required. Sentinel
+assigns container/volume names, exposes only the API on a LAN port and configures
+the Mac proxy to reach it. PostgreSQL has no published port.
+
+Remote Sentinel does not support a separate migration command. This profile
+explicitly runs the additive/idempotent schema migration before starting Uvicorn;
+failure prevents HTTP startup. Future incompatible migrations require a reviewed
+upgrade procedure, not automatic rollback. The original same-host profile keeps
+its separate operator migration command.
+
+Public clients use HTTPS. The current Sentinel remote ingress forwards HTTP
+between the Mac proxy and P510 over the trusted LAN; it does not provide encrypted
+node-to-node transport. Restrict access to the trusted home network. Operator
+credentials and environment must remain outside source/control logs.
+
+Source preparation is not a deployment receipt. Confirm matching remote commit,
+terminal worker receipt with transfer cleanup, actual container health, public
+TLS/ingestion and owner panel authentication before recording activation.
+
+### Historical deployment hold (superseded)
 
 The owner selected **P510**, not the Mac mini, and explicitly chose to leave
 deployment pending after the placement limitation was confirmed. Publishing

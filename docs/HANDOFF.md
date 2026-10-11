@@ -9,12 +9,14 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 
 ## Central telemetry implementation — 2026-10-11
 
-Publication is authorized to `main`. The owner selected **P510** for the backend
-and then explicitly deferred deployment: Sentinel32a4768 observes that node and
-uses it for CI, but application deployments still execute on its Mac controller.
-Resume only after adding supported explicit P510 placement and cross-host ingress
-to Sentinel; do not silently deploy on the Mac mini. See the target/hold section
-in the operator runbook. No Sentinel source or live configuration was changed.
+Source was published to `main107d3e1`. The owner selected **P510** for the backend.
+The earlier hold is superseded: Sentinel now supports remote Compose applications
+and the owner requested normal deployment despite its explicitly disclosed lack
+of remote backup/restore integration. Use `deploy/compose.metrics.p510.yml` and
+the current operator runbook; do not import the same-host YAML example unchanged.
+The remote profile performs an explicit idempotent migration before HTTP startup.
+Source preparation alone does not prove deployment, TLS or ingestion. Preserve
+default-off client sharing and record actual activation evidence separately.
 
 Owner selected an end-user Settings switch with no URL/key/account setup, metrics
 opt-in plus additional permissions for prompts/raw OTLP, owner-only private panel,

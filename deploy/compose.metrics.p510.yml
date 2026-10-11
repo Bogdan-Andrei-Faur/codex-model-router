@@ -1,0 +1,69 @@
+# P510 profile: Sentinel assigns project-owned names and the LAN web port.
+# No external Docker network or separate Sentinel migration command is required.
+name: router-metrics
+services:
+  db:
+    image: postgres:17-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826
+    container_name: router-metrics-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: router_metrics
+      POSTGRES_USER: router_metrics
+      POSTGRES_PASSWORD: ${METRICS_DB_PASSWORD:?Set a random hexadecimal database password in Sentinel}
+    volumes:
+      - metrics-db:/var/lib/postgresql/data
+    networks: [private]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U router_metrics -d router_metrics']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 128
+    logging:
+      options: {max-size: 10m, max-file: '3'}
+  api:
+    build:
+      context: ..
+      dockerfile: services/metrics/Dockerfile
+    image: codex-model-router-metrics:${METRICS_IMAGE_TAG:-local}
+    container_name: router-metrics-api
+    restart: unless-stopped
+    # Explicit, additive and idempotent bootstrap for Sentinel remote execution.
+    # A migration failure prevents the HTTP server from starting.
+    command: [sh, -c, 'python -m services.metrics.app migrate && exec uvicorn services.metrics.app:app --host 0.0.0.0 --port 8080 --workers 1 --limit-concurrency 32 --timeout-keep-alive 5 --no-access-log --no-proxy-headers']
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      DATABASE_URL: postgresql://router_metrics:${METRICS_DB_PASSWORD:?Set database password}@db:5432/router_metrics
+      ADMIN_PASSWORD: ${METRICS_ADMIN_PASSWORD:?Set a random owner password of at least 32 characters in Sentinel}
+      DELETION_LEDGER: /data/deletions.jsonl
+      MAX_INSTALLATIONS: '10000'
+      ENROLLMENTS_PER_HOUR: '60'
+      MAX_INSTALLATION_BYTES: '134217728'
+      MAX_TOTAL_BYTES: '1073741824'
+      MAX_DATABASE_BYTES: '5368709120'
+    volumes:
+      - metrics-ledger:/data
+    networks: [private, ingress]
+    read_only: true
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/ready', timeout=4)"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 64
+    logging:
+      options: {max-size: 10m, max-file: '3'}
+networks:
+  private: {internal: true}
+  ingress: {}
+volumes:
+  metrics-db:
+  metrics-ledger:
