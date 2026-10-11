@@ -45,6 +45,12 @@ volumes; no external `sentinel-public` network or host mount is required. Sentin
 assigns container/volume names, exposes only the API on a LAN port and configures
 the Mac proxy to reach it. PostgreSQL has no published port.
 
+The remote filename follows Sentinel's single-suffix convention
+(`compose.metrics-p510.yml`). Empty variable defaults allow Sentinel to inspect
+the Compose before configuring private environment values. They are not usable
+credentials: a new PostgreSQL database refuses an empty password and API readiness
+rejects an owner password shorter than32 characters. Never enable trust auth.
+
 Remote Sentinel does not support a separate migration command. This profile
 explicitly runs the additive/idempotent schema migration before starting Uvicorn;
 failure prevents HTTP startup. Future incompatible migrations require a reviewed

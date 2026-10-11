@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: router_metrics
       POSTGRES_USER: router_metrics
-      POSTGRES_PASSWORD: ${METRICS_DB_PASSWORD:?Set a random hexadecimal database password in Sentinel}
+      POSTGRES_PASSWORD: ${METRICS_DB_PASSWORD:-}
     volumes:
       - metrics-db:/var/lib/postgresql/data
     networks: [private]
@@ -36,8 +36,8 @@ services:
     depends_on:
       db: {condition: service_healthy}
     environment:
-      DATABASE_URL: postgresql://router_metrics:${METRICS_DB_PASSWORD:?Set database password}@db:5432/router_metrics
-      ADMIN_PASSWORD: ${METRICS_ADMIN_PASSWORD:?Set a random owner password of at least 32 characters in Sentinel}
+      DATABASE_URL: postgresql://router_metrics:${METRICS_DB_PASSWORD:-}@db:5432/router_metrics
+      ADMIN_PASSWORD: ${METRICS_ADMIN_PASSWORD:-}
       DELETION_LEDGER: /data/deletions.jsonl
       MAX_INSTALLATIONS: '10000'
       ENROLLMENTS_PER_HOUR: '60'
