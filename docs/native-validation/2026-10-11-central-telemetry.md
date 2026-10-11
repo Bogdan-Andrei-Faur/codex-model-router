@@ -62,6 +62,16 @@ API/DB readiness, private DB/no published port, owned networks and unauthenticat
 owner-panel401. Only UUID-owned disposable containers/networks/volumes were
 removed. This verifies the profile locally, not public or P510 activation.
 
+Actual onboarding compatibility checks also required Sentinel's single-suffix
+filename and inspectable empty interpolation defaults; credentials still fail
+closed at PostgreSQL startup/API readiness. The current remote source95787fc
+includes these corrections and Git exclusions for private deployment env files.
+Sentinel cloned the dedicated controller checkout, inspected both services and
+detected the two privately generated credentials. Its form is prepared; owner
+credential import/submission remains pending. Cloudflared acknowledged domain
+CNAME creation, without immediate local DNS/public-readiness confirmation. No
+remote backend container or public synthetic ingestion is claimed by this receipt.
+
 ## Limits and remaining gates
 
 Collection is best-effort research telemetry: the local journal and outbox are

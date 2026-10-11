@@ -18,6 +18,19 @@ The remote profile performs an explicit idempotent migration before HTTP startup
 Source preparation alone does not prove deployment, TLS or ingestion. Preserve
 default-off client sharing and record actual activation evidence separately.
 
+Preparation follow-up: the native controller has a clean, dedicated checkout at
+`/Users/admin/Projects/codex-model-router-metrics`, source95787fc. The live Sentinel
+form is prepared for P510, API8080, `/health/ready`, `router.andreifaur.dev`, no
+autodeploy and no initial deploy. The owner asked the agent to generate both
+credentials: independent random64-character values were stored only in private
+0600 files on the controller (Git-ignored `.env` and an operator copy under
+`~/Library/Application Support/Codex Model Router Metrics/operator.env`). Never
+print or commit their contents. Sentinel detected `.env (2)`; the browser handoff
+requires the owner to import it, simulate and submit the new credentials/project.
+No backend deployment receipt or public ingestion is established yet. Cloudflared
+acknowledged creating the domain's CNAME to its existing tunnel, but workstation
+DNS resolution/public readiness were still unavailable immediately afterward.
+
 Owner selected an end-user Settings switch with no URL/key/account setup, metrics
 opt-in plus additional permissions for prompts/raw OTLP, owner-only private panel,
 no automatic server deletion and `https://router.andreifaur.dev`. Sentinel must
