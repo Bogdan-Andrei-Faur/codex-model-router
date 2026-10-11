@@ -7,6 +7,26 @@ links current contracts, installation, routing/evidence and historical receipts.
 This checkout is sufficient; no other agent, personal memory or external knowledge
 service is needed. Preserve local work and coordinate disruptive owner actions.
 
+## CI portability and hover repairs — 2026-10-11
+
+The post0.9.9 audit found deterministic Windows portability/probe failures,
+a stale Ubuntu smoke callback and intermittent browser hover/collapse checks.
+Source now closes notice download handles before validation/rename/cleanup,
+uses portable notice inventory names, limits the real Unix shell-launcher test
+to Unix hosts and compares native Windows installer paths correctly.
+Windows frozen bridge smoke uses an explicit compiled synthetic JSONL backend,
+not an unprovided Desktop installation. It retains bounded synthetic failure
+diagnostics as CI artifacts; this verifies packaged pipe forwarding, not a real
+Desktop installation. Ubuntu smoke forwards the native delivery callback.
+DOM pointer tracking includes movement outside the capsule, preserving Escape
+for stationary samples while allowing re-entry; tests observe actual leave before
+advancing a fake clock and cover exact-pixel re-entry.
+Local checks:601 Python tests (53 optional/platform skips),33 JS, all16 browser
+groups,27/27 routing and six offline JEV cases PASS. Each targeted intermittent
+browser test also passed four repeated runs. Native Windows/Ubuntu results must
+come from the new GitHub matrix; local Mac checks do not substitute for them.
+No published installer, owner app, Desktop registration or user data changed.
+
 ## Published Mac retention update — 2026-10-11
 
 Stable **0.9.9** is published on GitHub Releases from immutable source

@@ -29,20 +29,22 @@ def fetch(url, sha256, cache, limit=100_000_000, size=None):
         raise ValueError('Invalid upstream notice input')
     target = cache / sha256
     if not target.exists():
-        with tempfile.NamedTemporaryFile(dir=cache, delete=False) as f:
-            partial = Path(f.name)
-            try:
+        f = tempfile.NamedTemporaryFile(dir=cache, delete=False)
+        partial = Path(f.name)
+        try:
+            with f:
                 with urllib.request.urlopen(url, timeout=30) as r:
                     total = 0
                     while chunk := r.read(1024 * 1024):
                         total += len(chunk)
                         if total > limit: raise ValueError('Notice archive is too large')
                         f.write(chunk)
-                f.flush()
-                if digest(partial) != sha256: raise ValueError('Upstream notice hash mismatch')
-                partial.replace(target)
-            finally:
-                partial.unlink(missing_ok=True)
+            # Windows forbids replacing/unlinking a NamedTemporaryFile while
+            # its handle is open, including rejection and network-error paths.
+            if digest(partial) != sha256: raise ValueError('Upstream notice hash mismatch')
+            partial.replace(target)
+        finally:
+            partial.unlink(missing_ok=True)
     if digest(target) != sha256 or (size is not None and target.stat().st_size != size):
         raise ValueError('Cached notice input mismatch')
     return target
@@ -63,7 +65,7 @@ def texts(archive, destination, excluded=()):
             target = destination / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(tar.extractfile(member).read())
-            copied.append(str(relative))
+            copied.append(relative.as_posix())
     if not copied: raise ValueError('Upstream archive has no license texts')
     return copied
 

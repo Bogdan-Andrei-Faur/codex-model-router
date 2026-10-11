@@ -1069,8 +1069,12 @@ document.documentElement.addEventListener('mouseleave',()=>{schedulePeekClose();
 $('surface').addEventListener('mouseenter',()=>islandPointer(true));
 $('surface').addEventListener('mouseleave',()=>islandPointer(false));
 $('compact').addEventListener('focusout',event=>{if(!$('compact').contains(event.relatedTarget))schedulePeekClose();});
-$('compact').addEventListener('pointermove',event=>{
-  if(event.movementX||event.movementY){peekDismissed=false;window.monitorPointer({x:event.clientX,y:event.clientY});}
+document.addEventListener('pointermove',event=>{
+  // Remember real movement outside the capsule too: returning to the same
+  // avatar pixel after Escape is movement, unlike a stationary native sample.
+  // Chromium can report zero movementX/Y on the first event after a layout swap.
+  if(event.movementX||event.movementY||!lastHoverPoint||event.clientX!==lastHoverPoint.x||event.clientY!==lastHoverPoint.y)
+    window.monitorPointer({x:event.clientX,y:event.clientY});
 });
 document.addEventListener('keydown',event=>{if(event.key==='Escape'){if(peekId||quotaOpen){peekDismissed=true;closePeek();}else setMode('Compact');}});
 let boundsFrame=0;

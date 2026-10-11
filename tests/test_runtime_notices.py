@@ -13,6 +13,25 @@ from tools.packaging import bundled_notices, prepare_runtime_notices as notices
 
 
 class RuntimeNoticesTests(unittest.TestCase):
+    def test_download_publishes_verified_bytes_and_reuses_cache(self):
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder); data = b'verified archive'
+            digest = hashlib.sha256(data).hexdigest()
+            with patch.object(notices.urllib.request, 'urlopen', return_value=io.BytesIO(data)) as network:
+                target = notices.fetch('https://example.invalid/archive', digest, cache)
+                self.assertEqual(target.read_bytes(), data)
+                self.assertEqual(notices.fetch('https://example.invalid/archive', digest, cache), target)
+                network.assert_called_once()
+            self.assertEqual(list(cache.iterdir()), [target])
+
+    def test_network_failure_closes_and_removes_partial(self):
+        with tempfile.TemporaryDirectory() as folder:
+            cache = Path(folder)
+            with patch.object(notices.urllib.request, 'urlopen', side_effect=OSError('synthetic network failure')):
+                with self.assertRaisesRegex(OSError, 'synthetic network failure'):
+                    notices.fetch('https://example.invalid/archive', '0' * 64, cache)
+            self.assertEqual(list(cache.iterdir()), [])
+
     def test_download_rejects_hash_or_size_and_does_not_leave_partial(self):
         with tempfile.TemporaryDirectory() as folder:
             cache = Path(folder); digest = hashlib.sha256(b'expected').hexdigest()

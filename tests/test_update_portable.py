@@ -218,7 +218,7 @@ class PortableUpdateTests(unittest.TestCase):
     def test_windows_command_cannot_restart_or_close_other_apps(self):
         command=u.windows_install_command(Path('C:/space here/setup.exe'),Path('C:/app here'))
         for flag in ('/NORESTART','/NOCLOSEAPPLICATIONS','/NORESTARTAPPLICATIONS','/RESTARTEXITCODE=3010'):self.assertIn(flag,command)
-        self.assertEqual(command[-1],'/DIR=C:/app here')
+        self.assertEqual(command[-1],'/DIR='+str(Path('C:/app here')))
 
     def test_adapter_requires_protocol_and_actual_host(self):
         with tempfile.TemporaryDirectory() as folder:

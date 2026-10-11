@@ -71,6 +71,18 @@ const fs=require('node:fs/promises'),os=require('node:os'),path=require('node:pa
     await page.locator('#agents .avatar').nth(1).hover();
     await page.waitForFunction(()=>document.querySelector('#peek').textContent.includes('Validar los cambios'));
     assert.match(await page.locator('#peek').innerText(),/Validar los cambios/);
+    const point=await page.evaluate(()=>lastHoverPoint);
+    assert.ok(point,'DOM hover did not project pointer coordinates');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(()=>document.querySelector('#peek').hidden);
+    // Repeated native samples at the same pixel must respect Escape; moving
+    // out and back to that exact pixel must permit the DOM hover again.
+    await page.evaluate(p=>window.monitorPointer(p),point);
+    assert.equal(await page.locator('#peek').isVisible(),false,'Stationary sample reopened dismissed peek');
+    await page.mouse.move(10,900);
+    await page.waitForFunction(()=>lastHoverPoint?.y===900);
+    await page.mouse.move(point.x,point.y);
+    await page.waitForFunction(()=>document.querySelector('#peek').textContent.includes('Validar los cambios')&&!document.querySelector('#peek').hidden);
     await page.locator('#quota').hover();
     await page.waitForFunction(()=>document.querySelector('#peek .quota-card-number')?.textContent==='85%');
     assert.equal(await page.locator('#peek .quota-card-number').innerText(),'85%');

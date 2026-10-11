@@ -206,9 +206,9 @@ def exercise(package, base):
     app = Monitor(migrated, preview=True)
     received = []
     original = app.emit
-    def capture(function, payload):
+    def capture(function, payload, *args):
         if function == 'receive': received.append(payload)
-        original(function, payload)
+        original(function, payload, *args)
     app.emit = capture
     deadline = time.monotonic() + 25
     error = []

@@ -22,10 +22,47 @@ sys.path.insert(0,str(ROOT))
 from tools.packaging.build_windows_installer import build_environment
 
 
+def fixture_backend(folder, env):
+    """Native JSONL peer: no installed Desktop, Python lookup or inference."""
+    source = folder / 'backend.cs'
+    binary = folder / 'codex.exe'
+    source.write_text('''using System;
+using System.Collections.Generic;
+using System.Web.Script.Serialization;
+class Backend {
+    static int Main() {
+        var json = new JavaScriptSerializer();
+        bool initialized = false;
+        string line;
+        while ((line = Console.ReadLine()) != null) {
+            var request = json.Deserialize<Dictionary<string, object>>(line);
+            string method = (string)request["method"];
+            if (method == "initialized") { initialized = true; continue; }
+            object result;
+            if (method == "initialize") result = new { userAgent = "synthetic-native-fixture" };
+            else if (method == "model/list" && initialized)
+                result = new { data = new[] { new { id = "synthetic-fixture", model = "synthetic-fixture" } } };
+            else if (method == "thread/list")
+                result = new { data = new object[0], nextCursor = (string)null };
+            else return 2;
+            Console.WriteLine(json.Serialize(new { id = request["id"], result = result }));
+            Console.Out.Flush();
+        }
+        return 0;
+    }
+}''', encoding='utf-8')
+    compiler = Path(os.environ['WINDIR']) / 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
+    subprocess.run([str(compiler), '/nologo', '/r:System.Web.Extensions.dll',
+                    '/out:' + str(binary), str(source)], env=env, check=True,
+                   capture_output=True, timeout=60)
+    return binary
+
+
 def probe_interactive_bridge(command, env):
     """Handshake/catalog must reply while stdin stays open; no task or turn."""
+    diagnostics = tempfile.TemporaryFile()
     process=subprocess.Popen([str(v) for v in command]+['app-server'],env=env,
-                             stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
+                             stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=diagnostics,
                              creationflags=subprocess.CREATE_NO_WINDOW)
     messages=queue.Queue()
     def read():
@@ -42,6 +79,7 @@ def probe_interactive_bridge(command, env):
             if message.get('id')==identifier and 'method' not in message:
                 if 'error' in message:raise RuntimeError('Frozen bridge rejected protocol request')
                 return message.get('result') or {}
+    failed = True
     try:
         send({'id':1,'method':'initialize','params':{'clientInfo':{'name':'router_connection_check','version':'1.0'}}})
         response(1)
@@ -49,12 +87,24 @@ def probe_interactive_bridge(command, env):
         send({'id':2,'method':'model/list','params':{}})
         catalog=response(2)
         assert isinstance(catalog.get('data'),list) and catalog['data']
+        assert catalog['data'][0]['id'] == 'synthetic-fixture'
         assert process.poll() is None
+        failed = False
     finally:
-        process.stdin.close()
+        try:process.stdin.close()
+        except BrokenPipeError:pass
         try:process.wait(timeout=10)
         except subprocess.TimeoutExpired:process.kill();process.wait(timeout=5)
         reader.join(timeout=2);process.stdout.close()
+        if failed:
+            # This peer/config contains synthetic fixture data only. Retain a
+            # bounded private diagnostic, rather than hiding early EOF causes.
+            diagnostics.seek(0, os.SEEK_END)
+            diagnostics.seek(max(0, diagnostics.tell() - 4096))
+            log = ROOT / 'state/windows-installer-bridge-failure.txt'
+            log.parent.mkdir(exist_ok=True)
+            log.write_bytes(('exit=' + str(process.returncode) + '\n').encode() + diagnostics.read())
+        diagnostics.close()
 
 
 def run(command, env, **kwargs):
@@ -99,7 +149,12 @@ def smoke(receipt, compiler=None, bootstrapper=None, previous=None, shortcuts=Fa
             stamp=run([powershell,'-NoProfile','-ExecutionPolicy','Bypass','-File',native_stamp,native],env).decode().strip()
             assert stamp==report['version']+'+'+report['build']+'+'+report['routerBuild']
         run(command+['--bootstrap'],empty)
-        config=data/'config.local.json';value=json.loads(config.read_text());value['enabled']=False;value['fixture']='retained';config.write_text(json.dumps(value))
+        backend = fixture_backend(temporary, empty)
+        config=data/'config.local.json';value=json.loads(config.read_text())
+        value.update(enabled=False, fixture='retained', installation_mode='manual',
+                     codex=str(backend), inference_telemetry=False, prompt_logging=False,
+                     phase_routing=False)
+        config.write_text(json.dumps(value))
         before=config.read_bytes();run(command+['--bootstrap'],empty);assert config.read_bytes()==before
         probe_interactive_bridge(command,empty)
         # Migrate synthetic data and a real DPAPI CurrentUser blob without keys.

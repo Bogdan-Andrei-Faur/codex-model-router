@@ -94,7 +94,11 @@ const assert=require('node:assert/strict');
     await page.locator('[data-tab="settings"]').click();
     await page.locator('[data-settings-section=routing]').click();
     await page.evaluate(()=>{const input=document.querySelector('#settings input[type=password]');input.closest('.key-editor').hidden=false;input.value='synthetic-unsaved-fixture';});
-    await page.mouse.move(1,850);await page.clock.runFor(400);
+    // Mouse dispatch and the fake page clock use different queues. Observe the
+    // real DOM leave before advancing its deadline on a busy CI runner.
+    await page.mouse.move(1,850);
+    await page.waitForFunction(()=>islandPointerOutside && (islandCloseTimer!==null || state.ui.mode==='Compact'));
+    await page.clock.runFor(400);
     assert.equal(await page.locator('#compact').isVisible(),true,'DOM exit failed to compact the island');
     await page.locator('#expand').click();
     assert.equal(await page.locator('#settings input[type=password]').first().inputValue(),'synthetic-unsaved-fixture','Auto-collapse discarded unsaved input');

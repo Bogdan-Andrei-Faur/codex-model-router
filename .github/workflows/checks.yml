@@ -141,3 +141,12 @@ jobs:
           $latest = (Get-ChildItem release/latest -Recurse -Filter build-result.json).FullName
           python tests/smoke_windows_installer.py $latest --compiler $tools.compiler --webview2-bootstrapper $tools.webview2Bootstrapper --previous-receipt $initial
           if ($LASTEXITCODE -ne 0) { throw 'Windows installer fixture validation failed' }
+      - name: Save synthetic Windows installer failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-fixture-diagnostics
+          path: |
+            state/windows-installer-bridge-failure.txt
+            state/windows-installer-fixture-failure.txt
+          if-no-files-found: warn

@@ -118,6 +118,7 @@ class SourceLayoutTests(unittest.TestCase):
                 copy_legal_notices(fixture, destination)
             self.assertFalse(destination.exists())
 
+    @unittest.skipIf(os.name == 'nt', 'Executes the generated Unix shell launcher')
     def test_generated_linux_runtime_executes_the_actual_payload(self):
         # Only the host's missing Debian/desktop-validation tools are substituted.
         # Execute the real generated shell launcher against the real staged code.
