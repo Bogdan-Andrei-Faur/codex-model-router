@@ -23,7 +23,8 @@ scene animations, the rigid body dimensions and reduced motion across the scene,
 instead of expecting every state to animate the body itself.
 DOM pointer tracking includes movement outside the capsule, preserving Escape
 for stationary samples while allowing re-entry; tests observe actual leave before
-advancing a fake clock and cover exact-pixel re-entry.
+advancing a fake clock and cover exact-pixel re-entry. DOM exit uses the actual
+surface margin: Windows Settings can extend below the old fixed test point.
 Local checks:601 Python tests (53 optional/platform skips),33 JS, all16 browser
 groups,27/27 routing and six offline JEV cases PASS. Each targeted intermittent
 browser test also passed four repeated runs. Native Windows/Ubuntu results must

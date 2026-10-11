@@ -94,9 +94,17 @@ const assert=require('node:assert/strict');
     await page.locator('[data-tab="settings"]').click();
     await page.locator('[data-settings-section=routing]').click();
     await page.evaluate(()=>{const input=document.querySelector('#settings input[type=password]');input.closest('.key-editor').hidden=false;input.value='synthetic-unsaved-fixture';});
-    // Mouse dispatch and the fake page clock use different queues. Observe the
-    // real DOM leave before advancing its deadline on a busy CI runner.
-    await page.mouse.move(1,850);
+    // Native fonts/scrollbars can grow Settings to the viewport limit. A fixed
+    // y=850 can still be inside its surface on Windows. Flush the layout frame,
+    // then leave through the actual bottom margin using real pointer events.
+    await page.clock.runFor(32);
+    // Exercise the largest permitted Settings surface on every platform too.
+    await page.evaluate(()=>document.getElementById('surface').style.setProperty('--preferences-height',innerHeight+'px'));
+    const surface=await page.locator('#surface').boundingBox(),viewport=page.viewportSize();
+    const outside={x:surface.x+surface.width/2,y:(surface.y+surface.height+viewport.height)/2};
+    assert.ok(outside.y>surface.y+surface.height && outside.y<viewport.height,'DOM exit needs a real margin outside the island');
+    await page.mouse.move(surface.x+surface.width/2,surface.y+20);
+    await page.mouse.move(outside.x,outside.y);
     await page.waitForFunction(()=>islandPointerOutside && (islandCloseTimer!==null || state.ui.mode==='Compact'));
     await page.clock.runFor(400);
     assert.equal(await page.locator('#compact').isVisible(),true,'DOM exit failed to compact the island');
