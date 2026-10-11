@@ -7,6 +7,11 @@ links current contracts, installation, routing/evidence and historical receipts.
 This checkout is sufficient; no other agent, personal memory or external knowledge
 service is needed. Preserve local work and coordinate disruptive owner actions.
 
+**Current work list:** [FOLLOWUP.md](FOLLOWUP.md) separates completed delivery,
+owner-accepted/waived gates and actual remaining work. Older dated sections below
+retain historical evidence; use the latest matching receipt rather than reviving
+superseded restart, deployment or installation prerequisites.
+
 ## CI portability and hover repairs — 2026-10-11
 
 The post0.9.9 audit found deterministic Windows portability/probe failures,
@@ -27,11 +32,15 @@ advancing a fake clock and cover exact-pixel re-entry. DOM exit uses the actual
 surface margin: Windows Settings can extend below the old fixed test point.
 Local checks:601 Python tests (53 optional/platform skips),33 JS, all16 browser
 groups,27/27 routing and six offline JEV cases PASS. Each targeted intermittent
-browser test also passed four repeated runs. Native Windows/Ubuntu results must
-come from the new GitHub matrix; local Mac checks do not substitute for them.
+browser test also passed four repeated runs. Final main `023665a` matrix
+[38169713976](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/38169713976)
+completed **14/14 successful**, including all three native monitor/browser jobs
+and the frozen Windows installer lifecycle. These are CI/fixture results, not
+new owner-host acceptance.
 The first repair matrix passed12/14 jobs, including all Python/platform and
 browser checks; its two newly unblocked native probe expectations are corrected
-above. The follow-up full matrix is the completion gate.
+above. A second matrix reached13/14 and exposed the Windows Settings exit test's
+fixed coordinate; the final matrix above closes the CI gate.
 No published installer, owner app, Desktop registration or user data changed.
 
 ## Published Mac retention update — 2026-10-11
@@ -100,7 +109,8 @@ Eight public synthetic checks and the actual client transport passed; all test
 events were deleted (two retained installation/tombstone records, zero events and
 bytes). Autodeploy remains owner-selected at300s. Client source now sends a truthful
 product User-Agent to avoid Cloudflare's rejection of generic Python requests.
-Owner application/release was not replaced and real client sharing remains off.
+That deployment step did not replace the owner app or enable sharing. The later
+owner0.9.8 activation above supersedes its then-disabled client state.
 Remote backups/restores remain unsupported, as previously accepted by the owner.
 See [deployment receipt](native-validation/2026-10-11-p510-metrics-deployment.md).
 The preparation and earlier blockers below are historical, superseded by this result.

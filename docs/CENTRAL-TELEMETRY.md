@@ -1,16 +1,21 @@
-# Central telemetry and Sentinel deployment — design, 2026-10-11
+# Central telemetry and Sentinel deployment — 2026-10-11
 
-Status: **implemented locally; public activation and native acceptance pending**.
+Status: **deployed on P510; owner Mac0.9.8 native metrics activation verified**.
 The repository now includes the FastAPI/PostgreSQL backend, consent-aware durable
 client outbox, shared Settings controls, private owner panel and Sentinel Compose
-artifacts. No DNS, production deployment or owner installation was changed.
-The canonical endpoint is `https://router.andreifaur.dev`; availability is not
-asserted. See [the operator runbook](CENTRAL-TELEMETRY-OPERATIONS.md) for exact
+artifacts. [Deployment](native-validation/2026-10-11-p510-metrics-deployment.md)
+and [owner activation](native-validation/2026-10-11-macos-central-sharing.md)
+record HTTPS readiness and real Settings enable/sync/disable/re-enable ingestion.
+The canonical endpoint is `https://router.andreifaur.dev`; these are dated
+observations, not a continuous availability claim. Other-platform sharing,
+owner-data deletion/offline retry and remote backup/restore remain separate.
+See [FOLLOWUP.md](FOLLOWUP.md) and [the operator runbook](CENTRAL-TELEMETRY-OPERATIONS.md) for exact
 commands, limits, credential custody, verification and remaining gates.
 
-Implementation refinements: diagnostic JSON lives privately in PostgreSQL and is
-included in its backup; the separate volume holds deletion intents. The initial
-read-only panel uses HTTP Basic over HTTPS, so it has no cookie/CSRF state. Batches
+Implementation refinements: diagnostic JSON lives privately in PostgreSQL and
+must be included in future backups; the separate volume holds deletion intents.
+P510 backup/restore integration is not implemented in the recorded deployment.
+The initial read-only panel uses HTTP Basic over HTTPS, so it has no cookie/CSRF state. Batches
 are bounded uncompressed JSON; larger raw OTLP records are counted as rejected.
 Collection occurs on new journal appends rather than historical tail scanning;
 crash/lock gaps are explicitly best-effort as documented in the runbook.
@@ -73,7 +78,7 @@ flowchart LR
   C --> E[Private diagnostic storage]
   D --> F[Owner-only web dashboard]
   E --> F
-  S[Sentinel] -->|Compose / health / routes / backup| C
+  S[Sentinel] -->|Compose / health / routes| C
 ```
 
 Implementation: a FastAPI service, PostgreSQL and a small private web

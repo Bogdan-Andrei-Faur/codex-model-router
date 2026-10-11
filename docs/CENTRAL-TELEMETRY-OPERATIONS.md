@@ -1,12 +1,19 @@
 # Central telemetry operator runbook
 
-Implementation date: 2026-10-11. This is a deployment candidate, **not an active
-public service**. No owner installation, DNS, Sentinel registration or credentials
-have been changed. The desktop default remains no remote sharing.
+Current recorded state, 2026-10-11: **deployed through Sentinel on P510**, HTTPS
+readiness and owner Mac0.9.8 native metrics ingestion verified. See the
+[deployment receipt](native-validation/2026-10-11-p510-metrics-deployment.md),
+[owner activation](native-validation/2026-10-11-macos-central-sharing.md) and
+[current follow-up](FOLLOWUP.md). New installations default to no remote sharing;
+this owner's Mac has metrics enabled and remote prompt/raw permissions off at the
+last verified snapshot. P510 backup/restore is not integrated. These are dated
+observations; no live operator action is implied by reading this runbook.
 
 ## Files and operator configuration
 
-- Compose: `deploy/compose.metrics.yml`; build: `services/metrics/Dockerfile`.
+- Deployed P510 Compose: `deploy/compose.metrics-p510.yml`; build: `services/metrics/Dockerfile`.
+- Same-host reference Compose: `deploy/compose.metrics.yml`. Its external
+  `sentinel-public` network/upstream example below is not the P510 topology.
 - Sentinel example: `deploy/metrics.sentinel.example.yml`. Replace `repoPath` with
   the checkout path on the actual Sentinel machine. Service type is `http` and
   Compose filename follows Sentinel's `compose.*.yml` convention.
@@ -30,9 +37,12 @@ have been changed. The desktop default remains no remote sharing.
 
 Current result: P510 backend deployment and public synthetic validation PASS;
 see [2026-10-11 deployment receipt](native-validation/2026-10-11-p510-metrics-deployment.md).
-Real owner-client sharing and a new desktop release remain separate pending gates.
+Owner Mac0.9.8 release/activation and actual metrics ingestion are also verified
+by the newer owner receipt linked above. Other-platform sharing and recovery
+remain open. Last deployment receipt records autodeploy at300s; do not replace
+that owner-selected setting with historical onboarding defaults below.
 
-### P510 deployment resumed — 2026-10-11
+### P510 onboarding procedure — historical preparation, 2026-10-11
 
 Sentinel now supports remote application deployment, state, logs and HTTP routing
 on P510. The live controller reports `e5864948a84b7704fc86a1aa4c2931cafbf5afaa`;

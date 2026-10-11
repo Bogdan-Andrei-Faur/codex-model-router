@@ -1,6 +1,14 @@
 # Validation and integration notes
 
-## Current dynamic-notch delivery — 2026-10-08
+## Current source and follow-up — 2026-10-11
+
+Main `023665a` [CI run38169713976](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/38169713976)
+completed14/14 successful after portability, native-probe and hover test repairs.
+Source/native fixture evidence remains distinct from published0.9.9 installer
+bytes and owner-host acceptance. [FOLLOWUP.md](FOLLOWUP.md) is the current work
+list; [STATUS.md](native-validation/STATUS.md) retains exact native gate evidence.
+
+## Historical dynamic-notch delivery — 2026-10-08
 
 [Delivery receipt](native-validation/2026-10-08-documentation-delivery.md):
 complete pending monitor/bridge/UI work, assets, fixtures and current documentation

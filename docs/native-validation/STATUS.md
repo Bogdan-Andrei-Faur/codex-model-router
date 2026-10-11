@@ -2,6 +2,16 @@
 
 Use [the runbook](../NATIVE-VALIDATION.md) and [report template](REPORT-TEMPLATE.md).
 This ledger is repository-owned; no external knowledge/memory service is needed.
+Use [current follow-up](../FOLLOWUP.md) for priorities. Older NOT_RUN rows are
+evidence gaps, not renewed installation prerequisites or known failures.
+
+## Current source CI — 2026-10-11
+
+Main `023665a5b38989c735b84e7dbce4d2165a60fd78`:
+[run38169713976](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/38169713976)
+completed14/14 successful, including native Windows/WebView2/installer and Ubuntu
+GTK package fixtures. This closes source CI defects, not physical owner-host,
+managed Settings/login acceptance or publication of Windows/Ubuntu installers.
 
 ## Latest Mac release — 2026-10-11
 
@@ -37,7 +47,7 @@ See [the owner decision](2026-10-11-owner-installation-acceptance.md). Existing
 update/cancel/recovery and hardware-specific rows keep their stated evidence;
 these installation gates no longer need agent retesting.
 
-## Current dynamic notch — 2026-10-09
+## Historical dynamic-notch baseline — 2026-10-09
 
 The notch is integrated into `main`; publication baseline is `a4af030`, product `0.9.6`.
 The owner authorized direct-main publication of the Ubuntu clock/top-edge changes; use

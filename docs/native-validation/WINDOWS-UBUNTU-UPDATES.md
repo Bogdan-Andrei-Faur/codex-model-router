@@ -4,8 +4,10 @@ Status: Windows/Ubuntu **installation ACCEPTED_BY_OWNER** on2026-10-11; no
 installation retest required. Publication is authorized and awaits the tested
 files from the other computers. See [the owner decision](2026-10-11-owner-installation-acceptance.md).
 Managed-update/cancel/login coverage retains its existing evidence and pending
-cases. This document is an update handoff, not a new execution receipt. The public
-0.9.7 Release still contains only the previously validated Mac arm64 artifact.
+cases. This document is an update handoff, not a new execution receipt. The latest
+stable public0.9.9 Release contains the validated Mac arm64 artifact; it does not
+publish Windows/Ubuntu installers. Source CI14/14 now includes native installer/
+WebView2 and GTK package fixtures; these do not close the Settings/login cases.
 Do not publish Windows/Linux assets as validated based on Mac unit tests.
 
 ## Preparation on each machine
@@ -26,8 +28,8 @@ Do not publish Windows/Linux assets as validated based on Mac unit tests.
    never add a test key or alternate feed to production. The production signing
    key stays on the publisher's Mac; transfer only packages/hashes and signed
    public metadata through the owner. Never invent a new publisher on another PC.
-5. First run the local fixture cases below. Then, after separate publication
-   authorization, publish immutable validated assets plus the signed manifest
+5. First run the local fixture cases below. Under the owner's existing installer
+   publication authorization, publish immutable validated assets plus the signed manifest
    and exercise the production anonymous GitHub check/download from Settings.
    A direct call to `PortableApplier.prepare` is not Settings-button acceptance.
 

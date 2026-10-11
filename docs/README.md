@@ -4,6 +4,8 @@ Start with [HANDOFF.md](HANDOFF.md) for current source/installed/loaded state,
 known failures and continuation. [../README.md](../README.md) is the user-facing
 project overview. Historical evidence describes its exact revision/artifact;
 it does not validate a later implementation or a different owner's machine.
+Use [FOLLOWUP.md](FOLLOWUP.md) for the reconciled current work list and closed,
+owner-accepted or waived gates.
 
 ## Current monitor and implementation
 
@@ -40,7 +42,7 @@ preview lives in `tools/preview_monitor.py` and `tools/preview-monitor.js`.
 ## Routing, privacy and evidence
 
 - [Central telemetry operations](CENTRAL-TELEMETRY-OPERATIONS.md) — Sentinel deployment, opt-in delivery, private dashboard, deletion/restore and remaining native checks.
-- [CENTRAL-TELEMETRY.md](CENTRAL-TELEMETRY.md): owner-selected central sharing, private dashboard and Sentinel deployment contract; implemented locally, activation pending.
+- [CENTRAL-TELEMETRY.md](CENTRAL-TELEMETRY.md): central sharing contract; P510 deployed and owner Mac ingestion verified, other-platform/recovery gates separate.
 
 - [MODEL-CATALOG.md](MODEL-CATALOG.md), [MODEL_POLICY.md](MODEL_POLICY.md), [MODEL-ROUTING-REVIEW.md](MODEL-ROUTING-REVIEW.md): catalog, reference policy and review.
 - [POLICY9-VALIDATION.md](POLICY9-VALIDATION.md), [PHASE-PROBE.md](PHASE-PROBE.md): candidate evaluation and model-switch boundaries.
