@@ -5,6 +5,12 @@ This ledger is repository-owned; no external knowledge/memory service is needed.
 
 ## Owner acceptance — 2026-10-11
 
+Latest Mac client: public0.9.8 signed delivery and isolated real-GitHub Settings
+update PASS. Actual owner0.9.7 detected/verified/downloaded it but correctly
+blocked replacement while Codex agents were active. Owner metrics sharing remains
+off; native consent/ingestion acceptance is PENDING after a normal owner closure
+and retry. See [the exact receipt](2026-10-11-macos-central-client-release.md).
+
 | Gate | Current decision | Scope |
 | --- | --- | --- |
 | Windows installation | ACCEPTED_BY_OWNER | Owner personally tested installation; exact file/version/hash not supplied in this confirmation |

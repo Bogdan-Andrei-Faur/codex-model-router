@@ -7,6 +7,21 @@ links current contracts, installation, routing/evidence and historical receipts.
 This checkout is sufficient; no other agent, personal memory or external knowledge
 service is needed. Preserve local work and coordinate disruptive owner actions.
 
+## Client release and owner-Mac continuation — 2026-10-11
+
+Public **0.9.8** now includes central sharing controls, built from
+`6f1aabf4d49c77195724ab591242fb5b72f5ed85`. The signed Mac arm64 package,
+checksums and build provenance are on GitHub Releases. Exact package smoke and
+isolated native Settings update through public GitHub PASS.
+
+The owner's real0.9.7 Settings detected0.9.8, verified the signature and downloaded
+the exact package, then blocked replacement because Desktop bridges were active.
+No agents were stopped. Owner must finish work, close Codex/ChatGPT normally and
+retry **Update to0.9.8** in Router Settings; the monitor relaunches automatically.
+Afterward validate metrics-only opt-in and server acknowledgement from Data and
+privacy. **Owner sharing is still off; this native ingestion gate is not closed.**
+See [delivery receipt](native-validation/2026-10-11-macos-central-client-release.md).
+
 ## Central telemetry implementation — 2026-10-11
 
 **Current operational state:** owner completed project creation; backend deployment
