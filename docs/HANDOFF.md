@@ -7,6 +7,19 @@ links current contracts, installation, routing/evidence and historical receipts.
 This checkout is sufficient; no other agent, personal memory or external knowledge
 service is needed. Preserve local work and coordinate disruptive owner actions.
 
+## Mac update retention — 2026-10-11
+
+Source now retains one identified previous Mac app and prunes terminal helper/
+extraction/cache artifacts after confirmed success.49 focused tests and three
+isolated native Settings update scenarios PASS, including actual automatic
+cleanup by the new frozen monitor. Owner-authorized one-off cleanup removed
+completed update payloads and inactive generated development bundles; the real
+0.9.8 app and one0.9.7 recovery app remain. See
+[retention receipt](native-validation/2026-10-11-macos-update-retention.md).
+Source version **0.9.9** prepares this policy for the next signed Mac arm64
+release. The owner installation remains0.9.8 until an explicit Settings update.
+The earlier same-version cleanup fixture is not a distributable replacement.
+
 ## Owner Mac metrics activation — 2026-10-11
 
 Owner updated/restarted: installed and handshaken bridge are **0.9.8**, monitor

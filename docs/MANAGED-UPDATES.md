@@ -107,9 +107,23 @@ commits at the next GUI login through a user LaunchAgent; terminal jobs remove
 their registration. Actual logout/power-loss execution still needs native QA.
 
 User configuration, credential handles, history and metrics are outside the app
-and are not modified by replacement. Previous app/job artifacts are retained;
-automatic backup pruning and user-facing manual rollback selection are not yet
-implemented. Do not delete them while an operation or recovery is pending.
+and are not modified by replacement. The Mac source now includes automatic
+retention: after a positively confirmed update, keep the newest identified
+previous app and remove older identified backups, terminal helper/extracted
+payloads and matching cached packages. Small operation/signature receipts remain.
+The monitor retries local maintenance once a minute on its serial update worker,
+independently of the opt-in network update check. Recovery registrations, pending
+or malformed receipts, live helper/bundle processes and the replacement lock
+defer cleanup. Unknown apps, newer downloads and symlink targets are preserved.
+Manual rollback selection is not yet implemented. Windows/Ubuntu retention is
+unchanged; this policy currently applies to the managed Mac bundle layout.
+
+This cleanup is source-implemented and locally/native-fixture verified, **not
+included in the immutable public0.9.8 package**. The owner Mac's already completed
+0.9.8 job was cleaned once using the reviewed maintenance routine, leaving its
+0.9.7 recovery app. Include the code in the next signed release to activate
+periodic maintenance in the installed monitor. See
+[the retention receipt](native-validation/2026-10-11-macos-update-retention.md).
 
 First launch offers Import / Start fresh / Cancel before creating data. Import
 preserves the source and refuses occupied targets, active bridges/monitors,

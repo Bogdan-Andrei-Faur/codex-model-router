@@ -101,6 +101,10 @@ class MacApplier:
         self.root, self.resources = Path(root).resolve(), Path(resources).resolve()
         self.app = self.resources.parent.parent
 
+    def maintenance(self):
+        from codex_model_router.update_cleanup import cleanup_macos
+        return cleanup_macos(self.root, self.app)
+
     def prepare(self, package_path, package, envelope, stop):
         from codex_model_router.platforms.installation_migration import reject_active, MigrationError
         from codex_model_router.updates import architecture, version_key

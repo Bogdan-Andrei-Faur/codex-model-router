@@ -157,6 +157,7 @@ class UpdateManager:
         self.future = None
         self.package = None
         self.next_check = 0
+        self.next_maintenance = 0
         self.state = {'status': 'idle', 'installedVersion': installed, 'latestVersion': None, 'checkedAt': None,
                       'progress': 0, 'error': None, 'canDownload': False, 'canInstall': False,
                       'publisherVerified': False, 'canUpdate': False, 'shutdownForUpdate': False}
@@ -176,8 +177,15 @@ class UpdateManager:
             return dict(self.state)
 
     def maybe_check(self, enabled):
-        """Opt-in daily checks; never run a network request on the polling thread."""
+        """Local retention and opt-in checks run on the serial update worker."""
         with self.lock:
+            maintenance = getattr(self.applier, 'maintenance', None)
+            if (callable(maintenance) and time.monotonic() >= self.next_maintenance
+                    and (self.future is None or self.future.done())
+                    and not self.state['shutdownForUpdate']):
+                self.next_maintenance = time.monotonic() + 60
+                self.future = self.executor.submit(maintenance)
+                return
             if (enabled is True and time.monotonic() >= self.next_check
                     and (self.future is None or self.future.done())
                     and self.state['status'] not in ('available', 'downloaded', 'preparing_install', 'installing')):

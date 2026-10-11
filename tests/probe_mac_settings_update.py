@@ -133,7 +133,7 @@ def stop_owned(root):
             except ProcessLookupError: pass
 
 
-def exercise(old_package, new_package, signature, output, scenario, github_release=False):
+def exercise(old_package, new_package, signature, output, scenario, github_release=False, verify_cleanup=False):
     folder = output / scenario; folder.mkdir()
     expanded = folder / 'expanded'
     subprocess.run(['/usr/sbin/pkgutil', '--expand-full', str(old_package), str(expanded)], check=True, capture_output=True, timeout=120)
@@ -193,11 +193,25 @@ def exercise(old_package, new_package, signature, output, scenario, github_relea
         assert config.read_bytes() == before and not (root / 'state/desktop-integration.json').exists()
         assert not list((root / 'fixture-agents').glob('*.plist'))
         assert app_info(app)['CFBundleShortVersionString'] == (version if scenario == 'success' else old_info['CFBundleShortVersionString'])
+        if verify_cleanup and scenario == 'success':
+            # The new packaged monitor must do this itself, after its helper
+            # exits; calling cleanup from this driver would hide integration bugs.
+            cleanup_deadline = time.monotonic() + 85
+            while time.monotonic() < cleanup_deadline:
+                if not (job / APP_NAME).exists():
+                    break
+                time.sleep(.2)
+            assert not (job / APP_NAME).exists(), 'New monitor did not clean the terminal helper'
+            assert not (job / 'expanded').exists() and not (job / 'rechecked').exists()
+            assert not (job / new_package.name).exists()
+            assert len(list(app.parent.glob('.router-previous-*.app'))) == 1
+            assert (job / 'operation.json').exists() and config.read_bytes() == before
         return dict(scenario=scenario, passed=True, nativeSettingsButtons=True, cancelledThenRetried=not github_release,
                     signedFrozenHelper=True, automaticOldHostExit=True, newOrRestoredNativeReady=True,
                     preferencesPreserved=True, recoveryHelperReplayed=restarted,
                     localFixtureTransport=not github_release, realGitHubTransport=github_release,
-                    downloadedPackageMatches=github_release, ownerInstallationTouched=False, actualLoginTested=False)
+                    downloadedPackageMatches=github_release, ownerInstallationTouched=False, actualLoginTested=False,
+                    automaticCleanupVerified=verify_cleanup and scenario == 'success')
     finally:
         stop_owned(root)
         if monitor.poll() is None:monitor.terminate()
@@ -210,6 +224,7 @@ if __name__ == '__main__':
     parser.add_argument('--package', type=Path, required=True)
     parser.add_argument('--signature', type=Path)
     parser.add_argument('--github-release', action='store_true', help='Check/download the real public latest release; no transport replacement')
+    parser.add_argument('--verify-cleanup', action='store_true', help='Require the new monitor to prune terminal payloads automatically')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--driver-package', type=Path)
     parser.add_argument('--old-version', default='0.9.6', help='Synthetic installed version, older than the candidate')
@@ -222,6 +237,6 @@ if __name__ == '__main__':
     old = args.driver_package.resolve() if args.driver_package else build_driver(output, args.python.absolute(), args.old_version, args.github_release)
     reports = []
     for scenario in (('success',) if args.github_release else ('success', 'rollback', 'interrupted')):
-        report = exercise(old, args.package.resolve(), args.signature.resolve() if args.signature else None, output, scenario, args.github_release)
+        report = exercise(old, args.package.resolve(), args.signature.resolve() if args.signature else None, output, scenario, args.github_release, args.verify_cleanup)
         reports.append(report); print(json.dumps(report), flush=True)
         (output / 'report.json').write_text(json.dumps(reports, indent=2) + '\n')

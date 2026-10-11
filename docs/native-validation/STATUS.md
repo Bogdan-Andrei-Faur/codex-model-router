@@ -5,6 +5,12 @@ This ledger is repository-owned; no external knowledge/memory service is needed.
 
 ## Owner acceptance — 2026-10-11
 
+Mac retention source:49 tests and isolated native success/rollback/interrupted
+scenarios PASS; new frozen monitor automatically cleans terminal payloads and
+keeps one previous bundle. Owner-authorized one-off cleanup completed. Installed
+public0.9.8 is unchanged; periodic maintenance delivery requires a new signed
+release. [Receipt](2026-10-11-macos-update-retention.md).
+
 Latest Mac client: public0.9.8 signed delivery and isolated real-GitHub Settings
 update PASS. Owner completed update/restart; installed and active bridge0.9.8
 match, handshake complete. Real native Settings metrics enable/sync/disable/

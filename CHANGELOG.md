@@ -1,5 +1,22 @@
 # Cambios
 
+## 0.9.9 — Limpieza de actualizaciones Mac, 11/10/2026
+
+- Conserva una sola versión anterior validada para recuperación tras actualizar.
+- Retira helpers, extracciones y paquetes temporales de operaciones terminadas
+  cuando ya no los necesita ningún proceso ni recuperación pendiente.
+- Mantenimiento en segundo plano, independiente de la comprobación de versiones;
+  conserva configuración, credenciales, métricas y recibos de actualización.
+- Publicación de instalador limitada a Mac Apple Silicon; las validaciones de
+  Windows y Ubuntu mantienen su alcance independiente.
+
+## 0.9.8 — Métricas opcionales, 11/10/2026
+
+- Envío opcional de métricas desde Ajustes, con permisos adicionales independientes
+  para prompts y OTLP crudo, sincronización y controles de borrado remoto.
+- Instalador Mac firmado por el proyecto y actualización real aislada desde
+  GitHub Releases verificados. Activación del propietario registrada por separado.
+
 ## 0.9.7 — Instalador y actualización pública para Mac, 10/10/2026
 
 - Primera [Release con instalador para Mac Apple Silicon](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.7),
