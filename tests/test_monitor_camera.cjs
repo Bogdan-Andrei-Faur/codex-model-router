@@ -6,6 +6,31 @@ const assert=require('node:assert/strict');
 (async()=>{
   const browser=await chromium.launch({headless:true});
   try {
+    // Two separately antialiased edges used to expose the desktop at half-pixel
+    // shoulder joins. Test rendered pixels, including fractional display scales.
+    for(const scale of [1,1.25,1.5,2]) {
+      const page=await browser.newPage({viewport:{width:800,height:160},deviceScaleFactor:scale});
+      await page.goto(pathToFileURL(path.resolve(__dirname,'../monitor-ui/index.html')).href);
+      for(const width of [800,801]) {
+        await page.setViewportSize({width,height:160});
+        await page.evaluate(()=>{
+          window.receive({connections:1,ui:{mode:'Compact',reduced:true,cameraWidth:185,cameraHeight:32},threads:{seam:{name:'Synthetic',status:'idle'}}});
+          document.body.style.background='#098bd0';
+        });
+        const bounds=await page.locator('#surface').boundingBox();
+        const png=await page.screenshot();
+        const pixels=await page.evaluate(async ({data,bounds,scale})=>{
+          const image=new Image();image.src=data;await image.decode();
+          const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
+          const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);
+          return [bounds.x+20,bounds.x+bounds.width-20].flatMap(x=>[1,5,8].map(y=>
+            Array.from(ctx.getImageData(Math.floor(x*scale),Math.floor(y*scale),1,1).data)));
+        },{data:'data:image/png;base64,'+png.toString('base64'),bounds,scale});
+        assert.ok(pixels.every(([r,g,b,a])=>r<=1&&g<=1&&b<=1&&a===255),
+          'Desktop seam at scale '+scale+', width '+width+': '+JSON.stringify(pixels));
+      }
+      await page.close();
+    }
     for(const scale of [1,2]) {
       const page=await browser.newPage({viewport:{width:800,height:1000},deviceScaleFactor:scale});
       const errors=[];page.on('pageerror',e=>errors.push(String(e)));
@@ -78,6 +103,6 @@ const assert=require('node:assert/strict');
       assert.deepEqual(errors,[]);
       await page.close();
     }
-    console.log('PASS: camera exclusion, expanded safe inset, flat display, narrow fallback and 1x/2x');
+    console.log('PASS: camera exclusion, safe inset, flat display, narrow fallback and seamless shoulders at 1–2x');
   } finally {await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

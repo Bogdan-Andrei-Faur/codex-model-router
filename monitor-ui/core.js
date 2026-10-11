@@ -198,14 +198,55 @@
     neck:[['none','Sin accesorio'],['bandana','Pañuelo'],['scarf','Bufanda'],['tie','Corbata'],['bowtie','Pajarita']],
     detail:[['none','Sin detalle'],['pocket','Bolsillo'],['buttons','Botones'],['pin','Pin'],['patch','Parche']],
   };
-  // Stable visual aliases depend on the conversation, never on routing choices.
+  const appearancePalette=[['Coral','#ff9e88'],['Menta','#81d7bd'],['Lila','#c1a0f0'],['Cielo','#96cfff'],['Miel','#e8c583'],['Rosa','#e9a9c1'],['Salvia','#b3c99b'],['Pizarra','#51698b'],['Crema','#eadbc3']];
+  // Append-only catalogues: rendezvous selection keeps existing assignments when
+  // most new entries arrive. Independent domains avoid matching name/color cycles.
+  const companionNames=('Milo Lumi Nori Auri Bimo Ciro Duna Eko Filo Galo Haku Iris Juno Kiro Lilo Miko Nilo Oki Pipo Rumi Sora Tilo Umi Vito Yuki Zuri '+
+    'Alba Balu Coco Dori Elio Fani Gumi Hana Ivo Jiro Koda Luma Momo Nala Oli Pali Rolo Sumi Taro Uma Vera Yuna Zeno '+
+    'Arlo Beni Cora Dimo Enzo Fuyu Gala Hilo Ilan Jara Kimi Lino Mina Nuno Oona Pino Runa Silo Tobi Uli Vega Yori Zola '+
+    'Aiko Boro Celi Dali Eira Fara Gino Hani Indi Jali Kumo Lani Miri Nima Orin Pomi Rafi Seli Tali Ugo Vani Yara Zimo '+
+    'Amu Bina Cami Deli Eni Feli Gigi Hoshi Iri Jori Kiki Leni Meli Novi Omi Puri Rini Suki Timi Una Veli Wini Yumi Zia Neko').split(' ');
+  const companionWardrobes=[
+    {outfit:'hoodie',head:'headphones'},
+    {outfit:'tee',head:'cap',detail:'patch'},
+    {outfit:'sweater',glasses:'round'},
+    {outfit:'overalls',head:'beanie'},
+    {outfit:'vest',neck:'bowtie'},
+    {outfit:'jacket',glasses:'rectangle'},
+    {outfit:'labcoat',glasses:'round',detail:'pin'},
+    {outfit:'tee',head:'antenna'},
+    {outfit:'sweater',head:'beret'},
+    {outfit:'jacket',head:'hat'},
+    {outfit:'vest',neck:'tie'},
+    {outfit:'overalls',glasses:'rectangle',detail:'pocket'},
+  ];
+  function identityHash(value) {
+    let hash=2166136261;
+    for(const char of value){hash^=char.codePointAt(0);hash=Math.imul(hash,16777619);}
+    // Avalanche adjacent identifiers before choosing from short catalogues.
+    hash^=hash>>>16;hash=Math.imul(hash,0x85ebca6b);hash^=hash>>>13;
+    hash=Math.imul(hash,0xc2b2ae35);return (hash^(hash>>>16))>>>0;
+  }
+  function identityChoice(id,domain,choices,key=value=>String(value)) {
+    return choices.reduce((best,value)=>{
+      const score=identityHash('companion-v1:'+domain+':'+String(id)+'\0'+key(value));
+      return !best||score>best.score?{score,value}:best;
+    },null).value;
+  }
+  // Automatic looks need no writes and survive polling, order and model changes.
   function companion(id, appearance) {
     let hash=2166136261;
     for(const char of String(id)){hash^=char.codePointAt(0);hash=Math.imul(hash,16777619);}
     const variants=[['coral','Milo','#ff9e88'],['mint','Lumi','#81d7bd'],['lilac','Nori','#c1a0f0']];
     const [variant,name,color]=variants[(hash>>>0)%variants.length];
     const base={variant,name,color,accessoryColor:'#51698b',roundness:21,eyes:'oval',head:'none',glasses:'none',outfit:'none',neck:'none',detail:'none'};
-    if(!appearance || typeof appearance!=='object')return base;
+    if(!appearance || typeof appearance!=='object') {
+      const [variant,color]=identityChoice(id,'color',appearancePalette,value=>value[0]);
+      const wardrobe=identityChoice(id,'wardrobe',companionWardrobes,value=>JSON.stringify(value));
+      return {...base,variant,name:identityChoice(id,'name',companionNames),color,
+        accessoryColor:color==='#51698b'?'#eadbc3':'#51698b',...wardrobe};
+    }
+    // Saved (including partial legacy) looks keep their previous fallback rules.
     return {...base,variant:'custom',name:typeof appearance.name==='string'?appearance.name.slice(0,24):name,
       color:/^#[0-9a-f]{6}$/i.test(appearance.color)?appearance.color:color,
       accessoryColor:/^#[0-9a-f]{6}$/i.test(appearance.accessoryColor)?appearance.accessoryColor:base.accessoryColor,
@@ -277,7 +318,7 @@
       statusLabel:!connected&&step.state==='active'?'Última lectura':waiting&&step.state==='active'?'En espera':labels[step.state]||'Sin confirmar'})),
       status:!connected?'Sin conexión':row.status==='interrupted'?'Interrumpida':stopped?'Con incidencia':row.status==='completed'?'Turno terminado':waiting?'En espera':''};
   }
-  const api = {appearanceSlots,withLiveDecisions,executionPipeline,companion,companionState,companionOrder,models,efforts,effortColors,neutral,identities,active,status,setting,model,family,identity,stableOrder,decisions,featuredThread,errorLabel,contextGauge,quotaGauge,liveAgent,usageSample,quotaWindows,weeklyQuota};
+  const api = {appearancePalette,appearanceSlots,withLiveDecisions,executionPipeline,companion,companionState,companionOrder,models,efforts,effortColors,neutral,identities,active,status,setting,model,family,identity,stableOrder,decisions,featuredThread,errorLabel,contextGauge,quotaGauge,liveAgent,usageSample,quotaWindows,weeklyQuota};
   if (typeof module !== 'undefined') module.exports = api;
   else scope.MonitorCore = api;
 })(globalThis);

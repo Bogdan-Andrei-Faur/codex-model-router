@@ -207,10 +207,30 @@ test('usage estimates deduplicate completions and exclude unconfirmed evidence',
 });
 
 test('companion identity is stable and independent of routing metadata',()=>{
-  const identities=Array.from({length:100},(_,i)=>C.companion('conversation-'+i));
-  assert.equal(new Set(identities.map(i=>i.variant)).size,3);
+  const identities=Array.from({length:1000},(_,i)=>C.companion('conversation-'+i));
+  assert.equal(new Set(identities.map(i=>i.color)).size,9);
+  assert.ok(new Set(identities.map(i=>i.name)).size>=100,'Names must vary independently of nine colors');
   assert.deepEqual(C.companion('stable'),C.companion('stable'));
-  for(const item of identities){assert.match(item.color,/^#[a-f0-9]{6}$/);assert.ok(item.name);}
+  for(const item of identities){
+    assert.ok(C.appearancePalette.some(([,color])=>color===item.color));
+    assert.ok(C.appearancePalette.some(([,color])=>color===item.accessoryColor));
+    assert.notEqual(item.color,item.accessoryColor);
+    assert.notEqual(item.outfit,'none');assert.ok(item.name.length<=24);
+    for(const [key,choices] of Object.entries(C.appearanceSlots))assert.ok(choices.some(([value])=>value===item[key]));
+  }
+  for(let i=999;i>=0;i--)assert.deepEqual(C.companion('conversation-'+i),identities[i],'Ordering cannot reshuffle looks');
+  const vm=require('node:vm'),fs=require('node:fs');
+  const context={module:{exports:{}}};vm.runInNewContext(fs.readFileSync(require.resolve('../monitor-ui/core.js'),'utf8'),context);
+  assert.equal(JSON.stringify(context.module.exports.companion('stable')),JSON.stringify(C.companion('stable')),'Fresh renderer must assign the same identity');
+});
+test('automatic wardrobe never replaces saved or partial legacy appearances',()=>{
+  const saved={name:'My name',color:'#81d7bd',accessoryColor:'#e8c583',roundness:24,eyes:'round',outfit:'none',head:'none',glasses:'none',neck:'none',detail:'none'};
+  assert.deepEqual(C.companion('stable',saved),{variant:'custom',...saved});
+  const legacy=C.companion('stable',{glasses:true,scarf:true});
+  assert.ok(['Milo','Lumi','Nori'].includes(legacy.name));
+  assert.equal(legacy.outfit,'none');assert.equal(legacy.head,'none');
+  assert.equal(legacy.glasses,'rectangle');assert.equal(legacy.neck,'scarf');
+  assert.notEqual(C.companion('stable',null).outfit,'none','Reset restores automatic styling');
 });
 test('companion state distinguishes compaction, waiting, completion and disconnection',()=>{
   assert.equal(C.companionState({status:'completed',context_compaction:{state:'compacting'}}).kind,'compacting');

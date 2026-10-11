@@ -12,6 +12,9 @@ const assert=require('node:assert/strict');
   await page.goto(pathToFileURL(path.resolve(__dirname,'../monitor-ui/index.html')).href);
   await page.evaluate(()=>window.receive({connections:1,ui:{mode:'Expanded',reduced:true},threads:{a:{name:'Agent A',status:'active',model:'gpt-6.1-sol'},b:{name:'Agent B',status:'idle'}}}));
   await page.getByRole('button',{name:'Agentes',exact:true}).click();
+  const automaticName=await page.locator('.agent-identity-copy .companion-alias').textContent();
+  assert.ok(await page.locator('.agent-portrait [data-slot=outfit]').evaluate(n=>n.childElementCount>0),'Unedited agents receive automatic clothing');
+  assert.equal(await page.evaluate(()=>window.messages.filter(m=>m.action==='appearance').length),0,'Automatic looks require no persistence writes');
   await page.getByRole('button',{name:'Personalizar',exact:true}).click();
   assert.equal(await page.locator('input[type=color],.appearance-mini,.appearance-sample').count(),0);
   assert.equal(await page.locator('.agent-portrait').getAttribute('data-state'),'idle');
@@ -69,6 +72,7 @@ const assert=require('node:assert/strict');
   await page.getByRole('button',{name:'Guardar',exact:true}).click();
   request=await page.evaluate(()=>window.messages.filter(m=>m.action==='appearance').at(-1));assert.equal(request.value,null);
   await page.evaluate(m=>window.monitorAppearanceResult({...m,ok:true}),request);
+  assert.equal(await page.locator('.agent-identity-copy .companion-alias').textContent(),automaticName,'Reset returns to the same automatic identity');
   await page.getByRole('button',{name:'Personalizar',exact:true}).click();
   for(const category of ['Ropa','Gafas','Cabeza','Cuello','Detalles']){
    await categories.getByRole('button',{name:category,exact:true}).click();

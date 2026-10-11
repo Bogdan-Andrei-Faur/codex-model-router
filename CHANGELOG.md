@@ -1,5 +1,16 @@
 # Cambios
 
+## 0.9.10 — Personajes automáticos, 11/10/2026
+
+- Los agentes sin personalización reciben un aspecto estable con 120 nombres,
+  9 colores de la paleta y 12 combinaciones de ropa y accesorios.
+- Conserva los personajes personalizados; restablecer recupera el aspecto
+  automático. Sin llamadas externas ni cambios en el nombre del chat.
+- Corrige la línea vertical de los hombros de la cápsula al centrarla entre píxeles.
+- Incluye las correcciones de portabilidad y validación de CI posteriores a 0.9.9.
+- Instalador publicado para Mac Apple Silicon; los paquetes Windows y Ubuntu
+  siguen pendientes de recibir los artefactos probados en esos equipos.
+
 ## 0.9.9 — Limpieza de actualizaciones Mac, 11/10/2026
 
 - Conserva una sola versión anterior validada para recuperación tras actualizar.

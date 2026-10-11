@@ -26,6 +26,25 @@ restricciones de posicionamiento y bandeja, descritas en la guía Linux.
 
 ## Datos y rendimiento
 
+### Identidad automática del personaje
+
+La interfaz compartida asigna a cada conversación un nombre entre 120, un color
+de la paleta del editor y uno de 12 conjuntos coordinados de ropa y accesorios.
+La selección determinista depende solo del identificador de conversación:
+conserva el aspecto al recargar, reordenar agentes o cambiar de modelo/estado.
+No requiere llamadas externas ni escrituras de configuración. Los nombres son
+alias visuales y pueden repetirse; no sustituyen el título ni el identificador
+del chat. Los catálogos se seleccionan por puntuación estable para minimizar
+reasignaciones si se amplían posteriormente.
+
+Una personalización guardada tiene prioridad, incluidas las antiguas apariencias
+parciales y la elección explícita de no llevar ropa/accesorios. «Restaurar
+original» recupera el conjunto automático. El cuerpo conserva sus dimensiones;
+los accesorios utilizan la paleta existente. Mac, Windows y Ubuntu comparten
+esta lógica en `monitor-ui/core.js`.
+
+### Proyección común
+
 `MonitorState` proyecta los mismos contadores, cuota, agentes, configuración
 permitida y modos en los tres hosts. Excluye claves, rutas de Python y campos
 privados de JEV de la configuración enviada a la interfaz. Las claves se

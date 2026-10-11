@@ -433,7 +433,7 @@ function appearanceAvatar(id,look) {
   // compacts, waits for approval or disconnects. Never change the live row.
   return avatar(id,{catalog_only:true,status:'idle'},()=>{},undefined,look,true);
 }
-const appearancePalette=[['Coral','#ff9e88'],['Menta','#81d7bd'],['Lila','#c1a0f0'],['Cielo','#96cfff'],['Miel','#e8c583'],['Rosa','#e9a9c1'],['Salvia','#b3c99b'],['Pizarra','#51698b'],['Crema','#eadbc3']];
+const appearancePalette=C.appearancePalette;
 function renderAppearanceEditor(detail,id) {
   const draft=appearanceDrafts.get(id),box=el('section','appearance-editor');box.dataset.thread=id;box.setAttribute('aria-label','Personalizar personaje');
   const heading=el('div','routing-heading');heading.append(icon('sliders-horizontal'),el('h3','','Personalizar personaje'));box.append(heading);

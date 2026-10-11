@@ -12,6 +12,22 @@ owner-accepted/waived gates and actual remaining work. Older dated sections belo
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
 
+## Automatic companions and capsule seam — 2026-10-11
+
+Local source now assigns 120 deterministic companion names, 9 palette colors and
+12 coordinated wardrobe templates to uncustomized agents. Saved manual/legacy
+looks retain priority; reset restores the automatic look. This uses only the
+conversation identifier, with no provider calls or state writes. See the
+[shared identity contract](SHARED-MONITOR.md#identidad-automática-del-personaje).
+Capsule shoulders overlap the central fill by 1 CSS pixel internally, removing
+the exposed desktop seam at fractional centering without enlarging the outline.
+Verification: 34 core tests, editor integration, camera/shoulder pixels at
+1/1.25/1.5/2x and 14,976 rigid wardrobe/animation samples PASS. The pixel regression
+rejects the original shoulder CSS in an isolated copy. Synthetic production
+renderer screenshots were visually reviewed. This is local source validation;
+not owner/native visual acceptance. Version0.9.10 is being prepared for signed
+Mac delivery; publication and installation require separate recorded evidence.
+
 ## CI portability and hover repairs — 2026-10-11
 
 The later intermittent native Ubuntu peek assertion is now reproduced and
