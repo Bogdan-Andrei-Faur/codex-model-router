@@ -267,8 +267,16 @@ def lifecycle(temporary,report,compiler,bootstrapper,previous,env,shortcuts=Fals
             if check not in (None,ctypes.c_void_p(-1).value):kernel.CloseHandle(check);return
             if time.monotonic()>=deadline:raise RuntimeError('Owned uninstall finalizer did not finish.')
             time.sleep(.1)
-    handle=kernel.CreateFileW(str(runtime),0x80000000,0,None,3,0,None)
-    assert handle not in (None,ctypes.c_void_p(-1).value)
+    deadline=time.monotonic()+10
+    while True:
+        handle=kernel.CreateFileW(str(runtime),0x80000000,0,None,3,0,None)
+        if handle not in (None,ctypes.c_void_p(-1).value):break
+        error=ctypes.get_last_error()
+        # A just-run frozen runtime may still be scanned/held temporarily. Wait
+        # only for sharing/lock violations; missing files and access errors fail.
+        if error not in (32,33) or time.monotonic()>=deadline:
+            raise OSError(error,'Could not acquire the fixture runtime lock',str(runtime))
+        time.sleep(.1)
     try:
         blocked=subprocess.run([str(latest),*options],env=env,capture_output=True,timeout=120)
         assert blocked.returncode!=0 and (install/'active.json').read_bytes()==active

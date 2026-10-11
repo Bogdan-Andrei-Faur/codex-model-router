@@ -7,6 +7,13 @@ evidence gaps, not renewed installation prerequisites or known failures.
 
 ## Current source CI — 2026-10-11
 
+Release tag `v0.9.10`, source `1de9269b1eba16fc18bc633df21234421901370e`:
+[run38174024670](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/38174024670)
+completed14/14 successful. The first main run of that same source completed13/14;
+Windows fixture lock acquisition failed before the blocked-upgrade assertion.
+Follow-up probe-only changes preserve that failure and wait for narrow transient
+lock errors; their own main CI is a separate run. See the latest delivery receipt.
+
 Main `023665a5b38989c735b84e7dbce4d2165a60fd78`:
 [run38169713976](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/38169713976)
 completed14/14 successful, including native Windows/WebView2/installer and Ubuntu
@@ -15,11 +22,12 @@ managed Settings/login acceptance or publication of Windows/Ubuntu installers.
 
 ## Latest Mac release — 2026-10-11
 
-Public0.9.9 from source0534467 includes automatic update retention. Exact package
-smoke, local native success/rollback/interrupted replay and real GitHub native
-Settings0.9.8 →0.9.9 with automatic cleanup PASS. Signed assets/checksums verified
-before promotion. Owner app remains0.9.8 and has automatic version checks enabled;
-owner installation/loaded bridge0.9.9 remain unclaimed. [Delivery receipt](2026-10-11-macos-retention-release.md).
+Public0.9.10 from source1de9269 includes automatic companions, capsule seam and
+earlier portability repairs. Exact package smoke, signed local native
+success/cancel-retry/rollback/interrupted replay and real GitHub native
+Settings0.9.9 →0.9.10 with automatic cleanup PASS. Signed assets/checksums verified
+before promotion. Last verified owner app/bridge is0.9.8; owner installation of
+0.9.10 remains unclaimed. [Delivery receipt](2026-10-11-macos-companions-release.md).
 
 ## Owner acceptance — 2026-10-11
 

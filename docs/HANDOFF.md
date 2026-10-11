@@ -25,8 +25,17 @@ Verification: 34 core tests, editor integration, camera/shoulder pixels at
 1/1.25/1.5/2x and 14,976 rigid wardrobe/animation samples PASS. The pixel regression
 rejects the original shoulder CSS in an isolated copy. Synthetic production
 renderer screenshots were visually reviewed. This is local source validation;
-not owner/native visual acceptance. Version0.9.10 is being prepared for signed
-Mac delivery; publication and installation require separate recorded evidence.
+not owner/native visual acceptance. Stable0.9.10 is now published from immutable
+source `1de9269b1eba16fc18bc633df21234421901370e`. Exact package smoke, signed local
+Settings cancellation/recovery and isolated production-GitHub0.9.9 →0.9.10 update
+with automatic cleanup PASS. Tag CI completed14/14 successfully; the first main
+run failed its Windows fixture lock acquisition (13/14). The follow-up harness
+waits only for transient sharing/lock errors and reports other Win32 failures;
+the Mac probe waits for all sequential deletions. No production code or immutable
+release asset was changed by these harness repairs. See the
+[delivery receipt](native-validation/2026-10-11-macos-companions-release.md).
+Owner installation/loaded bridge remain last verified0.9.8; update from Settings
+when convenient. No app replacement or Desktop restart was performed here.
 
 ## CI portability and hover repairs — 2026-10-11
 

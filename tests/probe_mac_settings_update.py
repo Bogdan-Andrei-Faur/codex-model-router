@@ -197,13 +197,15 @@ def exercise(old_package, new_package, signature, output, scenario, github_relea
             # The new packaged monitor must do this itself, after its helper
             # exits; calling cleanup from this driver would hide integration bugs.
             cleanup_deadline = time.monotonic() + 85
+            payloads = (job / APP_NAME, job / 'expanded', job / 'rechecked',
+                        job / new_package.name, job / ('checked-' + new_package.name))
             while time.monotonic() < cleanup_deadline:
-                if not (job / APP_NAME).exists():
+                # Cleanup removes these sequentially. The helper disappearing
+                # is not evidence that the remaining deletions have finished.
+                if not any(path.exists() for path in payloads):
                     break
                 time.sleep(.2)
-            assert not (job / APP_NAME).exists(), 'New monitor did not clean the terminal helper'
-            assert not (job / 'expanded').exists() and not (job / 'rechecked').exists()
-            assert not (job / new_package.name).exists()
+            assert not any(path.exists() for path in payloads), 'New monitor did not finish terminal payload cleanup'
             assert len(list(app.parent.glob('.router-previous-*.app'))) == 1
             assert (job / 'operation.json').exists() and config.read_bytes() == before
         return dict(scenario=scenario, passed=True, nativeSettingsButtons=True, cancelledThenRetried=not github_release,
