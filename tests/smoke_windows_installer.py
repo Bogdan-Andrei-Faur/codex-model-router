@@ -30,7 +30,11 @@ def fixture_backend(folder, env):
 using System.Collections.Generic;
 using System.Web.Script.Serialization;
 class Backend {
-    static int Main() {
+    static int Main(string[] args) {
+        if (args.Length == 1 && args[0] == "--version") {
+            Console.WriteLine("codex-cli synthetic-fixture");
+            return 0;
+        }
         var json = new JavaScriptSerializer();
         bool initialized = false;
         string line;

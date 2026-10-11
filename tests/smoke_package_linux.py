@@ -248,18 +248,19 @@ def exercise(package, base):
             app.web.evaluate_javascript("""
                 (()=>{
                   const kinds=['thinking','writing','planning','executing','editing','searching','tool','collaborating','inspecting','generating','reviewing','compacting','approval','question','retrying','error','interrupted','done'];
-                  const motions=new Set();
+                  const expected={thinking:'companion-cloud',writing:'companion-type-left',planning:'companion-plan',executing:'companion-cursor',editing:'companion-pencil',searching:'companion-search',tool:'companion-wrench',collaborating:'companion-note-left',inspecting:'companion-inspect',generating:'companion-paint',reviewing:'companion-read',compacting:'companion-sort',approval:'companion-wait-signal',question:'companion-wait-signal',retrying:'companion-retry',error:'companion-flinch',interrupted:'companion-settle',done:'companion-celebrate'};
                   for(const kind of kinds){
                     window.receive({connections:1,ui:{mode:'Expanded',reduced:false},threads:{'fixture-agent':{name:'Synthetic agent',status:'active',turn_id:'synthetic',activity:{version:1,source:'native',turn_id:'synthetic',kind,attention:kind==='approval'?['approval']:kind==='question'?['input']:[],observed_at:Date.now()/1000}}}});
                     const pet=document.querySelector('.hero-character'),prop=pet.querySelector('.activity-prop');
                     if(pet.dataset.state!==kind||prop.dataset.kind!==kind)throw Error('pose '+kind);
-                    const motion=getComputedStyle(pet.querySelector('.character-body')).animationName;
-                    if(motion==='none'||motions.has(motion))throw Error('distinct motion '+kind);
-                    motions.add(motion);
+                    const motions=[...pet.querySelectorAll('.character *')].flatMap(n=>getComputedStyle(n).animationName.split(',').map(s=>s.trim()));
+                    if(!motions.includes(expected[kind]))throw Error('scene motion '+kind);
+                    const face=pet.querySelector('.character-face');
+                    if(face.getAttribute('width')!=='78'||face.getAttribute('height')!=='65')throw Error('rigid body '+kind);
                     if(!['collaborating','approval','question'].includes(kind)&&!prop.children.length)throw Error('prop '+kind);
                   }
                   window.receive({ui:{reduced:true}});
-                  if(getComputedStyle(document.querySelector('.hero-character .character-body')).animationName!=='none')throw Error('reduced motion');
+                  if([...document.querySelectorAll('.hero-character .character *')].some(n=>getComputedStyle(n).animationName!=='none'))throw Error('reduced motion');
                   return kinds.length;
                 })()
             """, -1, None, app.page, None, activity_result, None)

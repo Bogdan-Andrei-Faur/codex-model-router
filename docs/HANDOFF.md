@@ -17,7 +17,10 @@ to Unix hosts and compares native Windows installer paths correctly.
 Windows frozen bridge smoke uses an explicit compiled synthetic JSONL backend,
 not an unprovided Desktop installation. It retains bounded synthetic failure
 diagnostics as CI artifacts; this verifies packaged pipe forwarding, not a real
-Desktop installation. Ubuntu smoke forwards the native delivery callback.
+Desktop installation. Its backend also implements CLI version forwarding.
+Ubuntu smoke forwards the native delivery callback and checks each of18 actual
+scene animations, the rigid body dimensions and reduced motion across the scene,
+instead of expecting every state to animate the body itself.
 DOM pointer tracking includes movement outside the capsule, preserving Escape
 for stationary samples while allowing re-entry; tests observe actual leave before
 advancing a fake clock and cover exact-pixel re-entry.
@@ -25,6 +28,9 @@ Local checks:601 Python tests (53 optional/platform skips),33 JS, all16 browser
 groups,27/27 routing and six offline JEV cases PASS. Each targeted intermittent
 browser test also passed four repeated runs. Native Windows/Ubuntu results must
 come from the new GitHub matrix; local Mac checks do not substitute for them.
+The first repair matrix passed12/14 jobs, including all Python/platform and
+browser checks; its two newly unblocked native probe expectations are corrected
+above. The follow-up full matrix is the completion gate.
 No published installer, owner app, Desktop registration or user data changed.
 
 ## Published Mac retention update — 2026-10-11
