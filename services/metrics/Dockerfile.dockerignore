@@ -2,8 +2,6 @@
 !src/
 !src/codex_model_router/
 !src/codex_model_router/**
-!src/codex_model_router/*/
-!src/codex_model_router/*/*.py
 !services/
 !services/metrics/
 !services/metrics/Dockerfile
