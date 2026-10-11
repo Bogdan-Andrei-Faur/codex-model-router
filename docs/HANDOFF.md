@@ -7,6 +7,21 @@ links current contracts, installation, routing/evidence and historical receipts.
 This checkout is sufficient; no other agent, personal memory or external knowledge
 service is needed. Preserve local work and coordinate disruptive owner actions.
 
+## Owner Mac metrics activation — 2026-10-11
+
+Owner updated/restarted: installed and handshaken bridge are **0.9.8**, monitor
+`e5bdb664cc13a783`, router `100ad6ea0e4db975`. The managed update transaction is
+completed. Actual native Settings enable → sync → disable → re-enable passed,
+with production P510 consent acknowledgements and real metric events. At one
+snapshot12 metric events were stored, no prompt/raw events; local queue and
+discard count were zero. **Metrics sharing is now enabled; remote prompts and
+raw OTLP permissions are off.** Existing local prompt capture is independent.
+
+See [native owner receipt](native-validation/2026-10-11-macos-central-sharing.md).
+The former active-bridge block below is resolved. Other-machine client validation,
+owner real-data deletion/offline retry and remote backup integration remain
+separate. Probable inference samples do not prove confirmed model attribution.
+
 ## Client release and owner-Mac continuation — 2026-10-11
 
 Public **0.9.8** now includes central sharing controls, built from
@@ -14,12 +29,12 @@ Public **0.9.8** now includes central sharing controls, built from
 checksums and build provenance are on GitHub Releases. Exact package smoke and
 isolated native Settings update through public GitHub PASS.
 
-The owner's real0.9.7 Settings detected0.9.8, verified the signature and downloaded
+Earlier, the owner's real0.9.7 Settings detected0.9.8, verified the signature and downloaded
 the exact package, then blocked replacement because Desktop bridges were active.
-No agents were stopped. Owner must finish work, close Codex/ChatGPT normally and
+No agents were stopped. At that time the owner had to finish work, close Codex/ChatGPT normally and
 retry **Update to0.9.8** in Router Settings; the monitor relaunches automatically.
 Afterward validate metrics-only opt-in and server acknowledgement from Data and
-privacy. **Owner sharing is still off; this native ingestion gate is not closed.**
+privacy. **This earlier pending gate is superseded by the owner activation above.**
 See [delivery receipt](native-validation/2026-10-11-macos-central-client-release.md).
 
 ## Central telemetry implementation — 2026-10-11
