@@ -54,7 +54,7 @@ the local verification above and from future native/production acceptance.
 Native Sentinel now reports `e5864948a84b7704fc86a1aa4c2931cafbf5afaa` and exposes
 an enabled P510 deployment target in the actual onboarding UI. The owner requested
 normal deployment after the lack of remote backup/restore support was disclosed.
-The new `deploy/compose.metrics.p510.yml` removes the external network requirement
+The new `deploy/compose.metrics-p510.yml` removes the external network requirement
 and explicitly migrates before HTTP startup. Both Compose profiles now quote the
 tmpfs option containing a comma; without quoting, YAML made it a second invalid
 mount. An isolated real Compose start of the remote profile passed migration,

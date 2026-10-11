@@ -12,7 +12,7 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 Source was published to `main107d3e1`. The owner selected **P510** for the backend.
 The earlier hold is superseded: Sentinel now supports remote Compose applications
 and the owner requested normal deployment despite its explicitly disclosed lack
-of remote backup/restore integration. Use `deploy/compose.metrics.p510.yml` and
+of remote backup/restore integration. Use `deploy/compose.metrics-p510.yml` and
 the current operator runbook; do not import the same-host YAML example unchanged.
 The remote profile performs an explicit idempotent migration before HTTP startup.
 Source preparation alone does not prove deployment, TLS or ingestion. Preserve

@@ -37,7 +37,7 @@ its remote-deployment contract is documented in Sentinel's
 deployment after being told remote backup/restore is **not integrated**. Do not
 describe this deployment as backed up or restored through Sentinel.
 
-Use `deploy/compose.metrics.p510.yml` via **Incorporar proyecto Compose**, select
+Use `deploy/compose.metrics-p510.yml` via **Incorporar proyecto Compose**, select
 execution node P510, web service `api`, internal port8080 and readiness endpoint
 `/health/ready`. Set the two private variables below and leave autodeploy and
 backup disabled. The remote profile uses only project-owned networks and named
