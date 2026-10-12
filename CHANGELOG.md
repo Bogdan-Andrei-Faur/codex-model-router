@@ -1,5 +1,16 @@
 # Cambios
 
+## 0.9.11 — Avisos de telemetría, 12/10/2026
+
+- Ajustes distingue los límites por instalación, almacenamiento total y base de
+  datos del servicio, y la limitación temporal de envíos.
+- Los descartes por cola llena o formato ya no ocultan el error del envío.
+- Reserva 512 KiB de la cola local para métricas frente a los diagnósticos nuevos,
+  conservando los eventos pendientes y todos los permisos actuales.
+- Incluye la corrección del backend de cuotas ya desplegada; no activa permisos
+  ni recupera automáticamente muestras descartadas anteriormente.
+- Entrega para Mac Apple Silicon; paquetes Windows y Ubuntu pendientes de transferencia.
+
 ## 0.9.10 — Personajes automáticos, 11/10/2026
 
 - Los agentes sin personalización reciben un aspecto estable con 120 nombres,

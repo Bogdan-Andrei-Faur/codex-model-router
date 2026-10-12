@@ -12,6 +12,17 @@ owner-accepted/waived gates and actual remaining work. Older dated sections belo
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
 
+## Client0.9.11 release preparation — 2026-10-12
+
+Owner authorized a new signed release for the client telemetry warnings. Version
+0.9.11 includes distinct capacity/rate labels, preserves sender errors through
+capture rejection and reserves512KiB for metrics against new diagnostics. No
+consent change, queued-event eviction or discarded-history backfill. Macarm64
+publication is being prepared with the existing approved Keychain publisher;
+package/native-update/public-GitHub validation and stable promotion remain pending.
+Owner installation/loaded bridge remain0.9.10, independently verified above the
+historical receipts. Do not replace the owner app or restart Desktop during QA.
+
 ## Central capacity repaired in production — 2026-10-12
 
 Sentinel shows API/DB healthy. Actual sender enrollment/consent200 but events507;
