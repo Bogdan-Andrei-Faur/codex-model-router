@@ -5,6 +5,16 @@ This ledger is repository-owned; no external knowledge/memory service is needed.
 Use [current follow-up](../FOLLOWUP.md) for priorities. Older NOT_RUN rows are
 evidence gaps, not renewed installation prerequisites or known failures.
 
+## Owner Mac0.9.11 activation — 2026-10-12
+
+Installed and loaded0.9.11 match the public monitor/router fingerprints and
+policy8; fresh handshake, valid signature, matching UI assets and no restart
+marker. Owner0.9.10→0.9.11 update completed, only0.9.10 recovery retained and no
+terminal payloads. Native background sync advances; queue drains to zero with
+stable rejection counter, unchanged existing permissions and no assisted sends.
+Owner activation and current sender health PASS; physical UI/login and other
+platforms remain independent. [Receipt](2026-10-12-macos-0.9.11-activation.md).
+
 ## Latest Mac release0.9.11 — 2026-10-12
 
 Public signed Macarm64 delivery from7942e0b, monitor eb13b64fc1720b81,
@@ -13,8 +23,9 @@ cancel/rollback/interrupted recovery and real-GitHub isolated native
 Settings0.9.10→0.9.11/automatic cleanup PASS. Source main CI14/14 first attempt;
 tag14/14 after one failed-job rerun (initial Ubuntu synthetic SIGTERM wait8s).
 No weakened assertion or product change; specific timing cause unconfirmed.
-Actual owner app remains0.9.10; no owner installation/restart/physical acceptance
-claimed. [Receipt](2026-10-12-macos-telemetry-release.md).
+At publication the owner app remained0.9.10; later activation above closes that
+pending gate. No fresh physical acceptance claimed.
+[Receipt](2026-10-12-macos-telemetry-release.md).
 
 ## Current source CI — 2026-10-11
 

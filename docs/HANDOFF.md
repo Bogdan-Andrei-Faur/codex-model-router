@@ -12,6 +12,18 @@ owner-accepted/waived gates and actual remaining work. Older dated sections belo
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
 
+## Owner Mac0.9.11 active — 2026-10-12
+
+Owner completed update/restart. Read-only installed plist and live bridge confirm
+0.9.11, monitor `eb13b64fc1720b81`, router `7c13745cb0d0cbec`, policy8 and fresh
+successful handshake. Signature and published UI assets match; no restart marker.
+Update0.9.10→0.9.11 completed; only0.9.10 recovery remains, no terminal payloads.
+Native central sync advances and pending queue drains to zero, with stable
+historical rejection count and unchanged existing sharing flags. No assisted
+uploads, install/restart or consent changes. Installation/bridge/sender gates
+closed; physical UI/login and other platforms remain separate. See the
+[owner receipt](native-validation/2026-10-12-macos-0.9.11-activation.md).
+
 ## Published client0.9.11 — 2026-10-12
 
 Stable [v0.9.11](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.11)
@@ -25,8 +37,9 @@ Settings0.9.10→0.9.11 with automatic cleanup PASS. Main CI14/14 first attempt;
 tag13/14 initially (Ubuntu synthetic SIGTERM wait8s),14/14 after one failed-job
 rerun; root timing cause unconfirmed, no source/test weakening. Details in the
 [release receipt](native-validation/2026-10-12-macos-telemetry-release.md).
-Owner installation remains0.9.10 until owner updates from Settings. No owner
-app replacement, Desktop restart or configuration/privacy change was performed.
+At publication the owner installation remained0.9.10; the later owner activation
+above supersedes that pending gate. No agent app replacement, Desktop restart or
+configuration/privacy change was performed.
 
 ## Central capacity repaired in production — 2026-10-12
 
