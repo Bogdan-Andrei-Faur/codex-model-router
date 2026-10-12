@@ -12,15 +12,26 @@ owner-accepted/waived gates and actual remaining work. Older dated sections belo
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
 
-## Local Settings simplification — 2026-10-12
+## Published Settings0.9.12 — 2026-10-12
+
+Stable Latest [v0.9.12](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.12)
+from immutable `fb360d77daae21e2043e7d7f5dc9b388a89be97a` delivers the shared
+Settings redesign. Macarm64 signed package/manifest/checksums/provenance verified;
+monitor `1d63ab96da79c087`, router `766899a8e0e070d3`, policy8.604Python/53skip,
+package smoke, native local cancel/recovery and real-GitHub isolated native
+Settings0.9.11→0.9.12/automatic cleanup PASS. Main/tag CI each14/14 first attempt.
+Owner installed0.9.11 remains untouched; actual owner update and physical UI
+acceptance separate. See [release receipt](native-validation/2026-10-12-macos-settings-release.md).
+
+## Settings simplification implementation — 2026-10-12
 
 Owner-requested concise, descriptive Settings implemented in shared monitor-ui:
 Aplicación/Modelos/Privacidad/Conexión, colored rounded cards, explicit switches
 and collapsed technical explanations. Sensitive-sharing warnings and independent
 permissions/deletion confirmation remain.34 core tests and all17 browser groups
-PASS; synthetic visual review includes narrow Jev. Installed/public0.9.11 remains
-unchanged. Local implementation only; publication and owner visual acceptance
-pending. See the [Settings receipt](native-validation/2026-10-12-settings-ux.md).
+PASS; synthetic visual review includes narrow Jev. Subsequent public0.9.12 above
+closes the implementation's publication gate; owner installed0.9.11 remains
+unchanged. See the [Settings receipt](native-validation/2026-10-12-settings-ux.md).
 
 ## Owner Mac0.9.11 active — 2026-10-12
 

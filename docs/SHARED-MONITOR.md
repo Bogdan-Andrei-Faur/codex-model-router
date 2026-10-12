@@ -112,9 +112,12 @@ muestran al compartir métricas; sus avisos de contenido sensible, destino,
 ausencia de borrado automático y captura futura permanecen visibles. El borrado
 remoto conserva una confirmación separada. Ningún cambio visual activa permisos.
 
-Implementación local y pruebas de navegador documentadas en
-[el recibo de Ajustes](native-validation/2026-10-12-settings-ux.md). No implica
-publicación, sustitución de la instalación ni aceptación física de otros sistemas.
+Implementación y pruebas de navegador documentadas en
+[el recibo de Ajustes](native-validation/2026-10-12-settings-ux.md). La entrega
+Mac0.9.12 firmada y su actualización nativa aislada desde GitHub constan en
+[el recibo de publicación](native-validation/2026-10-12-macos-settings-release.md).
+La publicación no sustituye la activación del propietario ni la aceptación
+física de otros sistemas.
 
 ## Windows y distribución
 

@@ -5,6 +5,15 @@ This ledger is repository-owned; no external knowledge/memory service is needed.
 Use [current follow-up](../FOLLOWUP.md) for priorities. Older NOT_RUN rows are
 evidence gaps, not renewed installation prerequisites or known failures.
 
+## Latest Mac release0.9.12 — 2026-10-12
+
+Signed stable Macarm64 Settings redesign fromfb360d7, monitor1d63ab96da79c087,
+router766899a8e0e070d3/policy8.604Python/53skip, exact package smoke, signed
+native local cancel/recovery and real-GitHub isolated Settings0.9.11→0.9.12
+with automatic retention/cleanup PASS. Source main and tag CI each14/14 first
+attempt. Owner installed0.9.11 unchanged; owner activation/physical UI/login
+remain separate. [Receipt](2026-10-12-macos-settings-release.md).
+
 ## Owner Mac0.9.11 activation — 2026-10-12
 
 Installed and loaded0.9.11 match the public monitor/router fingerprints and

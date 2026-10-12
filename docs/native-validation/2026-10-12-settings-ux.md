@@ -43,3 +43,11 @@ Screenshots are ignored local synthetic artifacts under
 identifiers are included here. Next: owner visual review and, if approved,
 publication in a new signed client release; cross-platform native acceptance
 remains separate.
+
+## Subsequent delivery
+
+Owner authorized main publication and a new release after reviewing the preview.
+The signed public Mac0.9.12 release now closes the earlier local-only publication
+gate; installed owner0.9.11 remains unchanged. Exact package, native local recovery
+and real-GitHub Settings update evidence is in the
+[release receipt](2026-10-12-macos-settings-release.md).

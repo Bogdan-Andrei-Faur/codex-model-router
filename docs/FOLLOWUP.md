@@ -9,6 +9,7 @@ No installation or live service was changed during this reconciliation.
 
 | Item | Evidence and exact scope |
 | --- | --- |
+| Public Mac0.9.12 Settings | Concise colored shared Settings delivered in signed Macarm64 release; exact native local cancel/recovery and real-GitHub update/cleanup PASS. Main/tag CI each14/14 first attempt. [Receipt](native-validation/2026-10-12-macos-settings-release.md). Owner actual update/physical review remain separate. |
 | CI repairs | Main `023665a5b38989c735b84e7dbce4d2165a60fd78`; [run38169713976](https://github.com/Bogdan-Andrei-Faur/codex-model-router/actions/runs/38169713976) completed14/14. Native Windows/WebView2/installer and Ubuntu GTK package fixtures passed; no owner-host acceptance inferred. |
 | Intermittent Ubuntu hover smoke | Reproduced the later500ms startup race; native delivery/deadline synchronization preserves all eight assertions. Four native DEB/Xvfb runs and negative controls PASS. [Timing receipt](native-validation/2026-10-11-ubuntu-hover-ci.md); published repair CI remains a separate check. |
 | Shared monitor implementation | One `monitor-ui` and common Python state/actions with native AppKit, WebView2/WPF and GTK hosts. Source/runtime fixture delivery is complete; physical/DPI/login checks remain separate. [Architecture](SHARED-MONITOR.md). |
@@ -24,7 +25,7 @@ No installation or live service was changed during this reconciliation.
 
 | Workstream | Next action | Boundary / dependency |
 | --- | --- | --- |
-| Settings simplification | Owner visual review; then publish the local shared UI in a signed client release when authorized. |34 core tests and17 browser groups PASS; concise descriptive switches/cards, privacy warnings preserved. Installed0.9.11 unchanged. [Receipt](native-validation/2026-10-12-settings-ux.md). |
+| Owner Settings0.9.12 activation | Update from Settings when ready, then verify actual installed/loaded identities and owner visual review. | Signed delivery and isolated native GitHub update PASS; owner installed0.9.11 unchanged. [Receipt](native-validation/2026-10-12-macos-settings-release.md). |
 | Windows/Ubuntu distribution | Transfer the owner-tested EXE/DEB and any build receipts; inspect version/architecture/hash, sign matching metadata and publish under existing authority. | Files are on other computers. Never rename binary version identity or overwrite immutable Mac assets. |
 | Managed update acceptance | On those machines exercise actual Settings update/cancel/recovery and login-specific cases. | Installation acceptance and CI lifecycle fixtures do not close these cases. Use the [machine checklist](native-validation/WINDOWS-UBUNTU-UPDATES.md). |
 | Central telemetry | Validate Windows/Ubuntu sharing and disposable offline/retry/deletion cases. Monitor capacity growth as diagnostics accumulate. | Owner0.9.11 installed/loaded and native sending verified. Quota incident is closed by95436e8 deployment and actual native recovery.1GiB/installation,4GiB total,5GiB physical DB; no automatic deletion. Existing metrics/prompts/raw flags and credentials preserved. Already rejected captures are not backfilled. [Receipt](native-validation/2026-10-12-central-capacity-repair.md). |
