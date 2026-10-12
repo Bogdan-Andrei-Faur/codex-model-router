@@ -12,6 +12,16 @@ owner-accepted/waived gates and actual remaining work. Older dated sections belo
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
 
+## Local Settings simplification — 2026-10-12
+
+Owner-requested concise, descriptive Settings implemented in shared monitor-ui:
+Aplicación/Modelos/Privacidad/Conexión, colored rounded cards, explicit switches
+and collapsed technical explanations. Sensitive-sharing warnings and independent
+permissions/deletion confirmation remain.34 core tests and all17 browser groups
+PASS; synthetic visual review includes narrow Jev. Installed/public0.9.11 remains
+unchanged. Local implementation only; publication and owner visual acceptance
+pending. See the [Settings receipt](native-validation/2026-10-12-settings-ux.md).
+
 ## Owner Mac0.9.11 active — 2026-10-12
 
 Owner completed update/restart. Read-only installed plist and live bridge confirm

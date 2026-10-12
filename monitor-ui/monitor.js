@@ -836,15 +836,34 @@ function statistics() {
   content.append(navigation,...Object.values(groups));selectConsumptionSection(consumptionSection);page.scrollTop=scroll;
 }
 function actionCard(parent,title,description,action){const node=button('',action,'settings-action');node.disabled=!!state.readOnly || !!state.preview || !!connectionPending;node.append(el('strong','',title),el('span','',description),icon('chevron-right','ui-glyph action-affordance'));parent.append(node);return node;}
+function settingToggle(parent,key,title,description,checked,action,tone='mint') {
+  const row=el('div','setting-row');row.dataset.tone=tone;
+  const copy=el('div','setting-copy'),name=el('strong','',title),hint=el('span','setting-hint',description);
+  name.id='setting-'+key+'-label';hint.id='setting-'+key+'-hint';copy.append(name,hint);
+  const toggle=button('',action,'setting-switch');toggle.dataset.setting=key;
+  toggle.setAttribute('role','switch');toggle.setAttribute('aria-checked',String(!!checked));
+  toggle.setAttribute('aria-labelledby',name.id);toggle.setAttribute('aria-describedby',hint.id);
+  toggle.disabled=!!state.readOnly||!!state.preview||!!connectionPending;
+  const track=el('i','switch-track');track.setAttribute('aria-hidden','true');
+  toggle.append(el('span','switch-state',checked?'Sí':'No'),track);row.append(copy,toggle);parent.append(row);return toggle;
+}
+function settingBlock(parent,title,glyph,tone='blue',description='') {
+  const card=el('div','setting-block');card.dataset.tone=tone;
+  const header=el('div','setting-block-heading');header.append(icon(glyph),el('h3','',title));card.append(header);
+  if(description)card.append(el('p','setting-intro',description));parent.append(card);return card;
+}
+function settingStatus(parent,label,tone='blue',glyph='circle-check') {
+  const tag=el('span','setting-status');tag.dataset.tone=tone;tag.append(icon(glyph),document.createTextNode(label));parent.append(tag);return tag;
+}
 const connectionLabels={doctor:'Comprobando conexión…',install:'Conectando…',uninstall:'Desconectando…'};
 function connectionControls() {
-  for(const node of $('settings').querySelectorAll('.settings-action')) {
+  for(const node of $('settings').querySelectorAll('.settings-action,.setting-switch')) {
     node.disabled=!!state.readOnly || !!state.preview || !!connectionPending;
     if(!node.dataset.connectionAction)continue;
     const busy=node.dataset.connectionAction===connectionPending;
     node.classList.toggle('busy',busy);node.setAttribute('aria-busy',String(busy));
     node.querySelector('strong').textContent=busy?connectionLabels[connectionPending]:node.dataset.title;
-    node.querySelector('span').textContent=busy?'La operación está en curso. Espera el resultado; puede tardar unos segundos.':node.dataset.description;
+    node.querySelector('span').textContent=busy?'Espera unos segundos…':node.dataset.description;
   }
 }
 function connectDesktop(value) {
@@ -863,10 +882,10 @@ const configure = (key,value) => native({action:'config',key,value});
 function keySettings(parent,id,label) {
   const ready=state.keys?.[id];
   const editor=el('div','key-editor');editor.hidden=true;
-  actionCard(parent,ready?'Clave guardada de '+label:'Añadir clave de '+label,'Se guarda en '+(state.secretStorage||'el almacén seguro de este equipo')+'.',()=>{editor.hidden=!editor.hidden;input.value='';if(!editor.hidden)input.focus();});
+  actionCard(parent,ready?'Clave guardada de '+label:'Añadir clave de '+label,ready?'Pulsa para sustituirla.':'Guardada en el almacén seguro de este equipo.',()=>{editor.hidden=!editor.hidden;input.value='';if(!editor.hidden)input.focus();});
   const input=el('input');input.type='password';input.disabled=!!state.readOnly||!!state.preview;input.autocomplete='off';input.setAttribute('aria-label','Clave API de '+label);
   input.dataset.keyId=id;
-  editor.append(input);const actions=el('div','choices');actions.append(productButton('Guardar clave',()=>{const value=input.value.trim();if(!value)return;native({action:'secret',provider:id,value});input.value='';editor.hidden=true;},'choice'),button('Cancelar',()=>{input.value='';editor.hidden=true;},'choice'));editor.append(actions);parent.append(editor);
+  editor.append(input);const actions=el('div','choices');const save=button('Guardar clave',()=>{if(state.readOnly||state.preview)return;const value=input.value.trim();if(!value)return;native({action:'secret',provider:id,value});input.value='';editor.hidden=true;},'choice');save.disabled=!!state.readOnly||!!state.preview;actions.append(save,button('Cancelar',()=>{input.value='';editor.hidden=true;},'choice'));editor.append(actions);parent.append(editor);
 }
 function refreshProductVersion() {
   if(!$('product-version'))return;
@@ -877,32 +896,37 @@ function refreshProductVersion() {
 function refreshRoutingControl() {
   const node=$('pause');if(!node)return;
   node.disabled=!!state.readOnly||!!state.preview||!!connectionPending;
-  node.querySelector('strong').replaceChildren(icon(state.config.enabled?'pause':'play'),document.createTextNode(state.config.enabled?'Pausar enrutamiento':'Activar enrutamiento'));
-  node.querySelector('span').textContent=state.config.enabled?'El enrutador elige el modelo en cada nuevo mensaje.':'Se respeta la selección manual de Codex.';
+  node.setAttribute('aria-checked',String(!!state.config.enabled));
+  node.querySelector('.switch-state').textContent=state.config.enabled?'Activa':'Pausada';
+  const row=node.closest('.setting-row');row.querySelector('.setting-hint').textContent=state.config.enabled?'Elige modelo y esfuerzo para cada mensaje.':'Se respeta el modelo que elijas en Codex.';
 }
 function updateSettings(box) {
   const update=state.updates||{status:'idle',installedVersion:state.productVersion},busy=['checking','downloading','preparing_install','installing'].includes(update.status);
-  heading(box,'ACTUALIZACIONES');
-  const statuses={idle:'Sin comprobar',checking:'Comprobando…',available:'Nueva versión disponible',package_unavailable:'Hay una nueva versión; aún no hay instalador publicado para este equipo.',up_to_date:'No hay una versión estable más reciente.',downloading:'Descargando…',downloaded:update.canUpdate?'Descarga verificada. Puedes actualizar cuando quieras.':'Descarga verificada. La instalación desde la aplicación aún no está disponible.',preparing_install:'Preparando la actualización…',installing:'Instalando. El monitor se abrirá de nuevo automáticamente.',completed:'Actualización instalada.',rolled_back:'Se ha recuperado la versión anterior. Tus datos se conservan.',failed:'La actualización no se completó. Revisa la instalación antes de volver a intentarlo.',cancelled:'Operación cancelada.',error:'No se pudo completar la actualización.'};
+  box=settingBlock(box,'Actualizaciones','rotate-cw','blue');
+  const statuses={idle:'Sin comprobar',checking:'Comprobando…',available:'Nueva versión disponible',package_unavailable:'Sin instalador para este equipo',up_to_date:'Estás al día',downloading:'Descargando…',downloaded:'Descarga verificada',preparing_install:'Preparando actualización…',installing:'Instalando…',completed:'Actualización instalada',rolled_back:'Versión anterior recuperada',failed:'No se pudo instalar',cancelled:'Actualización cancelada',error:'No se pudo completar'};
   const errors={release_unavailable:'No hay una entrega pública accesible.',rate_limited:'GitHub ha limitado las comprobaciones. Vuelve a intentarlo más tarde.',network_error:'Comprueba tu conexión e inténtalo de nuevo.',invalid_release:'La entrega no tiene metadatos válidos para actualizar.',unsupported_platform:'No hay un instalador compatible con este equipo.',unsafe_download:'La dirección de descarga no es válida.',invalid_size:'El tamaño recibido no coincide con el publicado.',integrity_error:'La descarga no coincide con su huella publicada.'};
   Object.assign(errors,{missing_signature:'Esta entrega no incluye una firma verificable.',invalid_signature:'No se pudo verificar la firma de la actualización.',unknown_publisher:'Esta entrega está firmada por una clave desconocida.',signature_expired:'La firma de esta entrega ha caducado; comprueba si hay otra versión.',signature_target_mismatch:'La firma no corresponde a este instalador.',invalid_trust_store:'La instalación no tiene una lista de firmas válida.',signature_support_missing:'Esta instalación necesita el componente de verificación de firmas.',invalid_installation:'El paquete no contiene una aplicación compatible.',installation_read_only:'La aplicación está en una carpeta sin permiso de escritura para este usuario.',active_bridge:'Codex sigue usando esta instalación. Cierra Codex cuando terminen tus tareas y vuelve a actualizar.',launch_failed:'La nueva versión no pudo iniciarse. Se recuperará la versión anterior.'});
   Object.assign(errors,{recovery_path_too_long:'La ruta de instalación es demasiado larga para registrar la recuperación segura de Windows.',installation_changed:'La instalación ha cambiado durante la preparación. Comprueba de nuevo la versión.',baseline_upgrade_required:'Esta versión necesita nuevas dependencias del sistema. Instala el paquete base de Ubuntu para continuar.',install_failed:'El instalador no pudo completar la actualización. Se conserva la versión anterior.'});
   const card=el('div','update-card'),version=el('span','', 'v'+(state.productVersion||update.installedVersion||'—'));const versionHeading=el('strong','','Versión instalada · ');versionHeading.append(version);card.append(versionHeading);
-  if(update.latestVersion)card.append(el('p','small','Última estable · '+update.latestVersion));
-  card.append(el('p','small',statuses[update.status]||statuses.idle));
+  const bad=['error','failed','rolled_back'].includes(update.status),good=['up_to_date','completed','downloaded'].includes(update.status);
+  settingStatus(card,statuses[update.status]||statuses.idle,bad?'coral':good?'mint':'blue',bad?'triangle-alert':good?'circle-check':'rotate-cw');
+  if(update.latestVersion && update.latestVersion!==(state.productVersion||update.installedVersion))card.append(el('p','setting-hint','Disponible · v'+update.latestVersion));
+  if(update.status==='downloaded'&&!update.canUpdate)card.append(el('p','setting-hint','La instalación desde la aplicación aún no está disponible.'));
+  if(update.status==='installing')card.append(el('p','setting-hint','El monitor se abrirá de nuevo automáticamente.'));
+  if(update.status==='rolled_back')card.append(el('p','setting-hint','Tus datos se conservan.'));
   if(update.error)card.append(el('p','warning',errors[update.error]||errors.network_error));
-  if(update.publisherVerified)card.append(el('p','small','Firma del proyecto verificada.'));
-  if(update.checkedAt)card.append(el('p','small','Comprobado · '+new Date(update.checkedAt*1000).toLocaleString('es-ES')));
+  if(update.publisherVerified)settingStatus(card,'Firma del proyecto verificada','mint','lock-keyhole');
+  if(update.checkedAt)card.append(el('p','setting-hint','Comprobado · '+new Date(update.checkedAt*1000).toLocaleString('es-ES')));
   if(update.status==='downloading'){
     const progress=el('progress');progress.max=100;progress.value=Number.isFinite(update.progress)?update.progress:0;progress.setAttribute('aria-label','Progreso de descarga');card.append(progress);
   }
   const actions=el('div','choices');
   const check=button('Comprobar ahora',()=>native({action:'update',value:'check'}),'choice');check.disabled=busy||!!state.preview||!!state.readOnly;actions.append(check);
-  if(update.canUpdate){const install=button('Actualizar a '+update.latestVersion,()=>native({action:'update',value:'install'}),'choice');install.disabled=busy||!!state.preview||!!state.readOnly;actions.append(install);}
+  if(update.canUpdate){const install=button('Actualizar a '+update.latestVersion,()=>native({action:'update',value:'install'}),'choice setting-primary');install.disabled=busy||!!state.preview||!!state.readOnly;actions.append(install);}
   else if(update.canDownload){const download=button('Descargar versión '+update.latestVersion,()=>native({action:'update',value:'download'}),'choice');download.disabled=busy||!!state.preview||!!state.readOnly;actions.append(download);}
   if(busy&&!update.shutdownForUpdate){const cancel=button('Cancelar',()=>native({action:'update',value:'cancel'}),'choice');cancel.disabled=!!state.preview||!!state.readOnly;actions.append(cancel);}
   card.append(actions);box.append(card);refreshProductVersion();
-  actionCard(box,state.config.updates_auto_check?'Desactivar comprobación diaria':'Activar comprobación diaria','Consulta las versiones públicas de este repositorio en GitHub. No envía tus tareas ni tus ajustes; no instala automáticamente.',()=>configure('updates_auto_check',!state.config.updates_auto_check));
+  settingToggle(box,'updates_auto_check','Buscar versiones cada día','Consulta GitHub; tú decides cuándo instalar.',state.config.updates_auto_check,()=>configure('updates_auto_check',!state.config.updates_auto_check),'blue');
 }
 function selectSettingsSection(value) {
   settingsSection=value;
@@ -912,70 +936,113 @@ function selectSettingsSection(value) {
 }
 function settings() {
   const page=$('settings'),scroll=page.scrollTop,config=state.config,catalogOpen=!!page.querySelector('.icon-catalog')?.open;
+  const openDetails=new Set([...page.querySelectorAll('details[open][data-setting-detail]')].map(n=>n.dataset.settingDetail));
   const drafts=new Map([...page.querySelectorAll('input[data-key-id]')].map(input=>[input.dataset.keyId,{value:input.value,open:!input.closest('.key-editor').hidden}]));
+  const focused=page.contains(document.activeElement)?document.activeElement:null;
+  const focusedSetting=focused?.dataset.setting,focusedSection=focused?.dataset.settingsSection,focusedEngine=focused?.dataset.engine;
+  const focusedDetail=focused?.tagName==='SUMMARY'?focused.closest('[data-setting-detail]')?.dataset.settingDetail:null;
+  const disclosure=(parent,key,label)=>{
+    const node=el('details','setting-details');node.dataset.settingDetail=key;node.open=openDetails.has(key);
+    node.append(el('summary','',label));const body=el('div','setting-details-body');node.append(body);
+    node.addEventListener('toggle',fitIsland);parent.append(node);return body;
+  };
   const workspace=el('div','settings-workspace'),header=el('div','workspace-heading'),version=el('span','small'),brand=el('div','settings-brand'),brandImage=el('img');brandImage.src='codex.png';brandImage.alt='Codex Model Router';brandImage.width=32;brandImage.height=32;brand.append(brandImage,el('h2','','Ajustes'));version.id='product-version';header.append(brand,version);workspace.append(header);page.replaceChildren(workspace);
-  actionCard(workspace,'','',()=>configure('enabled',!state.config.enabled));workspace.lastElementChild.id='pause';workspace.lastElementChild.classList.add('settings-master');refreshRoutingControl();
+  const master=settingToggle(workspace,'enabled','Selección automática','Elige modelo y esfuerzo para cada mensaje.',config.enabled,()=>configure('enabled',!state.config.enabled));master.id='pause';master.closest('.setting-row').classList.add('settings-master');refreshRoutingControl();
   const layout=el('div','settings-layout'),navigation=el('div','settings-navigation'),detail=el('div','settings-detail');navigation.setAttribute('role','group');navigation.setAttribute('aria-label','Secciones de ajustes');
   const groups={};
-  for(const [key,label] of [['application','Aplicación'],['routing','Enrutamiento'],['data','Datos y privacidad'],['connection','Conexión']]){
-    const item=button(label,()=>{selectSettingsSection(key);},'settings-nav-item');item.dataset.settingsSection=key;navigation.append(item);
-    const group=el('section','settings-panel');group.dataset.settingsGroup=key;group.setAttribute('aria-label',label);group.append(el('h3','settings-panel-title',label));detail.append(group);groups[key]=group;
+  for(const [key,label,glyph,tone] of [['application','Aplicación','panels-top-left','blue'],['routing','Modelos','route','lilac'],['data','Privacidad','lock-keyhole','mint'],['connection','Conexión','plug','peach']]){
+    const item=button('',()=>selectSettingsSection(key),'settings-nav-item');item.dataset.settingsSection=key;item.dataset.tone=tone;controlLabel(item,glyph,label);navigation.append(item);
+    const group=el('section','settings-panel');group.dataset.settingsGroup=key;group.dataset.tone=tone;group.setAttribute('aria-label',label);detail.append(group);groups[key]=group;
   }
   layout.append(navigation,detail);workspace.append(layout);
-  let box=groups.application;
-  actionCard(box,state.ui.topmost?'Desactivar Mantener delante':'Activar Mantener delante',state.ui.topmost?(state.platform==='linux'?'Solicita al escritorio mantener el monitor delante.':'El monitor permanece sobre otras ventanas.'):'El monitor puede quedar detrás de otras ventanas.',()=>native({action:'topmost',value:!state.ui.topmost}));
-  if(state.platform==='linux' && state.desktopCapabilities?.positioning===false)box.append(el('p','small','El escritorio decide la posición y si mantiene el monitor delante. Puedes moverlo con el atajo de ventanas del sistema.'));
-  updateSettings(box);
-  const catalog=el('details','icon-catalog');catalog.open=catalogOpen;catalog.append(el('summary','','Tipos de tarea · '+Object.keys(C.identities).length+' tipos'));
+  let box=settingBlock(groups.application,'Ventana','panels-top-left','lilac');
+  settingToggle(box,'topmost','Mantener delante','La isla permanece sobre otras ventanas.',state.ui.topmost,()=>native({action:'topmost',value:!state.ui.topmost}),'lilac');
+  if(state.platform==='linux' && state.desktopCapabilities?.positioning===false)box.append(el('p','setting-note','Tu escritorio decide la posición y si la isla permanece delante.'));
+  updateSettings(groups.application);
+  const catalog=el('details','icon-catalog setting-details');catalog.open=catalogOpen;catalog.append(el('summary','','Iconos de tareas · '+Object.keys(C.identities).length));catalog.addEventListener('toggle',fitIsland);
   const icons=el('div','icon-catalog-grid');for(const [category,[label]] of Object.entries(C.identities)){
     const item=el('div');item.append(icon(C.identities[category][1],'glyph'),el('span','small',label));icons.append(item);
-  }catalog.append(icons);box.append(catalog);
-  box=groups.routing;
-  heading(box,'FASES Y EVIDENCIA');
-  box.append(el('p','small',config.phase_routing?'Cambios por fases habilitados. Las tareas nuevas usan checkpoints compatibles tras cargar la configuración.':'Los cambios por fases están desactivados. El modelo se elige entre turnos.'));
-  actionCard(box,config.phase_routing?'Desactivar cambios automáticos por fases':'Activar cambios automáticos por fases',config.phase_routing?'Las tareas nuevas podrán cambiar modelo y esfuerzo en checkpoints amplios. Se aplica tras reiniciar Desktop.':'Mantiene el mismo modelo durante cada turno. Se aplica tras reiniciar Desktop.',()=>configure('phase_routing',!config.phase_routing));
+  }catalog.append(icons);groups.application.append(catalog);
+
   const engine=['rules','jev'].includes(config.routing_engine)?config.routing_engine:'rules';
-  heading(box,'MOTOR DE ENRUTAMIENTO');choices(box,[['rules','Reglas'],['jev','Jev']],engine,v=>configure('routing_engine',v));
-  box.append(el('p','small',engine==='rules'?'Las reglas locales deciden al instante sin enviar el mensaje a otro servicio.':'El clasificador recibe el mensaje de la tarea. Si falla o responde de forma inválida, se conservan las reglas locales. Puede consumir cuota del proveedor.'));
-  heading(box,'COMPARACIÓN EN PARALELO');const comparisons=(config.comparison_engines||[]).filter(x=>['rules','jev'].includes(x));
-  choices(box,[['rules','Reglas'],['jev','Jev']],[engine,...comparisons],key=>configure('comparison_engines',comparisons.includes(key)?comparisons.filter(x=>x!==key):[...comparisons,key]),[engine]);
-  box.append(el('p','small','El motor activo ya se registra. Marca otros para comparar propuestas; las comparaciones externas también reciben el mensaje.'));
+  box=settingBlock(groups.routing,'Quién elige el modelo','route','lilac');
+  const engineChoices=el('div','setting-options');
+  for(const [key,label,description,glyph] of [['rules','Motor local','Reglas rápidas, sin servicio externo.','settings-2'],['jev','Jev','Analiza tu mensaje; puede tener coste.','network']]){
+    const chosen=engine===key,node=button('',()=>configure('routing_engine',key),'setting-option'+(chosen?' selected':''));
+    node.dataset.engine=key;node.setAttribute('aria-pressed',String(chosen));node.disabled=!!state.readOnly||!!state.preview;
+    node.append(icon(glyph),el('strong','',label),el('span','setting-hint',description));engineChoices.append(node);
+  }box.append(engineChoices);
   if(engine==='jev'){
-    const jev=config.jev||{},connection=jev.connection||'typesafe';heading(box,'CONEXIÓN DE JEV');
-    choices(box,[['vercel','Vercel AI Gateway'],['typesafe','TypeSafe directo']],connection,v=>configure('jev.connection',v));
-    box.append(el('p','small',connection==='vercel'?'Usa typesafe-ai/jev mediante Vercel AI Gateway. El acceso puede requerir créditos del proveedor.':'Conecta directamente con api.typesafe.ai usando jev-latest.'));
-    keySettings(box,'jev-'+connection,connection==='vercel'?'Vercel AI Gateway':'TypeSafe');
-    if(!state.keys?.['jev-'+connection])box.append(el('p','small','Cada conexión necesita su propia clave. Si guardaste una clave en una versión anterior, introdúcela aquí una vez para vincularla a este proveedor.'));
+    box.append(el('p','setting-note','Jev recibe el mensaje. Si falla, decide el motor local.'));
+    const jev=config.jev||{},connection=jev.connection||'typesafe';
+    const provider=settingBlock(groups.routing,'Proveedor de Jev','network','blue');
+    choices(provider,[['vercel','Vercel AI Gateway'],['typesafe','TypeSafe']],connection,v=>configure('jev.connection',v));
+    keySettings(provider,'jev-'+connection,connection==='vercel'?'Vercel AI Gateway':'TypeSafe');
   }
-  heading(box,'POLÍTICA ACTUAL');for(const [tier,description] of [['simple','Tareas delimitadas'],['normal','Cambios concretos'],['complex','Ingeniería compleja'],['critical','UX, auditorías y gran alcance']]){const route=config.routes?.[tier];if(route){const row=el('div','policy');row.append(badge(route.model),el('span','',description),badge(route.effort,true));box.append(row);}}
-  box=groups.data;
-  heading(box,'CONSERVAR HISTORIAL');choices(box,[[30,'30 días'],[90,'90 días'],[180,'180 días'],[0,'Siempre']],config.history_days??90,v=>configure('history_days',v));
-  actionCard(box,config.inference_telemetry?'Desactivar telemetría local':'Activar telemetría local','Recoge evidencia del modelo ejecutado. Se aplica tras reiniciar Desktop.',()=>configure('inference_telemetry',!config.inference_telemetry));
-  actionCard(box,config.prompt_logging?'Desactivar captura de prompts':'Activar captura de prompts',config.prompt_logging?'Guarda cada nuevo mensaje con su decisión para evaluar el enrutamiento. El cambio se aplica al siguiente mensaje.':'No guarda el texto de los mensajes; las estadísticas agregadas continúan disponibles.',()=>configure('prompt_logging',!config.prompt_logging));
-  heading(box,'MEJORAR EL ENRUTADOR');
+  box=settingBlock(groups.routing,'Durante el trabajo','workflow','mint');
+  settingToggle(box,'phase_routing','Cambiar modelo entre fases','Ajusta modelo y esfuerzo dentro del turno si Codex lo admite.',config.phase_routing,()=>configure('phase_routing',!config.phase_routing));
+  box.append(el('p','setting-note','Requiere reiniciar Desktop. Se aplica a chats nuevos.'));
+  const phases=disclosure(box,'phases','Cómo funcionan los cambios');
+  phases.append(el('p','','Se revisan en los cambios de fase. Cruzar hacia o desde Astra requiere otro turno. La selección aceptada no confirma por sí sola el modelo de una inferencia.'));
+  const advanced=disclosure(groups.routing,'routing','Comparaciones y política de modelos');
+  heading(advanced,'COMPARAR MOTORES');const comparisons=(config.comparison_engines||[]).filter(x=>['rules','jev'].includes(x));
+  choices(advanced,[['rules','Motor local'],['jev','Jev']],[engine,...comparisons],key=>configure('comparison_engines',comparisons.includes(key)?comparisons.filter(x=>x!==key):[...comparisons,key]),[engine]);
+  advanced.append(el('p','setting-note','El activo ya se registra. Comparar con Jev también envía el mensaje y puede consumir cuota.'));
+  heading(advanced,'MODELO POR TIPO DE TRABAJO');
+  for(const [tier,description] of [['simple','Tarea sencilla'],['normal','Cambio concreto'],['complex','Trabajo complejo'],['critical','Trabajo crítico']]){const route=config.routes?.[tier];if(route){const row=el('div','policy');row.append(badge(route.model),el('span','',description),badge(route.effort,true));advanced.append(row);}}
+
+  box=settingBlock(groups.data,'En este equipo','database','lilac');
+  settingToggle(box,'inference_telemetry','Medir uso y modelo','Recoge evidencia local. Requiere reiniciar Desktop.',config.inference_telemetry,()=>configure('inference_telemetry',!config.inference_telemetry),'lilac');
+  settingToggle(box,'prompt_logging','Guardar mensajes','Conserva el texto de nuevos mensajes en este equipo.',config.prompt_logging,()=>configure('prompt_logging',!config.prompt_logging),'lilac');
+  const history=el('div','setting-retention');history.append(el('strong','','Conservar decisiones'));choices(history,[[30,'30 días'],[90,'90 días'],[180,'180 días'],[0,'Siempre']],config.history_days??90,v=>configure('history_days',v));box.append(history);
+  const local=disclosure(box,'local-privacy','Qué se guarda y dónde');
+  local.append(el('p','',config.prompt_logging?'Los nuevos mensajes se guardan en el archivo local privado state/prompts.jsonl. No se guardan respuestas, adjuntos, herramientas ni credenciales en ese archivo.':'El historial local guarda decisiones y contadores, sin texto de mensajes, respuestas ni adjuntos.'));
+  local.append(el('p','','Claves protegidas con '+(state.secretStorage||'el almacén seguro de este equipo')+'.'));
+
   const central=state.centralTelemetry||{},sharing=central.enabled===true;
-  actionCard(box,sharing?'Dejar de compartir métricas':'Compartir métricas','Envía modelos, esfuerzo, uso y resultados a router.andreifaur.dev. No incluye mensajes. Solo el responsable del proyecto puede consultar los datos; se conservan hasta solicitar su eliminación.',()=>configure('central_enabled',!sharing));
+  box=settingBlock(groups.data,'Ayudar a mejorar el enrutador','chart-no-axes-combined','mint');
+  settingToggle(box,'central_enabled','Compartir métricas','Envía modelos, esfuerzo, consumo y resultados. Sin mensajes.',sharing,()=>configure('central_enabled',!sharing));
+  box.append(el('p','setting-note','Destino: router.andreifaur.dev · acceso privado del responsable del proyecto · sin borrado automático.'));
   if(sharing){
-    actionCard(box,central.prompts?'Dejar de enviar prompts':'Permitir envío de prompts','Permiso adicional: comparte el texto de los nuevos mensajes capturados localmente. Puede contener información privada. No envía el historial anterior.',()=>configure('central_prompts',!central.prompts));
-    actionCard(box,central.raw_otlp?'Dejar de enviar OTLP crudo':'Permitir envío de OTLP crudo','Permiso adicional: comparte cargas originales de telemetría, que pueden contener mensajes, respuestas, herramientas y datos sensibles. No se anonimizan ni se filtran. Requiere captura de telemetría local.',()=>configure('central_raw_otlp',!central.raw_otlp));
+    const permissions=el('div','setting-permissions');permissions.append(el('span','setting-eyebrow','PERMISOS ADICIONALES'));
+    settingToggle(permissions,'central_prompts','Compartir mensajes','Texto de mensajes nuevos; puede contener datos privados.',central.prompts,()=>configure('central_prompts',!central.prompts),'peach');
+    settingToggle(permissions,'central_raw_otlp','Compartir diagnóstico completo','Mensajes, respuestas y herramientas sin filtrar ni anonimizar.',central.raw_otlp,()=>configure('central_raw_otlp',!central.raw_otlp),'peach');
+    permissions.append(el('p','setting-note','Solo captura nueva: mensajes requieren guardado local; diagnóstico requiere telemetría local. No se envía el historial anterior.'));box.append(permissions);
   }
-  const syncLabels={credential_unavailable:'No se puede acceder al almacén seguro de credenciales',server_capacity:'El servicio ha alcanzado su límite; reintentaremos',installation_capacity:'Esta instalación ha alcanzado su límite en el servicio; reintentaremos',total_capacity:'El almacenamiento de eventos del servicio está lleno; reintentaremos',database_capacity:'La base de datos del servicio ha alcanzado su límite; reintentaremos',server_busy:'El servicio limita temporalmente los envíos; reintentaremos',access_rejected:'El servicio ha rechazado la credencial o el permiso',unavailable:'No se puede leer el estado del envío',disabled:'Envío desactivado',pending:'Preparando conexión',synced:'Sincronizado',retrying:'Sin conexión o acceso rechazado; reintentaremos',capacity_or_invalid:'Hay muestras descartadas por cola llena, tamaño o formato',deleted:'Datos eliminados del servicio'};
-  box.append(el('p','small',`${syncLabels[central.status]||'Envío desactivado'} · ${central.pending||0} pendientes · ${central.rejected||0} descartadas${central.lastSync?' · Último envío: '+new Date(central.lastSync*1000).toLocaleString():''}`));
-  if(central.delete_pending)box.append(el('p','small','Eliminación pendiente de conexión. El envío está desactivado.'));
+  const syncLabels={credential_unavailable:'Credencial no disponible',server_capacity:'Servicio lleno · reintentando',installation_capacity:'Límite de esta instalación · reintentando',total_capacity:'Almacenamiento del servicio lleno · reintentando',database_capacity:'Base de datos llena · reintentando',server_busy:'Servicio ocupado · reintentando',access_rejected:'Acceso rechazado',unavailable:'Estado no disponible',disabled:'Envío desactivado',pending:'Conectando…',synced:'Sincronizado',retrying:'Envío pendiente · reintentando',capacity_or_invalid:'Muestras descartadas',deleted:'Datos eliminados'};
+  const sync=el('div','setting-sync');sync.setAttribute('role','status');
+  const healthy=central.status==='synced',off=['disabled','deleted'].includes(central.status)||!central.status;
+  settingStatus(sync,syncLabels[central.status]||'Envío desactivado',healthy?'mint':off?'blue':'peach',healthy?'circle-check':off?'pause':'triangle-alert');
+  sync.append(el('span','setting-hint',fmt(central.pending||0)+' pendientes'));box.append(sync);
+  const syncDetail=disclosure(box,'sharing','Detalles de envío y privacidad');
+  if(central.lastSync)syncDetail.append(el('p','','Último envío · '+new Date(central.lastSync*1000).toLocaleString('es-ES')));
+  syncDetail.append(el('p','',fmt(central.rejected||0)+' descartes acumulados. Pueden deberse a cola llena, tamaño o formato.'));
+  syncDetail.append(el('p','','El permiso de mensajes comparte el texto capturado localmente. El diagnóstico completo comparte las cargas originales OTLP, que pueden incluir información sensible. Solo el responsable del proyecto puede consultar los datos enviados; se conservan hasta solicitar su eliminación.'));
+  if(central.delete_pending)box.append(el('p','setting-note warning','Eliminación pendiente de conexión. El envío está desactivado.'));
   else if(central.canDelete || central.lastSync){
+    const deletion=el('div','setting-deletion');
     if(centralDeleteArmed){
-      actionCard(box,'Confirmar eliminación','Se borrarán los datos enviados por esta instalación y se desactivará el envío. Los datos locales se conservan.',()=>{centralDeleteArmed=false;configure('central_delete',true);settings();});
-      actionCard(box,'Cancelar eliminación','Conservar los datos enviados.',()=>{centralDeleteArmed=false;settings();});
-    }else actionCard(box,'Eliminar mis datos enviados','Desactiva el envío y solicita el borrado de esta instalación. Los datos locales se conservan.',()=>{centralDeleteArmed=true;settings();});
+      deletion.setAttribute('role','group');deletion.setAttribute('aria-label','Confirmar borrado de datos enviados');
+      actionCard(deletion,'Confirmar eliminación','Borra lo enviado y desactiva el envío. Conserva tus datos locales.',()=>{centralDeleteArmed=false;configure('central_delete',true);settings();});
+      actionCard(deletion,'Cancelar eliminación','Conservar los datos enviados.',()=>{centralDeleteArmed=false;settings();});
+    }else actionCard(deletion,'Eliminar mis datos enviados','Solicita el borrado del servidor. Conserva tus datos locales.',()=>{centralDeleteArmed=true;settings();});
+    box.append(deletion);
   }
-  heading(box,'PRIVACIDAD LOCAL');box.append(el('p','small',config.prompt_logging?'Además de las métricas, se guarda el texto de tus mensajes en el archivo local privado state/prompts.jsonl para evaluar las decisiones. No guarda respuestas, adjuntos, herramientas ni credenciales. Las claves se almacenan en '+(state.secretStorage || 'el llavero de macOS')+'.':'El historial guarda tareas, ajustes, motivos, estados y contadores. No guarda mensajes, respuestas, adjuntos, herramientas ni credenciales. Las claves se almacenan en '+(state.secretStorage || 'el llavero de macOS')+'.'));
-  box=groups.connection;
-    box.append(el('p','small','La instalación se detecta al arrancar. Conecta el inicio habitual una vez. Cerrar el monitor no detiene el selector.'));
-  connectionCard(box,'doctor','Comprobar conexión','Distingue instalación, registro y conexión observada.');
-  connectionCard(box,'install','Conectar al inicio habitual','Prepara el próximo arranque de Desktop. Puedes pulsarlo con tus tareas abiertas.');
-  connectionCard(box,'uninstall','Desconectar integración','Restaura el inicio habitual sin borrar ajustes ni historial.');
+
+  box=settingBlock(groups.connection,'Conectar con Codex','plug','peach');
+  const connected=state.connections>0,pending=!!state.desktopRestartPending;
+  settingStatus(box,connected?'Conectado':pending?'Preparado · reinicio pendiente':'Sin conexión',connected?'mint':'peach',connected?'circle-check':'plug');
+  connectionCard(box,'doctor','Comprobar conexión','Revisa si Codex está usando el enrutador.');
+  connectionCard(box,'install','Conectar al inicio habitual','Prepara el siguiente arranque de Desktop.');
+  connectionCard(box,'uninstall','Desconectar integración','Conserva tus ajustes y tu historial.');
+  const connectionDetail=disclosure(groups.connection,'connection','Cuándo necesitas estos controles');
+  connectionDetail.append(el('p','','La instalación se detecta al arrancar. Conecta una vez y reinicia Desktop cuando terminen tus tareas. Cerrar la isla no detiene el enrutador.'));
   for(const input of page.querySelectorAll('input[data-key-id]')){const draft=drafts.get(input.dataset.keyId);if(draft){input.value=draft.value;input.closest('.key-editor').hidden=!draft.open;}}
   selectSettingsSection(settingsSection);refreshProductVersion();page.scrollTop=scroll;
+  if(focusedSetting)page.querySelector('[data-setting="'+focusedSetting+'"]')?.focus({preventScroll:true});
+  else if(focusedSection)page.querySelector('[data-settings-section="'+focusedSection+'"]')?.focus({preventScroll:true});
+  else if(focusedEngine)page.querySelector('[data-engine="'+focusedEngine+'"]')?.focus({preventScroll:true});
+  else if(focusedDetail)page.querySelector('[data-setting-detail="'+focusedDetail+'"]>summary')?.focus({preventScroll:true});
 }
 
 function renderPage(){

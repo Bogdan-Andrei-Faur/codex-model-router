@@ -93,6 +93,29 @@ Los hosts cierran/reintentan su propio hijo tras EOF/error, conservando la vista
 y limitan esperas a 15 s (110 s para conexión). La configuración, valoraciones
 y modos se escriben mediante los locks/operaciones atómicas comunes.
 
+## Ajustes legibles
+
+La vista compartida agrupa los controles en **Aplicación, Modelos, Privacidad y
+Conexión**. Cada función tiene un nombre estable, una descripción breve y un
+interruptor con estado textual y `role="switch"`; el color acompaña al estado,
+sin ser su única señal. Tarjetas redondeadas e iconos Lucide del catálogo fijado
+mantienen el estilo del resto de la isla.
+
+Comparaciones, política de modelos, privacidad detallada y ayuda de conexión
+se despliegan bajo demanda. Los desplegables, el foco de interruptores/navegación
+y los borradores de claves se conservan durante los refrescos. La vista previa
+y el modo de solo lectura no permiten guardar claves ni cambiar permisos.
+
+Guardar mensajes localmente, compartir métricas, compartir mensajes y compartir
+diagnóstico completo son controles distintos. Los permisos adicionales solo se
+muestran al compartir métricas; sus avisos de contenido sensible, destino,
+ausencia de borrado automático y captura futura permanecen visibles. El borrado
+remoto conserva una confirmación separada. Ningún cambio visual activa permisos.
+
+Implementación local y pruebas de navegador documentadas en
+[el recibo de Ajustes](native-validation/2026-10-12-settings-ux.md). No implica
+publicación, sustitución de la instalación ni aceptación física de otros sistemas.
+
 ## Windows y distribución
 
 `native/windows/MonitorWindows.cs` sustituye como entrada activa al renderizador WPF anterior.

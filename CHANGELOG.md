@@ -1,5 +1,18 @@
 # Cambios
 
+## 0.9.12 — Ajustes más claros, 12/10/2026
+
+- Ajustes se organiza en Aplicación, Modelos, Privacidad y Conexión, con tarjetas
+  redondeadas, colores suaves e iconos Lucide.
+- Nombres breves, descripciones directas e interruptores con estado visible;
+  los detalles técnicos se consultan en desplegables.
+- Conserva permisos independientes, avisos de privacidad y confirmación de
+  borrado. Ningún permiso se activa por actualizar.
+- Mantiene borradores de claves, desplegables y foco durante los refrescos;
+  las vistas previas no permiten guardar claves.
+- Entrega para Mac Apple Silicon; instaladores Windows y Ubuntu pendientes
+  de transferencia. La interfaz compartida incluye el rediseño para los tres.
+
 ## 0.9.11 — Avisos de telemetría, 12/10/2026
 
 - Ajustes distingue los límites por instalación, almacenamiento total y base de

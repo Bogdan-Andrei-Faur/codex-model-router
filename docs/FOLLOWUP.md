@@ -24,6 +24,7 @@ No installation or live service was changed during this reconciliation.
 
 | Workstream | Next action | Boundary / dependency |
 | --- | --- | --- |
+| Settings simplification | Owner visual review; then publish the local shared UI in a signed client release when authorized. |34 core tests and17 browser groups PASS; concise descriptive switches/cards, privacy warnings preserved. Installed0.9.11 unchanged. [Receipt](native-validation/2026-10-12-settings-ux.md). |
 | Windows/Ubuntu distribution | Transfer the owner-tested EXE/DEB and any build receipts; inspect version/architecture/hash, sign matching metadata and publish under existing authority. | Files are on other computers. Never rename binary version identity or overwrite immutable Mac assets. |
 | Managed update acceptance | On those machines exercise actual Settings update/cancel/recovery and login-specific cases. | Installation acceptance and CI lifecycle fixtures do not close these cases. Use the [machine checklist](native-validation/WINDOWS-UBUNTU-UPDATES.md). |
 | Central telemetry | Validate Windows/Ubuntu sharing and disposable offline/retry/deletion cases. Monitor capacity growth as diagnostics accumulate. | Owner0.9.11 installed/loaded and native sending verified. Quota incident is closed by95436e8 deployment and actual native recovery.1GiB/installation,4GiB total,5GiB physical DB; no automatic deletion. Existing metrics/prompts/raw flags and credentials preserved. Already rejected captures are not backfilled. [Receipt](native-validation/2026-10-12-central-capacity-repair.md). |

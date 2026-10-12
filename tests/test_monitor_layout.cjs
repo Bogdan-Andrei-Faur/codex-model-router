@@ -135,13 +135,13 @@ const assert = require('node:assert/strict');
       await page.evaluate(value=>window.receive({config:{enabled:true,phase_routing:value,prompt_logging:value}}),enabled);
       await page.locator('[data-tab="settings"]').click();
       await page.locator('[data-settings-section=routing]').click();
-      const routingText=await page.locator('#settings').innerText();
+      assert.equal(await page.getByRole('switch',{name:'Cambiar modelo entre fases',exact:true}).getAttribute('aria-checked'),String(enabled));
       await page.locator('[data-settings-section=data]').click();
-      const settingsText=routingText+' '+await page.locator('#settings').innerText();
-      assert.ok(settingsText.includes(enabled?'Cambios por fases habilitados':'cambios por fases están desactivados'));
-      assert.ok(settingsText.includes(enabled?'Desactivar cambios automáticos por fases':'Activar cambios automáticos por fases'));
-      assert.ok(settingsText.includes(enabled?'Desactivar captura de prompts':'Activar captura de prompts'));
-      assert.equal(settingsText.includes('archivo local privado state/prompts.jsonl'),enabled);
+      assert.equal(await page.getByRole('switch',{name:'Guardar mensajes',exact:true}).getAttribute('aria-checked'),String(enabled));
+      assert.equal(await page.locator('[data-setting-detail=local-privacy]').evaluate(n=>n.open),false);
+      await page.locator('[data-setting-detail=local-privacy]>summary').click();
+      assert.equal((await page.locator('#settings').innerText()).includes('archivo local privado state/prompts.jsonl'),enabled);
+      await page.locator('[data-setting-detail=local-privacy]>summary').click();
     }
     console.log('PASS: settings reflect optional phase routing and private prompt capture');
     for (const deviceScaleFactor of [1,1.25,1.5,2]) {

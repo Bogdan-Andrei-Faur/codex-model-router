@@ -15,19 +15,24 @@ const assert=require('node:assert/strict');
     await page.evaluate(()=>{window.receive({ui:{mode:'Expanded',reduced:true},centralTelemetry:{enabled:false,status:'disabled'}});showTab('settings');selectSettingsSection('data');});
     const settings=page.locator('#settings');
     const last=()=>page.evaluate(()=>window.nativeMessages.at(-1));
-    await settings.getByRole('button',{name:/^Compartir métricas/}).click();
+    await settings.getByRole('switch',{name:'Compartir métricas',exact:true}).click();
     assert.deepEqual(await last(),{action:'config',key:'central_enabled',value:true});
-    assert.equal(await settings.getByRole('button',{name:/^Permitir envío/}).count(),0);
+    assert.equal(await settings.getByRole('switch',{name:/^Compartir (mensajes|diagnóstico completo)$/}).count(),0);
     await page.evaluate(()=>window.receive({centralTelemetry:{enabled:true,prompts:false,raw_otlp:false,status:'retrying',pending:12,rejected:3,canDelete:true}}));
     assert.ok((await settings.innerText()).includes('12 pendientes'));
-    for(const [status,label] of [['installation_capacity','Esta instalación ha alcanzado su límite'],['total_capacity','El almacenamiento de eventos del servicio está lleno'],['database_capacity','La base de datos del servicio ha alcanzado su límite'],['server_busy','El servicio limita temporalmente los envíos']]){
+    for(const [status,label] of [['installation_capacity','Límite de esta instalación'],['total_capacity','Almacenamiento del servicio lleno'],['database_capacity','Base de datos llena'],['server_busy','Servicio ocupado']]){
       await page.evaluate(status=>window.receive({centralTelemetry:{enabled:true,status,pending:233,rejected:10,canDelete:true}}),status);
       assert.ok((await settings.innerText()).includes(label));
       assert.ok((await settings.innerText()).includes('233 pendientes'));
     }
-    await settings.getByRole('button',{name:/^Permitir envío de prompts/}).click();
+    assert.equal(await settings.getByRole('switch',{name:'Compartir mensajes',exact:true}).getAttribute('aria-checked'),'false');
+    assert.equal(await settings.getByRole('switch',{name:'Compartir diagnóstico completo',exact:true}).getAttribute('aria-checked'),'false');
+    assert.ok((await settings.innerText()).includes('sin filtrar ni anonimizar'));
+    assert.ok((await settings.innerText()).includes('sin borrado automático'));
+    assert.ok((await settings.innerText()).includes('No se envía el historial anterior'));
+    await settings.getByRole('switch',{name:'Compartir mensajes',exact:true}).click();
     assert.deepEqual(await last(),{action:'config',key:'central_prompts',value:true});
-    await settings.getByRole('button',{name:/^Permitir envío de OTLP/}).click();
+    await settings.getByRole('switch',{name:'Compartir diagnóstico completo',exact:true}).click();
     assert.deepEqual(await last(),{action:'config',key:'central_raw_otlp',value:true});
     await settings.getByRole('button',{name:/^Eliminar mis datos enviados/}).click();
     assert.notEqual((await last()).key,'central_delete');
@@ -39,8 +44,8 @@ const assert=require('node:assert/strict');
     await page.evaluate(()=>window.receive({centralTelemetry:{enabled:false,status:'retrying',delete_pending:true,pending:0}}));
     assert.ok((await settings.innerText()).includes('Eliminación pendiente de conexión'));
     await page.evaluate(()=>window.receive({readOnly:true,centralTelemetry:{enabled:true,prompts:false,raw_otlp:false,status:'synced'}}));
-    assert.equal(await settings.getByRole('button',{name:/^Dejar de compartir/}).isDisabled(),true);
-    assert.equal(await settings.getByRole('button',{name:/^Permitir envío de prompts/}).isDisabled(),true);
+    assert.equal(await settings.getByRole('switch',{name:'Compartir métricas',exact:true}).isDisabled(),true);
+    assert.equal(await settings.getByRole('switch',{name:'Compartir mensajes',exact:true}).isDisabled(),true);
     assert.deepEqual(errors,[]);
     console.log('PASS: default opt-out, separate permissions, sync-only refresh, in-app delete confirmation and read-only Settings');
   }finally{await browser.close();}

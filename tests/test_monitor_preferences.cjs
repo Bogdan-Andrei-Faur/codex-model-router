@@ -43,8 +43,17 @@ const path=require('node:path'),assert=require('node:assert/strict');
   assert.equal(await page.getByLabel('Clave API de TypeSafe').inputValue(),'synthetic-unsaved');
   assert.equal(await page.evaluate(()=>window.messages.some(m=>m.action==='secret')),false);
   await page.locator('[data-settings-section=data]').click();
-  await page.getByRole('button',{name:/^Desactivar captura de prompts/}).click();
+  await page.getByRole('switch',{name:'Guardar mensajes',exact:true}).click();
   assert.deepEqual(await page.evaluate(()=>window.messages.at(-1)),{action:'config',key:'prompt_logging',value:false});
+  const promptSwitch=page.getByRole('switch',{name:'Guardar mensajes',exact:true});
+  await promptSwitch.focus();await page.keyboard.press('Space');
+  assert.deepEqual(await page.evaluate(()=>window.messages.at(-1)),{action:'config',key:'prompt_logging',value:false});
+  await page.locator('[data-setting-detail=local-privacy]>summary').click();
+  await page.evaluate(()=>window.receive({centralTelemetry:{enabled:false,status:'disabled',pending:1}}));
+  assert.equal(await page.locator('[data-setting-detail=local-privacy]').evaluate(n=>n.open),true,'Live refresh closed local privacy details');
+  await promptSwitch.focus();
+  await page.evaluate(()=>window.receive({centralTelemetry:{enabled:false,status:'disabled',pending:2}}));
+  assert.equal(await promptSwitch.evaluate(n=>n===document.activeElement),true,'Live refresh lost keyboard focus');
   for(const width of [800,620,390,320]){
    await page.setViewportSize({width,height:950});
    for(const key of ['application','routing','data','connection']){
@@ -57,7 +66,11 @@ const path=require('node:path'),assert=require('node:assert/strict');
   }
   await page.evaluate(()=>window.receive({readOnly:true}));
   await page.locator('[data-settings-section=data]').click();
-  assert.equal(await page.getByRole('button',{name:/^Desactivar captura de prompts/}).isDisabled(),true);
+  assert.equal(await page.getByRole('switch',{name:'Guardar mensajes',exact:true}).isDisabled(),true);
+  await page.evaluate(()=>window.receive({readOnly:false,preview:true}));
+  await page.locator('[data-settings-section=routing]').click();
+  assert.equal(await page.getByRole('button',{name:'Guardar clave',exact:true}).isDisabled(),true);
+  assert.equal(await page.locator('[data-engine=jev]').isDisabled(),true);
   assert.deepEqual(errors,[]);
   console.log('PASS: grouped consumption/settings, evidence limits, refresh state, credential draft isolation, action payloads and 320–800px layout');
  }finally{await browser.close();}
