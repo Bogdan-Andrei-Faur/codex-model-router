@@ -33,6 +33,36 @@ observations; no live operator action is implied by reading this runbook.
   stores their SHA256 hashes. Anonymous enrollment does **not** authenticate a
   real person or official binary. Treat cohorts as untrusted observations.
 
+## Capacity incident and candidate correction — 2026-10-12
+
+The owner Mac0.9.10 sender authenticated and acknowledged consent (HTTP200),
+then events failed with HTTP507 `storage_capacity`. Read-only P510 aggregates
+confirm134,101,327 encoded bytes for the largest/only data-bearing installation,
+against the134,217,728-byte quota. Total database size was32,085,683 bytes and
+host available space88,242,221,056 bytes. Raw OTLP dominates encoded event bytes;
+this was an application quota, not a full disk, expired credential or lost consent.
+Existing data/outbox/permissions are preserved. Already rejected capture attempts
+cannot be claimed recovered or remotely backfilled.
+
+Candidate defaults:1GiB per installation,4GiB aggregate encoded events,5GiB
+physical database. Compose operators can set `METRICS_MAX_INSTALLATION_BYTES`,
+`METRICS_MAX_TOTAL_BYTES`, `METRICS_MAX_DATABASE_BYTES` in Sentinel; these map to
+existing API `MAX_*` settings. No automatic deletion is introduced, and these
+ceilings are not disk reservations. Keep disk/DB monitoring active and revisit
+quotas as diagnostics grow. API507 reasons distinguish installation, aggregate
+and database capacity; HTTP429 remains transient admission/rate pressure.
+The private panel shows aggregate capacity use and bytes per kind, without IDs
+or diagnostic contents. Sentinel receives a content-free capacity warning.
+
+Client capture rejection preserves the last sender error instead of masking it.
+New diagnostics leave512KiB of the8MiB outbox available for metrics; existing
+queued rows are never pruned to obtain this reserve. A successful acknowledged
+send clears the transport error; pending rows are removed only after exact ACK.
+
+Publishing/deploying the candidate and confirming real outbox drain are separate
+remaining gates. Do not reset permissions, re-enroll, delete server events or clear
+the outbox as a workaround. The source/client fix is not in the installed0.9.10.
+
 ## Sentinel deployment
 
 Current result: P510 backend deployment and public synthetic validation PASS;
@@ -196,7 +226,7 @@ Nothing is deleted automatically by elapsed time. Defaults:
 | Authenticated operations |120/minute per installation (successful operations) |
 | Request |1MiB decoded JSON, no compressed request bodies |
 | Event / batch |256KiB /100 events |
-| Stored events |128MiB per installation,1GiB total encoded event bytes |
+| Stored events |1GiB per installation,4GiB total encoded event bytes (candidate; production still128MiB/1GiB until deployed) |
 | Database |5GiB database size admission ceiling |
 | Container resources |512MiB/1CPU each;32 concurrent API requests |
 | Desktop outbox |8MiB or4096 events, whichever comes first |

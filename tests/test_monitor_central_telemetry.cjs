@@ -20,6 +20,11 @@ const assert=require('node:assert/strict');
     assert.equal(await settings.getByRole('button',{name:/^Permitir envío/}).count(),0);
     await page.evaluate(()=>window.receive({centralTelemetry:{enabled:true,prompts:false,raw_otlp:false,status:'retrying',pending:12,rejected:3,canDelete:true}}));
     assert.ok((await settings.innerText()).includes('12 pendientes'));
+    for(const [status,label] of [['installation_capacity','Esta instalación ha alcanzado su límite'],['total_capacity','El almacenamiento de eventos del servicio está lleno'],['database_capacity','La base de datos del servicio ha alcanzado su límite'],['server_busy','El servicio limita temporalmente los envíos']]){
+      await page.evaluate(status=>window.receive({centralTelemetry:{enabled:true,status,pending:233,rejected:10,canDelete:true}}),status);
+      assert.ok((await settings.innerText()).includes(label));
+      assert.ok((await settings.innerText()).includes('233 pendientes'));
+    }
     await settings.getByRole('button',{name:/^Permitir envío de prompts/}).click();
     assert.deepEqual(await last(),{action:'config',key:'central_prompts',value:true});
     await settings.getByRole('button',{name:/^Permitir envío de OTLP/}).click();

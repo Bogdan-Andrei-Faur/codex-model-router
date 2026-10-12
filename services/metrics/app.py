@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import html
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -18,12 +19,26 @@ from starlette.concurrency import run_in_threadpool
 from codex_model_router.telemetry.central_protocol import MAX_BATCH, MAX_EVENTS, HEX, validate_event
 
 
+def capacity_limits():
+    return (int(os.environ.get('MAX_INSTALLATION_BYTES', str(1024**3))),
+            int(os.environ.get('MAX_TOTAL_BYTES', str(4*1024**3))),
+            int(os.environ.get('MAX_DATABASE_BYTES', str(5*1024**3))))
+
+
+def capacity_rejected(scope):
+    # Literal scope only: never log request bodies, installation IDs or headers.
+    logging.getLogger('router.metrics').warning('metrics_ingestion_capacity_rejected scope=%s', scope)
+    raise HTTPException(507, scope)
+
+
 def connect():
     return psycopg.connect(os.environ['DATABASE_URL'], connect_timeout=5, options='-c statement_timeout=10000 -c lock_timeout=5000')
 
 
 def migrate():
     with connect() as db:
+        # schema.sql owns BEGIN/COMMIT; avoid a second implicit BEGIN warning.
+        db.autocommit = True
         db.execute(Path(__file__).with_name('schema.sql').read_text())
 
 
@@ -160,8 +175,9 @@ def process(path, body, installation, token_hash):
         accepted, seen = [], set()
         total = db.execute('SELECT COALESCE(SUM(bytes),0) FROM installations').fetchone()[0]
         db_size = db.execute('SELECT pg_database_size(current_database())').fetchone()[0]
-        if db_size >= int(os.environ.get('MAX_DATABASE_BYTES', str(5*1024**3))):
-            raise HTTPException(507, 'storage_capacity')
+        installation_limit, total_limit, database_limit = capacity_limits()
+        if db_size >= database_limit:
+            capacity_rejected('database_capacity')
         for event in events:
             try:
                 encoded = validate_event(event)
@@ -178,8 +194,10 @@ def process(path, body, installation, token_hash):
                 if existing != (event['kind'], event['data'], current):
                     raise HTTPException(409, 'event_conflict')
             else:
-                if row[6] + size > int(os.environ.get('MAX_INSTALLATION_BYTES', str(128*1024**2))) or total + size > int(os.environ.get('MAX_TOTAL_BYTES', str(1024**3))):
-                    raise HTTPException(507, 'storage_capacity')
+                if row[6] + size > installation_limit:
+                    capacity_rejected('installation_capacity')
+                if total + size > total_limit:
+                    capacity_rejected('total_capacity')
                 db.execute('INSERT INTO events(installation,id,epoch,kind,data,size) VALUES (%s,%s,%s,%s,%s,%s)', (installation, event['id'], current, event['kind'], Jsonb(event['data']), size))
                 db.execute('UPDATE installations SET bytes=bytes+%s WHERE id=%s', (size, installation))
                 row = row[:6] + (row[6] + size,) + row[7:]
@@ -272,7 +290,9 @@ def panel(request: Request):
     admin(request)
     with connect() as db:
         installations = db.execute('SELECT COUNT(*),COALESCE(SUM(bytes),0) FROM installations').fetchone()
-        counts = db.execute('SELECT kind,COUNT(*) FROM events GROUP BY kind ORDER BY kind').fetchall()
+        largest = db.execute('SELECT COALESCE(MAX(bytes),0) FROM installations').fetchone()[0]
+        db_size = db.execute('SELECT pg_database_size(current_database())').fetchone()[0]
+        content_bytes = db.execute('SELECT kind,COUNT(*),COALESCE(SUM(size),0) FROM events GROUP BY kind ORDER BY kind').fetchall()
         accepted = db.execute("SELECT COALESCE(data->>'accepted_model',data->>'model','unknown'),COUNT(*) FROM events WHERE kind='metrics' AND data->>'event'='decision_accepted' GROUP BY 1 ORDER BY 2 DESC").fetchall()
         evidence = db.execute("SELECT data->>'event',COALESCE(data->>'evidence_confidence','unknown'),COUNT(*) FROM events WHERE kind='metrics' AND data->>'event' IN ('inference_observed','inference_probable','phase_checkpoint','decision_completed','decision_quality') GROUP BY 1,2 ORDER BY 1,2").fetchall()
         cohorts = db.execute("SELECT COALESCE(data->>'product_version','unknown'),COALESCE(data->>'execution_platform','unknown'),COUNT(*) FROM events WHERE kind='metrics' AND data->>'event'='decision_created' GROUP BY 1,2 ORDER BY 3 DESC").fetchall()
@@ -281,9 +301,13 @@ def panel(request: Request):
             (SELECT DISTINCT ON (installation,data->>'decision_id') data FROM events
              WHERE kind='metrics' AND data->>'event'='decision_usage' AND data ? 'decision_id'
              ORDER BY installation,data->>'decision_id',COALESCE((data->>'time')::numeric,0) DESC,received_at DESC) AS latest""").fetchone()
+    limits = capacity_limits()
+    capacity_rows = [(label, used, limit, f'{used/limit:.1%}' if limit > 0 else 'Desconocido')
+                     for label, used, limit in zip(('Mayor instalación', 'Eventos totales', 'Base de datos'),
+                                                   (largest, installations[1], db_size), limits)]
     def table(title, headings, rows):
         return '<h2>'+html.escape(title)+'</h2><table><thead><tr>'+''.join('<th>'+html.escape(h)+'</th>' for h in headings)+'</tr></thead><tbody>'+''.join('<tr>'+''.join('<td>'+html.escape(str(v) if v is not None else 'Desconocido')+'</td>' for v in row)+'</tr>' for row in rows)+'</tbody></table>'
-    return '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Router · Métricas privadas</title><style>body{font:16px system-ui;background:#121319;color:#eee;max-width:960px;margin:40px auto;padding:24px}h2{margin-top:32px}table{width:100%;border-collapse:collapse}td,th{padding:12px;text-align:left;border-bottom:1px solid #343641}p{color:#bfc4d4}</style><h1>Métricas del enrutador</h1><p>Panel privado · Sin borrado automático. Instalaciones anónimas y no verificadas; no representan a todos los usuarios.</p>'+table('Recogida', ['Instalaciones','Bytes de eventos'], [installations])+table('Contenido almacenado',['Tipo','Eventos'],counts)+table('Modelos aceptados',['Modelo','Registros'],accepted)+table('Evidencia y resultados',['Evento','Confianza','Muestras'],evidence)+table('Versiones y sistemas',['Versión','Sistema','Registros'],cohorts)+table('Últimos contadores por decisión',['Decisiones con muestra','Entrada','Salida'],[usage])+'<p>Aceptación no prueba inferencia. Los contadores pueden incluir contexto anterior al permiso; no son facturación ni consumo incremental. Coste facturado: desconocido. Los diagnósticos no se muestran en esta página.</p></html>'
+    return '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Router · Métricas privadas</title><style>body{font:16px system-ui;background:#121319;color:#eee;max-width:960px;margin:40px auto;padding:24px}h2{margin-top:32px}table{width:100%;border-collapse:collapse}td,th{padding:12px;text-align:left;border-bottom:1px solid #343641}p{color:#bfc4d4}</style><h1>Métricas del enrutador</h1><p>Panel privado · Sin borrado automático. Instalaciones anónimas y no verificadas; no representan a todos los usuarios.</p>'+table('Recogida', ['Instalaciones','Bytes de eventos'], [installations])+table('Capacidad',['Ámbito','Bytes usados','Límite en bytes','Uso'],capacity_rows)+table('Contenido almacenado',['Tipo','Eventos','Bytes'],content_bytes)+table('Modelos aceptados',['Modelo','Registros'],accepted)+table('Evidencia y resultados',['Evento','Confianza','Muestras'],evidence)+table('Versiones y sistemas',['Versión','Sistema','Registros'],cohorts)+table('Últimos contadores por decisión',['Decisiones con muestra','Entrada','Salida'],[usage])+'<p>Aceptación no prueba inferencia. Los contadores pueden incluir contexto anterior al permiso; no son facturación ni consumo incremental. Coste facturado: desconocido. Los diagnósticos no se muestran en esta página.</p></html>'
 
 
 @app.get('/admin/diagnostic/{installation}/{event_id}')

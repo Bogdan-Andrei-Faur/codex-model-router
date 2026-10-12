@@ -104,6 +104,30 @@ class CentralClientTests(unittest.TestCase):
         capture(self.root,'raw_otlp',json.dumps({'x':'x'*MAX_EVENT}))
         self.assertEqual(self.client.snapshot()['rejected'],2)
 
+    def test_capture_rejection_preserves_upload_failure(self):
+        self.client.configure('enabled', True)
+        from codex_model_router.telemetry.central_client import SEND_ERRORS
+        for status in SEND_ERRORS:
+            with self.subTest(status=status), database(self.root) as db:
+                db.execute('UPDATE control SET status=?', (status,))
+            with patch('codex_model_router.telemetry.central_client.MAX_QUEUE_EVENTS', 0):
+                self.sample()
+            self.assertEqual(self.client.snapshot()['status'], status)
+        self.sample()
+        self.client.tick()
+        self.assertEqual(self.client.snapshot()['status'], 'synced')
+
+    def test_diagnostics_leave_capacity_for_metrics(self):
+        self.client.configure('enabled', True)
+        self.client.configure('raw_otlp', True)
+        with patch('codex_model_router.telemetry.central_client.MAX_QUEUE_BYTES', 1024), \
+             patch('codex_model_router.telemetry.central_client.METRICS_RESERVE_BYTES', 512):
+            capture(self.root, 'raw_otlp', json.dumps({'synthetic': 'x'*500}))
+            self.assertEqual(self.client.snapshot()['pending'], 0)
+            self.sample()
+            self.assertEqual(self.client.snapshot()['pending'], 1)
+            self.assertEqual(self.client.snapshot()['rejected'], 1)
+
     def test_delete_waits_offline_and_clears_queue(self):
         self.client.configure('enabled',True)
         self.sample(); self.client.tick()
@@ -185,3 +209,20 @@ class CentralClientTests(unittest.TestCase):
             with self.assertRaisesRegex(OSError,'^server_capacity$'):
                 transport('/v1/events',{},'a'*64)
         self.assertTrue(body.closed)
+
+    def test_transport_only_reports_allowlisted_capacity_scope(self):
+        from io import BytesIO
+        from urllib.error import HTTPError
+        from codex_model_router.telemetry.central_client import transport
+        cases = [(507, reason, reason) for reason in ('installation_capacity', 'total_capacity', 'database_capacity')]
+        cases += [(507, 'PRIVATE_RESPONSE', 'server_capacity'), (429, 'rate_limited', 'server_busy'),
+                  (401, 'PRIVATE_RESPONSE', 'access_rejected'), (503, 'PRIVATE_RESPONSE', 'retrying'),
+                  (507, {'private': 'content'}, 'server_capacity')]
+        for code, reason, expected in cases:
+            body = BytesIO(json.dumps({'detail': reason}).encode())
+            error = HTTPError('https://router.andreifaur.dev/v1/events', code, 'PRIVATE_MESSAGE', {}, body)
+            with self.subTest(code=code, reason=reason), patch('codex_model_router.telemetry.central_client.urllib.request.build_opener') as opener:
+                opener.return_value.open.side_effect = error
+                with self.assertRaisesRegex(OSError, '^'+expected+'$'):
+                    transport('/v1/events', {}, 'a'*64)
+                self.assertTrue(body.closed)

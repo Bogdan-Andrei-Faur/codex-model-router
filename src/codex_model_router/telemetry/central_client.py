@@ -20,6 +20,16 @@ from codex_model_router.telemetry.evidence import scrub, pseudonym
 
 MAX_QUEUE_BYTES = 8 * 1024 * 1024
 MAX_QUEUE_EVENTS = 4096
+# Diagnostics must leave room for routing metrics during an outage.
+METRICS_RESERVE_BYTES = 512 * 1024
+SEND_ERRORS = ('credential_unavailable', 'server_capacity', 'installation_capacity',
+               'total_capacity', 'database_capacity', 'server_busy', 'access_rejected', 'retrying')
+
+
+def reject_capture(db):
+    # A full outbox is a consequence of a failed upload, not its cause.
+    placeholders = ','.join('?' for _ in SEND_ERRORS)
+    db.execute(f"UPDATE control SET rejected=rejected+1,status=CASE WHEN status IN ({placeholders}) THEN status ELSE 'capacity_or_invalid' END", SEND_ERRORS)
 
 
 @contextmanager
@@ -70,17 +80,18 @@ def capture(root, kind, data):
                 data = {'prompt': data.get('prompt'), 'decision_id': pseudonym(key, 'decision_id', str(data.get('decision_id', 'unknown')))}
             elif kind == 'raw_otlp':
                 if len(data) > MAX_EVENT:
-                    db.execute("UPDATE control SET rejected=rejected+1,status='capacity_or_invalid'")
+                    reject_capture(db)
                     return
                 data = data.decode('utf-8') if isinstance(data, bytes) else data
             try:
                 body = validate_event({'id': uuid.uuid4().hex, 'kind': kind, 'data': data})
                 size = len(body.encode())
                 total, count = db.execute('SELECT COALESCE(SUM(size),0), COUNT(*) FROM queue').fetchone()
-                if total + size > MAX_QUEUE_BYTES or count >= MAX_QUEUE_EVENTS:
+                limit = MAX_QUEUE_BYTES if kind == 'metrics' else max(0, MAX_QUEUE_BYTES - METRICS_RESERVE_BYTES)
+                if total + size > limit or count >= MAX_QUEUE_EVENTS:
                     raise ValueError('queue_full')
             except (ValueError, TypeError, RecursionError):
-                db.execute("UPDATE control SET rejected=rejected+1,status='capacity_or_invalid'")
+                reject_capture(db)
                 return
             db.execute('INSERT INTO queue(epoch,body,size) VALUES (?,?,?)', (c['epoch'], body, size))
     except (OSError, sqlite3.Error, ValueError, TypeError):
@@ -104,8 +115,16 @@ def transport(path, body, token):
         response = urllib.request.build_opener(NoRedirect()).open(request, timeout=8)
     except urllib.error.HTTPError as error:
         code = error.code
-        error.close()
-        raise OSError('server_capacity' if code in (429, 507) else 'access_rejected' if code in (401, 403) else 'retrying') from None
+        try:
+            reason = json.loads(error.read(4097)).get('detail')
+        except (ValueError, TypeError, AttributeError, OSError):
+            reason = None
+        finally:
+            error.close()
+        # Never propagate arbitrary response bodies or exception messages.
+        capacity = ('installation_capacity', 'total_capacity', 'database_capacity')
+        status = reason if code == 507 and reason in capacity else 'server_capacity' if code == 507 else 'server_busy' if code == 429 else 'access_rejected' if code in (401, 403) else 'retrying'
+        raise OSError(status) from None
     with response:
         raw = response.read(65537)
         if len(raw) > 65536:
@@ -238,7 +257,7 @@ class CentralTelemetry:
                     self.next_attempt = time.monotonic() + min(600, 2 ** min(self.failures, 9)) + random.random()
                     try:
                         with database(self.root) as db:
-                            status = str(error) if str(error) in ('credential_unavailable', 'server_capacity', 'access_rejected') else 'retrying'
+                            status = str(error) if str(error) in SEND_ERRORS else 'retrying'
                             db.execute('UPDATE control SET status=? WHERE enabled=1 OR delete_pending=1', (status,))
                     except (OSError, sqlite3.Error):
                         pass

@@ -16,7 +16,8 @@ env['PYTHONPATH']=str(root/'src')+os.pathsep+str(root)
 try:
     subprocess.run(['docker','run','--detach','--rm','--name',name,'-e','POSTGRES_PASSWORD','-e','POSTGRES_DB=router_metrics_fixture','-p','127.0.0.1::5432','postgres:17-bookworm'],env=env,check=True,stdout=subprocess.DEVNULL)
     for _ in range(60):
-        result=subprocess.run(['docker','exec',name,'pg_isready','-U','postgres'],capture_output=True)
+        # The entrypoint's temporary Unix-socket server precedes TCP readiness.
+        result=subprocess.run(['docker','exec',name,'pg_isready','-h','127.0.0.1','-U','postgres'],capture_output=True)
         if result.returncode==0: break
         time.sleep(.5)
     else: raise RuntimeError('fixture_database_not_ready')

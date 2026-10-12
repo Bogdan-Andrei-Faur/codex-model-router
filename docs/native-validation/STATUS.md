@@ -29,6 +29,28 @@ Settings0.9.9 →0.9.10 with automatic cleanup PASS. Signed assets/checksums ver
 before promotion. Last verified owner app/bridge is0.9.8; owner installation of
 0.9.10 remains unclaimed. [Delivery receipt](2026-10-11-macos-companions-release.md).
 
+## Central capacity repair candidate — 2026-10-12
+
+Production cause confirmed: authenticated events507 at128MiB per-installation
+quota, not physical disk exhaustion. Candidate increases configurable limits,
+distinguishes safe errors and prevents capture warnings hiding sender failures.
+Local fixtures PASS; publication/deployment/real queue drain remain pending.
+Installed0.9.10 unchanged. [Receipt](2026-10-12-central-capacity-repair.md).
+
+## Owner activation and current sharing health — 2026-10-12
+
+Owner installation/loaded bridge0.9.10 now PASS: expected monitor/router hashes,
+one fresh handshake, no restart marker, completed0.9.8 →0.9.10 transaction and
+automatic retention of only0.9.8. Published UI assets match; bundle signature
+verifies. This supersedes the prior pending owner-update statements.
+
+Local telemetry receives events with zero transport/size/auth errors. Central
+sharing is unhealthy:233 queued events nearly fill8MiB, rejection count increases,
+and last successful sync predates the update. HTTPS readiness200; sender root
+cause not established. Metrics, prompts and raw OTLP sharing are currently enabled
+and were not changed here. This supersedes earlier healthy/off consent snapshots
+only for current sender/consent state. [Receipt](2026-10-12-macos-0.9.10-activation.md).
+
 ## Owner acceptance — 2026-10-11
 
 Mac retention source:49 tests and isolated native success/rollback/interrupted

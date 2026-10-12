@@ -27,7 +27,7 @@ try:
     run(['network','create',net]);run(['volume','create',volume])
     run(['run','-d','--name',db,'--network',net,'--network-alias','db','-e','POSTGRES_PASSWORD','-e','POSTGRES_DB=router_metrics_fixture','postgres:17-bookworm'])
     for _ in range(60):
-        if subprocess.run(['docker','exec',db,'pg_isready','-U','postgres'],capture_output=True).returncode==0:break
+        if subprocess.run(['docker','exec',db,'pg_isready','-h','127.0.0.1','-U','postgres'],capture_output=True).returncode==0:break
         time.sleep(.5)
     else:raise RuntimeError('database_not_ready')
     command('migrate')

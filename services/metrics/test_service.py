@@ -114,12 +114,45 @@ class ServiceTests(unittest.TestCase):
     def test_caps_atomic_rejection_and_enrollment_rate(self):
         self.enroll()
         with patch.dict(os.environ,{'MAX_INSTALLATION_BYTES':'1'}):
-            self.assertEqual(self.post('events',self.base|{'events':[self.event()]}).status_code,507)
+            response = self.post('events',self.base|{'events':[self.event()]})
+            self.assertEqual(response.status_code,507)
+            self.assertEqual(response.json(), {'detail': 'installation_capacity'})
         with connect() as db: self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0],0)
         with patch.dict(os.environ,{'ENROLLMENTS_PER_HOUR':'1'}):
             self.assertEqual(self.post('enroll',{'installation':'b'*32}).status_code,429)
         self.assertEqual(self.api.post('/v1/enroll',content=b'x'*1048577,headers={'Content-Type':'application/json'}).status_code,413)
         self.assertEqual(self.api.post('/v1/enroll',content=b'x',headers={'Content-Type':'application/json','Content-Encoding':'gzip'}).status_code,415)
+
+    def test_capacity_scopes_and_owner_dashboard(self):
+        self.enroll(raw_otlp=True)
+        batch = self.base | {'events': [self.event('raw_otlp', '{"synthetic":"diagnostic"}')]}
+        for setting, detail in [('MAX_INSTALLATION_BYTES', 'installation_capacity'),
+                                ('MAX_TOTAL_BYTES', 'total_capacity'),
+                                ('MAX_DATABASE_BYTES', 'database_capacity')]:
+            with self.subTest(setting=setting), patch.dict(os.environ, {setting: '1'}):
+                response = self.post('events', batch)
+                self.assertEqual(response.status_code, 507)
+                self.assertEqual(response.json(), {'detail': detail})
+                with connect() as db:
+                    self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0], 0)
+        self.assertEqual(self.post('events', batch).status_code, 200)
+        panel = self.api.get('/', headers=self.owner).text
+        for label in ('Capacidad', 'Mayor instalación', 'Eventos totales', 'Base de datos', '1073741824', '4294967296'):
+            self.assertIn(label, panel)
+        self.assertNotIn('diagnostic', panel)
+        self.assertNotIn(self.installation, panel)
+
+    def test_capacity_recovery_preserves_existing_events_and_retries_same_batch(self):
+        self.enroll(raw_otlp=True)
+        original = self.base | {'events': [self.event()]}
+        self.assertEqual(self.post('events', original).status_code, 200)
+        diagnostics = self.base | {'events': [self.event('raw_otlp', '{"synthetic":"raw"}', 'f'*32)]}
+        with patch.dict(os.environ, {'MAX_INSTALLATION_BYTES': '1'}):
+            self.assertEqual(self.post('events', diagnostics).status_code, 507)
+        self.assertEqual(self.post('events', diagnostics).status_code, 200)
+        self.assertEqual(self.post('events', diagnostics).status_code, 200)
+        with connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0], 2)
 
     def test_cross_installation_cannot_delete_or_read(self):
         self.enroll()

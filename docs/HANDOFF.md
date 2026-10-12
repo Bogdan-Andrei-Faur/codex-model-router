@@ -12,6 +12,35 @@ owner-accepted/waived gates and actual remaining work. Older dated sections belo
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
 
+## Confirmed central capacity cause and candidate fix — 2026-10-12
+
+Sentinel shows API/DB healthy. Actual sender enrollment/consent200 but events507;
+read-only P510 aggregates confirm134,101,327 bytes against128MiB per-installation
+quota (raw OTLP dominates), despite82GiB free disk and31MiB physical database.
+Local candidate makes limits configurable (1GiB/installation,4GiB total, unchanged
+5GiB DB), distinguishes capacity scopes, exposes safe operational warnings/panel
+usage and preserves sender errors through capture rejection. New diagnostics
+reserve512KiB for metrics. Existing queue, events, credentials and consent remain.
+Not yet published/deployed; no owner app replacement/restart. See
+[capacity diagnosis/repair](native-validation/2026-10-12-central-capacity-repair.md).
+
+## Owner Mac0.9.10 activation and sharing incident — 2026-10-12
+
+Owner applied the update and restarted Desktop. Read-only checks confirm installed
+and live bridge0.9.10, monitor `2bf3077b1c3d4782`, router `f50a290841379145`,
+policy8, one fresh connection/handshake, no restart marker, valid bundle signature
+and exact published UI assets. Update0.9.8 →0.9.10 is completed; terminal payloads
+are gone and only0.9.8 remains as recovery. Installation/bridge activation is closed;
+fresh physical/visual acceptance is not claimed.
+
+Central sharing is unhealthy independently:233 queued events fill the8MiB outbox,
+with increasing rejection count and no recent sync. Last sync predates this update;
+the HTTPS readiness endpoint responds200 with the product User-Agent. Current
+metrics/prompt/raw sharing permissions are all enabled; no permission was changed
+by this check. Root cause of the stalled sender is unconfirmed. Preserve queued
+data, real history and credentials; do not reset/re-enroll/delete to troubleshoot.
+See [owner activation receipt](native-validation/2026-10-12-macos-0.9.10-activation.md).
+
 ## Automatic companions and capsule seam — 2026-10-11
 
 Local source now assigns 120 deterministic companion names, 9 palette colors and
