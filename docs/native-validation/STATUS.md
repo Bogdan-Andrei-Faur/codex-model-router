@@ -5,6 +5,17 @@ This ledger is repository-owned; no external knowledge/memory service is needed.
 Use [current follow-up](../FOLLOWUP.md) for priorities. Older NOT_RUN rows are
 evidence gaps, not renewed installation prerequisites or known failures.
 
+## Latest Mac release0.9.11 — 2026-10-12
+
+Public signed Macarm64 delivery from7942e0b, monitor eb13b64fc1720b81,
+router7c13745cb0d0cbec.604Python/53skip, exact package smoke, signed local native
+cancel/rollback/interrupted recovery and real-GitHub isolated native
+Settings0.9.10→0.9.11/automatic cleanup PASS. Source main CI14/14 first attempt;
+tag14/14 after one failed-job rerun (initial Ubuntu synthetic SIGTERM wait8s).
+No weakened assertion or product change; specific timing cause unconfirmed.
+Actual owner app remains0.9.10; no owner installation/restart/physical acceptance
+claimed. [Receipt](2026-10-12-macos-telemetry-release.md).
+
 ## Current source CI — 2026-10-11
 
 Release tag `v0.9.10`, source `1de9269b1eba16fc18bc633df21234421901370e`:
@@ -37,7 +48,7 @@ distinguishes safe errors and prevents capture warnings hiding sender failures.
 Local fixtures and code CI14/14 PASS.95436e8 deployed normally through Sentinel;
 233 original events ACKed, followed by independent native0.9.10 background syncs
 and decreasing pending bytes without new rejections. Client error/reserve fixes
-remain source-only pending a later signed update; installed0.9.10 unchanged. [Receipt](2026-10-12-central-capacity-repair.md).
+are delivered in0.9.11; installed owner0.9.10 remains unchanged until owner update. [Receipt](2026-10-12-central-capacity-repair.md).
 
 ## Owner activation and current sharing health — 2026-10-12
 

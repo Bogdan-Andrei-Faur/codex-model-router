@@ -62,7 +62,8 @@ send clears the transport error; pending rows are removed only after exact ACK.
 Sentinel P510 deployed the correction successfully. All233 original pending
 events were ACKed; installed0.9.10 native background delivery independently
 resumed after backoff. See [recovery receipt](native-validation/2026-10-12-central-capacity-repair.md). Do not reset permissions, re-enroll, delete server events or clear
-the outbox as a workaround. The source/client fix is not in the installed0.9.10.
+the outbox as a workaround. The client fix is now delivered in the signed0.9.11 Mac release; owner installation
+remains0.9.10 until updating. See [release receipt](native-validation/2026-10-12-macos-telemetry-release.md).
 
 ## Sentinel deployment
 

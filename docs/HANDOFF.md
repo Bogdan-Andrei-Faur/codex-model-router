@@ -1,4 +1,4 @@
-# Current project handoff — 2026-10-11
+# Current project handoff — 2026-10-12
 
 Canonical project: `codex-model-router`,
 `https://github.com/Bogdan-Andrei-Faur/codex-model-router.git`.
@@ -12,16 +12,21 @@ owner-accepted/waived gates and actual remaining work. Older dated sections belo
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
 
-## Client0.9.11 release preparation — 2026-10-12
+## Published client0.9.11 — 2026-10-12
 
-Owner authorized a new signed release for the client telemetry warnings. Version
-0.9.11 includes distinct capacity/rate labels, preserves sender errors through
-capture rejection and reserves512KiB for metrics against new diagnostics. No
-consent change, queued-event eviction or discarded-history backfill. Macarm64
-publication is being prepared with the existing approved Keychain publisher;
-package/native-update/public-GitHub validation and stable promotion remain pending.
-Owner installation/loaded bridge remain0.9.10, independently verified above the
-historical receipts. Do not replace the owner app or restart Desktop during QA.
+Stable [v0.9.11](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.11)
+from immutable source7942e0bb95280fb13913db4398fcf6316023176f is Latest. Macarm64
+package, installed-key-signed manifest, checksums and sanitized provenance are
+public. Monitor eb13b64fc1720b81, router7c13745cb0d0cbec, policy8. Client capacity/
+rate labels, preserved sender errors and512KiBmetrics reserve are now delivered.
+No new permissions, eviction or discarded-history backfill.604Python/53skip,
+package smoke, signed native local cancel/recovery and isolated real-GitHub
+Settings0.9.10→0.9.11 with automatic cleanup PASS. Main CI14/14 first attempt;
+tag13/14 initially (Ubuntu synthetic SIGTERM wait8s),14/14 after one failed-job
+rerun; root timing cause unconfirmed, no source/test weakening. Details in the
+[release receipt](native-validation/2026-10-12-macos-telemetry-release.md).
+Owner installation remains0.9.10 until owner updates from Settings. No owner
+app replacement, Desktop restart or configuration/privacy change was performed.
 
 ## Central capacity repaired in production — 2026-10-12
 
@@ -35,8 +40,8 @@ reserve512KiB for metrics. Existing queue, events, credentials and consent remai
 Sentinel P510 deployed successfully; all233 original queued events were ACKed.
 Installed0.9.10 background delivery resumed independently after backoff, with
 pending bytes1.74MB →0.83MB →18KB and no new rejections in those samples.
-Code CI38236530406 passed14/14. Client error/reserve improvements await a later
-signed app release; no owner app replacement/restart was needed. See
+Code CI38236530406 passed14/14. Client error/reserve improvements are now
+delivered in0.9.11 above; no owner app replacement/restart was needed. See
 [capacity diagnosis/repair](native-validation/2026-10-12-central-capacity-repair.md).
 
 ## Owner Mac0.9.10 activation and sharing incident — 2026-10-12
