@@ -29,13 +29,15 @@ Settings0.9.9 →0.9.10 with automatic cleanup PASS. Signed assets/checksums ver
 before promotion. Last verified owner app/bridge is0.9.8; owner installation of
 0.9.10 remains unclaimed. [Delivery receipt](2026-10-11-macos-companions-release.md).
 
-## Central capacity repair candidate — 2026-10-12
+## Central capacity production recovery — 2026-10-12
 
 Production cause confirmed: authenticated events507 at128MiB per-installation
 quota, not physical disk exhaustion. Candidate increases configurable limits,
 distinguishes safe errors and prevents capture warnings hiding sender failures.
-Local fixtures PASS; publication/deployment/real queue drain remain pending.
-Installed0.9.10 unchanged. [Receipt](2026-10-12-central-capacity-repair.md).
+Local fixtures and code CI14/14 PASS.95436e8 deployed normally through Sentinel;
+233 original events ACKed, followed by independent native0.9.10 background syncs
+and decreasing pending bytes without new rejections. Client error/reserve fixes
+remain source-only pending a later signed update; installed0.9.10 unchanged. [Receipt](2026-10-12-central-capacity-repair.md).
 
 ## Owner activation and current sharing health — 2026-10-12
 

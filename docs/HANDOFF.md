@@ -12,16 +12,20 @@ owner-accepted/waived gates and actual remaining work. Older dated sections belo
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
 
-## Confirmed central capacity cause and candidate fix — 2026-10-12
+## Central capacity repaired in production — 2026-10-12
 
 Sentinel shows API/DB healthy. Actual sender enrollment/consent200 but events507;
 read-only P510 aggregates confirm134,101,327 bytes against128MiB per-installation
 quota (raw OTLP dominates), despite82GiB free disk and31MiB physical database.
-Local candidate makes limits configurable (1GiB/installation,4GiB total, unchanged
+Published correction95436e8 makes limits configurable (1GiB/installation,4GiB total, unchanged
 5GiB DB), distinguishes capacity scopes, exposes safe operational warnings/panel
 usage and preserves sender errors through capture rejection. New diagnostics
 reserve512KiB for metrics. Existing queue, events, credentials and consent remain.
-Not yet published/deployed; no owner app replacement/restart. See
+Sentinel P510 deployed successfully; all233 original queued events were ACKed.
+Installed0.9.10 background delivery resumed independently after backoff, with
+pending bytes1.74MB →0.83MB →18KB and no new rejections in those samples.
+Code CI38236530406 passed14/14. Client error/reserve improvements await a later
+signed app release; no owner app replacement/restart was needed. See
 [capacity diagnosis/repair](native-validation/2026-10-12-central-capacity-repair.md).
 
 ## Owner Mac0.9.10 activation and sharing incident — 2026-10-12
