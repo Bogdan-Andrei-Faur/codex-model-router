@@ -116,7 +116,7 @@ class ServiceTests(unittest.TestCase):
         with patch.dict(os.environ,{'MAX_INSTALLATION_BYTES':'1'}):
             response = self.post('events',self.base|{'events':[self.event()]})
             self.assertEqual(response.status_code,507)
-            self.assertEqual(response.json(), {'detail': 'installation_capacity'})
+            self.assertEqual(response.json(), {'detail': 'metrics_installation_capacity'})
         with connect() as db: self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0],0)
         with patch.dict(os.environ,{'ENROLLMENTS_PER_HOUR':'1'}):
             self.assertEqual(self.post('enroll',{'installation':'b'*32}).status_code,429)
@@ -126,8 +126,8 @@ class ServiceTests(unittest.TestCase):
     def test_capacity_scopes_and_owner_dashboard(self):
         self.enroll(raw_otlp=True)
         batch = self.base | {'events': [self.event('raw_otlp', '{"synthetic":"diagnostic"}')]}
-        for setting, detail in [('MAX_INSTALLATION_BYTES', 'installation_capacity'),
-                                ('MAX_TOTAL_BYTES', 'total_capacity'),
+        for setting, detail in [('MAX_DIAGNOSTIC_INSTALLATION_BYTES', 'diagnostics_installation_capacity'),
+                                ('MAX_DIAGNOSTIC_TOTAL_BYTES', 'diagnostics_total_capacity'),
                                 ('MAX_DATABASE_BYTES', 'database_capacity')]:
             with self.subTest(setting=setting), patch.dict(os.environ, {setting: '1'}):
                 response = self.post('events', batch)
@@ -137,7 +137,7 @@ class ServiceTests(unittest.TestCase):
                     self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0], 0)
         self.assertEqual(self.post('events', batch).status_code, 200)
         panel = self.api.get('/', headers=self.owner).text
-        for label in ('Capacidad', 'Mayor instalación', 'Eventos totales', 'Base de datos', '1073741824', '4294967296'):
+        for label in ('Capacidad', 'Métricas · mayor instalación', 'Diagnósticos · mayor instalación', 'Base de datos', '1073741824', '8589934592'):
             self.assertIn(label, panel)
         self.assertNotIn('diagnostic', panel)
         self.assertNotIn(self.installation, panel)
@@ -147,12 +147,68 @@ class ServiceTests(unittest.TestCase):
         original = self.base | {'events': [self.event()]}
         self.assertEqual(self.post('events', original).status_code, 200)
         diagnostics = self.base | {'events': [self.event('raw_otlp', '{"synthetic":"raw"}', 'f'*32)]}
-        with patch.dict(os.environ, {'MAX_INSTALLATION_BYTES': '1'}):
+        with patch.dict(os.environ, {'MAX_DIAGNOSTIC_INSTALLATION_BYTES': '1'}):
             self.assertEqual(self.post('events', diagnostics).status_code, 507)
         self.assertEqual(self.post('events', diagnostics).status_code, 200)
         self.assertEqual(self.post('events', diagnostics).status_code, 200)
         with connect() as db:
             self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0], 2)
+
+    def test_full_diagnostics_never_spend_metrics_quota(self):
+        self.enroll(raw_otlp=True, prompts=True)
+        raw=self.event('raw_otlp', '{"synthetic":"'+'x'*2000+'"}', '1'*32)
+        self.assertEqual(self.post('events',self.base|{'events':[raw]}).status_code,200)
+        for setting in ['MAX_DIAGNOSTIC_INSTALLATION_BYTES','MAX_DIAGNOSTIC_TOTAL_BYTES']:
+            with self.subTest(setting=setting), patch.dict(os.environ,{setting:'1'}):
+                response=self.post('events',self.base|{'events':[self.event('raw_otlp','{}','2'*32)]})
+                self.assertEqual(response.status_code,507)
+                self.assertEqual(self.post('events',self.base|{'events':[self.event()]}).status_code,200)
+        with patch.dict(os.environ,{'MAX_INSTALLATION_BYTES':'1','MAX_TOTAL_BYTES':'1'}):
+            self.assertEqual(self.post('events',self.base|{'events':[self.event('raw_otlp','{}','3'*32)]}).status_code,200)
+            self.assertEqual(self.post('events',self.base|{'events':[self.event(identifier='4'*32)]}).status_code,507)
+        # Duplicates keep exact ACK even after the original class quota is full.
+        with patch.dict(os.environ,{'MAX_DIAGNOSTIC_INSTALLATION_BYTES':'1'}):
+            self.assertEqual(self.post('events',self.base|{'events':[raw]}).json(),{'accepted':[raw['id']]})
+        migrate()
+        with connect() as db:
+            sizes=dict(db.execute('SELECT kind,SUM(size) FROM events GROUP BY kind').fetchall())
+            self.assertEqual(db.execute('SELECT bytes FROM installations').fetchone()[0],sum(sizes.values()))
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0],3)
+
+    def test_physical_metrics_reserve_blocks_only_diagnostics(self):
+        self.enroll(raw_otlp=True)
+        with connect() as db: size=db.execute('SELECT pg_database_size(current_database())').fetchone()[0]
+        limits={'MAX_DATABASE_BYTES':str(size+1024**2),'METRICS_DATABASE_RESERVE_BYTES':str(2*1024**2)}
+        with patch.dict(os.environ,limits):
+            response=self.post('events',self.base|{'events':[self.event('raw_otlp','{}')]})
+            self.assertEqual(response.json(),{'detail':'diagnostics_database_capacity'})
+            self.assertEqual(self.post('events',self.base|{'events':[self.event()]}).status_code,200)
+
+    def test_client_drains_metrics_behind_blocked_diagnostics(self):
+        stored={}
+        def secret(root,value=None):
+            if value:stored.update(value)
+            return stored or None
+        def send(path,body,token):
+            response=self.api.post(path,json=body,headers={'Authorization':'Bearer '+token})
+            if response.status_code!=200:raise OSError(response.json()['detail'])
+            return response.json()
+        with patch.object(CentralTelemetry,'start'):
+            client=CentralTelemetry(Path(self.temp.name)/'lanes',secret=secret,send=send)
+            client.configure('enabled',True);client.configure('raw_otlp',True)
+            capture(client.root,'raw_otlp','{}')
+            capture(client.root,'metrics',{'event':'decision_accepted'})
+            with patch.dict(os.environ,{'MAX_DIAGNOSTIC_INSTALLATION_BYTES':'1'}):
+                client.tick()
+                self.assertEqual(client.snapshot()['pending'],1)
+                self.assertEqual(client.snapshot()['status'],'diagnostics_installation_capacity')
+                self.assertIsNotNone(client.snapshot()['lastSync'])
+                capture(client.root,'metrics',{'event':'decision_completed'})
+                client.tick()
+                self.assertEqual(client.snapshot()['pending'],1)
+            client.lane_retry.clear();client.tick()
+            self.assertEqual(client.snapshot()['pending'],0)
+            with connect() as db:self.assertEqual(db.execute('SELECT COUNT(*) FROM events').fetchone()[0],3)
 
     def test_cross_installation_cannot_delete_or_read(self):
         self.enroll()

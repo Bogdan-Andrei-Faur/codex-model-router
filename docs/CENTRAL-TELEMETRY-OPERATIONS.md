@@ -33,7 +33,48 @@ observations; no live operator action is implied by reading this runbook.
   stores their SHA256 hashes. Anonymous enrollment does **not** authenticate a
   real person or official binary. Treat cohorts as untrusted observations.
 
-## Capacity incident and production recovery — 2026-10-12
+## Independent quotas — source implementation, 2026-10-13
+
+The new implementation separates encoded event budgets. `metrics` uses the
+existing `METRICS_MAX_INSTALLATION_BYTES` (1GiB) and `METRICS_MAX_TOTAL_BYTES`
+(4GiB). `prompts` plus `raw_otlp` share a separate diagnostic budget:
+`METRICS_MAX_DIAGNOSTIC_INSTALLATION_BYTES` (8GiB) and
+`METRICS_MAX_DIAGNOSTIC_TOTAL_BYTES` (32GiB). Compose maps these to API
+`MAX_INSTALLATION_BYTES`, `MAX_TOTAL_BYTES`, `MAX_DIAGNOSTIC_INSTALLATION_BYTES`
+and `MAX_DIAGNOSTIC_TOTAL_BYTES`, respectively.
+
+Physical PostgreSQL size remains separately limited by
+`METRICS_MAX_DATABASE_BYTES` (5GiB). Diagnostics stop at that limit minus
+`METRICS_DATABASE_RESERVE_BYTES` (256MiB); metrics can still use that admission
+headroom. Encoded bytes and physical PostgreSQL bytes are different measures
+(compression/indexes included in the latter). These are admission ceilings,
+not allocated disk reservations or guaranteed filesystem bounds. Check disk,
+database size and capture rejection counters; no automatic deletion or
+unbounded storage is introduced.
+
+Existing event-size metadata supplies class usage without a schema migration or
+content decoding. Exact duplicate acknowledgements remain valid at capacity;
+new batches remain atomic. Class-specific507 reasons are `metrics_installation_capacity`,
+`metrics_total_capacity`, `diagnostics_installation_capacity`,
+`diagnostics_total_capacity` and `diagnostics_database_capacity`. The shared
+physical hard stop remains `database_capacity`.
+
+The new client sends metrics first, separately from diagnostics, with independent
+capacity backoff. It retains unacknowledged rows and checks consent before each
+lane. New diagnostics leave512KiB and256event slots in the bounded outbox for
+metrics; existing rows are never evicted to create room. Network/authentication
+failures and the shared physical hard stop still affect both lanes.
+
+Backend deployment should restore the existing legacy-client queue at current
+usage. Legacy clients still send mixed batches and show a generic507 warning;
+full lane isolation and descriptive new status labels require a signed client
+release and owner update. Neither source tests nor readiness200 prove that the
+installed background sender has recovered. Verify exact real ACKs, pending
+queue trend and advancing native last-sync separately, without resetting consent.
+See [implementation receipt](native-validation/2026-10-13-telemetry-quota-isolation.md)
+for current delivery status.
+
+## Historical capacity incident and production recovery — 2026-10-12
 
 The owner Mac0.9.10 sender authenticated and acknowledged consent (HTTP200),
 then events failed with HTTP507 `storage_capacity`. Read-only P510 aggregates

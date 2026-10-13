@@ -22,8 +22,14 @@ MAX_QUEUE_BYTES = 8 * 1024 * 1024
 MAX_QUEUE_EVENTS = 4096
 # Diagnostics must leave room for routing metrics during an outage.
 METRICS_RESERVE_BYTES = 512 * 1024
+METRICS_RESERVE_EVENTS = 256
+LANE_CAPACITY = {
+    'metrics': ('metrics_installation_capacity', 'metrics_total_capacity'),
+    'diagnostics': ('diagnostics_installation_capacity', 'diagnostics_total_capacity', 'diagnostics_database_capacity'),
+}
 SEND_ERRORS = ('credential_unavailable', 'server_capacity', 'installation_capacity',
-               'total_capacity', 'database_capacity', 'server_busy', 'access_rejected', 'retrying')
+               'total_capacity', 'database_capacity', 'server_busy', 'access_rejected', 'retrying',
+               *LANE_CAPACITY['metrics'], *LANE_CAPACITY['diagnostics'])
 
 
 def reject_capture(db):
@@ -88,7 +94,8 @@ def capture(root, kind, data):
                 size = len(body.encode())
                 total, count = db.execute('SELECT COALESCE(SUM(size),0), COUNT(*) FROM queue').fetchone()
                 limit = MAX_QUEUE_BYTES if kind == 'metrics' else max(0, MAX_QUEUE_BYTES - METRICS_RESERVE_BYTES)
-                if total + size > limit or count >= MAX_QUEUE_EVENTS:
+                count_limit = MAX_QUEUE_EVENTS if kind == 'metrics' else max(0, MAX_QUEUE_EVENTS - METRICS_RESERVE_EVENTS)
+                if total + size > limit or count >= count_limit:
                     raise ValueError('queue_full')
             except (ValueError, TypeError, RecursionError):
                 reject_capture(db)
@@ -122,7 +129,8 @@ def transport(path, body, token):
         finally:
             error.close()
         # Never propagate arbitrary response bodies or exception messages.
-        capacity = ('installation_capacity', 'total_capacity', 'database_capacity')
+        capacity = ('installation_capacity', 'total_capacity', 'database_capacity',
+                    *LANE_CAPACITY['metrics'], *LANE_CAPACITY['diagnostics'])
         status = reason if code == 507 and reason in capacity else 'server_capacity' if code == 507 else 'server_busy' if code == 429 else 'access_rejected' if code in (401, 403) else 'retrying'
         raise OSError(status) from None
     with response:
@@ -147,6 +155,9 @@ class CentralTelemetry:
         self.guard = threading.Lock()
         self.failures = 0
         self.next_attempt = 0
+        self.lane_retry = {}
+        self.lane_errors = {}
+        self.lane_failures = {}
         if not disabled and (self.root / 'state/central-telemetry/outbox.sqlite3').exists():
             self.start()
 
@@ -192,6 +203,9 @@ class CentralTelemetry:
             db.execute('UPDATE control SET epoch=epoch+1, enabled=?,prompts=?,raw_otlp=?,dirty=1,delete_pending=?,status=?',
                        (c['enabled'], c['prompts'], c['raw_otlp'], c['delete_pending'], 'pending' if c['enabled'] else 'disabled'))
         self.next_attempt = 0
+        self.lane_retry.clear()
+        self.lane_errors.clear()
+        self.lane_failures.clear()
         self.start()
 
     def tick(self):
@@ -228,21 +242,56 @@ class CentralTelemetry:
                 if not now['enabled']:
                     db.execute("UPDATE control SET dirty=0,status='disabled' WHERE epoch=?", (c['epoch'],))
                     return
-                rows = db.execute('SELECT * FROM queue WHERE epoch=? ORDER BY seq LIMIT ?', (c['epoch'], MAX_EVENTS)).fetchall()
-            selected, size = [], 512
+                # Bounded 8MiB/4096-row outbox. Look beyond a diagnostic FIFO head
+                # without requiring SQLite JSON extensions on older platforms.
+                rows = db.execute('SELECT * FROM queue WHERE epoch=? ORDER BY seq LIMIT ?', (c['epoch'], MAX_QUEUE_EVENTS)).fetchall()
+            lanes = {'metrics': [], 'diagnostics': []}
             for row in rows:
-                if size + row['size'] > MAX_BATCH - 1024:
-                    break
-                selected.append(row)
-                size += row['size'] + 1
-            if selected:
-                reply = self.send('/v1/events', base | {'events': [json.loads(r['body']) for r in selected]}, auth['token'])
-                if reply.get('accepted') != [json.loads(r['body'])['id'] for r in selected]:
-                    raise ValueError('invalid_ack')
+                event = json.loads(row['body'])
+                lanes['metrics' if event['kind'] == 'metrics' else 'diagnostics'].append((row, event))
+            for lane, candidates in lanes.items():
+                if not candidates:
+                    self.lane_errors.pop(lane, None)
+                    self.lane_retry.pop(lane, None)
+                    self.lane_failures.pop(lane, None)
+                    continue
+                if time.monotonic() < self.lane_retry.get(lane, 0):
+                    continue
+                selected, size = [], 512
+                for row, event in candidates:
+                    if len(selected) >= MAX_EVENTS or size + row['size'] > MAX_BATCH - 1024:
+                        break
+                    selected.append((row, event))
+                    size += row['size'] + 1
+                with database(self.root) as db:
+                    current = db.execute('SELECT epoch,enabled FROM control').fetchone()
+                    if current['epoch'] != c['epoch'] or not current['enabled']:
+                        return
+                try:
+                    reply = self.send('/v1/events', base | {'events': [event for _, event in selected]}, auth['token'])
+                    if reply.get('accepted') != [event['id'] for _, event in selected]:
+                        raise ValueError('invalid_ack')
+                except OSError as error:
+                    reason = str(error)
+                    if reason not in (*LANE_CAPACITY[lane], 'server_capacity', 'installation_capacity', 'total_capacity'):
+                        raise
+                    self.lane_errors[lane] = reason
+                    failures = self.lane_failures.get(lane, 0) + 1
+                    self.lane_failures[lane] = failures
+                    self.lane_retry[lane] = time.monotonic() + min(600, 2 ** min(failures, 9))
+                    continue
+                with database(self.root) as db:
+                    for row, _ in selected:
+                        db.execute('DELETE FROM queue WHERE seq=? AND epoch=?', (row['seq'], c['epoch']))
+                    db.execute('UPDATE control SET last_sync=? WHERE epoch=?', (time.time(), c['epoch']))
+                self.lane_errors.pop(lane, None)
+                self.lane_retry.pop(lane, None)
+                self.lane_failures.pop(lane, None)
             with database(self.root) as db:
-                for row in selected:
-                    db.execute('DELETE FROM queue WHERE seq=? AND epoch=?', (row['seq'], c['epoch']))
-                db.execute("UPDATE control SET dirty=0,status='synced',last_sync=? WHERE epoch=?", (time.time(), c['epoch']))
+                status = self.lane_errors.get('metrics') or self.lane_errors.get('diagnostics') or 'synced'
+                db.execute('UPDATE control SET dirty=0,status=? WHERE epoch=?', (status, c['epoch']))
+                if not rows and not self.lane_errors:
+                    db.execute('UPDATE control SET last_sync=? WHERE epoch=?', (time.time(), c['epoch']))
 
     def run(self):
         while not self.stop.is_set():

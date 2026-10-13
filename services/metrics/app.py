@@ -20,9 +20,28 @@ from codex_model_router.telemetry.central_protocol import MAX_BATCH, MAX_EVENTS,
 
 
 def capacity_limits():
-    return (int(os.environ.get('MAX_INSTALLATION_BYTES', str(1024**3))),
-            int(os.environ.get('MAX_TOTAL_BYTES', str(4*1024**3))),
-            int(os.environ.get('MAX_DATABASE_BYTES', str(5*1024**3))))
+    # Legacy settings now bound metrics only. Diagnostics have independent budgets.
+    return {'metrics': (int(os.environ.get('MAX_INSTALLATION_BYTES', str(1024**3))),
+                        int(os.environ.get('MAX_TOTAL_BYTES', str(4*1024**3)))),
+            'diagnostics': (int(os.environ.get('MAX_DIAGNOSTIC_INSTALLATION_BYTES', str(8*1024**3))),
+                            int(os.environ.get('MAX_DIAGNOSTIC_TOTAL_BYTES', str(32*1024**3)))),
+            'database': int(os.environ.get('MAX_DATABASE_BYTES', str(5*1024**3))),
+            'reserve': int(os.environ.get('METRICS_DATABASE_RESERVE_BYTES', str(256*1024**2)))}
+
+
+def usage_class(kind):
+    return 'metrics' if kind == 'metrics' else 'diagnostics'
+
+
+def capacity_usage(db, installation=None):
+    # Existing event sizes are authoritative: no content decoding, counter backfill
+    # or destructive migration. Works after restoring/rolling back an older DB.
+    usage = {'metrics': [0, 0], 'diagnostics': [0, 0]}
+    for kind, local, total in db.execute('SELECT kind,COALESCE(SUM(size) FILTER (WHERE installation=%s),0),COALESCE(SUM(size),0) FROM events GROUP BY kind', (installation,)):
+        bucket = usage[usage_class(kind)]
+        bucket[0] += local
+        bucket[1] += total
+    return usage
 
 
 def capacity_rejected(scope):
@@ -173,11 +192,9 @@ def process(path, body, installation, token_hash):
         if not isinstance(events, list) or not 1 <= len(events) <= MAX_EVENTS:
             raise HTTPException(400, 'invalid_batch')
         accepted, seen = [], set()
-        total = db.execute('SELECT COALESCE(SUM(bytes),0) FROM installations').fetchone()[0]
+        usage = capacity_usage(db, installation)
         db_size = db.execute('SELECT pg_database_size(current_database())').fetchone()[0]
-        installation_limit, total_limit, database_limit = capacity_limits()
-        if db_size >= database_limit:
-            capacity_rejected('database_capacity')
+        limits = capacity_limits()
         for event in events:
             try:
                 encoded = validate_event(event)
@@ -194,14 +211,20 @@ def process(path, body, installation, token_hash):
                 if existing != (event['kind'], event['data'], current):
                     raise HTTPException(409, 'event_conflict')
             else:
-                if row[6] + size > installation_limit:
-                    capacity_rejected('installation_capacity')
+                bucket = usage_class(event['kind'])
+                local, total = usage[bucket]
+                installation_limit, total_limit = limits[bucket]
+                if db_size >= limits['database']:
+                    capacity_rejected('database_capacity')
+                if bucket == 'diagnostics' and db_size >= max(0, limits['database'] - limits['reserve']):
+                    capacity_rejected('diagnostics_database_capacity')
+                if local + size > installation_limit:
+                    capacity_rejected(bucket + '_installation_capacity')
                 if total + size > total_limit:
-                    capacity_rejected('total_capacity')
+                    capacity_rejected(bucket + '_total_capacity')
                 db.execute('INSERT INTO events(installation,id,epoch,kind,data,size) VALUES (%s,%s,%s,%s,%s,%s)', (installation, event['id'], current, event['kind'], Jsonb(event['data']), size))
                 db.execute('UPDATE installations SET bytes=bytes+%s WHERE id=%s', (size, installation))
-                row = row[:6] + (row[6] + size,) + row[7:]
-                total += size
+                usage[bucket] = [local + size, total + size]
             accepted.append(event['id'])
         return {'accepted': accepted}
 
@@ -290,7 +313,10 @@ def panel(request: Request):
     admin(request)
     with connect() as db:
         installations = db.execute('SELECT COUNT(*),COALESCE(SUM(bytes),0) FROM installations').fetchone()
-        largest = db.execute('SELECT COALESCE(MAX(bytes),0) FROM installations').fetchone()[0]
+        quota_usage = capacity_usage(db)
+        largest = {'metrics': 0, 'diagnostics': 0}
+        for kind, size in db.execute("SELECT bucket,MAX(bytes) FROM (SELECT installation,CASE WHEN kind='metrics' THEN 'metrics' ELSE 'diagnostics' END bucket,SUM(size) bytes FROM events GROUP BY installation,bucket) a GROUP BY bucket"):
+            largest[kind] = size
         db_size = db.execute('SELECT pg_database_size(current_database())').fetchone()[0]
         content_bytes = db.execute('SELECT kind,COUNT(*),COALESCE(SUM(size),0) FROM events GROUP BY kind ORDER BY kind').fetchall()
         accepted = db.execute("SELECT COALESCE(data->>'accepted_model',data->>'model','unknown'),COUNT(*) FROM events WHERE kind='metrics' AND data->>'event'='decision_accepted' GROUP BY 1 ORDER BY 2 DESC").fetchall()
@@ -303,8 +329,13 @@ def panel(request: Request):
              ORDER BY installation,data->>'decision_id',COALESCE((data->>'time')::numeric,0) DESC,received_at DESC) AS latest""").fetchone()
     limits = capacity_limits()
     capacity_rows = [(label, used, limit, f'{used/limit:.1%}' if limit > 0 else 'Desconocido')
-                     for label, used, limit in zip(('Mayor instalación', 'Eventos totales', 'Base de datos'),
-                                                   (largest, installations[1], db_size), limits)]
+                     for label, used, limit in [
+                         ('Métricas · mayor instalación', largest['metrics'], limits['metrics'][0]),
+                         ('Métricas · total', quota_usage['metrics'][1], limits['metrics'][1]),
+                         ('Diagnósticos · mayor instalación', largest['diagnostics'], limits['diagnostics'][0]),
+                         ('Diagnósticos · total', quota_usage['diagnostics'][1], limits['diagnostics'][1]),
+                         ('Base de datos', db_size, limits['database']),
+                         ('Margen de admisión para métricas', limits['reserve'], limits['database'])]]
     def table(title, headings, rows):
         return '<h2>'+html.escape(title)+'</h2><table><thead><tr>'+''.join('<th>'+html.escape(h)+'</th>' for h in headings)+'</tr></thead><tbody>'+''.join('<tr>'+''.join('<td>'+html.escape(str(v) if v is not None else 'Desconocido')+'</td>' for v in row)+'</tr>' for row in rows)+'</tbody></table>'
     return '<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Router · Métricas privadas</title><style>body{font:16px system-ui;background:#121319;color:#eee;max-width:960px;margin:40px auto;padding:24px}h2{margin-top:32px}table{width:100%;border-collapse:collapse}td,th{padding:12px;text-align:left;border-bottom:1px solid #343641}p{color:#bfc4d4}</style><h1>Métricas del enrutador</h1><p>Panel privado · Sin borrado automático. Instalaciones anónimas y no verificadas; no representan a todos los usuarios.</p>'+table('Recogida', ['Instalaciones','Bytes de eventos'], [installations])+table('Capacidad',['Ámbito','Bytes usados','Límite en bytes','Uso'],capacity_rows)+table('Contenido almacenado',['Tipo','Eventos','Bytes'],content_bytes)+table('Modelos aceptados',['Modelo','Registros'],accepted)+table('Evidencia y resultados',['Evento','Confianza','Muestras'],evidence)+table('Versiones y sistemas',['Versión','Sistema','Registros'],cohorts)+table('Últimos contadores por decisión',['Decisiones con muestra','Entrada','Salida'],[usage])+'<p>Aceptación no prueba inferencia. Los contadores pueden incluir contexto anterior al permiso; no son facturación ni consumo incremental. Coste facturado: desconocido. Los diagnósticos no se muestran en esta página.</p></html>'

@@ -128,6 +128,66 @@ class CentralClientTests(unittest.TestCase):
             self.assertEqual(self.client.snapshot()['pending'], 1)
             self.assertEqual(self.client.snapshot()['rejected'], 1)
 
+    def test_metric_lane_bypasses_diagnostic_fifo_and_cooldown(self):
+        self.client.configure('enabled',True);self.client.configure('raw_otlp',True)
+        for _ in range(105):capture(self.root,'raw_otlp','{}')
+        self.sample()
+        send=self.client.send
+        def limited(path,body,token):
+            if path.endswith('events') and body['events'][0]['kind']!='metrics':
+                self.calls.append((path,body));raise OSError('diagnostics_installation_capacity')
+            return send(path,body,token)
+        self.client.send=limited;self.client.tick()
+        batches=[b['events'] for p,b in self.calls if p.endswith('events')]
+        self.assertEqual([e['kind'] for e in batches[0]],['metrics'])
+        self.assertEqual(self.client.snapshot()['pending'],105)
+        self.assertEqual(self.client.snapshot()['status'],'diagnostics_installation_capacity')
+        self.assertIsNotNone(self.client.snapshot()['lastSync'])
+        self.sample();self.client.tick()
+        self.assertEqual(self.client.snapshot()['pending'],105)
+        self.client.send=send;self.client.lane_retry.clear();self.client.tick();self.client.tick()
+        self.assertEqual(self.client.snapshot()['pending'],0)
+
+    def test_metric_capacity_does_not_block_diagnostic_lane(self):
+        self.client.configure('enabled',True);self.client.configure('raw_otlp',True)
+        self.sample();capture(self.root,'raw_otlp','{}')
+        send=self.client.send
+        def limited(path,body,token):
+            if path.endswith('events') and body['events'][0]['kind']=='metrics':raise OSError('metrics_total_capacity')
+            return send(path,body,token)
+        self.client.send=limited;self.client.tick()
+        self.assertEqual(self.client.snapshot()['pending'],1)
+        self.assertEqual(self.client.snapshot()['status'],'metrics_total_capacity')
+        self.assertEqual(self.calls[-1][1]['events'][0]['kind'],'raw_otlp')
+
+    def test_opt_out_between_lanes_does_not_send_diagnostics(self):
+        self.client.configure('enabled',True);self.client.configure('raw_otlp',True)
+        self.sample();capture(self.root,'raw_otlp','{}')
+        send=self.client.send
+        def disable(path,body,token):
+            result=send(path,body,token)
+            if path.endswith('events'):self.client.configure('enabled',False)
+            return result
+        self.client.send=disable;self.client.tick()
+        batches=[b['events'] for p,b in self.calls if p.endswith('events')]
+        self.assertEqual(len(batches),1)
+        self.assertEqual(batches[0][0]['kind'],'metrics')
+
+    def test_invalid_ack_does_not_remove_either_lane(self):
+        self.client.configure('enabled',True);self.client.configure('raw_otlp',True)
+        self.sample();capture(self.root,'raw_otlp','{}')
+        self.client.send=lambda *args:{'accepted':[]}
+        with self.assertRaisesRegex(ValueError,'invalid_ack'):self.client.tick()
+        self.assertEqual(self.client.snapshot()['pending'],2)
+
+    def test_small_diagnostics_reserve_event_slots_for_metrics(self):
+        self.client.configure('enabled',True);self.client.configure('raw_otlp',True)
+        with patch('codex_model_router.telemetry.central_client.MAX_QUEUE_EVENTS',3),patch('codex_model_router.telemetry.central_client.METRICS_RESERVE_EVENTS',1):
+            for _ in range(3):capture(self.root,'raw_otlp','{}')
+            self.sample()
+        self.assertEqual(self.client.snapshot()['pending'],3)
+        self.assertEqual(self.client.snapshot()['rejected'],1)
+
     def test_delete_waits_offline_and_clears_queue(self):
         self.client.configure('enabled',True)
         self.sample(); self.client.tick()
@@ -214,7 +274,7 @@ class CentralClientTests(unittest.TestCase):
         from io import BytesIO
         from urllib.error import HTTPError
         from codex_model_router.telemetry.central_client import transport
-        cases = [(507, reason, reason) for reason in ('installation_capacity', 'total_capacity', 'database_capacity')]
+        cases = [(507, reason, reason) for reason in ('installation_capacity', 'total_capacity', 'database_capacity', 'metrics_installation_capacity', 'metrics_total_capacity', 'diagnostics_installation_capacity', 'diagnostics_total_capacity', 'diagnostics_database_capacity')]
         cases += [(507, 'PRIVATE_RESPONSE', 'server_capacity'), (429, 'rate_limited', 'server_busy'),
                   (401, 'PRIVATE_RESPONSE', 'access_rejected'), (503, 'PRIVATE_RESPONSE', 'retrying'),
                   (507, {'private': 'content'}, 'server_capacity')]

@@ -20,7 +20,17 @@ const assert=require('node:assert/strict');
     assert.equal(await settings.getByRole('switch',{name:/^Compartir (mensajes|diagnóstico completo)$/}).count(),0);
     await page.evaluate(()=>window.receive({centralTelemetry:{enabled:true,prompts:false,raw_otlp:false,status:'retrying',pending:12,rejected:3,canDelete:true}}));
     assert.ok((await settings.innerText()).includes('12 pendientes'));
-    for(const [status,label] of [['installation_capacity','Límite de esta instalación'],['total_capacity','Almacenamiento del servicio lleno'],['database_capacity','Base de datos llena'],['server_busy','Servicio ocupado']]){
+    for(const [status,label] of [
+      ['installation_capacity','Límite de esta instalación'],
+      ['total_capacity','Almacenamiento del servicio lleno'],
+      ['database_capacity','Base de datos llena'],
+      ['server_busy','Servicio ocupado'],
+      ['metrics_installation_capacity','Límite de métricas de esta instalación'],
+      ['metrics_total_capacity','Cuota de métricas del servicio llena'],
+      ['diagnostics_installation_capacity','Cuota de diagnósticos llena · las métricas continúan'],
+      ['diagnostics_total_capacity','Diagnósticos del servicio llenos · las métricas continúan'],
+      ['diagnostics_database_capacity','Diagnósticos en espera']
+    ]){
       await page.evaluate(status=>window.receive({centralTelemetry:{enabled:true,status,pending:233,rejected:10,canDelete:true}}),status);
       assert.ok((await settings.innerText()).includes(label));
       assert.ok((await settings.innerText()).includes('233 pendientes'));

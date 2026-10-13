@@ -57,6 +57,30 @@ create a replacement publisher key here. See the
 [Windows release receipt and signing continuation](native-validation/2026-10-13-windows-0.9.12-release.md).
 Old private history/local validation work is preserved only in a local archive
 branch and stash; neither was merged or pushed into public main.
+## Quota isolation implemented locally — 2026-10-13
+
+Independent metrics/diagnostic budgets, metrics-first batches with separate
+backoff, event-slot reserve and specific status labels are implemented locally.
+609Python/53skip,20central-client tests,14real-PostgreSQL tests, shared browser
+Settings and real-container HTTP/restore/deletion fixtures PASS. No commit,
+push, production deployment or installed sender recovery was claimed by the local
+receipt. The owner has now authorized main publication and Sentinel deployment;
+production verification follows publication. Backend
+deployment restores the current budget; full lane isolation needs a signed client
+release/owner update. See [receipt](native-validation/2026-10-13-telemetry-quota-isolation.md)
+and [limits/runbook](CENTRAL-TELEMETRY-OPERATIONS.md).
+
+## Current API diagnosis — 2026-10-13
+
+API/DB Docker health and public readiness200 succeed, but Sentinel's long-running
+origin probe reports `fetch failed`; fresh controller Python/Node LAN probes200.
+Exact Sentinel-process cause remains unconfirmed. Independently, ingestion is
+blocked again at1GiB/installation:99.915% used,98.469% raw OTLP. The next batch
+cannot fit;1071queued events nearly fill8MiB and capture rejections increase.
+Physical DB107.5MiB and57.4GiB free disk exclude physical storage exhaustion in
+these observations. No repair/restart/quota/permission change applied. Preserve
+data and diagnose the probe separately from metrics/raw capacity isolation.
+[Diagnosis](native-validation/2026-10-13-api-degraded-diagnosis.md).
 
 ## Published Settings0.9.12 — 2026-10-12
 
