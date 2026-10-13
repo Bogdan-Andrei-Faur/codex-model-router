@@ -33,7 +33,9 @@ preview lives in `tools/preview_monitor.py` and `tools/preview-monitor.js`.
 - [DESKTOP-INTEGRATION.md](DESKTOP-INTEGRATION.md): connection, actual loading and recovery.
 - [INSTALLATION-UPDATES.md](INSTALLATION-UPDATES.md): independent code/data, update preparation and limits.
 - [DISTRIBUTION-PLAN.md](DISTRIBUTION-PLAN.md): owner-selected public repository/license, publication prerequisites and managed-update flow.
-- [LINUX.md](LINUX.md), [MACOS.md](MACOS.md), [WINDOWS-INSTALLER.md](WINDOWS-INSTALLER.md): platform setup and packaging.
+- [WINDOWS.md](WINDOWS.md): user installation, import, connection, manual updates, recovery and uninstall.
+- [LINUX.md](LINUX.md), [MACOS.md](MACOS.md): platform setup.
+- [WINDOWS-INSTALLER.md](WINDOWS-INSTALLER.md): Windows developer packaging and native validation.
 - [NATIVE-VALIDATION.md](NATIVE-VALIDATION.md): safe source/artifact/bridge/physical checks.
 - [native-validation/STATUS.md](native-validation/STATUS.md) and [REPORT-TEMPLATE.md](native-validation/REPORT-TEMPLATE.md): exact gates and new receipt format.
 - [VALIDATION.md](VALIDATION.md): dated validation history; new delivery links appear first.

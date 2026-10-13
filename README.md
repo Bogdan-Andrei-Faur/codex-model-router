@@ -88,8 +88,10 @@ repositorio. En Mac empaquetado, Actualizar descarga y verifica la firma del
 proyecto, reemplaza la aplicación y la abre automáticamente, conservando los datos
 y una copia anterior. No cierra Codex/ChatGPT ni sus agentes. La firma del proyecto
 no sustituye la de Apple; consulta [la guía Mac](docs/MACOS-PILOT.md).
-Ubuntu tiene un constructor `.deb` y Windows un [instalador por usuario](docs/WINDOWS-INSTALLER.md);
-su publicación y los adaptadores de actualización automática siguen pendientes.
+Windows ya tiene un instalador público por usuario: consulta [la instalación en Windows](#windows).
+Su actualización desde Ajustes necesita añadir Windows al manifiesto firmado;
+mientras tanto se actualiza ejecutando el nuevo instalador. Ubuntu tiene un
+constructor `.deb`; su instalador público sigue pendiente.
 Estado y límites: [INSTALLATION-UPDATES.md](docs/INSTALLATION-UPDATES.md).
 Canal del mismo repositorio, licencia y flujo de actualización acordado:
 [DISTRIBUTION-PLAN.md](docs/DISTRIBUTION-PLAN.md).
@@ -150,6 +152,33 @@ Los chats laterales locales de Codex también usan el selector. Se muestran como
 «Chat lateral» mientras trabajan; sus decisiones y contexto no se guardan en el
 historial permanente del selector. Los procesos internos de Desktop, como generar
 títulos, conservan su modelo original. Véase [el alcance y las pruebas](docs/SIDE-CHATS.md).
+
+## Windows
+
+Descarga el [instalador Windows x64 0.9.12](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/download/v0.9.12/codex-model-router-0.9.12-windows-x64-setup.exe).
+Incluye Python y el monitor: no necesitas Git, compilar ni clonar el repositorio.
+Requiere Windows 10 de 64 bits (build 19041 o posterior) o Windows 11,
+.NET Framework 4.8 y Microsoft Edge WebView2 Runtime. Si falta WebView2,
+el instalador ofrece instalarlo desde Microsoft con conexión a Internet.
+
+1. Termina tus tareas y cierra Desktop y, si ya lo tenías, el monitor desde su
+   icono de bandeja → **Salir**.
+2. Ejecuta el archivo `.exe`. Se instala para tu usuario, sin permisos de administrador.
+3. En la primera instalación, elige **Empezar de cero** o **Importar instalación…**.
+   Para importar, selecciona la carpeta anterior que contiene `config.local.json`
+   y `state`, no la carpeta `state` sola. Después pulsa **Abrir monitor**.
+4. En el monitor, abre **Ajustes → Conexión → Conectar al inicio habitual**.
+   Espera la confirmación y abre Desktop desde su acceso normal.
+
+Para volver a abrir el monitor, usa **Inicio → Codex Model Router**.
+Para actualizar una instalación existente, ejecuta el nuevo instalador con Desktop
+y el monitor cerrados: conserva ajustes, claves e historial; no tienes que volver
+a importarlos. Por ahora la descarga Windows es manual; su firma para actualizar
+desde Ajustes está pendiente. El `.exe` no tiene firma Authenticode y su SHA-256
+está disponible junto al instalador en el release.
+
+Pasos detallados, datos, recuperación y desinstalación: [guía de Windows](docs/WINDOWS.md).
+Compilación y pruebas para desarrolladores: [instalador Windows](docs/WINDOWS-INSTALLER.md).
 
 ## Ubuntu / Linux
 
