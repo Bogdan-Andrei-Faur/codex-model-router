@@ -1,5 +1,18 @@
 # Cambios
 
+## 0.9.13 — Envíos independientes, 13/10/2026
+
+- Envía las métricas antes y en lotes separados de los mensajes y el diagnóstico
+  completo. Si los diagnósticos alcanzan su cuota, las métricas pueden continuar.
+- Cada tipo de envío reintenta por separado los bloqueos por cuota; conserva los
+  eventos pendientes hasta que la API confirma su recepción.
+- Reserva espacio y entradas en la cola para nuevas métricas, sin borrar lo
+  pendiente. Ajustes distingue qué cuota está bloqueando el envío.
+- Conserva los permisos, credenciales, configuración y datos existentes.
+  No recupera muestras que ya se hubieran descartado antes de esta actualización.
+- Entrega firmada para Mac Apple Silicon; los instaladores de esta versión para
+  Windows y Ubuntu requieren sus compilaciones y validaciones nativas.
+
 ## 0.9.12 — Ajustes más claros, 12/10/2026
 
 - Ajustes se organiza en Aplicación, Modelos, Privacidad y Conexión, con tarjetas
