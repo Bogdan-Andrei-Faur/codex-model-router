@@ -12,6 +12,18 @@ owner-accepted/waived gates and actual remaining work. Older dated sections belo
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
 
+## Published independent client0.9.13 — 2026-10-13
+
+Stable Latest [v0.9.13](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.13)
+from immutable4dfc753 delivers separate metric/diagnostic batches, capacity
+backoff and warnings. Signed Macarm64 package, installed-trust verification,
+exact smoke, local native cancel/rollback/interrupted replay and real-GitHub
+isolated Settings0.9.11→0.9.13 with automatic cleanup PASS.609Python/53skip,
+source mainCI14/14; tag CI final status separate. Owner actual0.9.11 remains
+unchanged; update from Settings and verify installed/loaded0.9.13 separately.
+Windows/Ubuntu0.9.13 binaries need their own builds. See
+[release receipt](native-validation/2026-10-13-macos-independent-telemetry-release.md).
+
 ## Central telemetry recovered — 2026-10-13
 
 Quota correctionb81fe18 is on main and Sentinel-deployed on P510. Exact running
@@ -21,7 +33,7 @@ sync independently advanced three times and the new queue drained to zero.
 No consent, credentials, data deletion or Desktop/monitor restart. Rejections
 stable at34166 during native observation. API/DB/Sentinel healthy; reviewed backup
 source exclusion restored ready policy while retaining DB/deletion ledger.
-Full new-client lane isolation still needs signed delivery/owner update.
+The new Mac client is now published above; actual owner update remains separate.
 [Recovery receipt](native-validation/2026-10-13-telemetry-quota-recovery.md),
 [implementation](native-validation/2026-10-13-telemetry-quota-isolation.md).
 

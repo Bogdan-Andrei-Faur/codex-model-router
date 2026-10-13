@@ -68,8 +68,9 @@ failures and the shared physical hard stop still affect both lanes.
 Backendb81fe18 deployment restored the existing legacy-client queue;1071original
 events were ACKed with assistance, followed by independently observed installed
 background sending and queue drain. [Production receipt](native-validation/2026-10-13-telemetry-quota-recovery.md). Legacy clients still send mixed batches and show a generic507 warning;
-full lane isolation and descriptive new status labels require a signed client
-release and owner update. Neither source tests nor readiness200 prove that the
+full lane isolation and descriptive new status labels are now delivered in
+signed Mac0.9.13 and require the owner update. Windows/Ubuntu0.9.13 delivery
+remains separate. [Client release](native-validation/2026-10-13-macos-independent-telemetry-release.md). Neither source tests nor readiness200 prove that the
 installed background sender has recovered. Verify exact real ACKs, pending
 queue trend and advancing native last-sync separately, without resetting consent.
 See [implementation receipt](native-validation/2026-10-13-telemetry-quota-isolation.md)

@@ -5,6 +5,16 @@ This ledger is repository-owned; no external knowledge/memory service is needed.
 Use [current follow-up](../FOLLOWUP.md) for priorities. Older NOT_RUN rows are
 evidence gaps, not renewed installation prerequisites or known failures.
 
+## Latest Mac independent client0.9.13 — 2026-10-13
+
+Signed stable Macarm64 from4dfc753, monitorc2bf3f47727e6582/routerf909942515875555,
+policy8.609Python/53skip, package smoke, installed-trust signature, native local
+cancel/rollback/interrupted recovery and fresh real-GitHub Settings synthetic
+0.9.11→0.9.13/automatic cleanup PASS. Source mainCI14/14; tag CI final separate.
+Owner actual0.9.11 unchanged; installed activation/physical/login and new-version
+Windows/Ubuntu delivery remain separate.
+[Receipt](2026-10-13-macos-independent-telemetry-release.md).
+
 ## Mac/P510 quota recovery — 2026-10-13
 
 Correctionb81fe18 pushed/main, Sentinel P510 deployed with exact module/limit
