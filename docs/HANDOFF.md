@@ -12,6 +12,21 @@ owner-accepted/waived gates and actual remaining work. Older dated sections belo
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
 
+## Windows0.9.12 published — 2026-10-13
+
+The existing stable v0.9.12 now includes a Windows x64 manual installer, its
+`.exe.sha256` and per-target provenance. Exact setup build `124ee01a758f05b8`,
+router `766899a8e0e070d3`, source/tag fb360d7; checksum/download verified publicly.
+604 Python (68 expected skips),34 JS,17 browser groups and exact frozen/native/
+setup lifecycle PASS, including upgrade from the prior0.9.6 Windows build.
+No owner installation changed; this host remains on0.9.6 until the owner updates.
+The unchanged signed manifest still covers Mac only. The publisher Mac must sign
+both exact published targets before Windows Settings update is available; never
+create a replacement publisher key here. See the
+[Windows release receipt and signing continuation](native-validation/2026-10-13-windows-0.9.12-release.md).
+Old private history/local validation work is preserved only in a local archive
+branch and stash; neither was merged or pushed into public main.
+
 ## Published Settings0.9.12 — 2026-10-12
 
 Stable Latest [v0.9.12](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.12)

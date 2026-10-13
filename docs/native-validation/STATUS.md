@@ -5,6 +5,16 @@ This ledger is repository-owned; no external knowledge/memory service is needed.
 Use [current follow-up](../FOLLOWUP.md) for priorities. Older NOT_RUN rows are
 evidence gaps, not renewed installation prerequisites or known failures.
 
+## Windows0.9.12 manual release — 2026-10-13
+
+Public Windows x64 setup build124ee01a758f05b8/router766899a8e0e070d3 from
+immutable tagfb360d7; anonymous hashes and preserved Mac assets verified.
+604Python/68skip,34JS,17browser groups and exact frozen/native/Inno lifecycle
+PASS, including prior0.9.6 upgrade, DPAPI/import fixtures, locks and rollback.
+Owner installation unchanged. Windows signed Settings update awaits the existing
+Mac publisher signature; physical/login/managed-recovery checks remain separate.
+[Receipt](2026-10-13-windows-0.9.12-release.md).
+
 ## Latest Mac release0.9.12 — 2026-10-12
 
 Signed stable Macarm64 Settings redesign fromfb360d7, monitor1d63ab96da79c087,

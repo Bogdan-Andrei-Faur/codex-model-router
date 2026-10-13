@@ -1,10 +1,11 @@
 # Authenticated managed updates — 2026-10-11
 
-The owner personally accepted Windows/Ubuntu installation and waived a clean-Mac
-prerequisite on2026-10-11. Installer publication is authorized, awaiting transfer
-of the exact tested binaries from the other computers. See
-[the owner decision](native-validation/2026-10-11-owner-installation-acceptance.md).
-This closes installation acceptance; update/recovery coverage remains as below.
+Windows0.9.12 is now available as a public manual installer with verified
+checksums/provenance; see the [Windows receipt](native-validation/2026-10-13-windows-0.9.12-release.md).
+The signed manifest still covers Mac only. Adding Windows requires the existing
+publisher key on the Mac; no replacement key is created on another computer.
+Ubuntu binary transfer remains pending. The owner's earlier installation
+acceptance and clean-Mac waiver remain valid within their stated scope.
 
 ## What is implemented
 

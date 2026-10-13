@@ -222,11 +222,18 @@ def lifecycle(temporary,report,compiler,bootstrapper,previous,env,shortcuts=Fals
     compiler=Path(compiler).resolve();bootstrapper=Path(bootstrapper).resolve()
     install=temporary/'installed';data=temporary/'installed-data';builds=temporary/'setups';builds.mkdir()
     group='Codex Router QA '+temporary.name
-    fixture_script=temporary/'fixture.iss'
-    script=(ROOT/'tools/packaging/windows.iss').read_text(encoding='utf-8')
-    assert script.count('DefaultGroupName=Codex Model Router')==1
-    fixture_script.write_text(script.replace('DefaultGroupName=Codex Model Router','DefaultGroupName='+group),encoding='utf-8')
     def compile_setup(item,name):
+        # Build old fixtures with their original recipe: older payloads do not
+        # contain newer branding paths. Never alter the tested package bytes.
+        source=Path(item['payload']).parent/'source'
+        recipe=next((path for path in (source/'tools/packaging/windows.iss',
+                                     source/'installer/windows.iss') if path.is_file()),
+                    ROOT/'tools/packaging/windows.iss')
+        script=recipe.read_text(encoding='utf-8')
+        assert script.count('DefaultGroupName=Codex Model Router')==1
+        fixture_script=temporary/(name+'.iss')
+        fixture_script.write_text(script.replace('DefaultGroupName=Codex Model Router',
+                                                'DefaultGroupName='+group),encoding='utf-8')
         command=[compiler,'/DPayload='+item['payload'],'/DOutput='+str(builds),'/DProductVersion='+item['version'],
                  '/DVersionDirectory='+item['version']+'-'+item['build'],'/DBootstrapper='+str(bootstrapper),
                  '/DTestDataRoot='+str(data),'/F'+name,fixture_script]
