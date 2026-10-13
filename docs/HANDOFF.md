@@ -34,7 +34,11 @@ The existing stable v0.9.12 now includes a Windows x64 manual installer, its
 router `766899a8e0e070d3`, source/tag fb360d7; checksum/download verified publicly.
 604 Python (68 expected skips),34 JS,17 browser groups and exact frozen/native/
 setup lifecycle PASS, including upgrade from the prior0.9.6 Windows build.
-No owner installation changed; this host remains on0.9.6 until the owner updates.
+At publication the owner installation was unchanged. The owner subsequently
+installed0.9.12: native monitor/UI and loaded router match the published payload;
+fresh Desktop handshake and advancing authenticated telemetry PASS, zero failures
+and no restart flags. No further restart/import/registration needed. See the
+activation follow-up in the same receipt.
 The unchanged signed manifest still covers Mac only. The publisher Mac must sign
 both exact published targets before Windows Settings update is available; never
 create a replacement publisher key here. See the

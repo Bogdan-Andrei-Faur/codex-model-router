@@ -22,7 +22,9 @@ Public Windows x64 setup build124ee01a758f05b8/router766899a8e0e070d3 from
 immutable tagfb360d7; anonymous hashes and preserved Mac assets verified.
 604Python/68skip,34JS,17browser groups and exact frozen/native/Inno lifecycle
 PASS, including prior0.9.6 upgrade, DPAPI/import fixtures, locks and rollback.
-Owner installation unchanged. Windows signed Settings update awaits the existing
+Subsequent owner installation: installed/loaded0.9.12, matching UI/router, fresh
+Desktop handshake and advancing telemetry PASS; zero recorded failures and no
+restart flags. Windows signed Settings update awaits the existing
 Mac publisher signature; physical/login/managed-recovery checks remain separate.
 [Receipt](2026-10-13-windows-0.9.12-release.md).
 
