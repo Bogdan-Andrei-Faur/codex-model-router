@@ -61,3 +61,6 @@ readiness200 and successful ingestion do not by themselves resolve that badge.
 Windows/Ubuntu owner installation acceptance remains closed. Their actual
 sharing, signed update/cancel/recovery gates remain
 separate. No new platform-native acceptance is claimed here.
+
+Subsequent owner-authorized publication, deployment and actual native recovery
+are verified in the [production receipt](2026-10-13-telemetry-quota-recovery.md).

@@ -5,6 +5,16 @@ This ledger is repository-owned; no external knowledge/memory service is needed.
 Use [current follow-up](../FOLLOWUP.md) for priorities. Older NOT_RUN rows are
 evidence gaps, not renewed installation prerequisites or known failures.
 
+## Mac/P510 quota recovery — 2026-10-13
+
+Correctionb81fe18 pushed/main, Sentinel P510 deployed with exact module/limit
+verification. CI14/14. All1071original events exact-ACKed in bounded assisted
+sending; after assistance stopped, three native sync observations and queue drain
+independently verified installed0.9.11 background recovery. Rejected count stable,
+existing consent/credentials unchanged; no deletion/restart/install. New client
+lane isolation awaits signed delivery. Sentinel/API/DB healthy and reviewed backup
+policy ready. [Receipt](2026-10-13-telemetry-quota-recovery.md).
+
 ## Owner Ubuntu0.9.12 active — 2026-10-13
 
 APT0.9.12-1, application4ff237565ee7cf02 and live routera27f4352aeb3b3b1 match.

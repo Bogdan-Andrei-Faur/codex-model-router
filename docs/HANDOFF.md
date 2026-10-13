@@ -12,6 +12,19 @@ owner-accepted/waived gates and actual remaining work. Older dated sections belo
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
 
+## Central telemetry recovered — 2026-10-13
+
+Quota correctionb81fe18 is on main and Sentinel-deployed on P510. Exact running
+modules/limits match; CI38425389094 passed14/14. All1071original pending events
+received exact assisted ACKs; after assistance stopped, installed0.9.11 native
+sync independently advanced three times and the new queue drained to zero.
+No consent, credentials, data deletion or Desktop/monitor restart. Rejections
+stable at34166 during native observation. API/DB/Sentinel healthy; reviewed backup
+source exclusion restored ready policy while retaining DB/deletion ledger.
+Full new-client lane isolation still needs signed delivery/owner update.
+[Recovery receipt](native-validation/2026-10-13-telemetry-quota-recovery.md),
+[implementation](native-validation/2026-10-13-telemetry-quota-isolation.md).
+
 ## Owner Ubuntu0.9.12 active — 2026-10-13
 
 Owner completed installation/restart. APT0.9.12-1 and live bridge0.9.12 match
@@ -57,20 +70,7 @@ create a replacement publisher key here. See the
 [Windows release receipt and signing continuation](native-validation/2026-10-13-windows-0.9.12-release.md).
 Old private history/local validation work is preserved only in a local archive
 branch and stash; neither was merged or pushed into public main.
-## Quota isolation implemented locally — 2026-10-13
-
-Independent metrics/diagnostic budgets, metrics-first batches with separate
-backoff, event-slot reserve and specific status labels are implemented locally.
-609Python/53skip,20central-client tests,14real-PostgreSQL tests, shared browser
-Settings and real-container HTTP/restore/deletion fixtures PASS. No commit,
-push, production deployment or installed sender recovery was claimed by the local
-receipt. The owner has now authorized main publication and Sentinel deployment;
-production verification follows publication. Backend
-deployment restores the current budget; full lane isolation needs a signed client
-release/owner update. See [receipt](native-validation/2026-10-13-telemetry-quota-isolation.md)
-and [limits/runbook](CENTRAL-TELEMETRY-OPERATIONS.md).
-
-## Current API diagnosis — 2026-10-13
+## Historical API diagnosis — 2026-10-13
 
 API/DB Docker health and public readiness200 succeed, but Sentinel's long-running
 origin probe reports `fetch failed`; fresh controller Python/Node LAN probes200.
