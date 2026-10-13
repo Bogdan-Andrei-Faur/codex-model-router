@@ -5,6 +5,17 @@ This ledger is repository-owned; no external knowledge/memory service is needed.
 Use [current follow-up](../FOLLOWUP.md) for priorities. Older NOT_RUN rows are
 evidence gaps, not renewed installation prerequisites or known failures.
 
+## Ubuntu0.9.12 manual release — 2026-10-13
+
+Public Linux x64 DEB0.9.12-1 (Debian/all), application4ff237565ee7cf02,
+routera27f4352aeb3b3b1 from runtime/tagfb360d7.604Python/37skip,34JS,17browser
+groups and exact GTK/WebKit package PASS. Current-code signed helper success,
+rollback and interrupted replay PASS in isolated Xvfb with temporary fixture
+keys. All three public downloads match local bytes; existing Mac/Windows assets
+and Mac-only manifest unchanged. Owner chose manual publication with Linux
+signature pending; no owner install/restart. Production signing, actual Settings,
+login/physical acceptance separate. [Receipt](2026-10-13-ubuntu-0.9.12-release.md).
+
 ## Windows0.9.12 manual release — 2026-10-13
 
 Public Windows x64 setup build124ee01a758f05b8/router766899a8e0e070d3 from

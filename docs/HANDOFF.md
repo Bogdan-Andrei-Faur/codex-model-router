@@ -1,4 +1,4 @@
-# Current project handoff — 2026-10-12
+# Current project handoff — 2026-10-13
 
 Canonical project: `codex-model-router`,
 `https://github.com/Bogdan-Andrei-Faur/codex-model-router.git`.
@@ -11,6 +11,21 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 owner-accepted/waived gates and actual remaining work. Older dated sections below
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
+
+## Ubuntu0.9.12 published — 2026-10-13
+
+Owner authorized and published the validated Linux x64 DEB into existing stable
+v0.9.12 for manual installation, with per-target checksums/provenance. Build
+checkout611049e matches the runtime source/tagfb360d7; Debian0.9.12-1/all,
+application4ff237565ee7cf02/routera27f4352aeb3b3b1,3,916,360bytes.604Python/37skip,
+34JS,17browser groups, exact GTK/WebKit package and isolated native signed helper
+success/rollback/interrupted replay PASS. Public downloads match exact local
+bytes. Existing Mac/Windows assets and Mac-only manifest are unchanged.
+No owner installation, settings or Desktop process changed. Publisher Mac must
+sign metadata covering all three exact targets; Ubuntu Settings/login/physical
+acceptance remains separate. See [receipt and signing handoff](native-validation/2026-10-13-ubuntu-0.9.12-release.md).
+New public main was synchronized while preserving old private history only in a
+local backup branch; it and conflicting old tags were not pushed.
 
 ## Windows0.9.12 published — 2026-10-13
 

@@ -1,10 +1,12 @@
-# Authenticated managed updates — 2026-10-11
+# Authenticated managed updates — 2026-10-13
 
 Windows0.9.12 is now available as a public manual installer with verified
 checksums/provenance; see the [Windows receipt](native-validation/2026-10-13-windows-0.9.12-release.md).
-The signed manifest still covers Mac only. Adding Windows requires the existing
-publisher key on the Mac; no replacement key is created on another computer.
-Ubuntu binary transfer remains pending. The owner's earlier installation
+Ubuntu0.9.12 Linux x64 is also published as a validated manual DEB with per-target
+checksums/provenance; see the [Ubuntu receipt](native-validation/2026-10-13-ubuntu-0.9.12-release.md).
+The signed manifest still covers Mac only. Adding Windows and Ubuntu requires
+the existing publisher key on the Mac and all three exact published packages;
+no replacement key is created on another computer. The owner's earlier installation
 acceptance and clean-Mac waiver remain valid within their stated scope.
 
 ## What is implemented
@@ -22,7 +24,7 @@ silently fall back to hash-only updates. Preview/read-only views cannot update.
 | Packaged macOS, app writable by its user | Check → Update → real GitHub download/verify → installation-owned helper → replace → launch → WebKit/data acknowledgement PASS in isolated native Settings; owner Installer/import/connection also verified; restore previous app on launch failure tested locally | Downloaded-quarantine/clean-machine Gatekeeper, actual login/power-loss recovery, physical input and real provider credential use |
 | Source-backed macOS | Signed download only; no managed replacement of a checkout | Migrate to packaged app when owner is ready |
 | Packaged Windows with managed protocol 1 | Signed installer handoff, automatic native close/relaunch, version-selector rollback and login recovery implemented | Native Inno/WebView2/WPF, locked files, cancellation/recovery and real GitHub run pending |
-| Packaged Ubuntu with managed protocol 1 | Signed per-user payload update, automatic GTK close/relaunch, atomic selection/rollback and login recovery implemented; apt baseline retained | Real signed-helper/new GTK readiness and rollback/replay pass in Ubuntu24.04 arm64 Docker; Settings actions, physical XDG/login/apt coexistence and real GitHub run pending |
+| Packaged Ubuntu with managed protocol 1 | Signed per-user payload update, automatic GTK close/relaunch, atomic selection/rollback and login recovery implemented; apt baseline retained | Signed helper/GTK success/rollback/replay pass in isolated Ubuntu26.04 x64 with fixture keys and earlier Ubuntu24.04 arm64 Docker; production Linux signature, Settings actions, physical XDG/login/apt coexistence and real GitHub update pending |
 
 The [public 0.9.7 Release](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.7)
 contains the arm64 Mac installer, signed manifest, checksums and public build

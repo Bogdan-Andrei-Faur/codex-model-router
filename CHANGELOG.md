@@ -10,8 +10,11 @@
   borrado. Ningún permiso se activa por actualizar.
 - Mantiene borradores de claves, desplegables y foco durante los refrescos;
   las vistas previas no permiten guardar claves.
-- Entrega para Mac Apple Silicon; instaladores Windows y Ubuntu pendientes
-  de transferencia. La interfaz compartida incluye el rediseño para los tres.
+- Entrega para Mac Apple Silicon. El 13/10 se añadieron los instaladores manuales
+  Windows x64 y Ubuntu x64, con checksums y procedencia por plataforma. La firma
+  del actualizador Windows/Ubuntu sigue pendiente en el Mac; los instaladores y
+  el manifiesto Mac existentes se conservan. La interfaz compartida incluye el
+  rediseño para los tres.
 
 ## 0.9.11 — Avisos de telemetría, 12/10/2026
 

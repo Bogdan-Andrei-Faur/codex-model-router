@@ -1,4 +1,4 @@
-# Current follow-up — 2026-10-12
+# Current follow-up — 2026-10-13
 
 This is the current work list. Read it with [HANDOFF.md](HANDOFF.md) and the
 [native acceptance ledger](native-validation/STATUS.md). Dated receipts retain
@@ -18,7 +18,7 @@ No installation or live service was changed during this reconciliation.
 | Owner Mac0.9.10 activation | Owner update/restart completed; installed/loaded identities, handshake and one retained recovery version verified. [Historical receipt](native-validation/2026-10-12-macos-0.9.10-activation.md). The later0.9.11 activation and healthy sender observations supersede its incident snapshot. |
 | Central capacity recovery | Production quota cause identified;95436e8 deployed through Sentinel,233 original queued events ACKed and installed0.9.10 background sending independently resumed. CI14/14. [Receipt](native-validation/2026-10-12-central-capacity-repair.md). Client diagnostics/reserve fixes and actual owner activation are now verified in0.9.11. |
 | P510 deployment and Mac metrics activation | Deployment, HTTPS and real owner-Mac0.9.8 Settings enable/sync/disable/re-enable passed. [Deployment](native-validation/2026-10-11-p510-metrics-deployment.md), [activation](native-validation/2026-10-11-macos-central-sharing.md). |
-| Windows/Ubuntu installation | ACCEPTED_BY_OWNER. No installation retest required. Windows0.9.12 is now publicly downloadable with native fixture evidence; Ubuntu transfer remains pending. [Decision](native-validation/2026-10-11-owner-installation-acceptance.md). |
+| Windows/Ubuntu installation | ACCEPTED_BY_OWNER. No installation retest required. Windows/Ubuntu0.9.12 manual installers are now publicly downloadable with platform fixture evidence; production updater signatures remain pending on the Mac. [Decision](native-validation/2026-10-11-owner-installation-acceptance.md). |
 | Clean-Mac prerequisite | WAIVED_BY_OWNER for this delivery; not a technical PASS and not a delivery blocker. Same [decision](native-validation/2026-10-11-owner-installation-acceptance.md). |
 
 ## Remaining work
@@ -26,7 +26,7 @@ No installation or live service was changed during this reconciliation.
 | Workstream | Next action | Boundary / dependency |
 | --- | --- | --- |
 | Owner Settings0.9.12 activation | Update from Settings when ready, then verify actual installed/loaded identities and owner visual review. | Signed delivery and isolated native GitHub update PASS; owner installed0.9.11 unchanged. [Receipt](native-validation/2026-10-12-macos-settings-release.md). |
-| Windows/Ubuntu distribution | Windows0.9.12 manual EXE/checksum/provenance published and publicly verified; publisher Mac must sign metadata covering both exact Mac/Windows assets. Ubuntu DEB remains pending. | Existing production key is Mac-only. Preserve immutable installers/tag and all existing targets. [Windows receipt](native-validation/2026-10-13-windows-0.9.12-release.md). |
+| Windows/Ubuntu distribution | Windows/Ubuntu0.9.12 manual installers/checksums/provenance published and publicly verified; publisher Mac must sign metadata covering all three exact Mac/Windows/Linux assets. | Existing production key is Mac-only. Preserve immutable installers/tag and all existing targets. [Windows receipt](native-validation/2026-10-13-windows-0.9.12-release.md), [Ubuntu receipt](native-validation/2026-10-13-ubuntu-0.9.12-release.md). |
 | Managed update acceptance | On those machines exercise actual Settings update/cancel/recovery and login-specific cases. | Installation acceptance and CI lifecycle fixtures do not close these cases. Use the [machine checklist](native-validation/WINDOWS-UBUNTU-UPDATES.md). |
 | Central telemetry | Validate Windows/Ubuntu sharing and disposable offline/retry/deletion cases. Monitor capacity growth as diagnostics accumulate. | Owner0.9.11 installed/loaded and native sending verified. Quota incident is closed by95436e8 deployment and actual native recovery.1GiB/installation,4GiB total,5GiB physical DB; no automatic deletion. Existing metrics/prompts/raw flags and credentials preserved. Already rejected captures are not backfilled. [Receipt](native-validation/2026-10-12-central-capacity-repair.md). |
 | P510 data recovery | Add Sentinel remote backup/restore integration and verify database plus deletion-intent restoration. | Unsupported in the recorded deployed configuration; owner accepted normal deployment with this limit. This reconciliation does not inspect or modify Sentinel. |

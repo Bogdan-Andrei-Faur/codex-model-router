@@ -9,13 +9,15 @@ El código es visible, con redistribución restringida y la excepción de los fo
 permitidos por GitHub. Consulta [LICENSE](LICENSE) y los
 [avisos de terceros](THIRD_PARTY_NOTICES.md); no es una licencia open source.
 
-Ya puedes descargar los [instaladores 0.9.12 para Mac Apple Silicon y Windows x64](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.12).
-Incluye el runtime y no necesita Git, Python ni compilación local. La actualización
+Ya puedes descargar los [instaladores 0.9.12 para Mac Apple Silicon, Windows x64 y Ubuntu x64](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.12).
+Mac y Windows incluyen el runtime; Ubuntu instala las dependencias con APT.
+No necesitas Git ni compilación local. La actualización
 desde Ajustes en Mac está probada con descarga real de GitHub en una instalación aislada.
 El paquete Mac no tiene firma Developer ID ni notarización de Apple. El instalador
-Windows se descarga manualmente y no tiene firma Authenticode; su entrada en el
-manifiesto de actualización firmado está pendiente. Ubuntu e Intel Mac aún no
-tienen instalador en esta Release; consulta [el estado de distribución](docs/MANAGED-UPDATES.md).
+Windows se descarga manualmente y no tiene firma Authenticode. Windows y Ubuntu
+se instalan manualmente; sus entradas en el manifiesto de actualización firmado
+están pendientes en el Mac. Intel Mac aún no tiene instalador en esta Release;
+consulta [el estado de distribución](docs/MANAGED-UPDATES.md).
 
 Catálogo, tarifas, migración y evidencia de compatibilidad: [modelos 0.6.0](docs/MODEL-CATALOG.md).
 
