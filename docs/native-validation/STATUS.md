@@ -5,6 +5,16 @@ This ledger is repository-owned; no external knowledge/memory service is needed.
 Use [current follow-up](../FOLLOWUP.md) for priorities. Older NOT_RUN rows are
 evidence gaps, not renewed installation prerequisites or known failures.
 
+## Owner Ubuntu0.9.12 active — 2026-10-13
+
+APT0.9.12-1, application4ff237565ee7cf02 and live routera27f4352aeb3b3b1 match.
+One monitor/bridge/connection, no restart or mismatch flags; both processes
+started after installation. Owner-requested cleanup retired two old menu entries
+to recoverable Trash, retaining current Desktop registration, compatibility
+launchers and data. No second installed version found. Installation/bridge
+activation PASS; physical/login, central sharing and production signed update
+remain separate. [Receipt](2026-10-13-ubuntu-0.9.12-activation.md).
+
 ## Ubuntu0.9.12 manual release — 2026-10-13
 
 Public Linux x64 DEB0.9.12-1 (Debian/all), application4ff237565ee7cf02,

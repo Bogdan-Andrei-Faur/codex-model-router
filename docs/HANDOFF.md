@@ -12,6 +12,18 @@ owner-accepted/waived gates and actual remaining work. Older dated sections belo
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
 
+## Owner Ubuntu0.9.12 active — 2026-10-13
+
+Owner completed installation/restart. APT0.9.12-1 and live bridge0.9.12 match
+published application4ff237565ee7cf02/routera27f4352aeb3b3b1. Exactly one monitor
+and one bridge, started after package installation, with one connection and no
+mismatch/unknown/restart flags. Only0.9.12 is installed; two obsolete source menu
+entries were moved to recoverable Trash at the owner's request. Registered
+Desktop/current app entry, compatibility launchers and configuration are intact.
+No app was stopped; archive/build/data backups remain separate. See
+[activation/cleanup receipt](native-validation/2026-10-13-ubuntu-0.9.12-activation.md).
+Physical UI/login, production update signing and central sharing remain separate.
+
 ## Ubuntu0.9.12 published — 2026-10-13
 
 Owner authorized and published the validated Linux x64 DEB into existing stable
