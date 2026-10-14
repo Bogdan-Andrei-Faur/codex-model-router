@@ -5,6 +5,17 @@ This ledger is repository-owned; no external knowledge/memory service is needed.
 Use [current follow-up](../FOLLOWUP.md) for priorities. Older NOT_RUN rows are
 evidence gaps, not renewed installation prerequisites or known failures.
 
+## Latest Ubuntu 0.9.13 manual release — 2026-10-14
+
+Linux x64 DEB0.9.13-1/all from checkout89ca791, runtime/tag4dfc753;
+applicationbdb8851aec31e6c6/router14149085be092bfc.609Python/37skip,34JS,
+17browser groups,27routing cases, exact GTK/WebKit package and isolated native
+signed-fixture helper success/rollback/interrupted replay PASS. Tag CI14/14 PASS.
+Public DEB/provenance/checksum bytes verified; pre-existing Mac assets and signed
+Mac-only manifest unchanged. Owner installation/bridge remain0.9.12; no restart
+or install. Production Ubuntu signing, actual Settings update/login/physical
+acceptance remain separate. [Receipt](2026-10-14-ubuntu-0.9.13-release.md).
+
 ## Latest Mac independent client0.9.13 — 2026-10-13
 
 Signed stable Macarm64 from4dfc753, monitorc2bf3f47727e6582/routerf909942515875555,

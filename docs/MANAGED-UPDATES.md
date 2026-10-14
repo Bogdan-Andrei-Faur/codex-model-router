@@ -1,12 +1,14 @@
-# Authenticated managed updates — 2026-10-13
+# Authenticated managed updates — 2026-10-14
 
-Windows0.9.12 is now available as a public manual installer with verified
+Windows 0.9.12 is now available as a public manual installer with verified
 checksums/provenance; see the [Windows receipt](native-validation/2026-10-13-windows-0.9.12-release.md).
-Ubuntu0.9.12 Linux x64 is also published as a validated manual DEB with per-target
-checksums/provenance; see the [Ubuntu receipt](native-validation/2026-10-13-ubuntu-0.9.12-release.md).
+Ubuntu 0.9.13 Linux x64 is also published as a validated manual DEB with per-target
+checksums/provenance; see the [Ubuntu receipt](native-validation/2026-10-14-ubuntu-0.9.13-release.md).
 The signed manifest still covers Mac only. Adding Windows and Ubuntu requires
-the existing publisher key on the Mac and all three exact published packages;
-no replacement key is created on another computer. The owner's earlier installation
+the existing publisher key on the Mac and exact same-version published packages;
+do not combine the Windows 0.9.12 installer with the 0.9.13 manifest. Windows 0.9.13
+needs its own validated build. No replacement key is created on another computer.
+The owner's earlier installation
 acceptance and clean-Mac waiver remain valid within their stated scope.
 
 ## What is implemented

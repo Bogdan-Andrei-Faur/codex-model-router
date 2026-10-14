@@ -10,8 +10,10 @@
   pendiente. Ajustes distingue qué cuota está bloqueando el envío.
 - Conserva los permisos, credenciales, configuración y datos existentes.
   No recupera muestras que ya se hubieran descartado antes de esta actualización.
-- Entrega firmada para Mac Apple Silicon; los instaladores de esta versión para
-  Windows y Ubuntu requieren sus compilaciones y validaciones nativas.
+- Entrega firmada para Mac Apple Silicon y, desde el 14/10/2026, instalador
+  manual Ubuntu x64 con checksums y procedencia verificados. La firma del
+  actualizador Linux queda pendiente en el Mac. Windows 0.9.13 requiere su
+  compilación y validación nativa; continúa disponible el instalador 0.9.12.
 
 ## 0.9.12 — Ajustes más claros, 12/10/2026
 

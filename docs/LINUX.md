@@ -1,20 +1,20 @@
 # Ubuntu / Linux — instalación y recuperación
 
-## Instalador publicado 0.9.12 — Ubuntu x64
+## Instalador publicado 0.9.13 — Ubuntu x64
 
-Descarga [codex-model-router-0.9.12-linux-x64.deb](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/download/v0.9.12/codex-model-router-0.9.12-linux-x64.deb)
-desde [el release](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.12).
-Instálalo con `sudo apt install ./codex-model-router-0.9.12-linux-x64.deb` y vuelve
+Descarga [codex-model-router-0.9.13-linux-x64.deb](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/download/v0.9.13/codex-model-router-0.9.13-linux-x64.deb)
+desde [el release](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.13).
+Instálalo con `sudo apt install ./codex-model-router-0.9.13-linux-x64.deb` y vuelve
 a abrir el monitor. Si el puente muestra reinicio pendiente, termina tus tareas
 y reinicia Desktop cuando puedas. No hace falta reimportar una raíz de datos ya
 instalada para actualizar el paquete.
 
-Versión Debian `0.9.12-1`; validado en Ubuntu 26.04.1 x64. APT administra Python,
+Versión Debian `0.9.13-1`; validado en Ubuntu 26.04.1 x64. APT administra Python,
 criptografía y GTK/WebKit. El archivo declara arquitectura `all`, pero esta
 publicación no valida ARM. `SHA256SUMS-linux-x64` y
 `build-provenance-linux-x64.json` están junto al instalador. La firma del
 actualizador Ubuntu está pendiente en el Mac; esta entrega es de instalación
-manual. [Pruebas y límites](native-validation/2026-10-13-ubuntu-0.9.12-release.md).
+manual. [Pruebas y límites](native-validation/2026-10-14-ubuntu-0.9.13-release.md).
 
 ## Paquete autónomo `.deb`
 

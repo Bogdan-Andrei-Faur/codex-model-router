@@ -9,7 +9,8 @@ El código es visible, con redistribución restringida y la excepción de los fo
 permitidos por GitHub. Consulta [LICENSE](LICENSE) y los
 [avisos de terceros](THIRD_PARTY_NOTICES.md); no es una licencia open source.
 
-Ya puedes descargar los [instaladores 0.9.12 para Mac Apple Silicon, Windows x64 y Ubuntu x64](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.12).
+Ya puedes descargar los [instaladores 0.9.13 para Mac Apple Silicon y Ubuntu x64](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.13).
+Para Windows x64 sigue disponible el [instalador 0.9.12](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.12).
 Mac y Windows incluyen el runtime; Ubuntu instala las dependencias con APT.
 No necesitas Git ni compilación local. La actualización
 desde Ajustes en Mac está probada con descarga real de GitHub en una instalación aislada.
@@ -42,7 +43,7 @@ Atlas, memoria personal ni el chat original.
 
 ## Versión
 
-El producto usa versiones semánticas. La versión actual es **0.9.12**:
+El producto usa versiones semánticas. La versión actual es **0.9.13**:
 el primer número marca cambios incompatibles, el segundo añade funciones y el
 tercero corrige fallos. La versión visible en **Ajustes → Actualizaciones**
 procede del archivo común `VERSION` en modo repositorio y del sello

@@ -1,4 +1,4 @@
-# Current project handoff — 2026-10-13
+# Current project handoff — 2026-10-14
 
 Canonical project: `codex-model-router`,
 `https://github.com/Bogdan-Andrei-Faur/codex-model-router.git`.
@@ -11,6 +11,19 @@ service is needed. Preserve local work and coordinate disruptive owner actions.
 owner-accepted/waived gates and actual remaining work. Older dated sections below
 retain historical evidence; use the latest matching receipt rather than reviving
 superseded restart, deployment or installation prerequisites.
+
+## Ubuntu 0.9.13 published — 2026-10-14
+
+The existing stable v0.9.13 now includes the manual Linux x64 DEB, per-target
+provenance and checksums. Build checkout89ca791 matches immutable runtime/tag
+4dfc753; Debian0.9.13-1/all, applicationbdb8851aec31e6c6/router14149085be092bfc.
+609Python/37skip,34JS,17browser groups,27routing cases, exact GTK/WebKit package
+and isolated native helper success/rollback/interrupted replay PASS. Tag CI
+38429088204 is now complete14/14 PASS. All three public downloads match local
+bytes; original Mac asset IDs/digests and Mac-only production manifest unchanged.
+Owner Ubuntu0.9.12 installation and Desktop were not changed. Ubuntu signed
+Settings update awaits the existing Mac publisher; Windows0.9.13 delivery remains
+separate. See [receipt and signing handoff](native-validation/2026-10-14-ubuntu-0.9.13-release.md).
 
 ## Published independent client0.9.13 — 2026-10-13
 
