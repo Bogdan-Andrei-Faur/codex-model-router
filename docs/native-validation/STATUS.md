@@ -16,6 +16,16 @@ Mac-only manifest unchanged. Owner installation/bridge remain0.9.12; no restart
 or install. Production Ubuntu signing, actual Settings update/login/physical
 acceptance remain separate. [Receipt](2026-10-14-ubuntu-0.9.13-release.md).
 
+## Windows0.9.13 manual release — 2026-10-14
+
+Exact Windows x64 buildc55e49f6478fbe71/routerf909942515875555 from tag4dfc753
+published with checksum/provenance; all anonymous asset hashes verified.
+609Python/68skip, routing27/27,34JS,17browser groups and exact frozen/native/setup
+lifecycle PASS, including0.9.12 upgrade, import/DPAPI, locked files and rollback.
+Owner installation remains0.9.12. Signed Windows Settings update, actual owner
+activation, physical/login and managed-recovery gates remain separate.
+[Receipt](2026-10-14-windows-0.9.13-release.md).
+
 ## Latest Mac independent client0.9.13 — 2026-10-13
 
 Signed stable Macarm64 from4dfc753, monitorc2bf3f47727e6582/routerf909942515875555,

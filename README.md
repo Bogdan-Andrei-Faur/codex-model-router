@@ -9,8 +9,7 @@ El código es visible, con redistribución restringida y la excepción de los fo
 permitidos por GitHub. Consulta [LICENSE](LICENSE) y los
 [avisos de terceros](THIRD_PARTY_NOTICES.md); no es una licencia open source.
 
-Ya puedes descargar los [instaladores 0.9.13 para Mac Apple Silicon y Ubuntu x64](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.13).
-Para Windows x64 sigue disponible el [instalador 0.9.12](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.12).
+Ya puedes descargar los [instaladores 0.9.13 para Mac Apple Silicon, Windows x64 y Ubuntu x64](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.13).
 Mac y Windows incluyen el runtime; Ubuntu instala las dependencias con APT.
 No necesitas Git ni compilación local. La actualización
 desde Ajustes en Mac está probada con descarga real de GitHub en una instalación aislada.
@@ -158,7 +157,7 @@ títulos, conservan su modelo original. Véase [el alcance y las pruebas](docs/S
 
 ## Windows
 
-Descarga el [instalador Windows x64 0.9.12](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/download/v0.9.12/codex-model-router-0.9.12-windows-x64-setup.exe).
+Descarga el [instalador Windows x64 0.9.13](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/download/v0.9.13/codex-model-router-0.9.13-windows-x64-setup.exe).
 Incluye Python y el monitor: no necesitas Git, compilar ni clonar el repositorio.
 Requiere Windows 10 de 64 bits (build 19041 o posterior) o Windows 11,
 .NET Framework 4.8 y Microsoft Edge WebView2 Runtime. Si falta WebView2,

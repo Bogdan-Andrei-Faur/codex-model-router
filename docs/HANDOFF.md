@@ -22,8 +22,21 @@ and isolated native helper success/rollback/interrupted replay PASS. Tag CI
 38429088204 is now complete14/14 PASS. All three public downloads match local
 bytes; original Mac asset IDs/digests and Mac-only production manifest unchanged.
 Owner Ubuntu0.9.12 installation and Desktop were not changed. Ubuntu signed
-Settings update awaits the existing Mac publisher; Windows0.9.13 delivery remains
-separate. See [receipt and signing handoff](native-validation/2026-10-14-ubuntu-0.9.13-release.md).
+Settings update awaits the existing Mac publisher; Windows0.9.13 is now also
+published with its own native validation receipt. See [receipt and signing handoff](native-validation/2026-10-14-ubuntu-0.9.13-release.md).
+
+## Windows0.9.13 manual release — 2026-10-14
+
+The stable v0.9.13 now includes the Windows x64 installer, its checksum and
+per-target provenance. Exact buildc55e49f6478fbe71/routerf909942515875555 comes
+from immutable4dfc753.609Python/68skip, routing27/27,34JS,17browser groups and
+exact native/frozen/Inno lifecycle PASS, including upgrade0.9.12→0.9.13.
+Public download hashes match. Existing release assets and the Mac-only signed
+manifest remain unchanged. Windows Settings updates still require the existing
+Mac publisher signature; Ubuntu0.9.13 has also been published independently.
+No owner installation/restart or sharing permission changed; this Windows host
+remains0.9.12 until the owner chooses to update. See the
+[Windows release receipt](native-validation/2026-10-14-windows-0.9.13-release.md).
 
 ## Published independent client0.9.13 — 2026-10-13
 

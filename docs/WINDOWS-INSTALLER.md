@@ -1,9 +1,9 @@
-# Windows per-user installer — 0.9.12
+# Windows per-user installer — 0.9.13
 
-Public Windows x64 0.9.12 is available in [GitHub Releases](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.12).
+Public Windows x64 0.9.13 is available in [GitHub Releases](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.13).
 Use its manual setup and `.exe.sha256`; no Authenticode signature is claimed.
 Signed Settings updates await inclusion by the existing publisher key on the Mac.
-See the [exact artifact/validation receipt](native-validation/2026-10-13-windows-0.9.12-release.md).
+See the [exact artifact/validation receipt](native-validation/2026-10-14-windows-0.9.13-release.md).
 Historical version-specific corrections below retain their original scope.
 
 

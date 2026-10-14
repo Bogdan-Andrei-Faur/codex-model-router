@@ -2,8 +2,8 @@
 
 ## Descargar e instalar
 
-La [release 0.9.12](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.12)
-incluye el [instalador Windows x64](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/download/v0.9.12/codex-model-router-0.9.12-windows-x64-setup.exe).
+La [release 0.9.13](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/tag/v0.9.13)
+incluye el [instalador Windows x64](https://github.com/Bogdan-Andrei-Faur/codex-model-router/releases/download/v0.9.13/codex-model-router-0.9.13-windows-x64-setup.exe).
 Incluye Python y el monitor nativo; no necesitas herramientas de desarrollo ni
 una copia del repositorio. Se instala para el usuario actual.
 
@@ -14,7 +14,7 @@ La conexión con Codex requiere tener Desktop instalado.
 
 1. Termina las tareas y cierra Desktop por completo. Si tienes un monitor anterior,
    usa su icono de bandeja → **Salir**; ocultarlo no libera la instalación.
-2. Ejecuta `codex-model-router-0.9.12-windows-x64-setup.exe` y sigue el asistente.
+2. Ejecuta `codex-model-router-0.9.13-windows-x64-setup.exe` y sigue el asistente.
    La instalación por usuario no requiere permisos de administrador.
 3. Abre **Codex Model Router** al terminar o desde el menú Inicio.
 
@@ -23,7 +23,7 @@ El instalador no tiene firma Authenticode. El release incluye el archivo
 PowerShell desde la carpeta donde descargaste el archivo:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 .\codex-model-router-0.9.12-windows-x64-setup.exe
+Get-FileHash -Algorithm SHA256 .\codex-model-router-0.9.13-windows-x64-setup.exe
 ```
 
 ## Primera apertura e importación
